@@ -1,6 +1,6 @@
-# WopalSpace ontology — 能力本体上游
+# WopalSpace ontology — 本体能力锻造层
 
-> **定位**：WopalSpace 的 Agent 能力定义上游仓库（`wopal-cn/ontology`）。本仓库是通用能力基座，PR 目标。**活跃开发在 Fork（`sampx/wopal-space-ontology`）的 `.wopal/` worktree 中进行，不直接编辑本仓库。**
+> **定位**：WopalSpace 的 Agent 能力研发中心。
 
 ---
 
@@ -114,25 +114,22 @@ description: |
 
 ## 资源层次与归属
 
-> **注意**：本仓库是上游引用，活跃开发在 Fork `.wopal/` worktree。以下结构描述的是 upstream 源码树的组织方式。
-
 ### 源码结构
 
+> `.wopal/` 是 `sampx/wopal-space-ontology`（`wopal-cn/ontology` 的 fork）的 git worktree，直接编辑即生效。
+
 ```
-ontology/                   # upstream wopal-cn/ontology
-├── skills/                 # 所有技能统一存放
-├── commands/               # 命令定义
-│   ├── *.md                # 共享命令
-│   └── wopal/              # Wopal 专属命令
-├── rules/                  # 规则定义
-│   ├── *.md                # 共享规则  
-│   └── wopal/              # Wopal 专属规则
-├── agents/                 # Agent 灵魂定义
-│   ├── wopal.md
-│   ├── wopal-cn.md
-│   ├── fae.md
-│   └── fae-cn.md
-└── wopal-plugin/           # 空间唯一插件
+.wopal/
+├── skills/              # 所有技能统一存放
+├── commands/            # 命令定义（Agent 通过 permission 控制可见性）
+│   ├── *.md             # 共享命令
+│   └── wopal/           # Wopal 专属命令
+├── rules/               # 规则定义
+│   ├── *.md             # 共享规则
+│   └── wopal/           # Wopal 专属规则
+├── agents/              # Agent 灵魂定义（wopal.md, wopal-cn.md, fae.md, fae-cn.md）
+├── wopal-plugin/        # 空间唯一插件（规则注入、任务委派、记忆、上下文管理）
+└── config/              # 空间本地配置（不提交到 git）
 ```
 
 ### Agent 技能权限
