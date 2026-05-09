@@ -185,6 +185,45 @@ export class SimpleTaskManager {
     return interruptTask(this.getLifecycleDeps(), id, parentSessionID)
   }
 
+  async closeTask(taskId: string, parentSessionID: string): Promise<{ ok: boolean; message: string }> {
+    const { tasks, sessionToTask, client, debugLog, releaseConcurrencySlot } = this.getLifecycleDeps()
+
+    const task = this.getTaskForParent(taskId, parentSessionID)
+    if (!task) {
+      return { ok: false, message: "Task not found or not owned by this session" }
+    }
+
+    if (task.status === 'running') {
+      return { ok: false, message: "Task is still running. Please verify completion before deleting (use wopal_task_output to check status)." }
+    }
+
+    // Delete the child session via OpenCode API
+    if (task.sessionID && client.session?.delete) {
+      try {
+        const result = await client.session.delete({ path: { id: task.sessionID } })
+        if (result.error) {
+          debugLog(`[closeTask] session.delete error for taskId=${taskId}: ${String(result.error).substring(0, 200)}`)
+          return { ok: false, message: `Failed to delete session: ${String(result.error)}` }
+        }
+      } catch (err) {
+        debugLog(`[closeTask] session.delete exception for taskId=${taskId}: ${String(err).substring(0, 200)}`)
+        return { ok: false, message: `Failed to delete session: ${String(err)}` }
+      }
+    }
+
+    // Remove from maps
+    tasks.delete(taskId)
+    if (task.sessionID) {
+      sessionToTask.delete(task.sessionID)
+    }
+
+    // Release concurrency slot if applicable
+    releaseConcurrencySlot(task)
+
+    debugLog(`[closeTask] taskId=${taskId} deleted successfully`)
+    return { ok: true, message: "Task deleted successfully. Session removed from OpenCode." }
+  }
+
   async notifyParent(taskId: string): Promise<void> {
     const task = this.tasks.get(taskId)
     if (!task) return

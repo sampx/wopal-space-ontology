@@ -15,6 +15,7 @@ export interface TaskLifecycleDeps {
   client: {
     session?: {
       abort?: (args: { path: { id: string } }) => Promise<void>
+      delete?: (args: { path: { id: string } }) => Promise<{ data?: boolean; error?: unknown }>
     }
   }
   debugLog: DebugLog
