@@ -1,6 +1,6 @@
 import type { WopalTask } from "../types.js"
 import type { DebugLog } from "../debug.js"
-import { toErrorMessage } from "./task-launcher.js"
+import { toErrorMessage } from "./utils.js"
 
 export interface TaskNotifierDeps {
   client: {

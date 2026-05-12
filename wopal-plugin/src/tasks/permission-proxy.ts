@@ -1,5 +1,6 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
 import { createDebugLog, createWarnLog, type DebugLog } from "../debug.js"
+import { toErrorMessage } from "./utils.js"
 
 const defaultDebugLog = createDebugLog("[wopal-task]", "task")
 const defaultWarnLog = createWarnLog("[wopal-task]")
@@ -130,22 +131,4 @@ Permission was auto-approved for this background task.
     // 捕获异常，不传播
     log(`[permission] notify parent failed for task ${taskId}: ${toErrorMessage(err)}`)
   }
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-  if (typeof error === "string" && error.length > 0) {
-    return error
-  }
-  try {
-    const serialized = JSON.stringify(error)
-    if (serialized && serialized !== "{}") {
-      return serialized
-    }
-  } catch {
-    // Ignore JSON serialization failures
-  }
-  return String(error)
 }

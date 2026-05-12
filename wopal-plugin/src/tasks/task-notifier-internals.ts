@@ -1,6 +1,6 @@
 import type { WopalTask } from "../types.js"
 import type { DebugLog } from "../debug.js"
-import { toErrorMessage } from "./task-launcher.js"
+import { toErrorMessage } from "./utils.js"
 import { CONTEXT_WARN_THRESHOLD } from "./task-monitor.js"
 
 export interface SendProgressDeps {
