@@ -22,7 +22,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, _find_workspace_root
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
+from dev_flow.core.status import update_plan_status
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue
 from dev_flow.domain.plan.metadata import (
     get_plan_field,
     get_plan_issue,
@@ -46,63 +49,8 @@ from dev_flow.domain.issue.sync import (
 
 
 # ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str, file=None) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=file or sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-# ============================================
 # Helpers
 # ============================================
-
-def _resolve_repo(repo: str = None) -> str:
-    """Resolve repository name (owner/repo format)."""
-    if repo:
-        return repo
-    try:
-        result = subprocess.run(
-            ['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-            capture_output=True, text=True, check=True
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
-
-
-def _update_plan_status(plan_path: str, new_status: str) -> bool:
-    """
-    Update Plan status field in metadata section.
-    """
-    import re
-    path = Path(plan_path)
-    if not path.exists():
-        return False
-
-    content = path.read_text()
-    pattern = r'^\- \*\*Status\*\*:\s*\w+'
-    new_line = f'- **Status**: {new_status}'
-    new_content = re.sub(pattern, new_line, content, count=1, flags=re.MULTILINE)
-
-    if new_content == content:
-        log_warn("Status field not found or unchanged")
-        return False
-
-    path.write_text(new_content)
-    return True
 
 
 def _create_pr(issue_number: int, project: str, base: str = "main") -> str:
@@ -240,7 +188,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
         log_error("Usage: flow.sh complete <issue-or-plan> [--pr]")
         return 1
 
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
 
     # 1. Find Plan file (smart lookup: Issue number or plan name)
     try:
@@ -305,8 +253,13 @@ def cmd_complete(args: argparse.Namespace) -> int:
         log_error(f"After completing, run: flow.sh complete {input_ref}")
         return 1
 
-    # 6. Resolve repo for Issue sync
-    repo = _resolve_repo()
+    # 6. Resolve repo lazily for Issue sync
+    repo = ""
+    if plan_issue:
+        try:
+            repo = detect_space_repo(workspace_root)
+        except RuntimeError as e:
+            log_warn(f"Cannot determine space repo, skipping Issue sync: {e}")
 
     # Extract Target Project from Plan
     project = get_plan_project(plan_path)
@@ -336,7 +289,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
             log_success(f"PR created: {pr_url}")
 
             # State transition
-            if _update_plan_status(plan_path, target_status):
+            if update_plan_status(plan_path, target_status):
                 log_success(f"Plan status updated: {target_status}")
             else:
                 log_error("Failed to update Plan status")
@@ -362,7 +315,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
             log_success(f"PR created: {pr_url}")
 
             # State transition
-            if _update_plan_status(plan_path, target_status):
+            if update_plan_status(plan_path, target_status):
                 log_success(f"Plan status updated: {target_status}")
             else:
                 log_error("Failed to update Plan status")
@@ -386,7 +339,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
 
     else:
         # Without PR path: state transition + sync
-        if _update_plan_status(plan_path, target_status):
+        if update_plan_status(plan_path, target_status):
             log_success(f"Plan status updated: {target_status}")
         else:
             log_error("Failed to update Plan status")

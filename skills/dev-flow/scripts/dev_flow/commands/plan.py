@@ -39,50 +39,20 @@ import re
 from pathlib import Path
 from datetime import date
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name, _find_workspace_root
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name
 from dev_flow.domain.plan.naming import make_plan_name, validate_plan_name, ValidationError
 from dev_flow.domain.plan.metadata import get_plan_status
 from dev_flow.domain.issue.title import extract_scope, extract_type
 from dev_flow.domain.labels import normalize_plan_type
 from dev_flow.domain.workflow import PLAN_STATES
 from dev_flow.domain.validation import check_doc_plan
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # Helpers
 # ============================================
-
-def _get_space_repo() -> str:
-    """Get space repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure gh CLI is configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def _get_issue_info(issue_number: int, repo: str) -> dict:
@@ -305,8 +275,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
     deep_mode = args.deep
     check_only = args.check
     
-    workspace_root = _find_workspace_root()
-    repo = _get_space_repo()
+    workspace_root = find_workspace_root()
+    repo = detect_space_repo(workspace_root)
     
     # Resolve input_ref: digits → issue_number, string → plan name for check mode
     if input_ref and re.match(r'^\d+$', input_ref):

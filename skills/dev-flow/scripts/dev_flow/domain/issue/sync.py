@@ -16,31 +16,6 @@ from dev_flow.domain.labels import plan_type_to_issue_label
 from dev_flow.domain.plan.metadata import get_plan_project, get_plan_type
 
 
-def _resolve_repo(repo: str = None) -> str:
-    """Resolve repository name.
-    
-    Args:
-        repo: Optional explicit repo (owner/repo format)
-        
-    Returns:
-        Repository name in owner/repo format
-    """
-    if repo:
-        return repo
-    
-    # Try to get from gh CLI
-    try:
-        result = subprocess.run(
-            ['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
-
-
 def _get_issue_labels(issue_number: int, repo: str) -> list:
     """Get current labels for an issue.
     
@@ -85,7 +60,7 @@ def plan_status_to_issue_label(status: str) -> str:
     return label_map.get(status, "")
 
 
-def sync_status_label(issue_number: int, status: str, repo: str = None) -> None:
+def sync_status_label(issue_number: int, status: str, repo: str) -> None:
     """Sync Issue status label based on plan status.
     
     Uses batch sync to ensure only one status label is active.
@@ -93,9 +68,8 @@ def sync_status_label(issue_number: int, status: str, repo: str = None) -> None:
     Args:
         issue_number: Issue number
         status: Plan status (planning, executing, verifying)
-        repo: Repository in owner/repo format
+        repo: Repository in owner/repo format (REQUIRED)
     """
-    repo = _resolve_repo(repo)
     if not repo:
         return
     
@@ -129,7 +103,7 @@ def sync_status_label(issue_number: int, status: str, repo: str = None) -> None:
     subprocess.run(args, capture_output=True)
 
 
-def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str = None, workspace_root: str = None) -> None:
+def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str, workspace_root: str = None) -> None:
     """Sync approved plan content to Issue body.
     
     Updates Issue body with plan content (Goal, Scope, AC, etc.)
@@ -137,10 +111,9 @@ def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str = None,
     Args:
         issue_number: Issue number
         plan_file: Path to plan file
-        repo: Repository in owner/repo format
+        repo: Repository in owner/repo format (REQUIRED)
         workspace_root: Workspace root path
     """
-    repo = _resolve_repo(repo)
     if not repo:
         return
     
@@ -255,7 +228,7 @@ def plan_project_to_issue_label(project: str) -> str:
     return ""
 
 
-def ensure_issue_labels(issue_number: int, plan_file: str, repo: str = None) -> None:
+def ensure_issue_labels(issue_number: int, plan_file: str, repo: str) -> None:
     """Ensure Issue has correct labels based on Plan metadata.
     
     Syncs status, type, and project labels.
@@ -263,9 +236,8 @@ def ensure_issue_labels(issue_number: int, plan_file: str, repo: str = None) -> 
     Args:
         issue_number: Issue number
         plan_file: Path to plan file
-        repo: Repository in owner/repo format
+        repo: Repository in owner/repo format (REQUIRED)
     """
-    repo = _resolve_repo(repo)
     if not repo:
         return
     

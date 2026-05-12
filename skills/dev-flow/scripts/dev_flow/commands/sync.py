@@ -18,50 +18,20 @@ import os
 import re
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan_by_issue, _find_workspace_root
+from dev_flow.domain.plan.find import find_plan_by_issue
 from dev_flow.domain.issue.link import build_repo_blob_url
 from dev_flow.domain.labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
     ValidationError,
 )
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+from dev_flow.core.logging import log_info, log_success, log_warn, log_error
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def get_issue_info(issue_number: str, repo: str) -> dict:
@@ -613,7 +583,7 @@ def find_plan(input: str) -> str:
         return find_plan_by_issue(int(input))
     
     # String input → search all plan directories
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
     search_dir = Path(workspace_root) / "docs" / "products"
     
     if not search_dir.exists():
@@ -682,7 +652,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         log_error(f"Plan has no linked Issue: {plan_file}")
         return 1
     
-    repo = get_space_repo()
+    repo = detect_space_repo(find_workspace_root())
     
     # Sync body (unless labels_only)
     if not labels_only:

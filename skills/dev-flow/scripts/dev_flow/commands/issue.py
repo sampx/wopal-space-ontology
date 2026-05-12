@@ -26,39 +26,13 @@ from dev_flow.domain.labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
 )
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+from dev_flow.core.logging import log_info, log_success, log_error
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def ensure_label_exists(label: str, repo: str) -> None:
@@ -388,7 +362,7 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         body = build_structured_issue_body(**body_kwargs)
     
     # Get repo and ensure labels
-    repo = get_space_repo()
+    repo = detect_space_repo(find_workspace_root())
     ensure_flow_labels_exist(repo)
     ensure_label_exists(type_label, repo)
     ensure_label_exists(f"project/{project}", repo)
@@ -435,7 +409,7 @@ def cmd_issue_update(args: argparse.Namespace) -> int:
         log_error("Missing issue number")
         return 1
     
-    repo = get_space_repo()
+    repo = detect_space_repo(find_workspace_root())
     
     # Get current issue info
     issue_info = get_issue_info(issue_number, repo)

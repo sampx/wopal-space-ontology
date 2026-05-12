@@ -32,7 +32,10 @@ import sys
 import re
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name, _find_workspace_root
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn, log_step
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
+from dev_flow.core.status import update_plan_status
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name
 from dev_flow.domain.plan.metadata import get_plan_project, get_plan_issue, get_plan_status, set_plan_worktree
 from dev_flow.domain.plan.naming import validate_plan_name
 from dev_flow.domain.workflow import parse_plan_status, is_valid_transition
@@ -51,45 +54,8 @@ from dev_flow.infra.git import (
 
 
 # ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_step(msg: str) -> None:
-    print(f"\033[0;36m[STEP]\033[0m {msg}")
-
-
-# ============================================
 # Helpers
 # ============================================
-
-def _get_space_repo() -> str:
-    """Get space repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure gh CLI is configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
-
 
 def _find_project_path(project: str, workspace_root: Path) -> Path | None:
     """
@@ -324,45 +290,6 @@ def _create_worktree(project: str, branch: str, workspace_root: Path) -> bool:
 
 
 # ============================================
-# Update Plan Status
-# ============================================
-
-def update_plan_status(plan_path: str, new_status: str) -> bool:
-    """
-    Update Plan file status line.
-    
-    Args:
-        plan_path: Path to Plan markdown file
-        new_status: New status value (e.g., "executing")
-        
-    Returns:
-        True if updated successfully
-    """
-    path = Path(plan_path)
-    if not path.exists():
-        log_error(f"Plan file not found: {plan_path}")
-        return False
-    
-    content = path.read_text()
-    
-    # Update status line: - **Status**: planning -> - **Status**: executing
-    new_content = re.sub(
-        r'^\- \*\*Status\*\*:\s*\w+',
-        f'- **Status**: {new_status}',
-        content,
-        count=1,
-        flags=re.MULTILINE
-    )
-    
-    if new_content == content:
-        log_error("Failed to update status line in Plan file")
-        return False
-    
-    path.write_text(new_content)
-    return True
-
-
-# ============================================
 # approve command
 # ============================================
 
@@ -386,7 +313,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
         log_error("Usage: flow.sh approve <issue-or-plan> [--confirm] [--worktree]")
         return 1
     
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
     
     # 1. Smart lookup: Issue number OR Plan name
     try:
@@ -448,7 +375,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # --confirm mode: preflight checks + state transition
     # ============================================
     
-    repo = _get_space_repo()
+    repo = detect_space_repo(workspace_root)
     project = get_plan_project(plan_path)
     
     # --- Preflight Check 1: Target Project dirty workspace ---

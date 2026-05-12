@@ -11,47 +11,16 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 
-from dev_flow.domain.plan.find import find_plan, _find_workspace_root
+from dev_flow.domain.plan.find import find_plan
 from dev_flow.domain.workflow import plan_status_to_issue_label
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+from dev_flow.core.logging import log_info, log_success, log_warn, log_error
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def sync_status_label_group(issue_number: str, label: str, repo: str) -> None:
@@ -161,10 +130,10 @@ def cmd_reset(args: argparse.Namespace) -> int:
         print("Usage: flow.sh reset <issue-or-plan>")
         return 1
     
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
     
     try:
-        plan_file = find_plan(input_ref, workspace_root)
+        plan_file = find_plan(input_ref, str(workspace_root))
     except FileNotFoundError:
         log_error(f"No plan found for: {input_ref}")
         return 1
@@ -184,7 +153,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
     
     if issue_number:
         try:
-            repo = get_space_repo()
+            repo = detect_space_repo(find_workspace_root())
             sync_status_label_group(issue_number, "status/planning", repo)
             log_info(f"Issue #{issue_number} label reset to status/planning")
             

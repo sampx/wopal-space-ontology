@@ -12,50 +12,14 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 
-from dev_flow.domain.plan.find import _find_workspace_root
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_step(msg: str) -> None:
-    print(f"\033[0;36m[STEP]\033[0m {msg}")
+from dev_flow.core.logging import log_info, log_success, log_warn, log_error, log_step
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def create_phase_issue(phase_num: str, phase_title: str, project: str, prd_path: str) -> str | None:
@@ -87,7 +51,7 @@ def create_phase_issue(phase_num: str, phase_title: str, project: str, prd_path:
     issue_title = f"[Phase {phase_num}] {phase_title}"
     
     try:
-        repo = get_space_repo()
+        repo = detect_space_repo(find_workspace_root())
     except RuntimeError:
         log_error("Cannot get repo info for Issue creation")
         return None
@@ -183,8 +147,8 @@ def cmd_decompose(args: argparse.Namespace) -> int:
         print("Usage: flow.sh decompose-prd <prd-path> [--dry-run] [--project <name>]")
         return 1
     
-    workspace_root = _find_workspace_root()
-    full_prd_path = os.path.join(workspace_root, prd_path)
+    workspace_root = find_workspace_root()
+    full_prd_path = os.path.join(str(workspace_root), prd_path)
     
     if not os.path.isfile(full_prd_path):
         log_error(f"PRD file not found: {full_prd_path}")
