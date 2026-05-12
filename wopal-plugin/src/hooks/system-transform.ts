@@ -9,7 +9,8 @@ import type { SessionStore } from "../session-store.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { SystemPromptMetadata } from "../types.js";
-import { createDebugLog, isDebugEnabled } from "../debug.js";
+import type { MessageWithInfo } from "./message-context.js";
+import { createDebugLog } from "../debug.js";
 import type { Model } from "@opencode-ai/sdk";
 
 const ctxDebugLog = createDebugLog("[wopal-context]", "context");
@@ -47,6 +48,7 @@ export interface SystemTransformHookContext {
   systemSnapshots?: Map<string, string[]>;
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
+  transformedMessagesMap?: Map<string, MessageWithInfo[]>;
 }
 
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
@@ -96,16 +98,6 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
 
     // Record initial length before plugin injections
     const initialSystemLength = output.system.length;
-
-    const skillsToReload = sessionID
-      ? ctx.sessionStore.consumeSkillReload(sessionID)
-      : null;
-    if (skillsToReload) {
-      output.system.push(
-        `[系统提醒] 上下文已被压缩，之前加载的技能 [${skillsToReload.join(", ")}] 内容已丢失。` +
-          `请重新加载这些技能以恢复完整的指令和工具链。`,
-      );
-    }
 
     // Rule injection
     const contextPaths = sessionState
@@ -157,7 +149,8 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
         filenamePrefix: "AUTO-CTXDUMP",
         systemSnapshots: ctx.systemSnapshots ?? new Map(),
         systemMetadataMap: ctx.systemMetadataMap ?? new Map(),
-        systemInjectionsMap: ctx.systemInjectionsMap,
+        systemInjectionsMap: ctx.systemInjectionsMap ?? new Map(),
+        transformedMessagesMap: ctx.transformedMessagesMap ?? new Map(),
         client: ctx.client,
         detail: false,
       }).catch(err => ctx.debugLog(`[auto-dump] error: ${err}`));

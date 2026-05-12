@@ -13,6 +13,7 @@ export interface MessageHookContext {
   sessionStore: SessionStore;
   debugLog: DebugLog;
   projectDirectory: string;
+  transformedMessagesMap: Map<string, MessageWithInfo[]>;
 }
 
 export function createMessageHooks(ctx: MessageHookContext) {
@@ -27,45 +28,83 @@ export function createMessageHooks(ctx: MessageHookContext) {
     }
 
     const existingState = ctx.sessionStore.get(sessionID);
-    if (existingState && existingState.seededFromHistory) {
+    const shouldSeed = !existingState?.seededFromHistory;
+
+    if (shouldSeed) {
+      const contextPaths = extractFilePathsFromMessages(
+        toExtractableMessages(output.messages),
+      );
+      const userPrompt = extractLatestUserPrompt(output.messages);
+
+      // Store recent messages for context enrichment (last N messages)
+      const recentMessages = output.messages.slice(-MAX_RECENT_MESSAGES);
+
+      ctx.sessionStore.upsert(sessionID, (state) => {
+        for (const p of contextPaths) {
+          state.contextPaths.add(normalizeContextPath(p, ctx.projectDirectory));
+        }
+        if (userPrompt && !state.lastUserPrompt) {
+          state.lastUserPrompt = userPrompt;
+        }
+        state.needsMemoryInjection = true;
+        state.seededFromHistory = true;
+        state.seedCount = (state.seedCount ?? 0) + 1;
+        state.recentMessages = recentMessages;
+      });
+
+      if (contextPaths.length > 0) {
+        ctx.debugLog(
+          `Seeded ${contextPaths.length} context path(s) for session ${sessionID}: ${contextPaths
+            .slice(0, 5)
+            .join(", ")}${contextPaths.length > 5 ? "..." : ""}`,
+        );
+      }
+
+      if (userPrompt) {
+        ctx.debugLog(
+          `Seeded user prompt for session ${sessionID} (len=${userPrompt.length})`,
+        );
+      }
+    } else {
       ctx.debugLog(`Session ${sessionID} already seeded, skipping rescan`);
-      return output;
     }
 
-    const contextPaths = extractFilePathsFromMessages(
-      toExtractableMessages(output.messages),
-    );
-    const userPrompt = extractLatestUserPrompt(output.messages);
-
-    // Store recent messages for context enrichment (last N messages)
-    const recentMessages = output.messages.slice(-MAX_RECENT_MESSAGES);
-
-    ctx.sessionStore.upsert(sessionID, (state) => {
-      for (const p of contextPaths) {
-        state.contextPaths.add(normalizeContextPath(p, ctx.projectDirectory));
+    // Skill Reload injection: find last user message first, then consume
+    let lastUserMsg: MessageWithInfo | undefined;
+    for (let i = output.messages.length - 1; i >= 0; i--) {
+      const message = output.messages[i];
+      const role = message.info?.role ?? message.role;
+      if (role === "user") {
+        lastUserMsg = message;
+        break;
       }
-      if (userPrompt && !state.lastUserPrompt) {
-        state.lastUserPrompt = userPrompt;
+    }
+
+    if (lastUserMsg) {
+      const skillsToReload = ctx.sessionStore.consumeSkillReload(sessionID);
+      if (skillsToReload && skillsToReload.length > 0) {
+        const reminderText = [
+          "<system-reminder>",
+          `上下文已被压缩，之前加载的技能 [${skillsToReload.join(", ")}] 内容已丢失。`,
+          "请重新加载这些技能以恢复完整的指令和工具链。",
+          "</system-reminder>",
+        ].join("\n");
+
+        lastUserMsg.parts ??= [];
+        lastUserMsg.parts.push({
+          type: "text",
+          text: reminderText,
+          synthetic: true,
+        });
+
+        ctx.debugLog(
+          `Injected Skill Reload for session ${sessionID}: ${skillsToReload.join(", ")}`,
+        );
       }
-      state.needsMemoryInjection = true;
-      state.seededFromHistory = true;
-      state.seedCount = (state.seedCount ?? 0) + 1;
-      state.recentMessages = recentMessages;
-    });
-
-    if (contextPaths.length > 0) {
-      ctx.debugLog(
-        `Seeded ${contextPaths.length} context path(s) for session ${sessionID}: ${contextPaths
-          .slice(0, 5)
-          .join(", ")}${contextPaths.length > 5 ? "..." : ""}`,
-      );
     }
 
-    if (userPrompt) {
-      ctx.debugLog(
-        `Seeded user prompt for session ${sessionID} (len=${userPrompt.length})`,
-      );
-    }
+    // Store transformed messages for auto dump
+    ctx.transformedMessagesMap.set(sessionID, output.messages);
 
     return output;
   }

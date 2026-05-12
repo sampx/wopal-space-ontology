@@ -4,6 +4,7 @@ import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DiscoveredRule } from "../rules/index.js";
 import type { SystemPromptMetadata } from "../types.js";
+import type { MessageWithInfo } from "./message-context.js";
 import { createCommandHooks } from "./command-hooks.js";
 import { createMessageHooks } from "./message-hooks.js";
 import { createSystemTransformHooks } from "./system-transform.js";
@@ -64,6 +65,9 @@ export function createHookContext(opts: HookContextOptions): HookContext {
 }
 
 export function createAllHooks(ctx: HookContext): Record<string, unknown> {
+  // Shared map for transformed messages (contains synthetic parts)
+  const transformedMessagesMap = new Map<string, MessageWithInfo[]>();
+
   const commandHooks = createCommandHooks({
     sessionStore: ctx.sessionStore,
     debugLog: ctx.debugLog,
@@ -74,6 +78,7 @@ export function createAllHooks(ctx: HookContext): Record<string, unknown> {
     sessionStore: ctx.sessionStore,
     debugLog: ctx.debugLog,
     projectDirectory: ctx.projectDirectory,
+    transformedMessagesMap,
   });
 
   const systemTransformHooks = createSystemTransformHooks({
@@ -91,6 +96,7 @@ export function createAllHooks(ctx: HookContext): Record<string, unknown> {
     systemSnapshots: ctx.systemSnapshots,
     systemMetadataMap: ctx.systemMetadataMap,
     systemInjectionsMap: ctx.systemInjectionsMap,
+    transformedMessagesMap,
   });
 
   const eventRouter = createEventRouter({

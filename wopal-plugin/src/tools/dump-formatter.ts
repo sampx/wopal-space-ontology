@@ -1,9 +1,27 @@
-import type { SessionMessage, SystemPromptMetadata } from "../types.js";
+import type { SessionMessage, SystemPromptMetadata, SystemPromptSection, SystemPromptSectionKind } from "../types.js";
+import type { MessageWithInfo } from "../hooks/message-context.js";
 import { createDebugLog } from "../debug.js";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 const debugLog = createDebugLog("[wopal-context]", "context");
+
+// Compatible message type for dump formatter
+type DumpMessage = SessionMessage | MessageWithInfo;
+
+function getDumpMessageRole(msg: DumpMessage): string {
+  const directRole = "role" in msg ? msg.role : undefined;
+  return msg.info?.role ?? directRole ?? "unknown";
+}
+
+function getDumpMessageTime(
+  msg: DumpMessage,
+): string | { created?: number } | undefined {
+  const info = msg.info;
+  if (!info) return undefined;
+  if ("time" in info) return info.time;
+  return undefined;
+}
 
 export function localTimestamp(date: Date = new Date()): string {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -230,8 +248,8 @@ function filterPreCompaction(messages: SessionMessage[]): SessionMessage[] {
   return messages.slice(lastCompactionIdx);
 }
 
-export function formatMessagesForDump(messages: SessionMessage[], detail = false): string {
-  const filtered = filterPreCompaction(messages);
+export function formatMessagesForDump(messages: DumpMessage[], detail = false): string {
+  const filtered = filterPreCompaction(messages as SessionMessage[]);
   const lines: string[] = [];
   if (filtered.length < messages.length) {
     const dropped = messages.length - filtered.length;
@@ -246,10 +264,10 @@ export function formatMessagesForDump(messages: SessionMessage[], detail = false
       continue;
     }
 
-    const role = msg.info?.role ?? "unknown";
+    const role = getDumpMessageRole(msg);
     lines.push(`### ROLE: [${role.toUpperCase()}]`);
 
-    const time = msg.info?.time;
+    const time = getDumpMessageTime(msg);
     if (time) {
       const timeStr =
         typeof time === "string"
@@ -317,7 +335,12 @@ function parseRawBlocks(blocks: string[]): SystemPromptMetadata {
   function flush(): void {
     const content = currentLines.join("\n").trim();
     if (content && currentKind) {
-      sections.push({ kind: currentKind as SystemPromptSectionKind, content, source: currentSource });
+      const section: SystemPromptSection = {
+        kind: currentKind as SystemPromptSectionKind,
+        content,
+      };
+      if (currentSource) section.source = currentSource;
+      sections.push(section);
     }
     currentLines = [];
     currentSource = undefined;
@@ -508,6 +531,7 @@ export interface ContextDumpOptions {
   systemSnapshots: Map<string, string[]>;
   systemMetadataMap: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
+  transformedMessagesMap?: Map<string, MessageWithInfo[]>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client: any;
   detail: boolean;
@@ -531,6 +555,7 @@ export async function writeContextDump(options: ContextDumpOptions): Promise<Con
     systemSnapshots,
     systemMetadataMap,
     systemInjectionsMap,
+    transformedMessagesMap,
     client,
     detail,
     title,
@@ -612,14 +637,22 @@ export async function writeContextDump(options: ContextDumpOptions): Promise<Con
   lines.push("");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let messages: any[] = [];
-  try {
-    if (client && typeof client?.session?.messages === "function") {
-      const result = await client.session.messages({ path: { id: sessionID } });
-      messages = result?.data ?? [];
+  let messages: DumpMessage[] = [];
+
+  // Priority: use transformedMessagesMap (contains synthetic parts)
+  const transformed = transformedMessagesMap?.get(sessionID);
+  if (transformed && transformed.length > 0) {
+    messages = transformed;
+  } else {
+    // Fallback: load from DB
+    try {
+      if (client && typeof client?.session?.messages === "function") {
+        const result = await client.session.messages({ path: { id: sessionID } });
+        messages = result?.data ?? [];
+      }
+    } catch {
+      // Graceful degradation
     }
-  } catch {
-    // Graceful degradation
   }
 
   if (messages.length > 0) {
