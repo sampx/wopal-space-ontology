@@ -277,6 +277,7 @@ export class SimpleTaskManager {
       const result = await this.client.session.children({ path: { id: parentSessionID } })
       this.debugLog(`[recover] raw result keys: ${Object.keys(result ?? {}).join(', ')}`)
       const children = result?.data ?? result ?? []
+      this.debugLog(`[recover] children array length: ${Array.isArray(children) ? children.length : 'not array'}`)
       if (!Array.isArray(children)) {
         this.debugLog(`[recover] skipped: children is not an array, type=${typeof children}`)
         return

@@ -498,14 +498,16 @@ bun run format:check      # Prettier 检查
 
 ### 调试日志
 
+**实际日志位置**：`logs/wopal-plugins-debug.log`（工作空间根目录下）
+
 ```bash
 WOPAL_PLUGIN_DEBUG=1       # 启用所有模块
 WOPAL_PLUGIN_DEBUG=task    # 仅任务模块
 WOPAL_PLUGIN_DEBUG=memory  # 仅记忆模块
-WOPAL_PLUGIN_LOG_FILE=logs/debug.log  # 指定日志文件
+WOPAL_PLUGIN_LOG_FILE=path/to/file.log  # 自定义日志文件
 ```
 
-默认日志位置：`tmpdir()/wopal-plugin.log`
+默认日志位置：`tmpdir()/wopal-plugin.log`（未配置时）
 
 ### 规则注入开关
 

@@ -63,8 +63,10 @@ describe("SimpleTaskManager", () => {
       expect(result.taskId).toBe("wopal-task-child-session-1")
 
       expect(mockClient.session.create).toHaveBeenCalledWith({
-        parentID: "parent-1",
-        title: "Test task",
+        body: {
+          parentID: "parent-1",
+          title: "Test task",
+        },
       })
       expect(mockClient.session.promptAsync).toHaveBeenCalledWith({
         path: { id: "ses_child-session-1" },

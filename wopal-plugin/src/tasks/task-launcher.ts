@@ -18,7 +18,7 @@ export interface TaskLauncherDeps {
   tasks: Map<string, WopalTask>
   client: {
     session?: {
-      create?: (args: { parentID: string; title: string }) => Promise<{
+      create?: (args: { body: { parentID: string; title: string } }) => Promise<{
         data?: { id?: string }
         id?: string
         info?: { id?: string }
@@ -77,8 +77,10 @@ export async function launchTask(
   let sessionID: string | undefined
   try {
     const session = await client.session.create({
-      parentID: input.parentSessionID,
-      title: input.description,
+      body: {
+        parentID: input.parentSessionID,
+        title: input.description,
+      },
     })
 
     debugLog(`[launch] session.create returned: ${JSON.stringify(session)}`)
