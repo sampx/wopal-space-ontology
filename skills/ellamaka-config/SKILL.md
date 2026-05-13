@@ -1,67 +1,45 @@
 ---
-name: opencode-config
+name: ellamaka-config
 description: |-
-  Edit opencode.jsonc, AGENTS.md, and config files. Use proactively for provider setup, permission changes, model config, formatter rules, or environment variables.
+  Configure ellamaka (WopalSpace OpenCode fork) — edit config files, agent permissions, model/provider settings, and rules. Use proactively for permission changes, model config, provider setup, formatter rules, environment variables, or debugging config loading issues. Covers both upstream OpenCode paths and ellamaka-specific wopal-space mode config priority order.
   
   Examples:
-  - user: "Add Anthropic as a provider" → edit opencode.json providers, add API key baseEnv var, verify with opencode run test
-  - user: "Restrict this agent's permissions" → add permission block to agent config, set deny/allow for tools/fileAccess
-  - user: "Set GPT-5 as default model" → edit global or agent-level model preference, verify model name format
+  - user: "Add Anthropic as a provider" → edit global or wopal-space config
+  - user: "Restrict agent permissions" → edit agent frontmatter permission or settings.jsonc
+  - user: "Config not loading" → check wopal-space mode config priority
   - user: "Disable gofmt formatter" → edit formatters section, set languages.gofmt.enabled = false
 ---
 
-# OpenCode Configuration
+# ellamaka Configuration
 
-Help users configure OpenCode through guided setup of config files and rules.
-
-<question_tool>
-
-**Batching Rule:** Use only for 2+ related questions; single questions use plain text.
-
-**Syntax Constraints:** header max 12 chars, labels 1-5 words, mark defaults with `(Recommended)`.
-
-**Purpose:** Clarify config scope (models/permissions/rules), validate approach, and handle multiple valid options.
-
-</question_tool>
+Help users configure ellamaka (WopalSpace OpenCode fork) through guided setup of config files and rules.
 
 <reference>
 
 ## File Locations
 
-| Type | Global | Project |
-|------|--------|---------|
-| **Config** | `~/.config/opencode/opencode.jsonc` | `./opencode.jsonc` |
-| **Rules** | `~/.config/opencode/AGENTS.md` | `./AGENTS.md` |
+### ellamaka (WopalSpace Fork)
 
-**Precedence:** Project > Global. Configs are merged, not replaced.
+| Type | Global | Space |
+|------|-------------------|-------------|
+| **Config** | `~/.wopal/ellamaka/config/opencode.jsonc` | `.wopal/config/settings.jsonc` |
+| **Agent** | `~/.wopal/agents/{name}.md` | `.wopal/agents/{name}.md` |
+
+**Wopal-space mode config loading order** (priority low→high):
+1. defaults (built-in)
+2. `~/.wopal/ellamaka/config/opencode.jsonc` global
+3. `.wopal/config/settings.jsonc` → `ellamaka` 
+4. `.wopal/agents/{name}.md`
+
+> ⚠️ Wopal-space mode bypasses standard config returns directly, **skipping** project `opencode.jsonc`, `~/.config/opencode/`, `OPENCODE_CONFIG`.
+
+> **Precedence:** Project > Global. Configs are merged, not replaced.
 
 </reference>
 
-<workflow>
-
-## Question Tool
-
-**Batching:** Use the `question` tool for 2+ related questions. Single questions → plain text.
-
-**Syntax:** `header` ≤12 chars, `label` 1-5 words, add "(Recommended)" to default.
-
-When to ask: Vague request ("configure opencode"), permission/security changes, or multiple valid options exist.
-
-## Workflow
-
-Ask the user what they want to configure:
-
-1. **"What would you like to set up?"**
-   - Config file (models, tools, permissions, theme)
-   - Rules (project instructions via AGENTS.md)
-
-Then guide them through the relevant section below.
-
-</workflow>
-
 <config_file>
 
-## Config File (opencode.jsonc)
+## Config File (opencode.jsonc or config/settings.jsonc#ellamaka)
 
 ### Basic Setup
 
@@ -70,7 +48,6 @@ Then guide them through the relevant section below.
   "$schema": "https://opencode.ai/config.json",
   "model": "anthropic/claude-sonnet-4-20250514",
   "theme": "opencode",
-  "autoupdate": true
 }
 ```
 
@@ -247,6 +224,7 @@ Common JSONC mistakes:
 | Config not loading | Check JSON syntax, ensure valid path |
 | Skill not found | Verify `SKILL.md` (uppercase), check frontmatter |
 | Permission denied unexpectedly | Check global vs project config precedence |
+| Permission change not taking effect (wopal-space mode) | Wopal-space skips project `opencode.jsonc`. Check agent frontmatter > `settings.jsonc` > global config > defaults |
 
 </troubleshooting>
 

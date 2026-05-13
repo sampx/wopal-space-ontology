@@ -1,22 +1,8 @@
-# OpenCode Configuration Schema Reference (Q4 2025)
+# Ellamaka (opencode) Configuration Schema Reference (Q4 2025)
 
 <instructions>
-This document defines the schema and valid values for `opencode.json`. You MUST adhere strictly to these definitions. You MUST NOT use deprecated model identifiers.
+This document defines the schema and valid values for `opencode.json`. You MUST adhere strictly to these definitions. 
 </instructions>
-
-<critical_warning>
-
-## STRICTLY PROHIBITED MODELS
-
-The following models are DEPRECATED and MUST NOT be used:
-
-- OpenAI: `gpt-4o`, `gpt-4-turbo`, `o1-mini`, `o1-preview`
-- Anthropic: `claude-3-5-sonnet`, `claude-3-opus`
-- Google: `gemini-1.5-pro`, `gemini-2.0-flash`
-- Meta: `llama-3`, `llama-3.1`
-
-Use current frontier models: **GPT-5.2**, **Claude 4.5**, **Gemini 3**, **GLM-4.7**, **Kimi K2.5**, **MiniMax M2.1**, **Mistral Large 3**.
-</critical_warning>
 
 <top_level_options>
 
