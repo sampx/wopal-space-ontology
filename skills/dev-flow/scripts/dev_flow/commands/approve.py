@@ -38,6 +38,7 @@ from dev_flow.core.status import update_plan_status
 from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name
 from dev_flow.domain.plan.metadata import get_plan_project, get_plan_issue, get_plan_status, set_plan_worktree
 from dev_flow.domain.plan.naming import validate_plan_name
+from dev_flow.domain.plan.project import resolve_project_path
 from dev_flow.domain.workflow import parse_plan_status, is_valid_transition
 from dev_flow.domain.validation.check_doc import check_doc_plan, ValidationError
 from dev_flow.domain.issue.sync import (
@@ -56,27 +57,6 @@ from dev_flow.infra.git import (
 # ============================================
 # Helpers
 # ============================================
-
-def _find_project_path(project: str, workspace_root: Path) -> Path | None:
-    """
-    Find project directory path.
-    
-    Standard mapping: projects/<project_name>
-    
-    Args:
-        project: Project name from Plan metadata
-        workspace_root: Workspace root path
-        
-    Returns:
-        Project directory path, or None if not found
-    """
-    project_path = workspace_root / "projects" / project
-    
-    if project_path.exists():
-        return project_path
-    
-    return None
-
 
 def _extract_slug(plan_name: str) -> str:
     """Extract slug from plan name.
@@ -379,11 +359,11 @@ def cmd_approve(args: argparse.Namespace) -> int:
     project = get_plan_project(plan_path)
     
     # --- Preflight Check 1: Target Project dirty workspace ---
-    project_path = _find_project_path(project, workspace_root) if project else None
+    project_path = resolve_project_path(plan_path, project, workspace_root) if project else None
     dirty_workspace = False
     stashed = False
     
-    if project and project_path and (project_path / '.git').exists():
+    if project_path:
         dirty_workspace = is_repo_dirty(str(project_path))
     
     # --- Preflight Check 2: Worktree creation (if requested) ---

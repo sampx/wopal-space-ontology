@@ -9,6 +9,9 @@
 # Ported from lib/check-doc.sh, lib/plan.sh
 
 import re
+from pathlib import Path
+
+from dev_flow.core.workspace import find_workspace_root
 
 
 class ValidationError(Exception):
@@ -59,6 +62,11 @@ def check_doc_plan(plan_file: str) -> None:
     uv_issues = _check_user_validation_structure(content)
     if uv_issues:
         issues.extend(uv_issues)
+    
+    # Check Target Project Path validity (if declared)
+    pp_issue = _check_project_path(content)
+    if pp_issue:
+        issues.append(pp_issue)
     
     if issues:
         raise ValidationError("\n".join(issues))
@@ -230,6 +238,32 @@ def _check_user_validation_structure(content: str) -> list:
         issues.append("### User Validation: must contain final confirmation checkbox\n  Required: - [ ] 用户已完成上述功能验证并确认结果符合预期")
     
     return issues
+
+
+def _check_project_path(content: str) -> str | None:
+    """Validate Target Project Path if declared in plan metadata.
+
+    Checks that the declared path exists and is a git repository (contains .git).
+    Optional field — returns None if not declared.
+
+    Returns:
+        Error message string if validation fails, None if OK or not declared
+    """
+    match = re.search(r'^\-\s+\*\*Target Project Path\*\*:\s*(.+)$', content, re.MULTILINE)
+    if not match:
+        return None
+
+    declared = match.group(1).strip()
+    ws_root = find_workspace_root()
+    resolved = ws_root / declared
+
+    if not resolved.exists():
+        return f"### Target Project Path: declared path does not exist: {declared}"
+
+    if not (resolved / ".git").exists():
+        return f"### Target Project Path: declared path is not a git repository: {declared}"
+
+    return None
 
 
 def check_acceptance_criteria(plan_file: str) -> None:

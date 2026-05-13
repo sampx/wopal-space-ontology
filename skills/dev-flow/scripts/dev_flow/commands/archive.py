@@ -37,6 +37,7 @@ from dev_flow.domain.plan.metadata import (
     get_plan_status,
     get_plan_worktree,
 )
+from dev_flow.domain.plan.project import resolve_project_path
 from dev_flow.domain.workflow import parse_plan_status
 from dev_flow.domain.plan.link import update_issue_plan_link
 from dev_flow.domain.issue.sync import (
@@ -59,24 +60,6 @@ from dev_flow.infra.git import (
 # ============================================
 # Helpers
 # ============================================
-
-def _find_project_path(project: str, workspace_root: Path) -> Path | None:
-    """Find project directory path.
-
-    Args:
-        project: Project name from Plan metadata
-        workspace_root: Workspace root path
-
-    Returns:
-        Project directory path, or None if not found
-    """
-    project_path = workspace_root / "projects" / project
-
-    if project_path.exists():
-        return project_path
-
-    return None
-
 
 # ============================================
 # Worktree / Project Change Detection
@@ -601,9 +584,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
     project_committed = False
 
     if project:
-        project_path = _find_project_path(project, workspace_root)
+        project_path = resolve_project_path(plan_path, project, workspace_root)
 
-        if project_path and (project_path / '.git').exists():
+        if project_path:
             wt = _detect_worktree(plan_path, project, workspace_root)
 
             if wt:

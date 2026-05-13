@@ -54,6 +54,22 @@ def get_plan_project(plan_path: str) -> str:
     return get_plan_field(plan_path, "Target Project")
 
 
+def get_plan_project_path(plan_path: str) -> str:
+    """
+    Extract Target Project Path from Plan metadata.
+    
+    Declared relative path from workspace root to the project directory.
+    Optional field — returns empty string if not declared.
+    
+    Args:
+        plan_path: Path to Plan markdown file
+        
+    Returns:
+        Relative path string (e.g., ".wopal/wopal-plugin"), or empty string
+    """
+    return get_plan_field(plan_path, "Target Project Path")
+
+
 def get_plan_type(plan_path: str) -> str:
     """
     Extract Type from Plan metadata.
