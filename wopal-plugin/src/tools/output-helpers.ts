@@ -3,7 +3,7 @@ import type { ProgressInfo } from "../tasks/progress.js"
 import type { LoopWarning } from "../tasks/loop-detector.js"
 import { fetchContextPercent } from "../tasks/task-monitor.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 export const MAX_RECENT_OUTPUT = 800
 
 /**

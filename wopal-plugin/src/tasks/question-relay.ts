@@ -2,7 +2,7 @@ import type { SimpleTaskManager } from "./simple-task-manager.js"
 import { createDebugLog, type DebugLog } from "../debug.js"
 import { toErrorMessage } from "./utils.js"
 
-const defaultDebugLog = createDebugLog("[wopal-task]", "task")
+const defaultDebugLog = createDebugLog("[task]", "task")
 
 export interface QuestionAskedEvent {
   sessionID: string

@@ -23,8 +23,8 @@ import {
 // Re-export types for backward compatibility
 export type { Memory, MemoryInput, MemoryCategory, QueryType } from "./types.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 /** LanceDB connection and table manager */
 export class MemoryStore {

@@ -24,6 +24,8 @@ export interface HookContextOptions {
   systemSnapshots?: Map<string, string[]>;
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
+  rulesInjectionEnabled?: boolean;    // Default true
+  memoryInjectionEnabled?: boolean;   // Default true
 }
 
 export interface HookContext {
@@ -44,6 +46,8 @@ export interface HookContext {
   systemSnapshots: Map<string, string[]>;
   systemMetadataMap: Map<string, SystemPromptMetadata>;
   systemInjectionsMap: Map<string, string[]>;
+  rulesInjectionEnabled: boolean;
+  memoryInjectionEnabled: boolean;
 }
 
 export function createHookContext(opts: HookContextOptions): HookContext {
@@ -53,11 +57,11 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     projectDirectory: opts.projectDirectory,
     ruleFiles: opts.ruleFiles,
     sessionStore: opts.sessionStore,
-    pluginDebugLog: opts.debugLog ?? createDebugLog("[wopal-plugin]", "plugin"),
-    rulesDebugLog: createDebugLog("[wopal-rules]", "rules"),
-    taskDebugLog: createDebugLog("[wopal-task]", "task"),
-    memoryDebugLog: createDebugLog("[wopal-memory]", "memory"),
-    contextDebugLog: createDebugLog("[wopal-context]", "context"),
+    pluginDebugLog: opts.debugLog ?? createDebugLog("[plugin]", "plugin"),
+    rulesDebugLog: createDebugLog("[rules]", "rules"),
+    taskDebugLog: createDebugLog("[task]", "task"),
+    memoryDebugLog: createDebugLog("[memory]", "memory"),
+    contextDebugLog: createDebugLog("[context]", "context"),
     now: opts.now ?? (() => Date.now()),
     taskManager: opts.taskManager ?? undefined,
     memoryInjector: opts.memoryInjector,
@@ -65,6 +69,8 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     systemSnapshots: opts.systemSnapshots ?? new Map(),
     systemMetadataMap: opts.systemMetadataMap ?? new Map(),
     systemInjectionsMap: opts.systemInjectionsMap ?? new Map(),
+    rulesInjectionEnabled: opts.rulesInjectionEnabled ?? true,
+    memoryInjectionEnabled: opts.memoryInjectionEnabled ?? true,
   };
 }
 
@@ -102,6 +108,8 @@ export function createAllHooks(ctx: HookContext): Record<string, unknown> {
     systemMetadataMap: ctx.systemMetadataMap,
     systemInjectionsMap: ctx.systemInjectionsMap,
     transformedMessagesMap,
+    rulesInjectionEnabled: ctx.rulesInjectionEnabled,
+    memoryInjectionEnabled: ctx.memoryInjectionEnabled,
   });
 
   const eventRouter = createEventRouter({

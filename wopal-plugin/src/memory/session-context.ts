@@ -10,8 +10,8 @@ import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, readdirSync } from "fs";
 import { createDebugLog, createWarnLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 // State directory (same as legacy ExtractionState)
 const STATE_DIR = join(homedir(), ".wopal", "memory", "state");

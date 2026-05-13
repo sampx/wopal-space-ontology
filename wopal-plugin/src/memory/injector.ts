@@ -9,7 +9,7 @@ import type { MemoryRetriever } from "./retriever.js";
 import type { Memory, MemoryCategory } from "./store.js";
 import { createDebugLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
+const debugLog = createDebugLog("[memory]", "memory");
 
 export class MemoryInjector {
   private retriever: MemoryRetriever;

@@ -20,8 +20,7 @@ import { join } from "path";
 
 
 const debugLog = createDebugLog();
-const warnLog = createWarnLog("[wopal-plugin]");
-const memoryDebugLog = createDebugLog("[wopal-memory]", "memory");
+const warnLog = createWarnLog("[plugin]");
 
 function loadWopalEnv(rootDir: string): void {
   const envPath = join(rootDir, ".env");
@@ -54,6 +53,8 @@ let _memorySystem: {
 } | null = null;
 
 async function ensureMemorySystem(): Promise<typeof _memorySystem> {
+  const memoryDebugLog = createDebugLog("[memory]", "memory");
+
   if (_memorySystem) return _memorySystem;
 
   try {
@@ -88,15 +89,32 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
 
   loadWopalEnv(pluginInput.directory);
 
+  // Read switches after loadWopalEnv (ensure .env has taken effect)
   const rulesInjectionEnabled = process.env.WOPAL_RULES_INJECTION_ENABLED !== "false";
+  const memoryEnabled = process.env.WOPAL_MEMORY_ENABLED !== "false";
   const memoryInjectionEnabled = process.env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
 
-  const rulesDebugLog = createDebugLog("[wopal-rules]", "rules");
+  const rulesDebugLog = createDebugLog("[rules]", "rules");
 
-  const ruleFiles = rulesInjectionEnabled
-    ? await discoverRuleFiles(pluginInput.directory, rulesDebugLog)
-    : [];
-  debugLog(`Discovered ${ruleFiles.length} rule file(s)`);
+  // Rules module initialization
+  let ruleFiles: DiscoveredRule[];
+  if (rulesInjectionEnabled) {
+    ruleFiles = await discoverRuleFiles(pluginInput.directory, rulesDebugLog);
+    rulesDebugLog(`Discovered ${ruleFiles.length} rule file(s)`);
+  } else {
+    debugLog("Rules module disabled");
+    ruleFiles = [];
+  }
+
+  // Memory module initialization
+  let memory: typeof _memorySystem;
+  if (memoryEnabled) {
+    memory = await ensureMemorySystem();
+  } else {
+    debugLog("Memory module disabled");
+    memory = null;
+  }
+
   debugLog(`Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`);
 
   // Extract the internal fetch from v1 client (which uses Server.Default().fetch
@@ -118,9 +136,6 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     pluginInput.serverUrl,
   );
 
-  const memory = memoryInjectionEnabled
-    ? await ensureMemorySystem()
-    : null;
   const systemSnapshots = new Map<string, string[]>();
   const systemMetadataMap = new Map<string, SystemPromptMetadata>();
   const systemInjectionsMap = new Map<string, string[]>();
@@ -137,6 +152,8 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     systemSnapshots,
     systemMetadataMap,
     systemInjectionsMap,
+    rulesInjectionEnabled,
+    memoryInjectionEnabled,
   });
 
   const hooks = createAllHooks(ctx);

@@ -10,8 +10,8 @@ import { existsSync, readFileSync } from "fs";
 import type { MemoryCategory } from "./types.js";
 import { createDebugLog, createWarnLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 /**
  * Resolve prompt file path from environment variable

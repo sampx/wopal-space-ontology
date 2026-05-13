@@ -6,7 +6,7 @@ import { createDebugLog } from "../debug.js";
 import { getCachedRule, type DiscoveredRule } from "./discoverer.js";
 import { fileMatchesGlobs, promptMatchesKeywords } from "./matcher.js";
 
-const debugLog = createDebugLog();
+const debugLog = createDebugLog("[rules]", "rules");
 
 /**
  * Read and format rule files for system prompt injection

@@ -3,8 +3,8 @@ import { createDebugLog, createWarnLog, type DebugLog } from "../debug.js"
 import { toErrorMessage } from "./utils.js"
 import { sendNotification } from "./task-notifier.js"
 
-const defaultDebugLog = createDebugLog("[wopal-task]", "task")
-const defaultWarnLog = createWarnLog("[wopal-task]")
+const defaultDebugLog = createDebugLog("[task]", "task")
+const defaultWarnLog = createWarnLog("[task]")
 
 export interface PermissionAskedEvent {
   sessionID: string

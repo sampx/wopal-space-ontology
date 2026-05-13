@@ -4,7 +4,7 @@ import { createDebugLog } from "../debug.js";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
-const debugLog = createDebugLog("[wopal-context]", "context");
+const debugLog = createDebugLog("[context]", "context");
 
 // Compatible message type for dump formatter
 type DumpMessage = SessionMessage | MessageWithInfo;

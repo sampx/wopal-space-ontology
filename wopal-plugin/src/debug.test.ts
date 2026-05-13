@@ -33,7 +33,7 @@ describe("createDebugLog", () => {
     
     expect(existsSync(logFile)).toBe(true);
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-plugin] test message");
+    expect(content).toContain("[plugin] test message");
   });
 
   it("writes to log file when WOPAL_PLUGIN_DEBUG=*", () => {
@@ -43,7 +43,7 @@ describe("createDebugLog", () => {
     
     expect(existsSync(logFile)).toBe(true);
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-plugin] star test");
+    expect(content).toContain("[plugin] star test");
   });
 
   it("writes to log file when WOPAL_PLUGIN_DEBUG=all", () => {
@@ -53,7 +53,7 @@ describe("createDebugLog", () => {
     
     expect(existsSync(logFile)).toBe(true);
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-plugin] all test");
+    expect(content).toContain("[plugin] all test");
   });
 
   it("does not write when WOPAL_PLUGIN_DEBUG is unset", () => {
@@ -95,7 +95,7 @@ describe("createDebugLog", () => {
     log("timestamp test");
     
     const content = readFileSync(logFile, "utf-8");
-    // Match format: 2026-03-15 16:30:45 [wopal-plugin] timestamp test
+    // Match format: 2026-03-15 16:30:45 [plugin] timestamp test
     const timestampPattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /m;
     expect(timestampPattern.test(content)).toBe(true);
   });
@@ -126,36 +126,36 @@ describe("createDebugLog module filtering", () => {
   it("filters by single module: task only", () => {
     process.env.WOPAL_PLUGIN_DEBUG = "task";
     
-    const rulesLog = createDebugLog("[wopal-rules]", "rules");
-    const taskLog = createDebugLog("[wopal-task]", "task");
+    const rulesLog = createDebugLog("[rules]", "rules");
+    const taskLog = createDebugLog("[task]", "task");
     
     rulesLog("rules message");
     taskLog("task message");
     
     const content = readFileSync(logFile, "utf-8");
     expect(content).not.toContain("rules message");
-    expect(content).toContain("[wopal-task] task message");
+    expect(content).toContain("[task] task message");
   });
 
   it("filters by single module: rules only", () => {
     process.env.WOPAL_PLUGIN_DEBUG = "rules";
     
-    const rulesLog = createDebugLog("[wopal-rules]", "rules");
-    const taskLog = createDebugLog("[wopal-task]", "task");
+    const rulesLog = createDebugLog("[rules]", "rules");
+    const taskLog = createDebugLog("[task]", "task");
     
     rulesLog("rules message");
     taskLog("task message");
     
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-rules] rules message");
+    expect(content).toContain("[rules] rules message");
     expect(content).not.toContain("task message");
   });
 
   it("filters by multiple modules", () => {
     process.env.WOPAL_PLUGIN_DEBUG = "task,rules";
     
-    const rulesLog = createDebugLog("[wopal-rules]", "rules");
-    const taskLog = createDebugLog("[wopal-task]", "task");
+    const rulesLog = createDebugLog("[rules]", "rules");
+    const taskLog = createDebugLog("[task]", "task");
     
     rulesLog("rules message");
     taskLog("task message");
@@ -168,8 +168,8 @@ describe("createDebugLog module filtering", () => {
   it("handles whitespace in module list", () => {
     process.env.WOPAL_PLUGIN_DEBUG = " task , rules ";
     
-    const rulesLog = createDebugLog("[wopal-rules]", "rules");
-    const taskLog = createDebugLog("[wopal-task]", "task");
+    const rulesLog = createDebugLog("[rules]", "rules");
+    const taskLog = createDebugLog("[task]", "task");
     
     rulesLog("rules message");
     taskLog("task message");
@@ -182,11 +182,11 @@ describe("createDebugLog module filtering", () => {
   it("is case-insensitive for module names", () => {
     process.env.WOPAL_PLUGIN_DEBUG = "TASK";
     
-    const taskLog = createDebugLog("[wopal-task]", "task");
+    const taskLog = createDebugLog("[task]", "task");
     taskLog("task message");
     
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-task] task message");
+    expect(content).toContain("[task] task message");
   });
 });
 
@@ -219,7 +219,7 @@ describe("createWarnLog", () => {
     
     expect(existsSync(logFile)).toBe(true);
     const content = readFileSync(logFile, "utf-8");
-    expect(content).toContain("[wopal-plugin] [WARN] warning message");
+    expect(content).toContain("[plugin] [WARN] warning message");
   });
 
   it("uses custom prefix", () => {
@@ -235,7 +235,7 @@ describe("createWarnLog", () => {
     warn("timestamp test");
     
     const content = readFileSync(logFile, "utf-8");
-    // Match format: 2026-03-15 16:30:45 [wopal-plugin] [WARN] timestamp test
+    // Match format: 2026-03-15 16:30:45 [plugin] [WARN] timestamp test
     const timestampPattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /m;
     expect(timestampPattern.test(content)).toBe(true);
   });

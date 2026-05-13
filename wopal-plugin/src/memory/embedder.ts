@@ -8,8 +8,8 @@
 import OpenAI from "openai";
 import { createDebugLog, createWarnLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 /**
  * Embedding client using OpenAI-compatible API

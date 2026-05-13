@@ -17,8 +17,8 @@ import { MIN_CONVERSATION_LENGTH, extractConversationText } from "./conversation
 import { buildExtractionPrompt, type ExtractResult } from "./prompts.js";
 import { performDeduplication, type DedupResult } from "./dedup.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 /**
  * Result of distillation process

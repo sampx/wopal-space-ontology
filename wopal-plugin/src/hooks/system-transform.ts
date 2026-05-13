@@ -47,6 +47,8 @@ export interface SystemTransformHookContext {
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
   transformedMessagesMap?: Map<string, MessageWithInfo[]>;
+  rulesInjectionEnabled: boolean;    // Passed from HookContext
+  memoryInjectionEnabled: boolean;   // Passed from HookContext
 }
 
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
@@ -96,10 +98,8 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     // Record initial length before plugin injections
     const initialSystemLength = output.system.length;
 
-    // Rule injection
-    const rulesInjectionEnabled = process.env.WOPAL_RULES_INJECTION_ENABLED !== "false";
-
-    if (rulesInjectionEnabled) {
+    // Rule injection (controlled by ctx, not env vars)
+    if (ctx.rulesInjectionEnabled) {
       const contextPaths = sessionState
         ? Array.from(sessionState.contextPaths).sort()
         : [];
@@ -117,9 +117,7 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     }
 
     // Memory injection (after rules, into same system array)
-    const memoryInjectionEnabled = process.env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
-
-    if (memoryInjectionEnabled && sessionID) {
+    if (ctx.memoryInjectionEnabled && ctx.memoryInjector && sessionID) {
       await injectMemoriesIntoSystem(memoryInjectorCtx, sessionID, output);
     }
 

@@ -11,7 +11,7 @@ import {
   formatProgressOutput,
 } from "./output-helpers.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
 export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({

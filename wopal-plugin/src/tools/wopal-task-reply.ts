@@ -4,7 +4,7 @@ import type { WopalTask } from "../types.js"
 import { createDebugLog } from "../debug.js"
 import { trackActivity } from "../tasks/progress.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
 function resetTaskForResume(task: WopalTask): void {
   task.status = "running"

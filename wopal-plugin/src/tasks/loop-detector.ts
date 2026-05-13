@@ -2,7 +2,7 @@ import type { SessionMessage } from "../types.js"
 import { createDebugLog } from "../debug.js"
 import { getMessageTime, extractToolCallSequence } from "./session-messages.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
 export interface LoopWarning {
   type: "tool_loop" | "rapid_cycle"

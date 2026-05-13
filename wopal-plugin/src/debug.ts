@@ -109,14 +109,14 @@ function writeLog(prefix: string, message: string): void {
 /**
  * Create a debug log function for a specific module.
  *
- * @param prefix - Log prefix (e.g., "[wopal-plugin]", "[wopal-rules]", "[wopal-task]")
+ * @param prefix - Log prefix (e.g., "[plugin]", "[rules]", "[task]")
  * @param module - Module name for filtering ("plugin", "rules", "task", "memory", "context")
  *
  * Environment variables:
  * - WOPAL_PLUGIN_DEBUG: "1"/"*"/"all" for all, or comma-separated modules
  * - WOPAL_PLUGIN_LOG_FILE: Custom log file path (default: tmpdir/wopal-plugin.log)
  */
-export function createDebugLog(prefix = "[wopal-plugin]", module: DebugModule = "plugin"): LogFn {
+export function createDebugLog(prefix = "[plugin]", module: DebugModule = "plugin"): LogFn {
   return (message: string): void => {
     if (!isDebugEnabled(module)) {
       return;
@@ -128,7 +128,7 @@ export function createDebugLog(prefix = "[wopal-plugin]", module: DebugModule = 
 /**
  * Create a warn log function (always outputs to log file, ignores debug filter)
  */
-export function createWarnLog(prefix = "[wopal-plugin]"): LogFn {
+export function createWarnLog(prefix = "[plugin]"): LogFn {
   return (message: string): void => {
     writeLog(`${prefix} [WARN]`, message);
   };

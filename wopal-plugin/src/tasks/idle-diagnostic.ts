@@ -6,7 +6,7 @@ import {
   getFinishReason,
 } from "./session-messages.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
 export interface IdleDiagnostic {
   verdict: "completed" | "error"

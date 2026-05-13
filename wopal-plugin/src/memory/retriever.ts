@@ -11,7 +11,7 @@ import type { MemoryStore, Memory } from "./store.js";
 import type { EmbeddingClient } from "./embedder.js";
 import { createDebugLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
+const debugLog = createDebugLog("[memory]", "memory");
 
 const DEFAULT_LIMIT = 8;
 

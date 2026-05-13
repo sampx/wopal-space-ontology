@@ -17,7 +17,7 @@ import type { SessionMessage, SystemPromptMetadata } from "../types.js";
 import { createDebugLog } from "../debug.js";
 import { writeContextDump } from "./dump-formatter.js";
 
-const debugLog = createDebugLog("[wopal-context]", "context");
+const debugLog = createDebugLog("[context]", "context");
 
 function normalizeSessionID(id: string): string {
   if (id.startsWith("wopal-task-")) {

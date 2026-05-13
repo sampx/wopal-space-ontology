@@ -1,7 +1,7 @@
 import { writeFileSync } from "fs";
 import { createDebugLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-task]", "task");
+const debugLog = createDebugLog("[task]", "task");
 
 const SOUND_ENABLED = process.env.WOPAL_TASK_NOTIFY_SOUND !== "false";
 const SOUND_PATH = "/System/Library/Sounds/Glass.aiff";

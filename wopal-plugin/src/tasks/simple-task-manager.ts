@@ -34,7 +34,7 @@ import {
   CLEANUP_MAX_AGE_MS,
 } from "./task-lifecycle.js"
 
-const defaultManagerLog = createDebugLog("[wopal-task]", "task")
+const defaultManagerLog = createDebugLog("[task]", "task")
 
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
