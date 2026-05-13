@@ -25,6 +25,26 @@ function teardownTestDirs() {
   }
 }
 
+let savedInjectionEnv: Record<string, string | undefined>;
+
+function saveAndClearInjectionEnv() {
+  savedInjectionEnv = {
+    WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
+    WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
+  };
+  delete process.env.WOPAL_RULES_INJECTION_ENABLED;
+  delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
+}
+
+function restoreInjectionEnv() {
+  if (savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_RULES_INJECTION_ENABLED = savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED;
+  }
+  if (savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_MEMORY_INJECTION_ENABLED = savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED;
+  }
+}
+
 describe("extractConnectedMcpCapabilityIDs", () => {
   it("returns mcp_<sanitizedName> for connected servers", () => {
     const status = {
@@ -55,11 +75,13 @@ describe("extractConnectedMcpCapabilityIDs", () => {
 describe("mcp-tools integration", () => {
   beforeEach(() => {
     setupTestDirs();
+    saveAndClearInjectionEnv();
   });
 
   afterEach(async () => {
     teardownTestDirs();
     resetSessionState();
+    restoreInjectionEnv();
   });
 
   it("includes rules gated by connected mcp server capability", async () => {

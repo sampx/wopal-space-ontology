@@ -7,6 +7,7 @@ import { resetSessionState, getSeedCount, setSessionStateLimit, getSessionStateI
 let testDir: string;
 let globalRulesDir: string;
 let projectRulesDir: string;
+let savedInjectionEnv: Record<string, string | undefined>;
 
 function setupTestDirs() {
   testDir = mkdtempSync(path.join(os.tmpdir(), "opencode-rules-test-"));
@@ -22,15 +23,36 @@ function teardownTestDirs() {
   }
 }
 
+// Save and clear injection toggle env vars so tests aren't affected by external config
+function saveAndClearInjectionEnv() {
+  savedInjectionEnv = {
+    WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
+    WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
+  };
+  delete process.env.WOPAL_RULES_INJECTION_ENABLED;
+  delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
+}
+
+function restoreInjectionEnv() {
+  if (savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_RULES_INJECTION_ENABLED = savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED;
+  }
+  if (savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_MEMORY_INJECTION_ENABLED = savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED;
+  }
+}
+
 describe("OpenCodeRulesPlugin", () => {
   beforeEach(() => {
     setupTestDirs();
+    saveAndClearInjectionEnv();
   });
 
   afterEach(() => {
     teardownTestDirs();
     vi.resetAllMocks();
     resetSessionState();
+    restoreInjectionEnv();
   });
 
   it("should export a default plugin function", async () => {
@@ -141,11 +163,13 @@ describe("OpenCodeRulesPlugin", () => {
 describe("SessionState", () => {
   beforeEach(() => {
     setupTestDirs();
+    saveAndClearInjectionEnv();
   });
 
   afterEach(() => {
     teardownTestDirs();
     resetSessionState();
+    restoreInjectionEnv();
   });
 
   it("prunes session state when over limit", async () => {
