@@ -1,20 +1,19 @@
 /**
- * System Transform Hook - Memory injection + snapshot/dump
+ * System Transform Hook - Snapshot/dump infrastructure
  *
- * Coordinates memory-injector module.
+ * Handles auto-dump with isChildSession prefix detection.
+ * Memory injection has been migrated to messages.transform (memory-message-injector.ts).
  */
 
 import { createHash } from 'node:crypto';
 
 import type { SessionStore } from "../session-store.js";
-import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { Model } from "@opencode-ai/sdk";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
-  injectMemoriesIntoSystem,
   isChildSession,
   type MemoryInjectorContext,
   type SystemTransformOutput,
@@ -34,14 +33,12 @@ export interface SystemTransformHookContext {
   memoryDebugLog: DebugLog;
   contextDebugLog: DebugLog;
   now: () => number;
-  memoryInjector: MemoryInjector | undefined;
   childSessionCache: Map<string, boolean>;
   taskManager: { findBySession: (sessionID: string) => unknown } | undefined;
   systemSnapshots?: Map<string, string[]>;
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
   transformedMessagesMap?: Map<string, MessageWithInfo[]>;
-  memoryInjectionEnabled: boolean;   // Passed from HookContext
 }
 
 function normalizeFingerprintValue(value: unknown): unknown {
@@ -71,11 +68,13 @@ function buildAutoDumpFingerprint(input: {
 }
 
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
+  // MemoryInjectorContext for isChildSession (auto-dump prefix detection)
+  // memoryInjector is undefined - injection moved to messages.transform
   const memoryInjectorCtx: MemoryInjectorContext = {
     client: ctx.client,
     sessionStore: ctx.sessionStore,
     memoryDebugLog: ctx.memoryDebugLog,
-    memoryInjector: ctx.memoryInjector,
+    memoryInjector: undefined,
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
   };
@@ -87,29 +86,11 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
   ): Promise<SystemTransformOutput> {
     const sessionID = hookInput?.sessionID;
 
-    if (sessionID) {
-      const skip = ctx.sessionStore.shouldSkipInjection(sessionID);
-      if (skip) {
-        ctx.contextDebugLog(
-          `Session ${sessionID} is compacting - skipping memory injection`,
-        );
-        return output ?? { system: [] };
-      }
-    }
-
     if (!output) {
       output = { system: [] };
     }
     if (!output.system) {
       output.system = [];
-    }
-
-    // Record initial length before plugin injections
-    const initialSystemLength = output.system.length;
-
-    // Memory injection (after rules, into same system array)
-    if (ctx.memoryInjectionEnabled && ctx.memoryInjector && sessionID) {
-      await injectMemoriesIntoSystem(memoryInjectorCtx, sessionID, output);
     }
 
     // Snapshot system prompt for context dump
@@ -123,11 +104,6 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
       ctx.contextDebugLog(`Stored systemMetadata for session ${sessionID}: ${hookInput.systemMetadata.sections.length} sections`);
     } else if (sessionID && ctx.systemMetadataMap) {
       ctx.contextDebugLog(`No systemMetadata in hook input for session ${sessionID} (keys in map: ${ctx.systemMetadataMap.size})`);
-    }
-
-    // Store plugin injections (content appended after OpenCode's original system blocks)
-    if (sessionID && ctx.systemInjectionsMap && output.system.length > initialSystemLength) {
-      ctx.systemInjectionsMap.set(sessionID, output.system.slice(initialSystemLength));
     }
 
     // Auto-dump: requires explicit "context" module (not triggered by "all" wildcard)

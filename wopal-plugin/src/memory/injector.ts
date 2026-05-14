@@ -1,8 +1,8 @@
 /**
- * Memory Injector - Context Injection via system.transform Hook
+ * Memory Injector - Memory retrieval and formatting for injection
  *
- * Injects relevant memories into the system prompt as <system-reminder>.
- * Called from runtime.onSystemTransform — sub-session filtering happens there.
+ * Retrieves relevant memories and formats them for injection.
+ * Called from messages.transform hook via memory-message-injector.ts.
  */
 
 import type { MemoryRetriever } from "./retriever.js";
@@ -23,10 +23,10 @@ export class MemoryInjector {
   }
 
   /**
-   * Format memories for system prompt injection.
-   * Returns formatted string + memory IDs, or undefined if no memories found.
+   * Retrieve and format memories for injection.
+   * Returns formatted string (pure content, no wrapping tags), or undefined if no memories found.
    */
-  async formatForSystem(userQuery: string): Promise<string | undefined> {
+  async retrieveAndFormat(userQuery: string): Promise<string | undefined> {
     try {
       const memories = await this.retriever.retrieve(userQuery);
 
@@ -138,6 +138,6 @@ export class MemoryInjector {
   }
 
   private wrapLines(lines: string[]): string {
-    return `<system-reminder>\n${lines.join("\n")}\n</system-reminder>`;
+    return lines.join("\n");
   }
 }
