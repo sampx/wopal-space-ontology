@@ -10,6 +10,7 @@
 
 import subprocess
 import re
+import json
 from pathlib import Path
 
 from dev_flow.domain.labels import plan_type_to_issue_label
@@ -210,8 +211,8 @@ def _extract_section(content: str, heading: str) -> str:
     return ""
 
 
-# Project label group
-PROJECT_LABELS = ["project/ontology", "project/wopal-cli", "project/space"]
+# Project label group — removed hardcoded PROJECT_LABELS.
+# sync_project_label_group() now dynamically matches any project/* label.
 
 
 def plan_project_to_issue_label(project: str) -> str:
@@ -221,11 +222,28 @@ def plan_project_to_issue_label(project: str) -> str:
         project: Project name
         
     Returns:
-        Issue label name, or empty string
+        Issue label name (project/<name>), or empty string if project is empty
     """
-    if project in ["ontology", "wopal-cli", "space"]:
+    if project:
         return f"project/{project}"
     return ""
+
+
+def _get_project_labels_from_issue(issue_number: int | str, repo: str) -> list[str]:
+    """Get all project/* labels currently on an issue."""
+    result = subprocess.run(
+        ['gh', 'issue', 'view', str(issue_number), '--repo', repo, '--json', 'labels', '-q', '.'],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return []
+    
+    try:
+        labels = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return []
+    
+    return [l['name'] for l in labels if re.match(r'^project/', l.get('name', ''))]
 
 
 def ensure_issue_labels(issue_number: int, plan_file: str, repo: str) -> None:
@@ -308,6 +326,9 @@ def sync_type_label_group(issue_number: int, target_label: str, repo: str) -> No
 def sync_project_label_group(issue_number: int, target_label: str, repo: str) -> None:
     """Sync project label group on Issue.
     
+    Dynamically removes any project/* labels and adds the target.
+    No hardcoded project list — works with any project name.
+    
     Args:
         issue_number: Issue number
         target_label: Target project label
@@ -315,7 +336,8 @@ def sync_project_label_group(issue_number: int, target_label: str, repo: str) ->
     """
     current_labels = _get_issue_labels(issue_number, repo)
     
-    labels_to_remove = [l for l in PROJECT_LABELS if l in current_labels and l != target_label]
+    # Remove any project/* labels except the target
+    labels_to_remove = [l for l in current_labels if re.match(r'^project/', l) and l != target_label]
     labels_to_add = [target_label] if target_label not in current_labels else []
     
     if not labels_to_add and not labels_to_remove:
@@ -369,9 +391,6 @@ def _get_label_props(label_name: str) -> tuple:
         "type/docs": ("0075ca", "Documentation"),
         "type/test": ("fbca04", "Testing"),
         "type/chore": ("f9d0c4", "Chore/maintenance"),
-        "project/ontology": ("5319e7", "ontology project"),
-        "project/wopal-cli": ("1d76db", "wopal-cli project"),
-        "project/space": ("0e8a16", "space-level changes"),
     }
     
     return props_map.get(label_name, ("dddddd", ""))

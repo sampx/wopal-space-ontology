@@ -51,6 +51,7 @@ from dev_flow.infra.git import (
     is_commit_in_remote,
     get_relative_path,
     find_worktree_script,
+    get_current_branch,
 )
 
 

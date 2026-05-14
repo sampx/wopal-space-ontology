@@ -27,9 +27,8 @@ from dev_flow.domain.labels import (
     plan_type_to_issue_label,
 )
 from dev_flow.domain.plan.project import (
-    resolve_project_type,
+    resolve_project_info,
     ProjectType,
-    PROJECT_TYPE_REGISTRY,
 )
 from dev_flow.core.logging import log_info, log_success, log_error
 from dev_flow.core.workspace import find_workspace_root, detect_space_repo
@@ -253,16 +252,15 @@ def sync_type_label_group(issue_number: str, desired_label: str, repo: str) -> N
 
 
 def sync_project_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync project label group - remove others, add desired."""
-    project_labels = ["project/ontology", "project/wopal-cli", "project/space"]
-    
+    """Sync project label group - remove any project/* labels, add desired."""
     # Get current labels
     issue_info = get_issue_info(issue_number, repo)
     current_labels = [l["name"] for l in issue_info.get("labels", [])]
     
-    # Build add/remove args
+    # Dynamically remove any project/* labels except the target
+    import re
     add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in project_labels if l in current_labels and l != desired_label]
+    remove_labels = [l for l in current_labels if re.match(r'^project/', l) and l != desired_label]
     
     if not add_labels and not remove_labels:
         return
@@ -367,10 +365,9 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         body = build_structured_issue_body(**body_kwargs)
     
     # Inject project type metadata for ontology-worktree projects
-    project_type = resolve_project_type(project)
-    if project_type == ProjectType.ONTOLOGY_WORKTREE:
-        registry_entry = PROJECT_TYPE_REGISTRY[project]
-        project_path = registry_entry["path"]
+    workspace_root = find_workspace_root()
+    project_type, project_path = resolve_project_info(project, workspace_root)
+    if project_type == ProjectType.ONTOLOGY_WORKTREE and project_path:
         injection = (
             f"- **Project Type**: {project_type.value}\n"
             f"- **Project Path**: {project_path}\n"
@@ -379,7 +376,7 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         body = injection + body
     
     # Get repo and ensure labels
-    repo = detect_space_repo(find_workspace_root())
+    repo = detect_space_repo(workspace_root)
     ensure_flow_labels_exist(repo)
     ensure_label_exists(type_label, repo)
     ensure_label_exists(f"project/{project}", repo)

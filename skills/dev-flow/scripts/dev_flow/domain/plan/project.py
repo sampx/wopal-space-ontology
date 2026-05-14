@@ -1,14 +1,16 @@
-# project.py - Project path resolution
+# project.py - Project path/type/repo resolution
 #
-# Unified project path resolution, replacing scattered _find_project_path
-# copies in archive.py and approve.py.
+# Unified project resolution, replacing scattered _find_project_path copies
+# in archive.py and approve.py. All repo and base branch info is dynamically
+# inferred from git — no hardcoded GitHub org/repo/branch.
 #
-# Resolution priority:
+# Resolution priority for path:
 #   1. Project Path from Plan metadata (declared path)
 #   2. Fallback: projects/<project_name> (backward compat)
 #   3. Fallback: search workspace root children for directory matching
 #      <project_name>, then walk up to find the git root
 
+import re
 from enum import Enum
 from pathlib import Path
 import subprocess
@@ -22,14 +24,175 @@ class ProjectType(Enum):
     ONTOLOGY_WORKTREE = "ontology-worktree"
 
 
-# Project type registry: maps project_name -> {type, path}
-PROJECT_TYPE_REGISTRY = {
-    "wopal-space-ontology": {
-        "type": ProjectType.ONTOLOGY_WORKTREE,
-        "path": ".wopal",
-    },
-    # Standard projects are not registered; they use default resolution
-}
+def _get_wopal_repo_name(workspace_root: Path) -> str | None:
+    """Get the GitHub repo short name from .wopal's origin remote.
+
+    Returns the repo name after the owner/ prefix (e.g., "wopal-space-ontology"),
+    or None if .wopal is not a worktree or can't read its remote.
+    """
+    dot_git = workspace_root / ".wopal" / ".git"
+    if not dot_git.exists() or not dot_git.is_file():
+        return None
+
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=workspace_root / ".wopal",
+            capture_output=True, text=True, check=True,
+        )
+        repo = _parse_github_repo_url(result.stdout.strip())
+        if repo:
+            return repo.split("/")[-1]
+    except subprocess.CalledProcessError:
+        pass
+
+    return None
+
+
+def resolve_project_type(project_name: str, workspace_root: Path | None = None) -> ProjectType:
+    """Resolve project type from workspace structure.
+
+    Checks if .wopal is a git worktree whose origin remote matches
+    the project name. No hardcoded registry — fully derived from git.
+
+    Args:
+        project_name: Project name from Plan metadata
+        workspace_root: Workspace root for dynamic detection
+
+    Returns:
+        ProjectType enum value.
+    """
+    if workspace_root:
+        repo_name = _get_wopal_repo_name(workspace_root)
+        if repo_name and repo_name == project_name:
+            return ProjectType.ONTOLOGY_WORKTREE
+    return ProjectType.STANDARD
+
+
+def resolve_project_info(project_name: str, workspace_root: Path) -> tuple[ProjectType, str | None]:
+    """Resolve project type and workspace-relative path.
+
+    Derives the mapping from .wopal's git remote — if .wopal is a worktree
+    and its origin remote repo name matches the project name, this is an
+    ontology-worktree project at ".wopal". No configuration needed.
+
+    Args:
+        project_name: Project name
+        workspace_root: Workspace root path
+
+    Returns:
+        Tuple of (ProjectType, workspace_relative_path or None)
+    """
+    repo_name = _get_wopal_repo_name(workspace_root)
+    if repo_name and repo_name == project_name:
+        return ProjectType.ONTOLOGY_WORKTREE, ".wopal"
+    return ProjectType.STANDARD, None
+
+
+def _parse_github_repo_url(url: str) -> str | None:
+    """Parse GitHub remote URL to owner/repo format.
+
+    Handles:
+      - https://github.com/owner/repo.git
+      - https://github.com/owner/repo
+      - git@github.com:owner/repo.git
+
+    Returns:
+        "owner/repo" string, or None if URL can't be parsed.
+    """
+    match = re.search(r'github\.com[/:]([^/]+/[^/]+?)(?:\.git)?$', url)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _get_default_branch(project_path: Path) -> str:
+    """Detect the remote default branch for a git repository.
+
+    Uses git ls-remote --symref to query the ACTUAL remote HEAD,
+    not the locally-cached refs/remotes/origin/HEAD (which can be
+    stale for forks that inherited the upstream's HEAD).
+
+    Args:
+        project_path: Path to git repository
+
+    Returns:
+        Default branch name (e.g., "main"), falls back to "main".
+    """
+    # 1. Query remote HEAD (fast, always accurate)
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--symref", "origin", "HEAD"],
+            cwd=project_path,
+            capture_output=True, text=True, check=True,
+        )
+        # Parse: "ref: refs/heads/main\tHEAD\n<hash>\tHEAD"
+        first_line = result.stdout.strip().split("\n")[0]
+        if first_line.startswith("ref: refs/heads/"):
+            return first_line.split("/")[-1].split("\t")[0]
+    except subprocess.CalledProcessError:
+        pass
+
+    # 2. Fall back to local cache (no network)
+    try:
+        result = subprocess.run(
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+            cwd=project_path,
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip().split("/")[-1]
+    except subprocess.CalledProcessError:
+        pass
+
+    # 3. Ultimate fallback
+    return "main"
+
+
+def resolve_project_repo(project_path: Path) -> tuple[str | None, str]:
+    """Dynamically resolve GitHub repo and base branch from project path.
+
+    Uses git commands:
+      - repo: 'git remote get-url origin' → parsed to owner/repo
+      - base_branch: from project's git state
+
+    For ONTOLOGY_WORKTREE projects (.git is a file = worktree pointer),
+    the base branch is the current branch (space/<name>).
+    For standard projects, the base branch is detected from the remote
+    via git ls-remote --symref (queries actual remote HEAD, not stale
+    local cache that forks inherit from upstream).
+
+    Args:
+        project_path: Path to project's git root directory
+
+    Returns:
+        Tuple of (repo, base_branch).
+        repo is None if git remote is unavailable.
+    """
+    if not project_path.exists():
+        return None, "main"
+
+    # Repo from git remote
+    repo = None
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=project_path,
+            capture_output=True, text=True, check=True,
+        )
+        repo = _parse_github_repo_url(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        pass
+
+    # Base branch
+    dot_git = project_path / ".git"
+    if dot_git.exists() and dot_git.is_file():
+        # Ontology worktree: base = current branch (space/<name>)
+        base_branch = get_current_branch(project_path) or "main"
+    else:
+        # Standard project: detect from remote HEAD
+        base_branch = _get_default_branch(project_path)
+
+    return repo, base_branch
 
 
 def resolve_project_path(
@@ -40,9 +203,9 @@ def resolve_project_path(
     """Resolve project's git root directory path.
 
     Resolution order:
-      1. Read `Target Project Path` from Plan metadata → find git root → return
-      2. Fallback `projects/<project_name>` → return if it's a git repo
-      3. Search workspace children for dir named `<project_name>`,
+      1. Read 'Project Path' from Plan metadata → find git root → return
+      2. Fallback projects/<project_name> → return if it's a git repo
+      3. Search workspace children for dir named <project_name>,
          walk up to git root → return
 
     Returns the directory containing .git (repo root or worktree root),
@@ -106,20 +269,6 @@ def _is_git_repo(project_path: Path) -> bool:
     Shortcut for _find_git_root() is not None.
     """
     return _find_git_root(project_path) is not None
-
-
-def resolve_project_type(project_name: str) -> ProjectType:
-    """Resolve project type from registry.
-
-    Args:
-        project_name: Project name from Plan metadata
-
-    Returns:
-        ProjectType enum value. Returns ProjectType.STANDARD for unregistered projects.
-    """
-    if project_name in PROJECT_TYPE_REGISTRY:
-        return PROJECT_TYPE_REGISTRY[project_name]["type"]
-    return ProjectType.STANDARD
 
 
 def get_current_branch(repo_path: Path) -> str | None:

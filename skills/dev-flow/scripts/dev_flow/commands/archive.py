@@ -42,8 +42,6 @@ from dev_flow.domain.plan.metadata import (
 from dev_flow.domain.plan.project import (
     resolve_project_path,
     get_current_branch,
-    resolve_project_type,
-    ProjectType,
 )
 from dev_flow.domain.workflow import parse_plan_status
 from dev_flow.domain.plan.link import update_issue_plan_link

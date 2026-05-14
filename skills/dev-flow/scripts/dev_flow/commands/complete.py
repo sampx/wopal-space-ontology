@@ -28,11 +28,14 @@ from dev_flow.core.status import update_plan_status
 from dev_flow.core.workflow import guard_status, resolve_space_repo
 from dev_flow.domain.plan.find import find_plan, find_plan_by_issue
 from dev_flow.domain.plan.metadata import (
-    get_plan_field,
     get_plan_issue,
     get_plan_project,
+    get_plan_status,
+    set_plan_worktree,
     set_plan_field,
+    get_plan_field,
 )
+from dev_flow.domain.plan.project import resolve_project_path
 from dev_flow.domain.validation.check_doc import (
     ValidationError,
     check_acceptance_criteria,
@@ -54,31 +57,21 @@ from dev_flow.domain.issue.sync import (
 # ============================================
 
 
-def _create_pr(issue_number: int, project: str, base: str = "main") -> str:
-    """
-    Create a Pull Request for the issue in the target project repo.
+def _create_pr_common(project_path: Path, title: str, body: str) -> str:
+    """Create a Pull Request with dynamically resolved repo and base branch.
 
     Returns:
-        PR URL string
+        PR URL string, or empty string on failure.
     """
-    import re
+    from dev_flow.domain.plan.project import resolve_project_repo
 
-    # Determine target repo from project name
-    # Map project name to GitHub repo
-    project_repo_map = {
-        "ontology": "wopal-cn/ontology",
-        "wopal-cli": "wopal-cn/wopal-cli",
-        "space-flow": "wopal-cn/wopal-space-flow",
-        "ellamaka": "sampx/ellamaka",
-    }
-    target_repo = project_repo_map.get(project)
+    target_repo, base_branch = resolve_project_repo(project_path)
 
     if not target_repo:
-        # Try to determine from gh CLI
-        log_error(f"Cannot determine repo for project: {project}")
+        log_error(f"Cannot determine repo for project path: {project_path}")
         return ""
 
-    # Get current branch name
+    # Get current branch name (in worktree context, this is the feature branch)
     result = subprocess.run(
         ['git', 'branch', '--show-current'],
         capture_output=True, text=True
@@ -89,70 +82,11 @@ def _create_pr(issue_number: int, project: str, base: str = "main") -> str:
         log_error("Cannot determine current branch")
         return ""
 
-    # Create PR
-    title = f"#{issue_number}"
-    body = f"Closes #{issue_number}"
-
     result = subprocess.run(
         [
             'gh', 'pr', 'create',
             '--repo', target_repo,
-            '--base', base,
-            '--head', branch,
-            '--title', title,
-            '--body', body,
-        ],
-        capture_output=True, text=True
-    )
-
-    if result.returncode != 0:
-        log_error(f"Failed to create PR: {result.stderr}")
-        return ""
-
-    # gh pr create outputs the PR URL as the last line
-    output_lines = result.stdout.strip().split('\n')
-    pr_url = output_lines[-1].strip()
-
-    return pr_url
-
-
-def _create_pr_for_plan(plan_name: str, project: str, base: str = "main") -> str:
-    """
-    Create a Pull Request for a plan (no-issue mode).
-
-    Returns:
-        PR URL string
-    """
-    project_repo_map = {
-        "ontology": "wopal-cn/ontology",
-        "wopal-cli": "wopal-cn/wopal-cli",
-        "space-flow": "wopal-cn/wopal-space-flow",
-        "ellamaka": "sampx/ellamaka",
-    }
-    target_repo = project_repo_map.get(project)
-
-    if not target_repo:
-        log_error(f"Cannot determine repo for project: {project}")
-        return ""
-
-    result = subprocess.run(
-        ['git', 'branch', '--show-current'],
-        capture_output=True, text=True
-    )
-    branch = result.stdout.strip()
-
-    if not branch:
-        log_error("Cannot determine current branch")
-        return ""
-
-    title = plan_name
-    body = f"Plan: {plan_name}"
-
-    result = subprocess.run(
-        [
-            'gh', 'pr', 'create',
-            '--repo', target_repo,
-            '--base', base,
+            '--base', base_branch,
             '--head', branch,
             '--title', title,
             '--body', body,
@@ -166,8 +100,17 @@ def _create_pr_for_plan(plan_name: str, project: str, base: str = "main") -> str
 
     output_lines = result.stdout.strip().split('\n')
     pr_url = output_lines[-1].strip()
-
     return pr_url
+
+
+def _create_pr(issue_number: int, project_path: Path) -> str:
+    """Create a Pull Request for the issue."""
+    return _create_pr_common(project_path, f"#{issue_number}", f"Closes #{issue_number}")
+
+
+def _create_pr_for_plan(plan_name: str, project_path: Path) -> str:
+    """Create a Pull Request for a plan (no-issue mode)."""
+    return _create_pr_common(project_path, plan_name, f"Plan: {plan_name}")
 
 
 def _get_plan_name(plan_path: str) -> str:
@@ -261,12 +204,18 @@ def cmd_complete(args: argparse.Namespace) -> int:
             log_error("Cannot create PR: no Target Project in plan")
             return 1
 
+        # Resolve project path for dynamic repo/branch detection
+        project_path = resolve_project_path(plan_path, project, workspace_root)
+        if not project_path:
+            log_error(f"Cannot resolve project path for: {project}")
+            return 1
+
         pr_url = ""
         effective_issue = plan_issue
 
         if effective_issue:
             # With Issue: create PR referencing Issue
-            pr_url = _create_pr(effective_issue, project)
+            pr_url = _create_pr(effective_issue, project_path)
             if not pr_url:
                 return 1
 
@@ -292,7 +241,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
                 sync_plan_to_issue_body(effective_issue, plan_path, repo, str(workspace_root))
         else:
             # No Issue: create PR without Issue reference
-            pr_url = _create_pr_for_plan(plan_name, project)
+            pr_url = _create_pr_for_plan(plan_name, project_path)
             if not pr_url:
                 return 1
 

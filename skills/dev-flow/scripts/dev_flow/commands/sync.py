@@ -426,8 +426,7 @@ def plan_status_to_issue_label(plan_status: str) -> str:
 
 def plan_project_to_issue_label(project: str) -> str:
     """Map project name to Issue label."""
-    valid_projects = ['ontology', 'wopal-cli', 'space']
-    if project in valid_projects:
+    if project:
         return f"project/{project}"
     return ''
 
@@ -487,16 +486,14 @@ def sync_type_label_group(issue_number: str, desired_label: str, repo: str) -> N
 
 
 def sync_project_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync project label group - remove others, add desired."""
-    project_labels = ["project/ontology", "project/wopal-cli", "project/space"]
-    
+    """Sync project label group - remove any project/* labels, add desired."""
     # Get current labels
     issue_info = get_issue_info(issue_number, repo)
     current_labels = [l['name'] for l in issue_info.get('labels', [])]
     
-    # Build add/remove args
+    # Dynamically remove any project/* labels except the target
     add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in project_labels if l in current_labels and l != desired_label]
+    remove_labels = [l for l in current_labels if re.match(r'^project/', l) and l != desired_label]
     
     if not add_labels and not remove_labels:
         return
