@@ -1,7 +1,7 @@
 ---
 trigger: model_decision
 description: Astro 项目开发时遵守此规则。
-globs:
+keywords:
   - '**/*.astro'
   - '**/astro.config.*'
 ---
