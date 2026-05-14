@@ -168,26 +168,41 @@ function formatPartForDump(part: Record<string, any>, lines: string[], detail: b
     return;
   }
 
-  if (t === "snapshot" || t === "patch") {
+  if (t === "snapshot") {
     if (detail) {
-      lines.push(`#### PART: [${t === "snapshot" ? "Snapshot" : "Patch"}]`);
-      if (part.content != null) {
-        const contentLines: string[] = [];
-        formatContent(part.content, contentLines);
+      lines.push(`#### PART: [Snapshot]`);
+      if (part.snapshot) {
+        const contentLines = part.snapshot.split("\n");
         lines.push(...contentLines);
       }
-      if (part.text) lines.push(part.text);
     } else {
-      const content = part.content ?? part.text ?? "";
-      const contentStr = typeof content === "string" ? content : JSON.stringify(content);
-      const addMatch = contentStr.match(/^\+./gm);
-      const delMatch = contentStr.match(/^-./gm);
-      const additions = addMatch ? addMatch.length : 0;
-      const deletions = delMatch ? delMatch.length : 0;
-      const pathMatch = contentStr.match(/^--- a\/(.+)$/m) || contentStr.match(/^\+\+\+ b\/(.+)$/m);
-      const filePath = pathMatch ? pathMatch[1] : "unknown";
-      lines.push(`#### PART: [${t === "snapshot" ? "Snapshot" : "Patch"}: ${filePath}]`);
-      lines.push(`_+${additions}/-${deletions}_`);
+      const snapshotStr = typeof part.snapshot === "string" ? part.snapshot : "";
+      const contentLines = snapshotStr.split("\n");
+      const addMatch = contentLines.filter((l) => l.startsWith("+")).length;
+      const delMatch = contentLines.filter((l) => l.startsWith("-")).length;
+      lines.push(`#### PART: [Snapshot${addMatch || delMatch ? `: +${addMatch}/-${delMatch}` : ""}]`);
+    }
+    lines.push("");
+    return;
+  }
+
+  if (t === "patch") {
+    if (detail) {
+      lines.push(`#### PART: [Patch]`);
+      if (part.hash) lines.push(`_Hash: ${part.hash}_`);
+      if (part.files && part.files.length > 0) {
+        lines.push("_Files:_");
+        for (const f of part.files) {
+          lines.push(`  - ${f}`);
+        }
+      }
+    } else {
+      const fileCount = part.files?.length ?? 0;
+      const fileList = fileCount > 0
+        ? part.files.slice(0, 3).join(", ") + (fileCount > 3 ? ` +${fileCount - 3} more` : "")
+        : "none";
+      lines.push(`#### PART: [Patch: ${fileCount} file(s)]`);
+      lines.push(`_${fileList}_`);
     }
     lines.push("");
     return;
@@ -249,14 +264,9 @@ function filterPreCompaction(messages: SessionMessage[]): SessionMessage[] {
 }
 
 export function formatMessagesForDump(messages: DumpMessage[], detail = false): string {
-  const filtered = filterPreCompaction(messages as SessionMessage[]);
   const lines: string[] = [];
-  if (filtered.length < messages.length) {
-    const dropped = messages.length - filtered.length;
-    lines.push(`_(${dropped} messages before last compaction omitted)_`);
-    lines.push("");
-  }
-  for (const msg of filtered) {
+  let lastRole = "";
+  for (const msg of messages) {
     // Skip empty assistant messages — OpenCode creates these as response
     // containers before LLM generates content. They don't represent actual
     // context sent to the model and would misleadingly appear in the dump.
@@ -265,6 +275,12 @@ export function formatMessagesForDump(messages: DumpMessage[], detail = false): 
     }
 
     const role = getDumpMessageRole(msg);
+    // Annotate consecutive same-role messages (OpenCode splits multi-part turns)
+    if (role === lastRole && role !== "unknown") {
+      lines.push(`> _[continuation of previous ${role} turn]_`);
+      lines.push("");
+    }
+    lastRole = role;
     lines.push(`### ROLE: [${role.toUpperCase()}]`);
 
     const time = getDumpMessageTime(msg);
@@ -278,13 +294,13 @@ export function formatMessagesForDump(messages: DumpMessage[], detail = false): 
       if (timeStr) lines.push(`_Time: ${timeStr}_`);
     }
 
-    const model = msg.info?.model;
+    const model = (msg.info as SessionMessage['info'])?.model;
     if (model) {
       const variant = model.variant ? ` (${model.variant})` : "";
       lines.push(`_Model: ${model.providerID}/${model.modelID}${variant}_`);
     }
 
-    const tokens = msg.info?.tokens;
+    const tokens = (msg.info as SessionMessage['info'])?.tokens;
     if (tokens) {
       const tp: string[] = [];
       if (tokens.input) tp.push(`in=${tokens.input}`);
@@ -292,14 +308,20 @@ export function formatMessagesForDump(messages: DumpMessage[], detail = false): 
       if (tp.length) lines.push(`_Tokens: ${tp.join(", ")}_`);
     }
 
-    if (msg.info?.agent) lines.push(`_Agent: ${msg.info.agent}_`);
+    if ((msg.info as SessionMessage['info'])?.agent) lines.push(`_Agent: ${(msg.info as SessionMessage['info'])!.agent}_`);
 
     lines.push("");
 
     if (msg.parts) {
+      let hasCompaction = false;
       for (const part of msg.parts) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatPartForDump(part as Record<string, any>, lines, detail, role);
+        if (part.type === "compaction") hasCompaction = true;
+      }
+      if (hasCompaction) {
+        lines.push("> _Messages below this point may be a retained tail from before compaction. Timestamps may appear non-sequential._");
+        lines.push("");
       }
     }
 
@@ -656,7 +678,20 @@ export async function writeContextDump(options: ContextDumpOptions): Promise<Con
   }
 
   if (messages.length > 0) {
+    // Only apply pre-compaction filter to DB messages (chronological order).
+    // Hook-sourced messages (transformedMessagesMap) are already post-compaction
+    // active context — filtering would break on the compaction-at-start ordering.
+    const isFromDB = !transformed || transformed.length === 0;
+    let omittedCount = 0;
+    if (isFromDB) {
+      const beforeFilter = messages.length;
+      messages = filterPreCompaction(messages as SessionMessage[]) as DumpMessage[];
+      omittedCount = beforeFilter - messages.length;
+    }
     lines.push(`_(${messages.length} messages)_`);
+    if (omittedCount > 0) {
+      lines.push(`_(${omittedCount} messages before last compaction omitted)_`);
+    }
     lines.push("");
     lines.push(formatMessagesForDump(messages, detail));
   } else {

@@ -4,6 +4,8 @@
  * Coordinates memory-injector module.
  */
 
+import { createHash } from 'node:crypto';
+
 import type { SessionStore } from "../session-store.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
@@ -42,6 +44,32 @@ export interface SystemTransformHookContext {
   memoryInjectionEnabled: boolean;   // Passed from HookContext
 }
 
+function normalizeFingerprintValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeFingerprintValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, item]) => [key, normalizeFingerprintValue(item)]),
+    );
+  }
+
+  return value;
+}
+
+function buildAutoDumpFingerprint(input: {
+  snapshot: string[];
+  metadata: SystemPromptMetadata | undefined;
+  injections: string[];
+  messages: MessageWithInfo[] | undefined;
+}): string {
+  const payload = normalizeFingerprintValue(input);
+  return createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+}
+
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
   const memoryInjectorCtx: MemoryInjectorContext = {
     client: ctx.client,
@@ -51,6 +79,7 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
   };
+  const autoDumpFingerprintMap = new Map<string, string>();
 
   async function onSystemTransform(
     hookInput: SystemTransformInput,
@@ -105,18 +134,42 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     const debug = process.env.WOPAL_PLUGIN_DEBUG;
     const explicitContext = debug && debug.toLowerCase().split(",").map(m => m.trim()).includes("context");
     if (sessionID && explicitContext) {
+      const fingerprint = buildAutoDumpFingerprint({
+        snapshot: ctx.systemSnapshots?.get(sessionID) ?? output.system,
+        metadata: ctx.systemMetadataMap?.get(sessionID),
+        injections: ctx.systemInjectionsMap?.get(sessionID) ?? [],
+        messages: ctx.transformedMessagesMap?.get(sessionID),
+      });
+
+      if (autoDumpFingerprintMap.get(sessionID) === fingerprint) {
+        ctx.contextDebugLog(`[auto-dump] skipped duplicate for session ${sessionID}`);
+        return output;
+      }
+
       ctx.contextDebugLog(`[auto-dump] triggered for session ${sessionID}`);
-      void writeContextDump({
-        sessionID,
-        baseDir: ctx.directory,
-        filenamePrefix: "AUTO-CTXDUMP",
-        systemSnapshots: ctx.systemSnapshots ?? new Map(),
-        systemMetadataMap: ctx.systemMetadataMap ?? new Map(),
-        systemInjectionsMap: ctx.systemInjectionsMap ?? new Map(),
-        transformedMessagesMap: ctx.transformedMessagesMap ?? new Map(),
-        client: ctx.client,
-        detail: false,
-      }).catch(err => ctx.contextDebugLog(`[auto-dump] error: ${err}`));
+      autoDumpFingerprintMap.set(sessionID, fingerprint);
+      void (async () => {
+        try {
+          const isChild = await isChildSession(memoryInjectorCtx, sessionID);
+          const prefix = isChild ? "AUTO-CTXDUMP-TASK" : "AUTO-CTXDUMP";
+          await writeContextDump({
+            sessionID,
+            baseDir: ctx.directory,
+            filenamePrefix: prefix,
+            systemSnapshots: ctx.systemSnapshots ?? new Map(),
+            systemMetadataMap: ctx.systemMetadataMap ?? new Map(),
+            systemInjectionsMap: ctx.systemInjectionsMap ?? new Map(),
+            transformedMessagesMap: ctx.transformedMessagesMap ?? new Map(),
+            client: ctx.client,
+            detail: false,
+          });
+        } catch (err) {
+          if (autoDumpFingerprintMap.get(sessionID) === fingerprint) {
+            autoDumpFingerprintMap.delete(sessionID);
+          }
+          ctx.contextDebugLog(`[auto-dump] error: ${err}`);
+        }
+      })();
     }
 
     return output;
