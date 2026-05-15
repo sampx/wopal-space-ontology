@@ -36,6 +36,11 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     const eventType = input.event.type
     const props = input.event.properties
 
+    // DEBUG: log all step-related events
+    if (eventType.startsWith("session.next")) {
+      ctx.taskDebugLog(`[events] ${eventType}`)
+    }
+
     // Lazy recovery: trigger on first event with a sessionID
     if (!recovered && ctx.taskManager) {
       const sessionID = props?.sessionID as string | undefined
@@ -61,6 +66,9 @@ export function createEventRouter(ctx: EventRouterHookContext) {
         ctx.sessionStore.upsert(sessionID, (s) => {
           s.model = { providerID: model.providerID!, modelID: model.id!, variant: model.variant }
         })
+        ctx.taskDebugLog(`[model] cached ${model.providerID}/${model.id} for ${sessionID.slice(0, 8)}`)
+      } else {
+        ctx.taskDebugLog(`[model] step.started but missing model data`, { sessionID, model })
       }
     }
 
