@@ -1,4 +1,4 @@
-import { extractSessionID, extractLatestUserPrompt, type MessageWithInfo } from "./message-context.js";
+import { extractSessionID, extractLatestUserPrompt, extractAgentName, type MessageWithInfo } from "./message-context.js";
 import type { SessionStore } from "../session-store.js";
 import type { DebugLog } from "../debug.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
@@ -29,17 +29,16 @@ export function createMessageHooks(ctx: MessageHookContext) {
   ): Promise<MessagesTransformOutput> {
     const sessionID = extractSessionID(output.messages);
     if (!sessionID) {
-      ctx.contextDebugLog("No sessionID found in messages");
       return output;
     }
 
     const existingState = ctx.sessionStore.get(sessionID);
     const shouldSeed = !existingState?.seededFromHistory;
+    const isTask = !!ctx.taskManager?.findBySession(sessionID);
+    const agentName = extractAgentName(output.messages);
 
     if (shouldSeed) {
       const userPrompt = extractLatestUserPrompt(output.messages);
-
-      // Store recent messages for context enrichment (last N messages)
       const recentMessages = output.messages.slice(-MAX_RECENT_MESSAGES);
 
       ctx.sessionStore.upsert(sessionID, (state) => {
@@ -50,15 +49,14 @@ export function createMessageHooks(ctx: MessageHookContext) {
         state.seededFromHistory = true;
         state.seedCount = (state.seedCount ?? 0) + 1;
         state.recentMessages = recentMessages;
+        state.agent = agentName;
+        state.isTask = isTask;
       });
-
-      if (userPrompt) {
-        ctx.contextDebugLog(
-          `Seeded user prompt for session ${sessionID} (len=${userPrompt.length})`,
-        );
-      }
     } else {
-      ctx.contextDebugLog(`Session ${sessionID} already seeded, skipping rescan`);
+      ctx.sessionStore.upsert(sessionID, (state) => {
+        state.agent = agentName;
+        state.isTask = isTask;
+      });
     }
 
     // Skill Reload injection: find last user message first, then consume
@@ -73,11 +71,15 @@ export function createMessageHooks(ctx: MessageHookContext) {
     }
 
     await injectSkillReload(ctx.skillReloadCtx, sessionID, lastUserMsg);
-    const isTask = !!ctx.taskManager?.findBySession(sessionID);
     await injectRulesToMessage(ctx.ruleMessageCtx, sessionID, output.messages, lastUserMsg, isTask);
 
     // Store transformed messages for auto dump
     ctx.transformedMessagesMap.set(sessionID, output.messages);
+
+    const prefix = isTask ? "task" : "main";
+    const sid = `${sessionID.slice(0, 16)}(${prefix})`;
+    const agent = agentName ?? "?";
+    ctx.contextDebugLog(`[msg] ${sid} agent=${agent}`);
 
     return output;
   }
@@ -91,7 +93,6 @@ export function createMessageHooks(ctx: MessageHookContext) {
   ): Promise<void> {
     const sessionID = input?.sessionID;
     if (!sessionID) {
-      ctx.contextDebugLog("No sessionID in chat.message hook input");
       return;
     }
 
@@ -128,10 +129,6 @@ export function createMessageHooks(ctx: MessageHookContext) {
           state.lastUserPrompt = userPrompt;
           state.needsMemoryInjection = true;
         });
-
-        ctx.contextDebugLog(
-          `Updated lastUserPrompt for session ${sessionID} (len=${userPrompt.length}, parts=${textParts.length})`,
-        );
       }
     }
   }

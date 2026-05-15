@@ -12,6 +12,7 @@ import type { DebugLog } from "../debug.js";
 import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { Model } from "@opencode-ai/sdk";
+import { formatSessionID } from "../debug.js";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
   injectMemoriesIntoSystem,
@@ -81,7 +82,7 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
   };
   const autoDumpFingerprintMap = new Map<string, string>();
 
-  async function onSystemTransform(
+async function onSystemTransform(
     hookInput: SystemTransformInput,
     output: SystemTransformOutput | null,
   ): Promise<SystemTransformOutput> {
@@ -90,9 +91,6 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     if (sessionID) {
       const skip = ctx.sessionStore.shouldSkipInjection(sessionID);
       if (skip) {
-        ctx.contextDebugLog(
-          `Session ${sessionID} is compacting - skipping memory injection`,
-        );
         return output ?? { system: [] };
       }
     }
@@ -120,14 +118,23 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
     // Store structured metadata if available
     if (sessionID && hookInput.systemMetadata && ctx.systemMetadataMap) {
       ctx.systemMetadataMap.set(sessionID, hookInput.systemMetadata);
-      ctx.contextDebugLog(`Stored systemMetadata for session ${sessionID}: ${hookInput.systemMetadata.sections.length} sections`);
-    } else if (sessionID && ctx.systemMetadataMap) {
-      ctx.contextDebugLog(`No systemMetadata in hook input for session ${sessionID} (keys in map: ${ctx.systemMetadataMap.size})`);
     }
 
     // Store plugin injections (content appended after OpenCode's original system blocks)
     if (sessionID && ctx.systemInjectionsMap && output.system.length > initialSystemLength) {
       ctx.systemInjectionsMap.set(sessionID, output.system.slice(initialSystemLength));
+    }
+
+    // Consolidated context summary log (replaces multiple verbose logs)
+    if (sessionID) {
+      const state = ctx.sessionStore.get(sessionID);
+      const isTask = state?.isTask ?? false;
+      const agent = state?.agent;
+      const model = hookInput.model;
+      const modelStr = model ? `${model.providerID}/${model.id}` : "?";
+      ctx.contextDebugLog(
+        `[sys] ${formatSessionID(sessionID, isTask)} agent=${agent ?? "?"} model=${modelStr}`,
+      );
     }
 
     // Auto-dump: requires explicit "context" module (not triggered by "all" wildcard)
@@ -142,11 +149,9 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
       });
 
       if (autoDumpFingerprintMap.get(sessionID) === fingerprint) {
-        ctx.contextDebugLog(`[auto-dump] skipped duplicate for session ${sessionID}`);
         return output;
       }
 
-      ctx.contextDebugLog(`[auto-dump] triggered for session ${sessionID}`);
       autoDumpFingerprintMap.set(sessionID, fingerprint);
       void (async () => {
         try {

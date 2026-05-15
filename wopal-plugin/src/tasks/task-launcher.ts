@@ -80,7 +80,8 @@ export async function launchTask(
       body: {
         parentID: input.parentSessionID,
         title: input.description,
-      },
+        agent: input.agent,
+      } as { parentID: string; title: string; agent?: string },
     })
 
     debugLog(`[launch] session.create returned: ${JSON.stringify(session)}`)

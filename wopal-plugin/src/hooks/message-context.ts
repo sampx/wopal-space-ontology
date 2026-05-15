@@ -20,6 +20,19 @@ export interface MessageWithInfo {
 }
 
 /**
+ * Extract agent name from messages.
+ * Traverses from the end of messages backwards, returning the agent value
+ * of the first message that has info.agent defined.
+ */
+export function extractAgentName(messages: MessageWithInfo[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const agent = messages[i].info?.agent;
+    if (agent) return agent;
+  }
+  return undefined;
+}
+
+/**
  * Normalize paths to repo-relative POSIX format.
  * If path is absolute and under baseDir, convert to relative POSIX path.
  * Otherwise return path as-is.

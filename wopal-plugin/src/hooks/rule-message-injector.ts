@@ -3,23 +3,7 @@ import type { DebugLog } from "../debug.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
 import { injectRules } from "./rule-injector.js";
-import { extractLatestUserPrompt } from "./message-context.js";
-
-/**
- * Extract agent name from messages.
- * Traverses from the end of messages backwards, returning the agent value
- * of the first message that has info.agent defined.
- * Returns undefined if no message has an agent field.
- */
-export function extractAgentName(
-  messages: MessageWithInfo[],
-): string | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const agent = messages[i].info?.agent;
-    if (agent) return agent;
-  }
-  return undefined;
-}
+import { extractLatestUserPrompt, extractAgentName } from "./message-context.js";
 
 export interface RuleMessageInjectorContext {
   sessionStore: SessionStore;

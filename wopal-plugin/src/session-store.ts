@@ -16,6 +16,10 @@ export interface SessionState {
   loadedSkills: Set<string>;
   /** Set to true after compact completes when loadedSkills is non-empty */
   needsSkillReload?: boolean;
+  /** Agent name extracted from the most recent messages.transform cycle */
+  agent?: string | undefined;
+  /** Whether this session is a background task child session */
+  isTask?: boolean | undefined;
 }
 
 export interface SessionStoreOptions {

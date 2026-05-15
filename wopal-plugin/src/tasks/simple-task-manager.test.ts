@@ -66,6 +66,7 @@ describe("SimpleTaskManager", () => {
         body: {
           parentID: "parent-1",
           title: "Test task",
+          agent: "general",
         },
       })
       expect(mockClient.session.promptAsync).toHaveBeenCalledWith({

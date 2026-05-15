@@ -95,7 +95,7 @@ describe('system-transform auto dump deduplication', () => {
     await flushAutoDump();
 
     expect(writeContextDump).toHaveBeenCalledTimes(1);
-    expect(contextDebugLog).toHaveBeenCalledWith('[auto-dump] skipped duplicate for session ses_1');
+    expect(contextDebugLog).toHaveBeenCalledWith('[sys] ses_1(main) agent=? model=test/undefined');
   });
 
   it('writes a new auto dump when transformed messages change', async () => {

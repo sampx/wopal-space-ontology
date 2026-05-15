@@ -54,7 +54,7 @@ export async function injectRules(
   if (result.content) {
     const matchedRuleNames = formatMatchedRulesForLog(result.matchedRules);
     ctx.rulesDebugLog(
-      `Injected ${matchedRuleNames.length} rules for session ${formatSessionID(sessionID, !!isTask)}: ${matchedRuleNames.join(", ")}`,
+      `${formatSessionID(sessionID, !!isTask)} agent=${agentName ?? "?"}: injected ${matchedRuleNames.length} rules → ${matchedRuleNames.join(", ")}`,
     );
     return result.content;
   } else {

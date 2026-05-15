@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractAgentName } from "./rule-message-injector.js";
+import { extractAgentName } from "./message-context.js";
 import type { MessageWithInfo } from "./message-context.js";
 
 describe("extractAgentName", () => {
