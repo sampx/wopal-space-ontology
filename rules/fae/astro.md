@@ -3,6 +3,7 @@ trigger: model_decision
 description: Astro 项目开发时遵守此规则。
 keywords:
   - 'astro'
+  - '*博客界面*'
 ---
 # Astro 开发规范
 
