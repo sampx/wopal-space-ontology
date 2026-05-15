@@ -26,7 +26,7 @@ export interface EventRouterHookContext {
 export function createEventRouter(ctx: EventRouterHookContext) {
   let recovered = false
 
-  const infoLog = createInfoLog("[tokens]");
+  const infoLog = createInfoLog("[plugin] [tokens]");
 
   async function onEvent(
     input: { event: { type: string; properties?: Record<string, unknown> } },
