@@ -11,6 +11,7 @@ import { createSystemTransformHooks } from "./system-transform.js";
 import { createEventRouter } from "./event-router.js";
 import { createCompactionHooks } from "./compaction.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
+import type { MemoryInjectorContext } from "./memory-injector.js";
 
 export interface HookContextOptions {
   client: unknown;
@@ -110,7 +111,20 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
       rulesDebugLog: ctx.rulesDebugLog,
       rulesInjectionEnabled: ctx.rulesInjectionEnabled,
     },
-    taskManager: ctx.taskManager,
+    memoryMessageCtx: {
+      memoryInjectorCtx: {
+        client: ctx.client,
+        sessionStore: ctx.sessionStore,
+        memoryDebugLog: ctx.memoryDebugLog,
+        memoryInjector: ctx.memoryInjector,
+        childSessionCache: ctx.childSessionCache,
+        taskManager: ctx.taskManager,
+      } satisfies MemoryInjectorContext,
+      memoryInjector: ctx.memoryInjector,
+      sessionStore: ctx.sessionStore,
+      memoryDebugLog: ctx.memoryDebugLog,
+      memoryInjectionEnabled: ctx.memoryInjectionEnabled,
+    },
   });
 
   const systemTransformHooks = createSystemTransformHooks({
@@ -121,14 +135,12 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
     memoryDebugLog: ctx.memoryDebugLog,
     contextDebugLog: ctx.contextDebugLog,
     now: ctx.now,
-    memoryInjector: ctx.memoryInjector,
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
     systemSnapshots: ctx.systemSnapshots,
     systemMetadataMap: ctx.systemMetadataMap,
     systemInjectionsMap: ctx.systemInjectionsMap,
     transformedMessagesMap,
-    memoryInjectionEnabled: ctx.memoryInjectionEnabled,
   });
 
   const eventRouter = createEventRouter({

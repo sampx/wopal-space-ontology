@@ -4,6 +4,7 @@ import type { DebugLog } from "../debug.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import { injectSkillReload, type SkillReloadInjectorContext } from "./skill-reload-injector.js";
 import { injectRulesToMessage, type RuleMessageInjectorContext } from "./rule-message-injector.js";
+import { injectMemoryToMessage, type MemoryMessageInjectorContext } from "./memory-message-injector.js";
 
 /** Max recent messages to store for short-query context enrichment */
 const MAX_RECENT_MESSAGES = 10;
@@ -20,6 +21,7 @@ export interface MessageHookContext {
   skillReloadCtx: SkillReloadInjectorContext;
   ruleMessageCtx: RuleMessageInjectorContext;
   taskManager?: SimpleTaskManager | undefined;
+  memoryMessageCtx: MemoryMessageInjectorContext;
 }
 
 export function createMessageHooks(ctx: MessageHookContext) {
@@ -72,6 +74,7 @@ export function createMessageHooks(ctx: MessageHookContext) {
 
     await injectSkillReload(ctx.skillReloadCtx, sessionID, lastUserMsg);
     await injectRulesToMessage(ctx.ruleMessageCtx, sessionID, output.messages, lastUserMsg, isTask);
+    await injectMemoryToMessage(ctx.memoryMessageCtx, sessionID, output.messages, lastUserMsg);
 
     // Store transformed messages for auto dump
     ctx.transformedMessagesMap.set(sessionID, output.messages);

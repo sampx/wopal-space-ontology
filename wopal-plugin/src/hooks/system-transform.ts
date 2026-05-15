@@ -1,13 +1,13 @@
 /**
- * System Transform Hook - Memory injection + snapshot/dump
+ * System Transform Hook - Snapshot/dump infrastructure
  *
- * Coordinates memory-injector module.
+ * Handles auto-dump with isChildSession prefix detection.
+ * Memory injection has been migrated to messages.transform (memory-message-injector.ts).
  */
 
 import { createHash } from 'node:crypto';
 
 import type { SessionStore } from "../session-store.js";
-import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
@@ -15,7 +15,6 @@ import type { Model } from "@opencode-ai/sdk";
 import { formatSessionID } from "../debug.js";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
-  injectMemoriesIntoSystem,
   isChildSession,
   type MemoryInjectorContext,
   type SystemTransformOutput,
@@ -35,14 +34,12 @@ export interface SystemTransformHookContext {
   memoryDebugLog: DebugLog;
   contextDebugLog: DebugLog;
   now: () => number;
-  memoryInjector: MemoryInjector | undefined;
   childSessionCache: Map<string, boolean>;
   taskManager: { findBySession: (sessionID: string) => unknown } | undefined;
   systemSnapshots?: Map<string, string[]>;
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
   transformedMessagesMap?: Map<string, MessageWithInfo[]>;
-  memoryInjectionEnabled: boolean;   // Passed from HookContext
 }
 
 function normalizeFingerprintValue(value: unknown): unknown {
@@ -72,11 +69,13 @@ function buildAutoDumpFingerprint(input: {
 }
 
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
+  // MemoryInjectorContext for isChildSession (auto-dump prefix detection)
+  // memoryInjector is undefined - injection moved to messages.transform
   const memoryInjectorCtx: MemoryInjectorContext = {
     client: ctx.client,
     sessionStore: ctx.sessionStore,
     memoryDebugLog: ctx.memoryDebugLog,
-    memoryInjector: ctx.memoryInjector,
+    memoryInjector: undefined,
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
   };
@@ -102,13 +101,7 @@ async function onSystemTransform(
       output.system = [];
     }
 
-    // Record initial length before plugin injections
     const initialSystemLength = output.system.length;
-
-    // Memory injection (after rules, into same system array)
-    if (ctx.memoryInjectionEnabled && ctx.memoryInjector && sessionID) {
-      await injectMemoriesIntoSystem(memoryInjectorCtx, sessionID, output);
-    }
 
     // Snapshot system prompt for context dump
     if (sessionID && ctx.systemSnapshots) {
