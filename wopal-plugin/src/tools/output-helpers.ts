@@ -34,7 +34,7 @@ export async function getSessionModelInfo(
     if (typeof client.session?.messages !== "function") return null
     const messagesResult = await client.session.messages({
       path: { id: sessionID },
-      query: { limit: 1 }
+      query: { limit: 5 }
     })
     const messages = messagesResult?.data ?? []
 
