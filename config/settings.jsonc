@@ -32,8 +32,7 @@
         },
         "instructions": [
             ".workspace.md",
-            "USER.md",
-            "MEMORY.md"
+            "USER.md"
         ],
         // "skills": {
         //   "paths": ["/Users/sam/coding/wopal/wopal-workspace/.agents/skills"]
