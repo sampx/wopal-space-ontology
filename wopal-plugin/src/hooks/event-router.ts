@@ -3,6 +3,7 @@ import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { DebugLog } from "../debug.js";
 import { trackActivity } from "../tasks/progress.js";
 import { createInfoLog } from "../debug.js";
+import { getTaskModelInfo } from "../tools/output-helpers.js";
 import type { IdleDiagnostic } from "../tasks/idle-diagnostic.js";
 
 interface EventPart {
@@ -36,43 +37,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     const eventType = input.event.type
     const props = input.event.properties
 
-    // DEBUG: log all step-related events
-    if (eventType.startsWith("session.next")) {
-      ctx.taskDebugLog(`[events] ${eventType}`)
-    }
-
-    // Lazy recovery: trigger on first event with a sessionID
-    if (!recovered && ctx.taskManager) {
-      const sessionID = props?.sessionID as string | undefined
-      if (sessionID) {
-        recovered = true
-        void ctx.taskManager.recoverFromSession(sessionID).catch((err) => {
-          ctx.taskDebugLog(`[recover] failed: ${err instanceof Error ? err.message : String(err)}`)
-        })
-      }
-    }
-
-    const ACTIONABLE_EVENTS = new Set(["session.idle"])
-    if (ACTIONABLE_EVENTS.has(eventType)) {
-      const eventSessionID = props?.sessionID as string | undefined
-      ctx.taskDebugLog(`[onEvent] received event: ${eventType}${eventSessionID ? ` session=${eventSessionID}` : ''}`)
-    }
-
-    // Cache model info from each step start (per-round accurate, no API calls)
-    if (eventType === "session.next.step.started") {
-      const sessionID = props?.sessionID as string | undefined
-      const model = props?.model as { id?: string; providerID?: string; variant?: string } | undefined
-      if (sessionID && model?.id && model?.providerID) {
-        ctx.sessionStore.upsert(sessionID, (s) => {
-          s.model = { providerID: model.providerID!, modelID: model.id!, variant: model.variant }
-        })
-        ctx.taskDebugLog(`[model] cached ${model.providerID}/${model.id} for ${sessionID.slice(0, 8)}`)
-      } else {
-        ctx.taskDebugLog(`[model] step.started but missing model data`, { sessionID, model })
-      }
-    }
-
-    // Track meaningful activity from streaming events for stuck detection
+// Lazy recovery: trigger on first event with a sessionID
     if (eventType === "message.part.delta") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
@@ -89,7 +54,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       if (sessionID && part?.type === "step-finish" && part?.tokens) {
         const t = part.tokens
         const cache = t.cache ?? {}
-        const modelInfo = ctx.sessionStore.get(sessionID)?.model
+        const modelInfo = await getTaskModelInfo(ctx.client, sessionID)
         const model = modelInfo ? ` model=${modelInfo.providerID}/${modelInfo.modelID}` : ""
         infoLog(`${sessionID.slice(0, 8)} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${model}`)
       }
