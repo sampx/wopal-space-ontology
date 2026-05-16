@@ -47,13 +47,13 @@ plan → approve → approve --confirm → complete → verify --confirm → arc
 ## 最容易遗漏的两步
 
 1. **Plan 写完后：`--check` → 必要时 `sync <issue> --body-only` → `approve` → 等用户审批。**
-2. **实施完成后：勾选已完成步骤 → 完成 Agent Verification → `complete` → 再等用户验证。**
+2. **实施完成后：每个 Task 运行 Verify 通过后勾选 Done → 完成 Agent Verification → `complete` → 再等用户验证。**
 
-   **步骤勾选范围**：
-   - Implementation：每个 Task 的 **Changes** 和 **Verification** 里的 `- [ ] Step N:` 格式 checkbox
-   - Test Plan：每个 Case 的 **Execution** 里的 `- [ ] Step N:` 格式 checkbox
-   
-   `complete` 会强制校验以上所有 Step checkbox 必须全部勾选，否则阻断并提示。
+   **Done 勾选范围**：
+   - Implementation：每个 Task 的 **Done** 里的 `- [ ]` checkbox
+   - Agent Verification：`### Agent Verification` 中的 `- [ ]` checkbox
+
+   `complete` 会强制校验以上所有 Done checkbox 必须全部勾选，否则阻断并提示。
 
 ## 状态机与命令映射
 
@@ -131,18 +131,17 @@ flow.sh plan --title "<type>(<scope>): <description>" --project <name> --type <t
 
 ### C. 进入 executing 后实施
 
-实施过程中，每完成一个步骤就立即勾选对应 checkbox，不要积压到最后统一补勾。
+实施过程中，每完成一个 Task 就运行 Verify 命令通过后立即勾选对应 Done checkbox，不要积压到最后统一补勾。
 
 至少及时更新：
-- `Implementation` 里的 `Changes`
-- `Verification` 里的步骤
-- 已实际完成的测试步骤
+- `Implementation` 里的每个 Task 的 Done checkbox
+- `Agent Verification` 的 checkbox
 
 ### D. 实施完成后，进入用户验证阶段
 
 不要直接让用户验证。先完成这几步：
 
-1. 回看 Plan，确认**所有步骤都已勾选**（Implementation + Test Plan 的 Step checkbox）。
+1. 回看 Plan，确认**所有 Task Done 都已勾选**。
 2. 完成并勾选 `### Agent Verification`。
 3. 然后必须执行：
    ```bash
@@ -150,7 +149,7 @@ flow.sh plan --title "<type>(<scope>): <description>" --project <name> --type <t
    ```
 
 `complete` 的硬门控：
-- Step completion：Implementation / Test Plan 中所有 `- [ ] Step N:` 格式 checkbox 必须勾选
+- Done completion：Implementation 中所有 Task 的 `- [ ]` Done checkbox 必须勾选
 - Agent Verification：`### Agent Verification` 中所有 checkbox 必须勾选
 
 门控失败时会阻断并提示：
@@ -167,7 +166,7 @@ flow.sh complete <issue> --pr
 ```
 
 不要这样做：
-- 步骤做完了但不勾选 checkbox
+- Task 完成运行 Verify 通过后但不勾选 Done checkbox
 - `Agent Verification` 未完成就推进
 - 忘记执行 `complete`
 
@@ -256,9 +255,11 @@ complete --pr → PR opened → PR merged → verify --confirm → archive
 
 SKILL.md 不重复模板章节内容，只规定流程要求：
 - Plan 写完后先做质量校验
+- 校验覆盖 Task 新字段（Verification Intent / Behavior / Design / TDD / Verify / Done）
 - 校验通过后再进入 `approve`
-- 实施过程中及时勾选步骤
+- 实施过程中每完成 Task 运行 Verify 后勾选 Done
 - 实施完成后补齐 `Agent Verification`，再执行 `complete`
+- Delegation Strategy 的详细规则见模板注释（Wave 分配、委派规则、Autonomous 标记等）
 
 如果 `approve` 被 check-doc 阻断，先修 Plan，再重试。
 
@@ -266,11 +267,15 @@ SKILL.md 不重复模板章节内容，只规定流程要求：
 
 ### Agent Verification
 
-由 agent 在 `complete` 前完成并勾选，用于机器可验证项，如构建、单测、CLI 自测。
+由 agent 在 `complete` 前完成并勾选，用于机器可验证项。
+
+**命令化要求**：每条必须写具体命令和预期输出（如 `rg -c 'pattern' file` ≥ 1），禁止纯描述性条目（如"代码构建通过"）。同时承载单 Task 内验证和跨 Task 集成验证。
 
 ### User Validation
 
 由用户在真实验证后确认，用于人工感知项，如 UI / UX、业务流程、集成行为。
+
+**排除规则**：禁止放入 Agent 可自动验证的项（构建、测试、lint、CLI 自测）。详细规则见 `references/plan-validation.md`。
 
 关键约束：
 - Agent 不得代勾选 User Validation 最终 checkbox
@@ -368,7 +373,7 @@ flow.sh reset <plan-name>
 ## 边缘场景
 
 1. **已有 Plan 再次执行 `plan`**：不重复创建，继续基于现有 Plan 推进。
-2. **`complete` 时 Step 未完成**：先勾选 Implementation / Test Plan 中所有 `- [ ] Step N:` 格式的 checkbox，不要强行进入 `verifying`。
+2. **`complete` 时 Done 未勾选**：先勾选 Implementation 中所有 Task 的 Done checkbox，不要强行进入 `verifying`。
 3. **`complete` 时 Agent Verification 未完成**：先补齐 `Agent Verification`，不要强行进入 `verifying`。
 4. **`verify --confirm` 时 PR 未 merged**：先等 PR merge。
 5. **`verify --confirm` 时用户未勾选最终 checkbox**：先让用户完成 User Validation。
@@ -382,7 +387,7 @@ flow.sh reset <plan-name>
 | `Invalid transition` | 回到正确状态顺序执行 |
 | `Plan not found` | 先运行 `plan` |
 | `check-doc failed` | 修好 Plan 再 `approve` |
-| `Step completion failed` | 勾选 Implementation / Test Plan 中所有 Step checkbox，再 `complete` |
+| `Done completion failed` | 勾选 Implementation 中所有 Task Done checkbox，再 `complete` |
 | `Agent Verification failed` | 补齐 Agent Verification checkbox，再 `complete` |
 | `dirty workspace` | 当前工作区不适合继续执行；先清理/提交，或改用 `--worktree` |
 | `PR not merged yet` | 等 merge 后再 `verify --confirm` |
@@ -401,5 +406,6 @@ flow.sh reset <plan-name>
 | `templates/issue-refactor.md` | refactor 类型 Issue 模板 |
 | `templates/issue-docs.md` | docs 类型 Issue 模板 |
 | `templates/issue-test.md` | test 类型 Issue 模板 |
-| `references/plan-validation.md` | Plan 校验规则（含 Test Plan / AC 写法） |
+| `references/plan-validation.md` | Plan 校验规则（Agent/User 验证边界、新字段校验） |
+| `references/tdd-guide.md` | TDD Task 编写指南（判断启发式、写法、提交建议） |
 | `references/issue-format.md` | Issue 标题与 Plan 命名规范 |
