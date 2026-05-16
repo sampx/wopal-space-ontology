@@ -79,11 +79,6 @@ export function createMessageHooks(ctx: MessageHookContext) {
     // Store transformed messages for auto dump
     ctx.transformedMessagesMap.set(sessionID, output.messages);
 
-    const prefix = isTask ? "task" : "main";
-    const sid = `${sessionID.slice(0, 16)}(${prefix})`;
-    const agent = agentName ?? "?";
-    ctx.contextDebugLog(`[msg] ${sid} agent=${agent}`);
-
     return output;
   }
 

@@ -52,6 +52,7 @@ export class SimpleTaskManager {
   private isShuttingDown = false
   private tickRunning = false
   private unregistered = false
+  private recoveredSessions = new Set<string>() // Prevent duplicate recovery calls
 
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,6 +269,12 @@ export class SimpleTaskManager {
   }
 
   async recoverFromSession(parentSessionID: string): Promise<void> {
+    // Prevent duplicate recovery calls for the same session
+    if (this.recoveredSessions.has(parentSessionID)) {
+      return
+    }
+    this.recoveredSessions.add(parentSessionID)
+
     if (typeof this.client?.session?.children !== "function") {
       this.debugLog(`[recover] skipped: session.children is unavailable`)
       return
@@ -275,9 +282,7 @@ export class SimpleTaskManager {
 
     try {
       const result = await this.client.session.children({ path: { id: parentSessionID } })
-      this.debugLog(`[recover] raw result keys: ${Object.keys(result ?? {}).join(', ')}`)
       const children = result?.data ?? result ?? []
-      this.debugLog(`[recover] children array length: ${Array.isArray(children) ? children.length : 'not array'}`)
       if (!Array.isArray(children)) {
         this.debugLog(`[recover] skipped: children is not an array, type=${typeof children}`)
         return

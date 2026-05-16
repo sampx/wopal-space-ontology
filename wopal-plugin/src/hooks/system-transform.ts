@@ -121,7 +121,10 @@ async function onSystemTransform(
     // Consolidated context summary log (replaces multiple verbose logs)
     if (sessionID) {
       const state = ctx.sessionStore.get(sessionID);
-      const isTask = state?.isTask ?? false;
+      // Use isChildSession to detect all child sessions (wopal_task + built-in task tool),
+      // not just taskManager-tracked sessions. Results are cached after first call.
+      const isChild = await isChildSession(memoryInjectorCtx, sessionID);
+      const isTask = (state?.isTask ?? false) || isChild;
       const agent = state?.agent;
       const model = hookInput.model;
       const modelStr = model ? `${model.providerID}/${model.id}` : "?";

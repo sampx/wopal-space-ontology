@@ -2,7 +2,7 @@ import type { SessionStore } from "../session-store.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { DebugLog } from "../debug.js";
 import { trackActivity } from "../tasks/progress.js";
-import { createInfoLog, formatSessionID } from "../debug.js";
+import { createDebugLog, formatSessionID } from "../debug.js";
 import { getSessionModelInfo } from "../tools/output-helpers.js";
 import type { IdleDiagnostic } from "../tasks/idle-diagnostic.js";
 
@@ -27,7 +27,7 @@ export interface EventRouterHookContext {
 export function createEventRouter(ctx: EventRouterHookContext) {
   let recovered = false
 
-  const infoLog = createInfoLog("[evt] [tokens]");
+  const contextLog = createDebugLog("[evt] [tokens]", "context");
 
   async function onEvent(
     input: { event: { type: string; properties?: Record<string, unknown> } },
@@ -39,7 +39,9 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     const sessionID = props?.sessionID as string | undefined
 
     // Lazy recovery: on first event from main session, restore child tasks
+    // Early flag setting prevents concurrent events from triggering duplicate recovery
     if (!recovered && sessionID) {
+      recovered = true // Set flag immediately to block concurrent events
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = ctx.client as any
       if (typeof client?.session?.get === "function") {
@@ -47,13 +49,15 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           const result = await client.session.get({ path: { id: sessionID } })
           const session = result?.data
           if (session && !session.parentID) {
-            recovered = true
             ctx.taskDebugLog(`[recover] main session detected: ${sessionID.slice(0, 16)}, triggering recovery`)
             void ctx.taskManager.recoverFromSession(sessionID)
           }
         } catch {
-          // Next event will retry
+          // Reset flag on failure so next event can retry
+          recovered = false
         }
+      } else {
+        recovered = false // Reset if client unavailable
       }
     }
 
@@ -67,14 +71,14 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     } else if (eventType === "message.part.updated") {
       const part = props?.part as EventPart | undefined
 
-// Token usage logging for all step-finish events (always-on, no debug flag needed)
+// Token usage logging for step-finish events (context debug module)
 if (sessionID && part?.type === "step-finish" && part?.tokens) {
   const t = part.tokens
   const cache = t.cache ?? {}
   const isTask = !!ctx.taskManager?.findBySession(sessionID)
   const modelInfo = await getSessionModelInfo(ctx.client, sessionID)
   const model = modelInfo ? ` model=${modelInfo.providerID}/${modelInfo.modelID}` : ""
-  infoLog(`${formatSessionID(sessionID, isTask)} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${model}`)
+  contextLog(`${formatSessionID(sessionID, isTask)} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${model}`)
 }
 
       if (sessionID) {
