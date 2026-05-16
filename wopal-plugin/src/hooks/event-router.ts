@@ -76,9 +76,10 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
   const t = part.tokens
   const cache = t.cache ?? {}
   const isTask = !!ctx.taskManager?.findBySession(sessionID)
+  const agent = ctx.sessionStore.get(sessionID)?.agent ?? "?"
   const modelInfo = await getSessionModelInfo(ctx.client, sessionID)
-  const model = modelInfo ? ` model=${modelInfo.providerID}/${modelInfo.modelID}` : ""
-  contextLog(`${formatSessionID(sessionID, isTask)} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${model}`)
+  const model = modelInfo ? `${modelInfo.providerID}/${modelInfo.modelID}` : "?"
+  contextLog(`${formatSessionID(sessionID, isTask)} agent=${agent} model=${model} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}`)
 }
 
       if (sessionID) {
@@ -96,12 +97,9 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
     if (eventType === "session.idle") {
       if (!sessionID) return
 
-      // 检查是否是 wopal_task 子会话
+      // Only handle wopal_task child sessions, skip main session idle
       const task = ctx.taskManager?.findBySession(sessionID)
-      if (!task) {
-        ctx.taskDebugLog(`[onEvent] session.idle for ${sessionID.slice(0, 16)}: no matching task found`)
-        return
-      }
+      if (!task) return
 
       // 拉取消息并诊断
       const diagnostic = await diagnoseIdleSession(sessionID)

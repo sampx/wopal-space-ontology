@@ -118,21 +118,6 @@ async function onSystemTransform(
       ctx.systemInjectionsMap.set(sessionID, output.system.slice(initialSystemLength));
     }
 
-    // Consolidated context summary log (replaces multiple verbose logs)
-    if (sessionID) {
-      const state = ctx.sessionStore.get(sessionID);
-      // Use isChildSession to detect all child sessions (wopal_task + built-in task tool),
-      // not just taskManager-tracked sessions. Results are cached after first call.
-      const isChild = await isChildSession(memoryInjectorCtx, sessionID);
-      const isTask = (state?.isTask ?? false) || isChild;
-      const agent = state?.agent;
-      const model = hookInput.model;
-      const modelStr = model ? `${model.providerID}/${model.id}` : "?";
-      ctx.contextDebugLog(
-        `[sys] ${formatSessionID(sessionID, isTask)} agent=${agent ?? "?"} model=${modelStr}`,
-      );
-    }
-
     // Auto-dump: requires explicit "context" module (not triggered by "all" wildcard)
     const debug = process.env.WOPAL_PLUGIN_DEBUG;
     const explicitContext = debug && debug.toLowerCase().split(",").map(m => m.trim()).includes("context");

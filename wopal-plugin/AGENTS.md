@@ -41,10 +41,12 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 | LanceDB/Embedding/LLM 初始化, 记忆检索/注入 | Memory | `[memory]` | `memory` |
 | 任务委派/监控/通信 | Task | `[task]` | `task` |
 | 会话状态/snapshot/compaction | Context | `[context]` | `context` |
-| Token 用量（input/output/cache_read/cache_write） | Context | `[context] [tokens]` | `context` |
+| Token 用量（input/output/cache_read/cache_write + agent/model） | Context | `[context] [tokens]` | `context` |
 
-Token 用量日志格式：`ses_<id> tokens: input=N output=N cache_read=N cache_write=N model=<provider>/<model>`
+Token 用量日志格式：`ses_<id> agent=<name> model=<provider>/<model> tokens: input=N output=N cache_read=N cache_write=N`
 
+- `agent`：会话所属 Agent（从 sessionStore 读取）
+- `model`：请求使用的模型（providerID/modelID，从 session.created/updated 事件缓存）
 - `input`：本次请求新增的 prompt token
 - `output`：LLM 回复生成的 token
 - `cache_read`：命中 prompt cache 的 token（约 90% 折扣计费）
