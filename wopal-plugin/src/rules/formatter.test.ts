@@ -363,8 +363,8 @@ Content with multiple paragraphs.`,
       "format test",
     );
 
-    expect(result.content).toContain("OpenCode Rules");
-    expect(result.content).toContain("## format-test.md");
+    expect(result.content).toContain("Matched rules");
+    expect(result.content).toContain("- **format-test.md**");
     expect(result.content).toContain("Rule Title");
   });
 

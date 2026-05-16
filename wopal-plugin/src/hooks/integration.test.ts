@@ -153,7 +153,7 @@ Do this always`,
         (p: any) => p.synthetic,
       );
       const rulesText = syntheticParts.map((p: any) => p.text).join("\n");
-      expect(rulesText).toContain("OpenCode Rules");
+      expect(rulesText).toContain("Matched rules");
       expect(rulesText).toContain("Test Rule");
     } finally {
       process.env.HOME = originalHome;
@@ -211,7 +211,7 @@ keywords:
         (p: any) => p.synthetic,
       );
       const rulesText = syntheticParts.map((p: any) => p.text).join("\n");
-      expect(rulesText).toContain("OpenCode Rules");
+      expect(rulesText).toContain("Matched rules");
       expect(rulesText).toContain("Rule Content");
     } finally {
       process.env.HOME = originalHome;

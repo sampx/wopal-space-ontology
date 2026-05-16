@@ -108,8 +108,10 @@ export async function readAndFormatRules(
       reason: `keyword: ${matchingKeywords.join(", ")}`,
     });
 
-    // Use relativePath for unique headings instead of just filename
-    ruleContents.push(`## ${relativePath}\n\n${strippedContent}`);
+    // Use list items + individual markdown blocks
+    ruleContents.push(
+      `- **${relativePath}**\n\n\`\`\`markdown\n${strippedContent}\n\`\`\``,
+    );
   }
 
   if (ruleContents.length === 0) {
@@ -117,8 +119,8 @@ export async function readAndFormatRules(
   }
 
   const content =
-    `# OpenCode Rules\n\nPlease follow the following rules:\n\n` +
-    ruleContents.join("\n\n---\n\n");
+    `Matched rules — apply if relevant:\n\n` +
+    ruleContents.join("\n\n");
 
   return { content, matchedRules };
 }

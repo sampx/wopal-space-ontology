@@ -43,7 +43,7 @@ function createMemoryCtx(opts?: {
     isEmpty: opts?.isEmpty ?? vi.fn().mockResolvedValue(false),
     retrieveAndFormat:
       opts?.retrieveAndFormat ??
-      vi.fn().mockResolvedValue('# 相关记忆\n\n## 知识\n\n- test memory'),
+      vi.fn().mockResolvedValue('Relevant memories (ordered by relevance, first is most relevant):\n\n```markdown\n- test memory\n```'),
   } as unknown as MemoryInjector;
 
   const ctx: MemoryMessageInjectorContext = {
@@ -105,10 +105,10 @@ describe('injectMemoryToMessage', () => {
     const injected = lastUserMsg.parts![1]!;
     expect(injected.synthetic).toBe(true);
     expect(injected.text).toContain('<memory-context>');
-    expect(injected.text).toContain('# 相关记忆');
+    expect(injected.text).toContain('Relevant memories (ordered by relevance');
     expect(injected.text).toContain('</memory-context>');
 
-    expect(sessionStore.get('ses_1')?.injectedRawText).toContain('# 相关记忆');
+    expect(sessionStore.get('ses_1')?.injectedRawText).toContain('Relevant memories (ordered by relevance');
     expect(sessionStore.get('ses_1')?.needsMemoryInjection).toBe(false);
   });
 
