@@ -471,7 +471,7 @@ def _check_done_completion(content: str, plan_file: str) -> None:
         tasks = re.findall(TASK_PATTERN, impl_section, re.MULTILINE | re.DOTALL)
         for task_title, task_content in tasks:
             done_match = re.search(
-                r'\*\*Done\*\*:\s*\n(.*?)(?=^###|\Z)',
+                r'\*\*Done\*\*:.*?\n(.*?)(?=^###|\Z)',
                 task_content, re.MULTILINE | re.DOTALL
             )
             if done_match:
