@@ -2,6 +2,7 @@ import type { SimpleTaskManager } from "./simple-task-manager.js"
 import { createDebugLog, createWarnLog, formatSessionID, type DebugLog } from "../debug.js"
 import { toErrorMessage } from "./utils.js"
 import { sendNotification } from "./task-notifier.js"
+import type { OpenCodeClient } from "../types.js"
 
 const defaultDebugLog = createDebugLog("[task]", "task")
 const defaultWarnLog = createWarnLog("[task]")
@@ -27,7 +28,7 @@ export interface PermissionAskedEvent {
 export async function handlePermissionAsked(
   event: PermissionAskedEvent,
   taskManager: SimpleTaskManager,
-  client?: unknown,
+  client?: OpenCodeClient,
   debugLog?: DebugLog,
 ): Promise<boolean> {
   const log = debugLog ?? defaultDebugLog
@@ -48,8 +49,7 @@ export async function handlePermissionAsked(
 
   // 获取客户端（v1 SDK: postSessionIdPermissionsPermissionId）
   const actualClient = client ?? taskManager.getClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const clientAny = actualClient as any
+  const clientAny = actualClient
 
   // v2 SDK: client.permission.reply({ requestID, reply: "once" })
   // v1 SDK: client.postSessionIdPermissionsPermissionId({ path: { id, permissionID }, body: { response } })
@@ -111,8 +111,7 @@ ${patterns && patterns.length > 0 ? `**Patterns:** ${patterns.join(", ")}` : ""}
 Permission was auto-approved for this background task.
 </system-reminder>`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = taskManager.getClient() as any
+  const client = taskManager.getClient()
 
   await sendNotification({ client, debugLog: log }, task.parentSessionID, notification, true)
   log(`[permission] notified parent for task ${taskId}`)

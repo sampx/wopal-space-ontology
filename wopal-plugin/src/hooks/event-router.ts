@@ -6,6 +6,8 @@ import { createDebugLog, formatSessionID } from "../debug.js";
 import { getSessionModelInfo } from "../tools/output-helpers.js";
 import type { IdleDiagnostic } from "../tasks/idle-diagnostic.js";
 
+import type { OpenCodeClient, SessionMessage } from "../types.js";
+
 interface EventPart {
   type?: string;
   tokens?: {
@@ -17,7 +19,7 @@ interface EventPart {
 }
 
 export interface EventRouterHookContext {
-  client: unknown;
+  client: OpenCodeClient;
   sessionStore: SessionStore;
   contextDebugLog: DebugLog;
   taskDebugLog: DebugLog;
@@ -42,12 +44,11 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     // Early flag setting prevents concurrent events from triggering duplicate recovery
     if (!recovered && sessionID) {
       recovered = true // Set flag immediately to block concurrent events
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = ctx.client as any
+      const client = ctx.client;
       if (typeof client?.session?.get === "function") {
         try {
-          const result = await client.session.get({ path: { id: sessionID } })
-          const session = result?.data
+const result = await client.session.get({ path: { id: sessionID } })
+      const session = (result as { data?: { parentID?: string } } | undefined)?.data
           if (session && !session.parentID) {
             ctx.taskDebugLog(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
             void ctx.taskManager.recoverFromSession(sessionID)
@@ -215,8 +216,7 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
 
   async function diagnoseIdleSession(sessionID: string): Promise<IdleDiagnostic> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = ctx.client as any
+      const client = ctx.client;
       if (typeof client?.session?.messages !== "function") {
         return { verdict: 'error', reason: 'no_message_access' }
       }
@@ -225,7 +225,7 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
         path: { id: sessionID },
         query: { limit: 10 }
       })
-      const messages = result?.data ?? []
+      const messages = (result as { data?: SessionMessage[] } | undefined)?.data ?? []
       ctx.taskDebugLog(`diagnoseIdleSession: fetched ${messages.length} messages (limit: 10)`)
 
       const { diagnoseIdle } = await import("../tasks/idle-diagnostic.js")

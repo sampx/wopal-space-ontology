@@ -1,6 +1,7 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
 import { createDebugLog, formatSessionID, type DebugLog } from "../debug.js"
 import { toErrorMessage } from "./utils.js"
+import type { OpenCodeClient } from "../types.js"
 
 const defaultDebugLog = createDebugLog("[task]", "task")
 
@@ -98,8 +99,7 @@ async function notifyParentQuestion(
 This question requires your attention. The background task is waiting.
 </system-reminder>`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = taskManager.getClient() as any
+  const client = taskManager.getClient() as OpenCodeClient
 
   if (typeof client?.session?.promptAsync !== "function") {
     log(`[question] session.promptAsync unavailable for notification`)

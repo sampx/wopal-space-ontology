@@ -1,6 +1,6 @@
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
-import type { WopalTask } from "../types.js"
+import type { WopalTask, OpenCodeClient } from "../types.js"
 import { createDebugLog } from "../debug.js"
 import { trackActivity } from "../tasks/progress.js"
 
@@ -13,7 +13,7 @@ function resetTaskForResume(task: WopalTask): void {
   trackActivity(task, "text")
 }
 
-async function replyQuestion(taskId: string, manager: SimpleTaskManager, client: Record<string, unknown>, requestID: string, message: string) {
+async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientArg: OpenCodeClient, requestID: string, message: string) {
   const v2Client = manager.getV2Client()
   if (typeof v2Client?.question?.reply === "function") {
     const result = await v2Client.question.reply({
@@ -29,7 +29,7 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, client:
     return
   }
 
-  const questionClient = (client?.question ?? {}) as { reply?: (args: { requestID: string; answers: string[][] }) => Promise<unknown> }
+  const questionClient = (clientArg?.question ?? {}) as { reply?: (args: { requestID: string; answers: string[][] }) => Promise<unknown> }
   if (typeof questionClient.reply === "function") {
     await questionClient.reply({
       requestID,
@@ -43,8 +43,8 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, client:
     throw new Error("question.reply is unavailable")
   }
 
-  const clientAny = manager.getClient() as Record<string, unknown> | undefined
-  const internalClient = clientAny?._client as { getConfig?: () => { fetch?: typeof globalThis.fetch } } | undefined
+  const client = manager.getClient() as Record<string, unknown> | undefined
+  const internalClient = client?._client as { getConfig?: () => { fetch?: typeof globalThis.fetch } } | undefined
   const internalFetch = internalClient?.getConfig?.()?.fetch ?? globalThis.fetch
 
   const url = new URL(`/question/${requestID}/reply`, serverUrl)
@@ -103,17 +103,15 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
         return "Error: Task has no active session"
       }
 
-      const client = manager.getClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clientAny = client as any
+      const client = manager.getClient() as OpenCodeClient
 
       // Handle interrupt mode
       if (interrupt) {
         try {
           // Abort current execution
-          if (typeof clientAny?.session?.abort === "function") {
+          if (typeof client?.session?.abort === "function") {
             try {
-              await clientAny.session.abort({ path: { id: task.sessionID } })
+              await client.session.abort({ path: { id: task.sessionID } })
               debugLog(`task ${task_id} aborted before interrupt reply`)
             } catch (abortErr) {
               debugLog(`abort failed (task may already be idle): ${abortErr}`)
@@ -121,11 +119,11 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           }
 
           // Send corrective message
-          if (typeof clientAny?.session?.promptAsync !== "function") {
+          if (typeof client?.session?.promptAsync !== "function") {
             return "Error: session.promptAsync is unavailable"
           }
 
-          await clientAny.session.promptAsync({
+          await client.session.promptAsync({
             path: { id: task.sessionID },
             body: {
               parts: [{ type: "text", text: message }],
@@ -154,7 +152,7 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           const questionID = task.pendingQuestionID
           debugLog(`resolving question deferred: requestID=${questionID}`)
 
-          await replyQuestion(task_id, manager, clientAny, questionID, message)
+          await replyQuestion(task_id, manager, client, questionID, message)
 
           debugLog(`question resolved: requestID=${questionID}`)
           delete task.pendingQuestionID
@@ -165,11 +163,11 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           return `Reply sent to task ${task_id}. The background task will continue execution.`
         }
 
-        if (typeof clientAny?.session?.promptAsync !== "function") {
+        if (typeof client?.session?.promptAsync !== "function") {
           return "Error: session.promptAsync is unavailable"
         }
 
-        await clientAny.session.promptAsync({
+        await client.session.promptAsync({
           path: { id: task.sessionID },
           body: {
             parts: [{ type: "text", text: message }],

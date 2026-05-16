@@ -7,7 +7,7 @@
  */
 
 import type { PluginInput, Hooks } from "@opencode-ai/plugin";
-import type { SystemPromptMetadata } from "./types.js";
+import type { SystemPromptMetadata, OpenCodeClient } from "./types.js";
 import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk/v2";
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
@@ -142,7 +142,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
   const systemInjectionsMap = new Map<string, string[]>();
 
   const ctx = createHookContext({
-    client: pluginInput.client,
+    client: pluginInput.client as OpenCodeClient,
     directory: pluginInput.directory,
     projectDirectory: pluginInput.directory,
     ruleFiles,

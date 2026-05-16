@@ -9,10 +9,9 @@ import { createHash } from 'node:crypto';
 
 import type { SessionStore } from "../session-store.js";
 import type { DebugLog } from "../debug.js";
-import type { SystemPromptMetadata } from "../types.js";
+import type { SystemPromptMetadata, OpenCodeClient } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { Model } from "@opencode-ai/sdk";
-import { formatSessionID } from "../debug.js";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
   isChildSession,
@@ -27,7 +26,7 @@ interface SystemTransformInput {
 }
 
 export interface SystemTransformHookContext {
-  client: unknown;
+  client: OpenCodeClient;
   directory: string;
   projectDirectory: string;
   sessionStore: SessionStore;

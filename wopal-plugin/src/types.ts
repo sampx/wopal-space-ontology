@@ -139,3 +139,31 @@ export interface SystemPromptMetadata {
   version: 1
   sections: SystemPromptSection[]
 }
+
+// EllaMaka SDK client types (minimal interface for plugin usage)
+// Return types use `unknown` because the SDK returns discriminated unions
+// (data/error) that are consumed via optional chaining throughout the plugin.
+
+export interface OpenCodeSession {
+  get(args: { path: { id: string } }): Promise<unknown>
+  messages(args: { path: { id: string }; query?: { limit?: number } }): Promise<unknown>
+  promptAsync(args: { path: { id: string }; body: { parts: unknown[]; noReply?: boolean } }): Promise<unknown>
+  abort(args: { path: { id: string } }): Promise<unknown>
+  update(args: { path: { id: string }; body: { title: string } }): Promise<unknown>
+}
+
+export interface OpenCodePermission {
+  reply(args: { requestID: string; reply: string }): Promise<unknown>
+}
+
+export interface OpenCodeQuestion {
+  reply(args: { requestID: string; answers: string[][] }): Promise<unknown>
+}
+
+export interface OpenCodeClient {
+  session?: OpenCodeSession
+  permission?: OpenCodePermission
+  question?: OpenCodeQuestion
+  // v1 SDK compatibility (deprecated)
+  postSessionIdPermissionsPermissionId?(args: { path: { id: string; permissionID: string }; body: { response: string } }): Promise<unknown>
+}

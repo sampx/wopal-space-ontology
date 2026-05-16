@@ -9,10 +9,11 @@ import type { SessionStore } from "../session-store.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { MessageWithInfo } from "./message-context.js";
+import type { OpenCodeClient } from "../types.js";
 import { buildEnrichedQuery } from "./conversation-context.js";
 
 export interface MemoryInjectorContext {
-  client: unknown;
+  client: OpenCodeClient;
   sessionStore: SessionStore;
   memoryDebugLog: DebugLog;
   memoryInjector: MemoryInjector | undefined;
@@ -43,12 +44,11 @@ export async function isChildSession(
 
   // Check 2: OpenCode session API — parentID means child session
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const client = ctx.client as any;
+    const client = ctx.client;
     const sessionApi = client?.session;
     if (sessionApi?.get && typeof sessionApi.get === "function") {
       const result = await sessionApi.get({ path: { id: sessionID } });
-      const data = result?.data;
+      const data = (result as { data?: { parentID?: string } } | undefined)?.data;
       const hasParent = !!data?.parentID;
       ctx.childSessionCache.set(sessionID, hasParent);
       if (hasParent) {
@@ -120,12 +120,12 @@ export async function injectMemoriesIntoSystem(
   // Build enriched query — fetch full session messages for context
   let allMessages: MessageWithInfo[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const messages = await (ctx.client as any).session?.messages?.({
+    const messages = await ctx.client.session?.messages?.({
       path: { id: sessionID },
     });
-    if (Array.isArray(messages?.data)) {
-      allMessages = messages.data;
+    const data = (messages as { data?: MessageWithInfo[] } | undefined)?.data;
+    if (Array.isArray(data)) {
+      allMessages = data;
     }
     ctx.memoryDebugLog(
       `API returned ${allMessages.length} messages for context extraction`,

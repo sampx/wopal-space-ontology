@@ -3,7 +3,7 @@ import type { SessionStore } from "../session-store.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DiscoveredRule } from "../rules/index.js";
-import type { SystemPromptMetadata } from "../types.js";
+import type { SystemPromptMetadata, OpenCodeClient } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
 import { createCommandHooks } from "./command-hooks.js";
 import { createMessageHooks } from "./message-hooks.js";
@@ -14,7 +14,7 @@ import type { RuleInjectorContext } from "./rule-injector.js";
 import type { MemoryInjectorContext } from "./memory-injector.js";
 
 export interface HookContextOptions {
-  client: unknown;
+  client: OpenCodeClient;
   directory: string;
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
@@ -31,7 +31,7 @@ export interface HookContextOptions {
 }
 
 export interface HookContext {
-  client: unknown;
+  client: OpenCodeClient;
   directory: string;
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
