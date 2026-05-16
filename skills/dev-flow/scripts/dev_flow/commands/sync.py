@@ -195,12 +195,27 @@ def _extract_technical_context_subsection(plan_file: str, subsection: str) -> st
 
 
 def _plan_has_audit_subsections(plan_file: str) -> bool:
-    """Check if Plan has Technical Context named subsections."""
+    """Check if Plan has Technical Context audit subsections (old format for audit tasks)."""
     subsections = ["Confirmed Bugs", "Content Model Defects", "Cleanup Scope", "Key Findings"]
     
     with open(plan_file, 'r') as f:
         content = f.read()
     
+    for subsection in subsections:
+        if f"### {subsection}" in content:
+            return True
+    
+    return False
+
+
+def _plan_has_new_template_subsections(plan_file: str) -> bool:
+    """Check if Plan has new template Technical Context 4 subsections."""
+    subsections = ["Architecture Context", "Research Findings", "Key Decisions", "Key Interfaces"]
+    
+    with open(plan_file, 'r') as f:
+        content = f.read()
+    
+    # Detect if any of the 4 subsections exists
     for subsection in subsections:
         if f"### {subsection}" in content:
             return True
@@ -253,6 +268,34 @@ def _extract_technical_context_top(plan_file: str) -> str:
 
 
 # ============================================
+# New Template Technical Context Extraction
+# ============================================
+
+def _extract_new_template_subsection(plan_file: str, subsection: str) -> str:
+    """
+    Extract a named subsection from Technical Context (new template).
+    
+    Subsection names: Architecture Context, Research Findings, Key Decisions, Key Interfaces
+    """
+    content = []
+    in_subsection = False
+    
+    with open(plan_file, 'r') as f:
+        for line in f:
+            if line.strip() == f"### {subsection}":
+                in_subsection = True
+                continue
+            
+            if in_subsection and (line.startswith("###") or (line.startswith("##") and not line.startswith("###"))):
+                break
+            
+            if in_subsection:
+                content.append(line)
+    
+    return ''.join(content).strip()
+
+
+# ============================================
 # Issue Body Construction (from plan-sync.sh)
 # ============================================
 
@@ -281,14 +324,41 @@ def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str) -> str
     Build normalized issue body from approved plan content.
     
     This preserves checkbox states from Agent Verification.
+    
+    NOTE: This function has a parallel implementation in
+    domain/issue/sync.py::_build_issue_body_from_plan. Both must be kept in sync.
+    TODO: Merge into a shared module to eliminate duplication.
     """
     has_audit_sections = _plan_has_audit_subsections(plan_file)
+    has_new_template = _plan_has_new_template_subsections(plan_file)
     
     # Extract Goal
     goal = _extract_plan_section(plan_file, "Goal", 5)
     
     # Extract Background based on Plan structure
-    if has_audit_sections:
+    if has_new_template:
+        # New template: extract 4 subsections and combine as background
+        arch_context = _extract_new_template_subsection(plan_file, "Architecture Context")
+        research_findings = _extract_new_template_subsection(plan_file, "Research Findings")
+        key_decisions = _extract_new_template_subsection(plan_file, "Key Decisions")
+        key_interfaces = _extract_new_template_subsection(plan_file, "Key Interfaces")
+        
+        # Combine non-empty subsections into background
+        bg_parts = []
+        if arch_context:
+            bg_parts.append(f"### Architecture Context\n\n{arch_context}")
+        if research_findings:
+            bg_parts.append(f"### Research Findings\n\n{research_findings}")
+        if key_decisions:
+            bg_parts.append(f"### Key Decisions\n\n{key_decisions}")
+        if key_interfaces:
+            bg_parts.append(f"### Key Interfaces\n\n{key_interfaces}")
+        background = "\n\n".join(bg_parts) if bg_parts else ""
+        confirmed_bugs = ""
+        content_model_defects = ""
+        cleanup_scope = ""
+        key_findings = ""
+    elif has_audit_sections:
         background = _extract_technical_context_top(plan_file)
         confirmed_bugs = _extract_technical_context_subsection(plan_file, "Confirmed Bugs")
         content_model_defects = _extract_technical_context_subsection(plan_file, "Content Model Defects")
@@ -335,8 +405,8 @@ def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str) -> str
     sections += _render_issue_section("Background", background, "<背景描述>")
     sections += "\n"
     
-    # Audit sections (only for Plans with subsections)
-    if has_audit_sections:
+    # Audit sections (only for Plans with old audit subsections)
+    if has_audit_sections and not has_new_template:
         if confirmed_bugs:
             sections += _render_issue_section("Confirmed Bugs", confirmed_bugs, "")
             sections += "\n"

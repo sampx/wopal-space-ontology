@@ -141,6 +141,10 @@ def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str, worksp
 def _build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, workspace_root: str = None) -> str:
     """Build Issue body content from plan file.
     
+    NOTE: This function has a parallel implementation in
+    commands/sync.py::build_issue_body_from_plan. Both must be kept in sync.
+    TODO: Merge into a shared module to eliminate duplication.
+    
     Args:
         plan_file: Path to plan file
         plan_name: Plan name (for URL)
@@ -151,9 +155,33 @@ def _build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, works
         Formatted Issue body
     """
     content = Path(plan_file).read_text()
+    has_new_template = _has_new_template_subsections(content)
     
     # Extract Goal section
     goal = _extract_section(content, "Goal")
+    
+    # Extract Background based on Plan structure
+    if has_new_template:
+        # New template: extract 4 subsections and combine as background
+        arch_context = _extract_subsection(content, "Architecture Context")
+        research_findings = _extract_subsection(content, "Research Findings")
+        key_decisions = _extract_subsection(content, "Key Decisions")
+        key_interfaces = _extract_subsection(content, "Key Interfaces")
+        
+        # Combine non-empty subsections into background
+        bg_parts = []
+        if arch_context:
+            bg_parts.append(f"### Architecture Context\n\n{arch_context}")
+        if research_findings:
+            bg_parts.append(f"### Research Findings\n\n{research_findings}")
+        if key_decisions:
+            bg_parts.append(f"### Key Decisions\n\n{key_decisions}")
+        if key_interfaces:
+            bg_parts.append(f"### Key Interfaces\n\n{key_interfaces}")
+        background = "\n\n".join(bg_parts) if bg_parts else ""
+    else:
+        # Old template: extract whole Technical Context section
+        background = _extract_section(content, "Technical Context")
     
     # Extract In Scope section
     in_scope = _extract_section(content, "In Scope")
@@ -177,6 +205,9 @@ def _build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, works
     
     # Goal section
     sections.append(f"## Goal\n\n{goal or '<目标描述>'}")
+    
+    # Background section
+    sections.append(f"## Background\n\n{background or '<背景描述>'}")
     
     # In Scope section
     sections.append(f"## In Scope\n\n{in_scope or '- 范围项 1'}")
@@ -205,6 +236,41 @@ def _extract_section(content: str, heading: str) -> str:
     """
     # Match ## Heading to next ## heading
     pattern = rf'^## {heading}\s*\n(.*?)(?=^##[^#]|\Z)'
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def _has_new_template_subsections(content: str) -> bool:
+    """Check if Plan content has new template Technical Context 4 subsections.
+    
+    Detects: Architecture Context, Research Findings, Key Decisions, Key Interfaces.
+    
+    Args:
+        content: Full Plan file content
+        
+    Returns:
+        True if any of the 4 subsections is found
+    """
+    subsections = ["Architecture Context", "Research Findings", "Key Decisions", "Key Interfaces"]
+    for subsection in subsections:
+        if f"### {subsection}" in content:
+            return True
+    return False
+
+
+def _extract_subsection(content: str, subsection: str) -> str:
+    """Extract a named ### subsection from content.
+    
+    Args:
+        content: Full markdown content
+        subsection: Subsection name (without ### prefix)
+        
+    Returns:
+        Subsection body content, or empty string
+    """
+    pattern = rf'^### {subsection}\s*\n(.*?)(?=^##[^#]|\Z)'
     match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
     if match:
         return match.group(1).strip()
