@@ -134,23 +134,17 @@ export function buildEnrichedQuery(
 
   if (conversation) {
     const result = `当前意图: ${trimmed}\n---\n${summaryText}${conversation}`;
-    debugLog(
-      `buildEnrichedQuery: conversation context found (${result.length} chars)`,
-    );
+    debugLog(`[enrichedQuery]\n${result}`);
     return result;
   }
 
   // No conversation found — use summary + raw query or just raw query
   if (summaryText) {
     const result = `当前意图: ${trimmed}\n---\n${summaryText}`;
-    debugLog(
-      `buildEnrichedQuery: no conversation, using summary + query (${result.length} chars)`,
-    );
+    debugLog(`[enrichedQuery] (no conversation)\n${result}`);
     return result;
   }
 
-  debugLog(
-    `buildEnrichedQuery: no context, using raw query (${trimmed.length} chars)`,
-  );
+  debugLog(`[enrichedQuery] (raw query only): ${trimmed}`);
   return trimmed;
 }

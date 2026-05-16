@@ -40,19 +40,14 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 | 规则发现/匹配/注入 | Rules | `[rules]` | `rules` |
 | LanceDB/Embedding/LLM 初始化, 记忆检索/注入 | Memory | `[memory]` | `memory` |
 | 任务委派/监控/通信 | Task | `[task]` | `task` |
-| 会话状态/snapshot/compaction | Context | `[context]` | `context` |
-| Token 用量（input/output/cache_read/cache_write + agent/model） | Context | `[context] [tokens]` | `context` |
+| 会话状态/snapshot/compaction/context 管理 | Context | `[context]` | `context` |
 
-Token 用量日志格式：`ses_<id> agent=<name> model=<provider>/<model> tokens: input=N output=N cache_read=N cache_write=N`
+**日志格式规则**：
 
-- `agent`：会话所属 Agent（从 sessionStore 读取）
-- `model`：请求使用的模型（providerID/modelID，从 session.created/updated 事件缓存）
-- `input`：本次请求新增的 prompt token
-- `output`：LLM 回复生成的 token
-- `cache_read`：命中 prompt cache 的 token（约 90% 折扣计费）
-- `cache_write`：首次写入 prompt cache 的 token（仅新会话前 1-2 次请求出现，约 25% 加价）
-- 三项之和 ≈ 完整 prompt token 数：input + cache_read + cache_write
-- `model`：请求使用的模型（providerID/modelID，从 session.created/updated 事件缓存）
+1. **SessionID 统一格式**：所有日志中的 sessionID 必须使用 `formatSessionID(sessionID, isTask)`，格式为 `ses_<16chars>(main)` 或 `ses_<16chars>(task)`
+2. **日志紧凑**：单条日志无空行分隔，多行内容用 `\n` 拼接后缩进展示
+3. **有价值信息**：日志内容必须包含实际值（如 enrichedQuery 内容、token 具体数值），避免"found"、"completed"等空洞描述
+4. **模块归属正确**：日志 prefix 和 module 参数必须与功能归属对应，禁止跨模块混用
 
 禁用状态在 Global 层（`[plugin]`）报告**一次**，禁用时模块代码**完全不执行**。
 

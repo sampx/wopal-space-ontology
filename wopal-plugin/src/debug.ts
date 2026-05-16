@@ -110,7 +110,7 @@ function writeLog(prefix: string, message: string): void {
   const timestamp = formatCSTTimestamp();
   const header = `${timestamp} ${prefix} `;
   const lines = message.split('\n');
-  const logMessage = lines.map((line, i) => i === 0 ? `${header}${line}` : `  ${line}`).join('\n') + '\n\n';
+  const logMessage = lines.map((line, i) => i === 0 ? `${header}${line}` : `  ${line}`).join('\n') + '\n';
 
   try {
     appendFileSync(logFile, logMessage, "utf-8");
