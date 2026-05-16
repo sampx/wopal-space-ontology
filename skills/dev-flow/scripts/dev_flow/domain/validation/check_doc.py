@@ -14,6 +14,44 @@ from pathlib import Path
 from dev_flow.core.workspace import find_workspace_root
 
 
+# ============================================
+# Module-level Regex Patterns (REFACTOR)
+# ============================================
+
+# Task field patterns
+DESIGN_PATTERN = r'\*\*Design\*\*:\s*\n(.*?)(?:\*\*TDD\*\*:|^###|^##|\Z)'
+BEHAVIOR_PATTERN = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Files\*\*:|\Z)'
+TDD_PATTERN = r'\*\*TDD\*\*:\s*(true|false)'
+DONE_PATTERN = r'\*\*Done\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
+CHANGES_PATTERN = r'\*\*Changes\*\*:\s*\n(.*?)(?:\*\*Verify\*\*:|^###|^##|\Z)'
+VERIFY_PATTERN_OLD = r'\*\*Verification\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
+
+# Checkbox patterns
+CHECKBOX_PATTERN = r'-\s+\[\s*\]'
+CHECKBOX_CHECKED_PATTERN = r'-\s+\[x\]'
+STEP_CHECKBOX_PATTERN = r'-\s+\[\s*\]\s+Step\s+\d+:'
+
+# Section patterns
+ARCH_CONTEXT_PATTERN = r'^###\s+Architecture\s+Context\s*\n'
+TASK_PATTERN = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
+
+# Executable command patterns
+COMMAND_PATTERNS = [
+    r'rg\s+-', r'python\s+-m', r'python\s+-c', r'pytest', r'npm\s+',
+    r'bun\s+', r'cargo\s+', r'curl\s+', r'bash\s+', r'sh\s+',
+    r'git\s+', r'gh\s+', r'grep', r'cat\s+', r'ls\s+', r'mkdir',
+    r'echo\s+', r'cd\s+', r'chmod', r'rm\s+', r'cp\s+', r'mv\s+',
+]
+
+# Forbidden automated test/build patterns (User Validation)
+FORBIDDEN_TEST_PATTERNS = [
+    r'npm\s+test', r'npm\s+run', r'npm\s+build',
+    r'pytest', r'python\s+-m\s+pytest', r'bun\s+test',
+    r'cargo\s+test', r'cargo\s+build', r'tsc',
+    r'go\s+test', r'go\s+build', r'make\s+test',
+]
+
+
 class ValidationError(Exception):
     """Raised when plan validation fails"""
     pass
@@ -23,13 +61,21 @@ def check_doc_plan(plan_file: str) -> None:
     """
     Check Plan document completeness (execution-grade quality gate).
     
-    Validates:
-    - File naming convention
+    Supports both old and new template formats via version detection.
+    
+    Old template validates:
     - No placeholders
-    - Required sections
     - Changes block format (checkbox, not numbered list)
     - Test Plan structure
     - User Validation section
+    - Project Path / Project Type
+    
+    New template validates:
+    - No placeholders
+    - Task structure (Design/Behavior/TDD/Done/Changes)
+    - Agent Verification (command format + position)
+    - User Validation (no automated commands)
+    - Project Path / Project Type
     
     Args:
         plan_file: Path to plan file
@@ -41,34 +87,43 @@ def check_doc_plan(plan_file: str) -> None:
         content = f.read()
     
     issues = []
+    version = detect_template_version(content)
     
-    # Check for placeholders (exclude code blocks)
+    # Common checks: placeholders
     content_no_codeblocks = _remove_code_blocks(content)
     placeholder_pattern = r'(<!-- *(TODO|FIXME)|\- \[ \] *(TODO|FIXME)|\*\*(TODO|FIXME)|(TODO|FIXME)[：:]|待补充|REQ-xxx|path/to/)'
     if re.search(placeholder_pattern, content_no_codeblocks):
         issues.append("Found placeholders in plan")
     
-    # Check Changes block format - must use '- [ ] Step N:' not numbered list
-    changes_issues = _check_changes_format(content)
-    if changes_issues:
-        issues.extend(changes_issues)
-    
-    # Check Test Plan structure
-    testplan_issues = _check_test_plan_structure(content)
-    if testplan_issues:
-        issues.extend(testplan_issues)
-    
-    # Check User Validation structure
-    uv_issues = _check_user_validation_structure(content)
-    if uv_issues:
+    if version == 'new':
+        # New template checks
+        task_issues = check_task_structure(content)
+        issues.extend(task_issues)
+        
+        ac_issues = check_agent_verification(content)
+        issues.extend(ac_issues)
+        
+        uv_issues = check_user_validation_new(content)
         issues.extend(uv_issues)
+    else:
+        # Old template checks (unchanged)
+        changes_issues = _check_changes_format(content)
+        if changes_issues:
+            issues.extend(changes_issues)
+        
+        testplan_issues = _check_test_plan_structure(content)
+        if testplan_issues:
+            issues.extend(testplan_issues)
+        
+        uv_issues = _check_user_validation_structure(content)
+        if uv_issues:
+            issues.extend(uv_issues)
     
-    # Check Project Path validity (if declared)
+    # Common checks: Project Path / Project Type
     pp_issue = _check_project_path(content)
     if pp_issue:
         issues.append(pp_issue)
 
-    # Check Project Type validity (if declared)
     pt_issue = _check_project_type(content)
     if pt_issue:
         issues.append(pt_issue)
@@ -144,8 +199,7 @@ def _check_changes_format(content: str) -> list:
     issues = []
     
     # Find each Task section
-    task_pattern = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
-    tasks = re.findall(task_pattern, content, re.MULTILINE | re.DOTALL)
+    tasks = re.findall(TASK_PATTERN, content, re.MULTILINE | re.DOTALL)
     
     for task_title, task_content in tasks:
         # Extract Changes block
@@ -411,19 +465,18 @@ def check_step_completion(plan_file: str) -> None:
     
     if impl_section:
         # Find each Task section
-        task_pattern = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
-        tasks = re.findall(task_pattern, impl_section, re.MULTILINE | re.DOTALL)
+        tasks = re.findall(TASK_PATTERN, impl_section, re.MULTILINE | re.DOTALL)
         
         for task_title, task_content in tasks:
             # Check Changes block for unchecked steps
             changes_match = re.search(
-                r'\*\*Changes\*\*:\s*\n(.*?)(?:\*\*Verification\*\*:|^###|^##|\Z)',
+                CHANGES_PATTERN.replace(r'\*\*Verify\*\*:', r'\*\*Verification\*\*:'),
                 task_content, re.MULTILINE | re.DOTALL
             )
             if changes_match:
                 changes_block = changes_match.group(1).strip()
                 unchecked_in_changes = re.findall(
-                    r'^\s*-\s+\[\s*\]\s+Step\s+\d+:.*$',
+                    r'^\s*' + STEP_CHECKBOX_PATTERN + r'.*$',
                     changes_block,
                     re.MULTILINE
                 )
@@ -479,3 +532,232 @@ def check_step_completion(plan_file: str) -> None:
             f"Please check the completed steps in the Plan file:\n  {plan_file}\n\n"
             f"After completing, run: flow.sh complete"
         )
+
+
+# ============================================
+# New Template Validation Functions
+# ============================================
+
+def detect_template_version(content: str) -> str:
+    """
+    Detect Plan template version (new vs old).
+    
+    Detection rule:
+    - New template: contains '### Architecture Context' subsection
+    - Old template: does not contain this subsection
+    
+    Args:
+        content: Plan file content
+        
+    Returns:
+        'new' if Architecture Context subsection found, 'old' otherwise
+    """
+    if re.search(ARCH_CONTEXT_PATTERN, content, re.MULTILINE):
+        return 'new'
+    return 'old'
+
+
+def check_task_structure(content: str) -> list[str]:
+    """
+    Check Task structure validation for new template.
+    
+    Validates:
+    - Design field exists and non-empty
+    - Behavior field exists when TDD=true
+    - Behavior precedes Design (order validation)
+    - Done contains checkbox (- [ ])
+    - Changes does NOT contain Step checkbox format
+    
+    Args:
+        content: Plan file content
+        
+    Returns:
+        List of error message strings (empty if valid)
+    """
+    errors = []
+    
+    # Extract Implementation section
+    impl_section = _extract_level2_section(content, "## Implementation")
+    if not impl_section:
+        return errors
+    
+    # Find each Task section
+    tasks = re.findall(TASK_PATTERN, impl_section, re.MULTILINE | re.DOTALL)
+    
+    for task_title, task_content in tasks:
+        task_errors = _check_single_task(task_title.strip(), task_content)
+        errors.extend(task_errors)
+    
+    return errors
+
+
+def check_agent_verification(content: str) -> list[str]:
+    """
+    Check Agent Verification validation for new template.
+    
+    Validates:
+    - At least one item contains executable command
+    - Agent Verification appears before Implementation
+    
+    Args:
+        content: Plan file content
+        
+    Returns:
+        List of error message strings (empty if valid)
+    """
+    errors = []
+    
+    # Check position: Agent Verification must be before Implementation
+    ac_pos = content.find("### Agent Verification")
+    impl_pos = content.find("## Implementation")
+    
+    if ac_pos != -1 and impl_pos != -1 and ac_pos > impl_pos:
+        errors.append("FAIL: Agent Verification must appear before Implementation")
+    
+    # Extract Agent Verification section
+    agent_ac_section = _extract_level3_section(content, "### Agent Verification")
+    if not agent_ac_section:
+        return errors
+    
+    # Check for at least one executable command
+    has_command = False
+    for pattern in COMMAND_PATTERNS:
+        if re.search(pattern, agent_ac_section):
+            has_command = True
+            break
+    
+    if not has_command:
+        # Check for inline code format: `command`
+        if re.search(r'\`[^\`]+\`', agent_ac_section):
+            has_command = True
+    
+    if not has_command:
+        errors.append("FAIL: At least one AC item must contain executable command")
+    
+    return errors
+
+
+def check_user_validation_new(content: str) -> list[str]:
+    """
+    Check User Validation validation for new template.
+    
+    Validates:
+    - User Validation does NOT contain automated test commands
+    - Forbidden: npm test, pytest, bun test, cargo test, tsc, build commands
+    
+    Args:
+        content: Plan file content
+        
+    Returns:
+        List of error message strings (empty if valid)
+    """
+    errors = []
+    
+    # Extract User Validation section
+    uv_section = _extract_level3_section(content, "### User Validation")
+    if not uv_section:
+        return errors
+    
+    # Forbidden automated test/build commands
+    for pattern in FORBIDDEN_TEST_PATTERNS:
+        match = re.search(pattern, uv_section, re.IGNORECASE)
+        if match:
+            errors.append(
+                "FAIL: User Validation must not contain automated test commands "
+                f"(found: '{match.group()}')"
+            )
+            break
+    
+    return errors
+
+
+def _check_single_task(task_title: str, task_content: str) -> list[str]:
+    """
+    Check single Task structure validation.
+    
+    Args:
+        task_title: Task title
+        task_content: Task content
+        
+    Returns:
+        List of error message strings
+    """
+    errors = []
+    
+    # 1. Check Design field exists and non-empty
+    design_match = re.search(
+        DESIGN_PATTERN, task_content, re.MULTILINE | re.DOTALL
+    )
+    if not design_match:
+        errors.append(f"MISSING: Design (Task '{task_title}')")
+    else:
+        design_content = design_match.group(1).strip()
+        # Remove HTML comments
+        design_clean = re.sub(r'<!--.*?-->', '', design_content, flags=re.DOTALL)
+        if not design_clean or re.match(r'^\s*$', design_clean):
+            errors.append(f"MISSING: Design (Task '{task_title}')")
+    
+    # 2. Check TDD field
+    tdd_match = re.search(TDD_PATTERN, task_content, re.IGNORECASE)
+    tdd_value = tdd_match.group(1).lower() if tdd_match else 'false'
+    
+    # 3. Check Behavior field exists when TDD=true
+    behavior_match = re.search(
+        BEHAVIOR_PATTERN, task_content, re.MULTILINE | re.DOTALL
+    )
+    
+    if tdd_value == 'true':
+        if not behavior_match:
+            errors.append(
+                f"MISSING: Behavior (TDD=true requires Behavior) "
+                f"(Task '{task_title}')"
+            )
+        else:
+            behavior_content = behavior_match.group(1).strip()
+            behavior_clean = re.sub(r'<!--.*?-->', '', behavior_content, flags=re.DOTALL)
+            if not behavior_clean or re.match(r'^\s*$', behavior_clean):
+                errors.append(
+                    f"MISSING: Behavior (TDD=true requires Behavior) "
+                    f"(Task '{task_title}')"
+                )
+    
+    # 4. Check Behavior precedes Design (order validation)
+    if behavior_match and design_match:
+        behavior_pos = task_content.find("**Behavior**:")
+        design_pos = task_content.find("**Design**:")
+        if behavior_pos > design_pos:
+            errors.append(
+                f"ORDER: Behavior must precede Design "
+                f"(Task '{task_title}')"
+            )
+    
+    # 5. Check Done contains checkbox
+    done_match = re.search(
+        DONE_PATTERN, task_content, re.MULTILINE | re.DOTALL
+    )
+    if done_match:
+        done_content = done_match.group(1)
+        checkbox_match = re.search(CHECKBOX_PATTERN, done_content, re.MULTILINE)
+        if not checkbox_match:
+            errors.append(
+                f"MISSING: Done must contain at least one checkbox "
+                f"(Task '{task_title}')"
+            )
+    
+    # 6. Check Changes does NOT contain Step checkbox format
+    changes_match = re.search(
+        CHANGES_PATTERN, task_content, re.MULTILINE | re.DOTALL
+    )
+    if changes_match:
+        changes_content = changes_match.group(1)
+        step_checkbox_match = re.search(
+            STEP_CHECKBOX_PATTERN,
+            changes_content, re.MULTILINE
+        )
+        if step_checkbox_match:
+            errors.append(
+                f"FAIL: Changes must not contain checkbox format "
+                f"(Task '{task_title}')"
+            )
+    
+    return errors

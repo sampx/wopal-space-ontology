@@ -17,12 +17,12 @@ from dev_flow.domain.validation.check_doc import (
     detect_template_version,
     check_task_structure,
     check_agent_verification,
-    check_user_validation,
+    check_user_validation_new,
 )
 
 
-# Fixture directory
-FIXTURE_DIR = Path(__file__).parent.parent.parent.parent.parent / ".tmp" / "test-check-doc"
+# Fixture directory: scripts/dev_flow/domain/validation/tests/ → 6 levels up = skills/dev-flow/
+FIXTURE_DIR = Path(__file__).parent.parent.parent.parent.parent.parent / ".tmp" / "test-check-doc"
 
 
 def read_fixture(filename: str) -> str:
@@ -134,13 +134,13 @@ class TestCheckAgentVerification:
         assert any("FAIL" in e for e in errors), f"Expected FAIL error, got: {errors}"
 
 
-class TestCheckUserValidation:
-    """Test check_user_validation function."""
+class TestCheckUserValidationNew:
+    """Test check_user_validation_new function."""
 
     def test_user_val_contains_npm_test(self):
         """User Validation containing npm test returns FAIL error."""
         content = read_fixture("plan-new-user-val-has-commands.md")
-        errors = check_user_validation(content)
+        errors = check_user_validation_new(content)
         assert len(errors) > 0, "Expected at least one error"
         assert any("FAIL" in e for e in errors), f"Expected FAIL error, got: {errors}"
 
