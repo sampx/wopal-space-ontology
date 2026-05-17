@@ -24,7 +24,6 @@ BEHAVIOR_PATTERN = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Files\*\*:|\Z)'
 TDD_PATTERN = r'\*\*TDD\*\*:\s*(true|false)'
 DONE_PATTERN = r'\*\*Done\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
 CHANGES_PATTERN = r'\*\*Changes\*\*:\s*\n(.*?)(?:\*\*Verify\*\*:|^###|^##|\Z)'
-VERIFY_PATTERN_OLD = r'\*\*Verification\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
 
 # Checkbox patterns
 CHECKBOX_PATTERN = r'-\s+\[\s*\]'
@@ -195,7 +194,7 @@ def _extract_level3_section(content: str, heading: str) -> str:
 
 
 def _check_changes_format(content: str) -> list:
-    """Check Changes blocks use checkbox format, not numbered list"""
+    """Check Changes blocks use checkbox format (legacy template only)."""
     issues = []
     
     # Find each Task section
@@ -464,7 +463,7 @@ def check_step_completion(plan_file: str) -> None:
 
 def _check_done_completion(content: str, plan_file: str) -> None:
     """Check all Task Done checkboxes are checked in new template."""
-    unchecked = []
+    issues = []
     impl_section = _extract_level2_section(content, "## Implementation")
     
     if impl_section:
@@ -476,18 +475,22 @@ def _check_done_completion(content: str, plan_file: str) -> None:
             )
             if done_match:
                 done_block = done_match.group(1).strip()
-                unchecked_in_done = re.findall(
-                    r'^\s*-\s+\[\s*\]\s+',
-                    done_block,
-                    re.MULTILINE
-                )
-                for _ in unchecked_in_done:
-                    unchecked.append(f"Task '{task_title}' Done: checkbox not completed")
+                has_any_checkbox = bool(re.search(r'-\s+\[[ xX]\]', done_block, re.MULTILINE))
+                if not has_any_checkbox:
+                    issues.append(f"Task '{task_title}' Done: no checkbox found — must have a '- [ ]' checkbox")
+                else:
+                    unchecked_in_done = re.findall(
+                        r'^\s*-\s+\[\s*\]\s+',
+                        done_block,
+                        re.MULTILINE
+                    )
+                    for _ in unchecked_in_done:
+                        issues.append(f"Task '{task_title}' Done: checkbox not completed")
     
-    if unchecked:
-        unchecked_str = "\n".join(unchecked)
+    if issues:
+        issues_str = "\n".join(issues)
         raise ValidationError(
-            f"Task Done checkboxes not completed:\n\n{unchecked_str}\n\n"
+            f"Task Done checkboxes not completed:\n\n{issues_str}\n\n"
             f"Please check the completed tasks in the Plan file:\n  {plan_file}\n\n"
             f"After completing, run: flow.sh complete"
         )
