@@ -30,6 +30,14 @@ CHECKBOX_PATTERN = r'-\s+\[\s*\]'
 CHECKBOX_CHECKED_PATTERN = r'-\s+\[x\]'
 STEP_CHECKBOX_PATTERN = r'-\s+\[\s*\]\s+Step\s+\d+:'
 
+# Numbered checkbox patterns (Agent Verification AC items)
+NUM_CHECKBOX_PATTERN = r'\d+\.\s+\[\s*\]'
+NUM_CHECKBOX_CHECKED_PATTERN = r'\d+\.\s+\[x\]'
+
+# Unified AC checkbox pattern: matches both `- [ ]` and `1. [ ]`
+AC_CHECKBOX_UNCHECKED = r'(?:\d+\.\s*|-\s+)\[\s*\]'
+AC_CHECKBOX_CHECKED = r'(?:\d+\.\s*|-\s+)\[x\]'
+
 # Section patterns
 ARCH_CONTEXT_PATTERN = r'^###\s+Architecture\s+Context\s*\n'
 TASK_PATTERN = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
@@ -407,7 +415,7 @@ def check_acceptance_criteria(plan_file: str) -> None:
     section_name = ""
     
     # Check if `### Agent Verification` exists and has checkbox content
-    if agent_ac_section and re.search(r'^\s*-\s+\[', agent_ac_section, re.MULTILINE):
+    if agent_ac_section and re.search(r'^\s*(?:\d+\.\s*|-\s+)\[', agent_ac_section, re.MULTILINE):
         ac_section = agent_ac_section
         section_name = "Agent Verification"
     else:
@@ -416,18 +424,18 @@ def check_acceptance_criteria(plan_file: str) -> None:
         section_name = "Acceptance Criteria"
     
     # If no section or empty, pass
-    if not ac_section or not re.search(r'-', ac_section):
+    if not ac_section or not re.search(r'(?:\d+\.|-)\s', ac_section):
         return
     
-    # Check for unchecked items: - [ ]
-    unchecked = re.findall(r'^\s*-\s+\[\s*\].*$', ac_section, re.MULTILINE)
+    # Check for unchecked items: both `1. [ ]` and `- [ ]` formats
+    unchecked = re.findall(r'^\s*(?:\d+\.\s*|-\s+)\[\s*\].*$', ac_section, re.MULTILINE)
     
     if unchecked:
         unchecked_str = "\n".join(unchecked)
         raise ValidationError(f"{section_name} not completed:\n\n{unchecked_str}\n\nPlease complete the remaining items and update the Plan file.")
     
     # Check if there are any checked items
-    checked = re.findall(r'^\s*-\s+\[x\].*$', ac_section, re.MULTILINE)
+    checked = re.findall(r'^\s*(?:\d+\.\s*|-\s+)\[x\].*$', ac_section, re.MULTILINE)
     
     if not checked:
         # No items found - pass

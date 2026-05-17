@@ -107,8 +107,8 @@
 
   flow.sh complete 会校验此子章节的 checkbox 是否全部勾选。
 -->
-- [ ] <可执行命令 1：如 `rg -c '### Architecture Context' templates/plan.md` ≥ 1>
-- [ ] <可执行命令 2：如 `python -m pytest tests/ -v` 全部 pass>
+1. [ ] <可执行命令 1：如 `rg -c '### Architecture Context' templates/plan.md` ≥ 1>
+2. [ ] <可执行命令 2：如 `python -m pytest tests/ -v` 全部 pass>
 
 ### User Validation
 
