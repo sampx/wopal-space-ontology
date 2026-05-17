@@ -159,7 +159,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
     if not guard_status(current_status, "executing", input_ref):
         return 1
 
-    # 4. Check step checkboxes in Implementation and Test Plan (hard gate)
+    # 4. Check Done/Step checkboxes in Implementation (hard gate)
     try:
         check_step_completion(plan_path)
     except ValidationError as e:

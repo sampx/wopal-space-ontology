@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dev_flow.domain.labels import plan_type_to_issue_label
 from dev_flow.domain.plan.metadata import get_plan_project, get_plan_type
+from dev_flow.domain.plan.body import build_issue_body_from_plan
 
 
 def _get_issue_labels(issue_number: int, repo: str) -> list:
@@ -129,86 +130,13 @@ def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str, worksp
     
     # Build plan body content from plan file
     plan_name = Path(plan_file).stem
-    body = _build_issue_body_from_plan(plan_file, plan_name, repo, workspace_root)
+    body = build_issue_body_from_plan(plan_file, plan_name, repo, workspace_root)
     
     # Update Issue body
     subprocess.run(
         ['gh', 'issue', 'edit', str(issue_number), '--repo', repo, '--body', body],
         capture_output=True,
     )
-
-
-def _build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, workspace_root: str = None) -> str:
-    """Build Issue body content from plan file.
-    
-    Args:
-        plan_file: Path to plan file
-        plan_name: Plan name (for URL)
-        repo: Repository
-        workspace_root: Workspace root
-        
-    Returns:
-        Formatted Issue body
-    """
-    content = Path(plan_file).read_text()
-    
-    # Extract Goal section
-    goal = _extract_section(content, "Goal")
-    
-    # Extract In Scope section
-    in_scope = _extract_section(content, "In Scope")
-    
-    # Extract Out of Scope section
-    out_of_scope = _extract_section(content, "Out of Scope")
-    
-    # Extract Acceptance Criteria section
-    acceptance_criteria = _extract_section(content, "Acceptance Criteria")
-    
-    # Build plan URL
-    project = get_plan_project(plan_file)
-    if workspace_root and project:
-        plan_path = f"docs/products/{project}/plans/{plan_name}.md"
-    else:
-        plan_path = f"docs/products/plans/{plan_name}.md"
-    plan_url = f"https://github.com/{repo}/blob/main/{plan_path}"
-    
-    # Build body sections
-    sections = []
-    
-    # Goal section
-    sections.append(f"## Goal\n\n{goal or '<目标描述>'}")
-    
-    # In Scope section
-    sections.append(f"## In Scope\n\n{in_scope or '- 范围项 1'}")
-    
-    # Out of Scope section
-    sections.append(f"## Out of Scope\n\n{out_of_scope or '- 不做的项（原因）'}")
-    
-    # Acceptance Criteria section
-    sections.append(f"## Acceptance Criteria\n\n{acceptance_criteria or '- 验收条件 1'}")
-    
-    # Related Resources table
-    sections.append("## Related Resources\n\n| Resource | Link |\n|----------|------|\n| Plan | [{}]({}) |".format(plan_name, plan_url))
-    
-    return "\n\n".join(sections)
-
-
-def _extract_section(content: str, heading: str) -> str:
-    """Extract section content from markdown.
-    
-    Args:
-        content: Markdown content
-        heading: Section heading (without ## prefix)
-        
-    Returns:
-        Section content (without heading), or empty string
-    """
-    # Match ## Heading to next ## heading
-    pattern = rf'^## {heading}\s*\n(.*?)(?=^##[^#]|\Z)'
-    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return ""
 
 
 # Project label group — removed hardcoded PROJECT_LABELS.
