@@ -87,10 +87,6 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
         const task = ctx.taskManager?.findBySession(sessionID)
         if (task && task.status === "running") {
           trackActivity(task, part?.type)
-          // Cache context usage when step finishes (tokens are populated)
-          if (part?.type === "step-finish") {
-            void ctx.taskManager?.cacheContextUsage(sessionID)
-          }
         }
       }
     }

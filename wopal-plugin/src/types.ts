@@ -31,9 +31,6 @@ export interface WopalTask {
   progress?: TaskProgress
   errorCategory?: ErrorCategory
   concurrencyKey?: string | undefined
-  // Progress notification tracking
-  lastNotifyMessageCount?: number
-  lastNotifyTime?: Date
   // Idle diagnostic fields
   waitingReason?: string
   lastAssistantMessage?: string
@@ -42,13 +39,12 @@ export interface WopalTask {
   // Stuck detection
   stuckNotified?: boolean
   stuckNotifiedAt?: Date
+  // Progress notification: time quota for dedup
+  lastNotifyTimeQuota?: number
   // Concurrency slot key for waiting tasks
   waitingConcurrencyKey?: string
   // Idle notification (Phase 3: judgment delegated to Wopal)
   idleNotified?: boolean
-  // Context usage tracking
-  lastNotifyContextUsage?: number  // percentage at last notification (for growth detection)
-  lastContextUsage?: number        // last successfully fetched percentage (cached for tick display)
 }
 
 export interface LaunchInput {

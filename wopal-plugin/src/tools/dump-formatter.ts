@@ -7,7 +7,7 @@
 
 import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "../hooks/message-context.js";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { debugLog, localTimestamp, localDateTimeStr, findInMap } from "./dump-format-utils.js";
 import type { DumpMessage } from "./message-formatter.js";
@@ -40,6 +40,35 @@ export interface ContextDumpResult {
   blockCount: number;
   injectionCount: number;
   messageCount: number;
+}
+
+const MAX_AUTO_DUMPS = 10;
+
+function cleanupOldAutoDumps(logsDir: string): void {
+  try {
+    const files = readdirSync(logsDir)
+      .filter(f => f.includes("AUTO-CTXDUMP"))
+      .sort();
+
+    // Group by session shortID (last segment before .md)
+    const groups = new Map<string, string[]>();
+    for (const f of files) {
+      const base = f.replace(/\.md$/, "");
+      const shortID = base.split("-").pop() ?? "";
+      if (!groups.has(shortID)) groups.set(shortID, []);
+      groups.get(shortID)!.push(f);
+    }
+
+    for (const [, groupFiles] of groups) {
+      if (groupFiles.length <= MAX_AUTO_DUMPS) continue;
+      const toDelete = groupFiles.slice(0, groupFiles.length - MAX_AUTO_DUMPS);
+      for (const f of toDelete) {
+        unlinkSync(join(logsDir, f));
+      }
+    }
+  } catch {
+    // Graceful: cleanup failure must not break dump writing
+  }
 }
 
 export async function writeContextDump(options: ContextDumpOptions): Promise<ContextDumpResult> {
@@ -96,19 +125,17 @@ export async function writeContextDump(options: ContextDumpOptions): Promise<Con
     lines.push("");
     lines.push(formatSystemPromptSections(effectiveMetadata, detail));
 
-    // Plugin Injections — always show block, display _empty_ if none
-    lines.push("---", "");
-    lines.push("## Plugin Injections");
-    lines.push("");
+    // Plugin Injections — only show when actual injections exist
     if (injections && injections.length > 0) {
+      lines.push("---", "");
+      lines.push("## Plugin Injections");
+      lines.push("");
       for (let i = 0; i < injections.length; i++) {
         lines.push(`### Injection ${i + 1}`);
         lines.push("");
         lines.push(injections[i]);
         lines.push("");
       }
-    } else {
-      lines.push("_empty_", "");
     }
   } else if (snapshot && snapshot.length > 0) {
     // Fallback: raw dump when parsing failed (should not happen normally)
@@ -174,7 +201,8 @@ export async function writeContextDump(options: ContextDumpOptions): Promise<Con
 
   writeFileSync(filepath, lines.join("\n"), "utf-8");
 
-  debugLog(`dump written: ${filename} (${messages.length} msgs, ${effectiveMetadata ? "structured" : "raw"})`);
+  // Cleanup old auto dumps: keep only the 10 most recent
+  cleanupOldAutoDumps(logsDir);
 
   return {
     filepath,

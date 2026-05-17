@@ -24,6 +24,10 @@ export async function injectRulesToMessage(
 
   const userPrompt = extractLatestUserPrompt(messages);
 
+  // Deduplication: skip if rules already injected for this user prompt
+  const state = ctx.sessionStore.get(sessionID);
+  if (state?.lastRulesPrompt && state.lastRulesPrompt === userPrompt) return;
+
   const agentName = extractAgentName(messages);
   const formattedRules = await injectRules(
     ctx.ruleInjectorCtx,
@@ -34,6 +38,11 @@ export async function injectRulesToMessage(
   );
 
   if (!formattedRules) return;
+
+  // Record that we've injected rules for this prompt
+  ctx.sessionStore.upsert(sessionID, (s) => {
+    s.lastRulesPrompt = userPrompt;
+  });
 
   lastUserMsg.parts ??= [];
   lastUserMsg.parts.push({

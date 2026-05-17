@@ -56,10 +56,11 @@ export function clearStuckState(tasks: Iterable<WopalTask>): void {
 // --- original task-monitor.ts ---
 
 // Progress notification thresholds
-export const PROGRESS_NOTIFY_MESSAGE_THRESHOLD = 20
+export const PROGRESS_NOTIFY_MESSAGE_MODULO = 20
 export const PROGRESS_NOTIFY_TIME_THRESHOLD_MS = 180_000 // 3 minutes
 export const CONTEXT_WARN_THRESHOLD = 45
-export const CONTEXT_NOTIFY_INCREMENT = 5
+export const CONTEXT_NOTIFY_MODULO = 10
+export const CONTEXT_WARN_NOTIFY_MODULO = 5
 
 export interface ProgressTaskInfo {
   taskId: string
@@ -111,35 +112,28 @@ export async function fetchContextPercent(
   sessionID: string,
   debugLog: DebugLog,
 ): Promise<ContextUsageInfo | null> {
-  const ctxLog = (msg: string) => debugLog(`[ctxUsage] ${formatSessionID(sessionID, true)} ${msg}`)
   try {
     if (typeof client.session?.messages !== "function") {
-      ctxLog("no session.messages API")
       return null
     }
     const messagesResult = await client.session.messages({
       path: { id: sessionID },
     })
     const messages = messagesResult?.data ?? []
-    ctxLog(`fetched ${messages.length} messages`)
     const lastAssistant = [...messages].reverse().find((m) =>
       m?.info?.role === "assistant" && m?.info?.tokens
     )
     if (!lastAssistant?.info?.tokens) {
-      const assistantCount = messages.filter((m: SessionMessage) => m?.info?.role === "assistant").length
-      ctxLog(`no assistant with tokens (total assistants: ${assistantCount})`)
       return null
     }
 
     const tokens = lastAssistant.info.tokens
     const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
     if (used === 0) {
-      ctxLog("tokens.input=0 (step still streaming)")
       return null
     }
 
     if (typeof client.config?.providers !== "function") {
-      ctxLog("no config.providers API")
       return null
     }
     const providersResult = await client.config.providers({
@@ -149,22 +143,19 @@ export async function fetchContextPercent(
     const providerID = lastAssistant.info.providerID ?? lastAssistant.info.model?.providerID
     const modelID = lastAssistant.info.modelID ?? lastAssistant.info.model?.modelID
     if (!providerID || !modelID) {
-      ctxLog(`missing IDs: providerID=${providerID ?? 'undefined'} modelID=${modelID ?? 'undefined'}`)
       return null
     }
 
     const provider = providers.find((p: { id: string }) => p.id === providerID)
     const contextLimit = provider?.models?.[modelID]?.limit?.context
     if (!contextLimit) {
-      ctxLog(`no context limit for ${providerID}/${modelID}`)
       return null
     }
 
     const pct = Math.round((used / contextLimit) * 100)
-    ctxLog(`${used}/${contextLimit} = ${pct}%`)
     return { pct, used, contextLimit }
   } catch (err) {
-    ctxLog(`error: ${err instanceof Error ? err.message : String(err)}`)
+    debugLog(`[ctxUsage] ${formatSessionID(sessionID, true)} error: ${err instanceof Error ? err.message : String(err)}`)
     return null
   }
 }
@@ -197,46 +188,38 @@ export async function checkProgressNotifications(
       if (!messagesResult?.data) continue
 
       const messageCount = messagesResult.data.length
+
+      let shouldNotify = messageCount > 0 && messageCount % PROGRESS_NOTIFY_MESSAGE_MODULO === 0
+
+      // Time-based fallback: notify once per time quota slot (3 min each)
+      // This ensures stuck tasks (no message/context change) still get periodic notifications
       const now = new Date()
-      const lastNotifyCount = task.lastNotifyMessageCount ?? 0
-
-      const referenceTime = lastNotifyCount > 0
-        ? (task.lastNotifyTime?.getTime() ?? 0)
-        : (task.startedAt?.getTime() ?? 0)
-      const messageDelta = messageCount - lastNotifyCount
-      const timeDelta = now.getTime() - referenceTime
-
-      let shouldNotify = messageDelta >= PROGRESS_NOTIFY_MESSAGE_THRESHOLD ||
-        (referenceTime > 0 && timeDelta >= PROGRESS_NOTIFY_TIME_THRESHOLD_MS)
-
-      // Bug 1 fix: prefer cached value to avoid streaming window returning null
-      let contextUsage: number | null = task.lastContextUsage ?? null
-      if (contextUsage === null) {
-        try {
-          contextUsage = await getContextUsagePercent(client, directory, task.sessionID, debugLog)
-          if (contextUsage !== null) {
-            task.lastContextUsage = contextUsage
-          }
-        } catch {
-          // Graceful degradation
-        }
+      const elapsedMs = now.getTime() - (task.startedAt?.getTime() ?? 0)
+      const timeQuota = Math.floor(elapsedMs / PROGRESS_NOTIFY_TIME_THRESHOLD_MS)
+      const lastQuota = task.lastNotifyTimeQuota ?? -1
+      if (timeQuota > lastQuota) {
+        task.lastNotifyTimeQuota = timeQuota
+        shouldNotify = true
       }
 
-      if (contextUsage !== null && contextUsage >= CONTEXT_WARN_THRESHOLD) {
-        const lastNotifiedUsage = task.lastNotifyContextUsage ?? 0
-        const usageGrowth = contextUsage - lastNotifiedUsage
-        if (usageGrowth >= CONTEXT_NOTIFY_INCREMENT) {
+      let contextUsage: number | null = null
+      try {
+        contextUsage = await getContextUsagePercent(client, directory, task.sessionID, debugLog)
+      } catch {
+        // Graceful degradation
+      }
+
+      if (contextUsage !== null) {
+        const modulo = contextUsage >= CONTEXT_WARN_THRESHOLD
+          ? CONTEXT_WARN_NOTIFY_MODULO
+          : CONTEXT_NOTIFY_MODULO
+        if (contextUsage > 0 && contextUsage % modulo === 0) {
           shouldNotify = true
         }
       }
 
       if (shouldNotify) {
         await sendProgressNotificationFn(task, messageCount, contextUsage)
-        task.lastNotifyMessageCount = messageCount
-        task.lastNotifyTime = now
-        if (contextUsage !== null && contextUsage >= CONTEXT_WARN_THRESHOLD) {
-          task.lastNotifyContextUsage = contextUsage
-        }
       }
 
       taskInfos.push({
@@ -291,28 +274,17 @@ export function logTickStatus(
   const now = Date.now()
   const lines = runningTasks.map((task, i) => {
     const shortId = task.id.replace('wopal-task-', '').slice(0, 8)
-    const lastNotifyCount = task.lastNotifyMessageCount ?? 0
     const wasChecked = progressInfos.find(p => p.taskId === task.id)
 
-    let msgsText: string
-    if (wasChecked) {
-      msgsText = lastNotifyCount > 0
-        ? `+${wasChecked.messageCount - lastNotifyCount} msgs`
-        : `${wasChecked.messageCount} msgs`
-    } else {
-      msgsText = '—'
-    }
+    const msgsText = wasChecked ? `${wasChecked.messageCount} msgs` : '—'
 
-    const refTime = lastNotifyCount > 0 && task.lastNotifyTime
-      ? task.lastNotifyTime.getTime()
-      : (task.startedAt?.getTime() ?? 0)
-    const elapsedMs = refTime > 0 ? now - refTime : 0
+    const elapsedMs = now - (task.startedAt?.getTime() ?? 0)
     const totalSec = Math.floor(elapsedMs / 1000)
     const min = Math.floor(totalSec / 60)
     const sec = totalSec % 60
     const timeText = `${min}m${sec.toString().padStart(2, '0')}s`
 
-    const ctxPct = wasChecked?.contextUsage ?? task.lastContextUsage
+    const ctxPct = wasChecked?.contextUsage
     const ctxText = ctxPct != null
       ? (ctxPct >= CONTEXT_WARN_THRESHOLD ? `, ctx:${ctxPct}% ⚠️` : `, ctx:${ctxPct}%`)
       : ''

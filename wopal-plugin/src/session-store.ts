@@ -20,6 +20,8 @@ export interface SessionState {
   agent?: string | undefined;
   /** Whether this session is a background task child session */
   isTask?: boolean | undefined;
+  /** The user prompt for which rules were last injected (dedup) */
+  lastRulesPrompt?: string;
 }
 
 export interface SessionStoreOptions {
