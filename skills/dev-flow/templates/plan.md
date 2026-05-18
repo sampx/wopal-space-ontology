@@ -247,6 +247,11 @@
   **Wave 间门控**：
   - 每 wave 完成后 Wopal 运行 Verify 命令验证产出
   - 通过后才释放下一 wave
+
+  **委派 prompt 必含项**：
+  - 每次委派 fae 执行 Task 时，prompt 末尾必须附加勾选 Done 指令：
+    `完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<绝对路径>`
+  - 这是结构性保障，缺少此指令 = fae 不会主动更新 Plan
 -->
 
 | Wave | Task | 执行者 | 依赖 | 委派理由 |

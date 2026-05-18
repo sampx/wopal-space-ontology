@@ -139,6 +139,13 @@ flow.sh plan --title "<type>(<scope>): <description>" --project <name> --type <t
 - 例外（可由 Wopal 直接执行）：极小收尾工作（勾选 checkbox、同步 Issue body）、非代码操作（更新记忆、纯审查）
 - "代码复杂"或"需谨慎"不是跳过委派的理由 — 越复杂的任务越应该委派
 
+**委派 prompt 必含项**：
+每次委派 fae 执行 Plan Task 时，prompt 末尾必须附加：
+```
+完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<绝对路径>
+```
+这是结构性保障，不是可选项。缺少此指令 = fae 不会主动更新 Plan，导致 Done 全部遗漏。
+
 **Task 字段顺序与约束**：
 - Verification Intent → Behavior → Files → Pre-read → Design → TDD → Changes → Verify → Done
 - **Behavior 必填**：代码 Task（TDD=true）必须在 Behavior 中填写输入/输出映射；非代码 Task 可描述预期状态变化或跳过（TDD=false 时 Behavior 不强制）
