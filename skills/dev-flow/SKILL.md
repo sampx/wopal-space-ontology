@@ -252,6 +252,19 @@ flow.sh approve <issue> --confirm --worktree
 - 不带 `--worktree` 且目标项目工作区不干净时，命令会阻断；此时应先清理/提交当前变更，或改用 `--worktree`
 - worktree 创建失败时，状态应保持在 `planning`
 
+**创建后必须验证目录结构**，防止在错误路径下编辑：
+
+```bash
+ls .worktrees/<project>-issue-<N>-*/
+```
+
+| 项目类型 | worktree 内结构 | 注意事项 |
+|----------|---------------|---------|
+| `ontology-worktree` | 平铺：`skills/`、`wopal-plugin/` 直接在根目录 | 不嵌套 `.wopal/` 子目录；编辑时用 worktree 内的正确相对路径 |
+| `standard` | 保持项目原结构 | 与主工作空间结构一致 |
+
+禁止在主工作空间对应目录编辑——所有变更必须在 worktree 路径下进行，防止污染运行时环境。
+
 ## PR（高级可选）
 
 默认主流程不走 PR。
