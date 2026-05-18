@@ -1,7 +1,9 @@
 import type { SessionMessage, WopalTask } from "../types.js"
 import type { DebugLog } from "../debug.js"
 import type { SessionStore } from "../session-store.js"
-import { formatSessionID } from "../debug.js"
+import { formatSessionID, createTraceLog } from "../debug.js"
+
+const traceLog = createTraceLog("[task]", "task")
 
 // --- merged from stuck-detector.ts ---
 
@@ -132,7 +134,7 @@ export function extractContextUsage(
   const tokens = lastAssistant.info.tokens
   const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
   if (used === 0) {
-    debugLog?.(`[extractCtx] tokens.input=0 (step still streaming)`)
+    traceLog(`[extractCtx] tokens.input=0 (step still streaming)`)
     return null
   }
 
@@ -168,39 +170,39 @@ export function extractContextFromStore(
   const state = sessionStore.get(sessionID)
   const tokens = state?.lastTokens
   if (!tokens) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} no lastTokens in store`)
+    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} no lastTokens in store`)
     return null
   }
 
   // Stale check: tokens older than 60s may be outdated
   const ageMs = Date.now() - tokens.updatedAt
   if (ageMs > 60_000) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
+    traceLog(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
     return null
   }
 
   const providerID = state.providerID
   const modelID = state.modelID
   if (!providerID || !modelID) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} missing provider/model info`)
+    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} missing provider/model info`)
     return null
   }
 
   const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
   if (used === 0) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} used=0`)
+    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} used=0`)
     return null
   }
 
   const provider = providers.find((p) => p.id === providerID)
   const contextLimit = provider?.models?.[modelID]?.limit?.context
   if (!contextLimit) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} no contextLimit for ${providerID}/${modelID}`)
+    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} no contextLimit for ${providerID}/${modelID}`)
     return null
   }
 
   const pct = Math.round((used / contextLimit) * 100)
-  debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, true)} ${used}/${contextLimit} = ${pct}%`)
+  traceLog(`[ctxFromStore] ${formatSessionID(sessionID, state?.isTask ?? false)} ${used}/${contextLimit} = ${pct}%`)
   return { pct, used, contextLimit }
 }
 
@@ -216,7 +218,9 @@ export async function fetchContextPercent(
   sessionID: string,
   debugLog: DebugLog,
 ): Promise<ContextUsageInfo | null> {
-  const ctxLog = (msg: string) => debugLog(`[ctxUsage] ${formatSessionID(sessionID, true)} ${msg}`)
+  const state = sessionStore.get(sessionID)
+  const isTask = state?.isTask ?? false
+  const ctxLog = (msg: string) => debugLog(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
 
   try {
     // Get providers config (needed for contextLimit lookup)
@@ -232,20 +236,20 @@ export async function fetchContextPercent(
     // Cache-first: try sessionStore.lastTokens
     const fromStore = extractContextFromStore(sessionStore, sessionID, providers, debugLog)
     if (fromStore) {
-      ctxLog(`from store: ${fromStore.pct}%`)
+      traceLog(`[ctxUsage] ${formatSessionID(sessionID, isTask)} from store: ${fromStore.pct}%`)
       return fromStore
     }
 
     // Fallback: messages API (may return tokens=0 during streaming)
     if (typeof client.session?.messages !== "function") {
-      ctxLog("no session.messages API")
+      ctxLog(`no session.messages API`)
       return null
     }
     const messagesResult = await client.session.messages({
       path: { id: sessionID },
     })
     const messages = messagesResult?.data ?? []
-    ctxLog(`fetched ${messages.length} messages (fallback)`)
+    traceLog(`[ctxUsage] ${formatSessionID(sessionID, isTask)} fetched ${messages.length} messages (fallback)`)
 
     const result = extractContextUsage(messages, providers, debugLog)
     if (result) {

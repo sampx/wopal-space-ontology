@@ -114,6 +114,7 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
         state.providerID = modelInfo.providerID
         state.modelID = modelInfo.modelID
       }
+      state.isTask = isTask  // Ensure isTask is set for context usage logs
       const cache = t.cache ? { ...t.cache } : undefined
       state.lastTokens = {
         input: t.input ?? 0,
@@ -135,6 +136,41 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
 
     if (eventType === "session.idle") {
       if (!sessionID) return
+
+      const state = ctx.sessionStore.get(sessionID)
+
+      // Main session deferred compact: do NOT call summarize from inside the tool turn.
+      // Wait until the session is idle, then trigger summarize on the now-idle session.
+      if (!ctx.taskManager?.findBySession(sessionID) && state?.pendingCompactTrigger === "plugin") {
+        ctx.sessionStore.upsert(sessionID, (s) => {
+          delete s.pendingCompactTrigger
+        })
+
+        const providerID = state.providerID ?? ""
+        const modelID = state.modelID ?? ""
+        if (typeof ctx.client.session?.summarize !== "function") {
+          ctx.contextDebugLog(`${formatSessionID(sessionID, false)} summarize unavailable for deferred compact`)
+          return
+        }
+
+        ctx.sessionStore.markCompacting(sessionID, Date.now(), "plugin")
+        ctx.contextDebugLog(`${formatSessionID(sessionID, false)} idle -> starting deferred main-session compact`)
+
+        try {
+          await ctx.client.session.summarize({
+            path: { id: sessionID },
+            body: { providerID, modelID },
+          })
+        } catch (err) {
+          ctx.sessionStore.upsert(sessionID, (s) => {
+            s.isCompacting = false
+            delete s.compactingSince
+            delete s.compactingTrigger
+          })
+          ctx.contextDebugLog(`${formatSessionID(sessionID, false)} deferred compact failed: ${err instanceof Error ? err.message : String(err)}`)
+        }
+        return
+      }
 
       // Only handle wopal_task child sessions, skip main session idle
       const task = ctx.taskManager?.findBySession(sessionID)
@@ -159,10 +195,11 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
       if (!sessionID) return
 
       ctx.sessionStore.markCompacted(sessionID);
-      ctx.contextDebugLog(`${formatSessionID(sessionID, false)} compact completed (event-driven)`);
+      const compactedState = ctx.sessionStore.get(sessionID)
+      ctx.contextDebugLog(`${formatSessionID(sessionID, compactedState?.isTask ?? false)} compact completed (event-driven)`);
 
       // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
-      const state = ctx.sessionStore.get(sessionID)
+      const state = compactedState
       if (!state?.compactingTrigger || !state?.needsAutoContinue) return
 
       const task = ctx.taskManager?.findBySession(sessionID)

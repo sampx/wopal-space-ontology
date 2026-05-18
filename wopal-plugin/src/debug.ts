@@ -120,6 +120,32 @@ function writeLog(prefix: string, message: string): void {
 }
 
 /**
+ * Check if trace output is enabled for a specific module.
+ * Trace level includes diagnostic logs (stale/fallback/streaming) that are
+ * too noisy for regular DEBUG level.
+ * 
+ * WOPAL_PLUGIN_TRACE values: same format as WOPAL_PLUGIN_DEBUG.
+ * When both DEBUG and TRACE are enabled for a module, TRACE takes precedence.
+ */
+export function isTraceEnabled(module: DebugModule): boolean {
+  const trace = process.env.WOPAL_PLUGIN_TRACE;
+  if (!trace) {
+    return false;
+  }
+
+  const normalized = trace.trim().toLowerCase();
+
+  // Enable all
+  if (normalized === "1" || normalized === "*" || normalized === "all") {
+    return true;
+  }
+
+  // Check specific modules
+  const modules = normalized.split(",").map(m => m.trim());
+  return modules.includes(module);
+}
+
+/**
  * Create a debug log function for a specific module.
  *
  * @param prefix - Log prefix (e.g., "[plugin]", "[rules]", "[task]")
@@ -132,6 +158,20 @@ function writeLog(prefix: string, message: string): void {
 export function createDebugLog(prefix = "[plugin]", module: DebugModule = "plugin"): LogFn {
   return (message: string): void => {
     if (!isDebugEnabled(module)) {
+      return;
+    }
+    writeLog(prefix, message);
+  };
+}
+
+/**
+ * Create a trace log function for diagnostic details.
+ * Trace logs are only shown when WOPAL_PLUGIN_TRACE is enabled for the module.
+ * Use for: stale checks, fallback paths, streaming states, intermediate states.
+ */
+export function createTraceLog(prefix = "[plugin]", module: DebugModule = "plugin"): LogFn {
+  return (message: string): void => {
+    if (!isTraceEnabled(module)) {
       return;
     }
     writeLog(prefix, message);

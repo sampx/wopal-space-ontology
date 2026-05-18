@@ -85,7 +85,10 @@ export function createContextManageTool(
     execute: async (args, context: ToolContext): Promise<string> => {
       const sessionID = context.sessionID;
 
-      debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+      // Only log caller session for summary/dump; compact has dedicated target session log
+      if (args.action !== "compact") {
+        debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+      }
 
       if (args.action === "dump") {
         const rawSessionID = args.session_id ?? sessionID;
@@ -270,7 +273,6 @@ async function handleCompact(
   directory: string,
   isTask: boolean,
 ): Promise<string> {
-  // 1. Check sessionStore.isCompacting (prevent double-compaction)
   const state = sessionStore.get(sessionID);
   if (state?.isCompacting) {
     const since = state.compactingSince;
@@ -278,48 +280,54 @@ async function handleCompact(
     return `Already compacting ${formatSessionID(sessionID, isTask)} (started ${elapsedSec}s ago). Wait for compaction to complete.`;
   }
 
-  // 2. Check if session exists in store (has provider/model info)
   if (!state) {
     return `Failed: session not found in store. Ensure the session ${formatSessionID(sessionID, isTask)} has been active (received at least one step-finish event).`;
   }
 
-  // 3. Get current context usage
-  let contextPct: number | null = null;
-  let contextInfo = "";
+  if (typeof client?.session?.summarize !== "function") {
+    return `Failed: session.summarize API unavailable.`;
+  }
+
+  let contextInfo = "Context: unknown";
   try {
     const ctxInfo = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog);
     if (ctxInfo) {
-      contextPct = ctxInfo.pct;
-      const warning = contextPct >= 75 ? " ⚠️" : contextPct >= 55 ? " ⚡" : "";
-      contextInfo = `Context: ${contextPct}% used${warning} (${ctxInfo.used}/${ctxInfo.contextLimit} tokens)`;
-    } else {
-      contextInfo = "Context: unknown (no token data available)";
+      const warning = ctxInfo.pct >= 75 ? " ⚠️" : ctxInfo.pct >= 55 ? " ⚡" : "";
+      contextInfo = `Context: ${ctxInfo.pct}% used${warning} (${ctxInfo.used}/${ctxInfo.contextLimit} tokens)`;
     }
   } catch {
-    contextInfo = "Context: unknown (failed to fetch)";
+    // ignore - context info is informational only
   }
 
-  // 4. Check summarize API availability
-  if (typeof client?.session?.summarize !== "function") {
-    return `Failed: session.summarize API unavailable.\n${contextInfo}`;
-  }
-
-  // 5. Get providerID/modelID from sessionStore
   const providerID = state.providerID ?? "";
   const modelID = state.modelID ?? "";
 
-  // 6. Mark as compacting
-  sessionStore.markCompacting(sessionID, Date.now());
+  if (!isTask) {
+    sessionStore.upsert(sessionID, (next) => {
+      next.pendingCompactTrigger = "plugin";
+    });
+    debugLog(`[handleCompact] ${formatSessionID(sessionID, false)} scheduled main-session compact for next idle`);
+    return [
+      `Compacting session ${formatSessionID(sessionID, false)}...`,
+      contextInfo,
+      `Model: ${providerID || "?"}/${modelID || "?"}`,
+      "Main-session compaction scheduled. It will start automatically when the current turn becomes idle.",
+      "Main session will receive auto-recovery message when compaction completes.",
+    ].join("\n");
+  }
 
-  // 7. Call summarize API
+  sessionStore.markCompacting(sessionID, Date.now(), "plugin");
   try {
     await client.session.summarize({
       path: { id: sessionID },
       body: { providerID, modelID },
     });
   } catch (error) {
-    // Reset compacting state on failure
-    sessionStore.markCompacted(sessionID);
+    sessionStore.upsert(sessionID, (next) => {
+      next.isCompacting = false;
+      delete next.compactingSince;
+      delete next.compactingTrigger;
+    });
     const message = error instanceof Error ? error.message : String(error);
     return `Failed to compact: ${message}\n${contextInfo}`;
   }
@@ -329,8 +337,6 @@ async function handleCompact(
     contextInfo,
     `Model: ${providerID || "?"}/${modelID || "?"}`,
     "Compaction triggered. The session will be summarized and become IDLE.",
-    isTask
-      ? "Parent agent will be notified via [WOPAL TASK COMPACTED]. Use wopal_task_reply to send recovery instructions."
-      : "Recovery message will be sent automatically after compaction completes.",
+    "Parent agent will receive [WOPAL TASK COMPACTED] notification when done.",
   ].join("\n");
 }

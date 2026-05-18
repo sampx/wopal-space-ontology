@@ -293,7 +293,7 @@ describe('context_manage: handleCompact', () => {
     vi.restoreAllMocks();
   });
 
-  it('C1: calls session.summarize with providerID/modelID from sessionStore', async () => {
+  it('C1: main session schedules deferred compact instead of calling summarize immediately', async () => {
     // Setup: sessionStore has model info from step-finish event
     compactSessionStore.upsert('ses_compact_test', (state) => {
       state.providerID = 'test-provider';
@@ -317,13 +317,11 @@ describe('context_manage: handleCompact', () => {
     const contextWithStore = { ...compactCtx, sessionStore: compactSessionStore };
     const result = await execute({ action: 'compact' }, contextWithStore);
 
-    expect(compactMockSummarize).toHaveBeenCalledOnce();
-    expect(compactMockSummarize).toHaveBeenCalledWith({
-      path: { id: 'ses_compact_test' },
-      body: { providerID: 'test-provider', modelID: 'test-model' },
-    });
+    expect(compactMockSummarize).not.toHaveBeenCalled();
+    expect(compactSessionStore.get('ses_compact_test')?.pendingCompactTrigger).toBe('plugin');
     expect(result).toContain('Context: 50%');
     expect(result).toContain('Compacting session');
+    expect(result).toContain('scheduled');
   });
 
   it('C2: normalizes wopal-task-xxx session_id to ses_xxx', async () => {
@@ -347,6 +345,7 @@ describe('context_manage: handleCompact', () => {
 
     const result = await execute({ action: 'compact', session_id: 'wopal-task-task123' }, contextWithStore);
 
+    expect(compactSessionStore.get('ses_task123')?.isCompacting).toBe(true);
     expect(compactMockSummarize).toHaveBeenCalledWith({
       path: { id: 'ses_task123' },
       body: { providerID: 'test-provider', modelID: 'test-model' },
@@ -449,7 +448,7 @@ describe('context_manage: handleCompact', () => {
     expect(result).toContain('used ⚠️');
   });
 
-  it('C7: handles missing provider/model info gracefully', async () => {
+  it('C7: main session handles missing provider/model info by scheduling deferred compact', async () => {
     compactSessionStore.upsert('ses_compact_test', (state) => {
       state.lastTokens = { input: 50000, output: 1000, updatedAt: Date.now() };
     });
@@ -468,10 +467,32 @@ describe('context_manage: handleCompact', () => {
 
     const result = await execute({ action: 'compact' }, contextWithStore);
 
-    expect(compactMockSummarize).toHaveBeenCalledOnce();
-    // Should still attempt compaction even without model info
+    expect(compactMockSummarize).not.toHaveBeenCalled();
+    expect(compactSessionStore.get('ses_compact_test')?.pendingCompactTrigger).toBe('plugin');
+    expect(result).toContain('scheduled');
+  });
+
+  it('C8: child session with missing provider/model info still calls summarize immediately', async () => {
+    compactSessionStore.upsert('ses_task123', (state) => {
+      state.lastTokens = { input: 50000, output: 1000, updatedAt: Date.now() };
+    });
+
+    const tool = createContextManageTool(
+      distillLLM,
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+    );
+    const execute = getExecute(tool);
+    const contextWithStore = { sessionID: 'ses_main', sessionStore: compactSessionStore };
+
+    await execute({ action: 'compact', session_id: 'wopal-task-task123' }, contextWithStore);
+
     expect(compactMockSummarize).toHaveBeenCalledWith({
-      path: { id: 'ses_compact_test' },
+      path: { id: 'ses_task123' },
       body: { providerID: '', modelID: '' },
     });
   });

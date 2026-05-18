@@ -20,6 +20,8 @@ export interface SessionState {
   needsAutoContinue?: boolean;
   /** Set to "plugin" when compact was triggered by context_manage tool; checked by event-router to distinguish Plugin-initiated vs other compacts */
   compactingTrigger?: "plugin";
+  /** Main-session compact requested during active tool run; trigger summarize after session.idle */
+  pendingCompactTrigger?: "plugin";
   /** Agent name extracted from the most recent messages.transform cycle */
   agent?: string | undefined;
   /** Whether this session is a background task child session */
@@ -120,7 +122,7 @@ export class SessionStore {
     this.upsert(sessionID, (state) => {
       state.isCompacting = false;
       delete state.compactingSince;
-      // Keep compactingTrigger for event-router to check after event
+      // DO NOT delete compactingTrigger here — event-router reads it to distinguish Plugin-initiated
       state.needsAutoContinue = true;
       if (state.loadedSkills.size > 0) {
         state.needsSkillReload = true;
