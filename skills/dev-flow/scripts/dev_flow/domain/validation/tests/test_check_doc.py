@@ -59,6 +59,7 @@ class TestDetectTemplateVersion:
             "plan-new-ac-no-commands.md",
             "plan-new-ac-after-impl.md",
             "plan-new-user-val-has-commands.md",
+            "plan-new-has-template-comments.md",
         ]
         for filename in new_fixtures:
             content = read_fixture(filename)
