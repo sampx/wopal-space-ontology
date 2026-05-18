@@ -20,7 +20,8 @@ export function createCompactionHooks(ctx: CompactionHookContext) {
     }
 
     ctx.sessionStore.markCompacting(sessionID, ctx.now());
-    ctx.contextDebugLog(`${formatSessionID(sessionID, false)} marked as compacting`);
+    const state = ctx.sessionStore.get(sessionID)
+    ctx.contextDebugLog(`${formatSessionID(sessionID, state?.isTask ?? false)} marked as compacting`);
   }
 
   return {

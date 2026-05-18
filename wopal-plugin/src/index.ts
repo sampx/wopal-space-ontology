@@ -173,6 +173,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
       systemInjectionsMap,
       transformedMessagesMap,
       pluginInput.directory,
+      sessionStore,
     );
   }
 

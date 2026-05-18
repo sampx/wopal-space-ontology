@@ -86,6 +86,20 @@ class TestCheckDocPlan(unittest.TestCase):
         plan_file = os.path.join(self.fixtures_dir, 'feature-old-plan-no-techcontext.md')
         check_doc_plan(plan_file)
 
+    def test_plan_with_template_comments_rejected(self):
+        """plan with leftover template comments should reject"""
+        plan_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+            '.tmp', 'test-check-doc', 'plan-new-has-template-comments.md'
+        )
+        with self.assertRaises(ValidationError) as context:
+            check_doc_plan(plan_file)
+        error_msg = str(context.exception)
+        self.assertTrue(
+            'template comments' in error_msg.lower() or 'comments' in error_msg.lower(),
+            f"Error should mention template comments: {error_msg}"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

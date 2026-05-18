@@ -97,11 +97,17 @@ def check_doc_plan(plan_file: str) -> None:
     issues = []
     version = detect_template_version(content)
     
-    # Common checks: placeholders
+    # Common checks: placeholders / uncleaned template guidance
     content_no_codeblocks = _remove_code_blocks(content)
     placeholder_pattern = r'(<!-- *(TODO|FIXME)|\- \[ \] *(TODO|FIXME)|\*\*(TODO|FIXME)|(TODO|FIXME)[：:]|待补充|REQ-xxx|path/to/)'
     if re.search(placeholder_pattern, content_no_codeblocks):
         issues.append("Found placeholders in plan")
+
+    # Reject leftover HTML template comments. Execution-grade plans must not
+    # contain authoring guidance blocks or marker comments copied from the template.
+    # Allow only comments inside fenced code blocks (already stripped above).
+    if "<!--" in content_no_codeblocks or "-->" in content_no_codeblocks:
+        issues.append("Found uncleaned template comments in plan")
     
     if version == 'new':
         # New template checks
