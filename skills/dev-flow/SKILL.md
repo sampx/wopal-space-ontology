@@ -133,6 +133,12 @@ flow.sh plan --title "<type>(<scope>): <description>" --project <name> --type <t
 
 实施过程中，每完成一个 Task 就运行 Verify 命令通过后立即勾选对应 Done checkbox，不要积压到最后统一补勾。
 
+**Task 字段顺序与约束**：
+- Verification Intent → Behavior → Files → Pre-read → Design → TDD → Changes → Verify → Done
+- **Behavior 必填**：代码 Task（TDD=true）必须在 Behavior 中填写输入/输出映射；非代码 Task 可描述预期状态变化或跳过（TDD=false 时 Behavior 不强制）
+- **Design 在 Behavior 后**：先定义"什么是对的"，再写实现设计
+- **Changes 编号列表**：使用 `1. 2. 3.` 格式，禁止 checkbox
+
 至少及时更新：
 - `Implementation` 里的每个 Task 的 Done checkbox
 - `Agent Verification` 的 checkbox
@@ -260,6 +266,11 @@ SKILL.md 不重复模板章节内容，只规定流程要求：
 - 实施过程中每完成 Task 运行 Verify 后勾选 Done
 - 实施完成后补齐 `Agent Verification`，再执行 `complete`
 - Delegation Strategy 的详细规则见模板注释（Wave 分配、委派规则、Autonomous 标记等）
+
+**TDD 默认规则**：
+- **代码 Task 默认启用 TDD**：Agent 编写 Plan 时应自动为代码变更 Task 设置 `**TDD**: true`，遵循 RED-GREEN-REFACTOR 流程，并填写 Behavior 字段（输入/输出映射）
+- **非代码 Task 显式声明 false**：UI 布局、配置变更、胶水代码、探索性原型等不适合 TDD 的场景，需显式设置 `**TDD**: false`，并在注释中说明理由（如"TDD 不适用：纯 UI 样式调整，无业务逻辑"）
+- 参考 `references/tdd-guide.md` 的判断启发式
 
 如果 `approve` 被 check-doc 阻断，先修 Plan，再重试。
 

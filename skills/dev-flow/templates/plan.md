@@ -177,12 +177,13 @@
 -->
 <完整实施设计>
 
-**TDD**: false
+**TDD**: true
 
 <!--
   TDD 标记说明：
-  - false（默认）：非 TDD Task，Changes 按常规顺序组织
-  - true：TDD Task，Changes 按 RED → GREEN → REFACTOR 组织，Behavior 必填
+  - true（默认）：代码 Task，Changes 按 RED → GREEN → REFACTOR 组织，Behavior 必填
+  - false：非代码 Task（UI 布局、配置变更、胶水代码、探索性原型），需在注释中说明理由
+  - 参考 references/tdd-guide.md 判断是否适合 TDD
 -->
 
 **Changes**:
