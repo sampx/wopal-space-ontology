@@ -143,6 +143,95 @@ const dumpClient = {
 const dumpCtx = { sessionID: 'ses_test1' } as { sessionID: string };
 const testTmpDir = join(tmpdir(), 'wopal-test-dump');
 
+// --- Stats action tests ---
+
+describe('context_manage: handleStats', () => {
+  it('S1: returns complete stats for populated session state', async () => {
+    const statsSessionStore = new SessionStore();
+    statsSessionStore.upsert('ses_stats_test', (state) => {
+      state.agent = 'fae';
+      state.isCompacting = false;
+      state.providerID = 'anthropic';
+      state.modelID = 'claude-sonnet';
+      state.lastTokens = {
+        input: 1234,
+        output: 567,
+        cache: { read: 89, write: 21 },
+        updatedAt: Date.now(),
+      };
+      state.loadedSkills.add('project-worktrees');
+      state.loadedSkills.add('another-skill');
+    });
+
+    const tool = createContextManageTool(distillLLM, summaryClient);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'stats' },
+      { sessionID: 'ses_stats_test', sessionStore: statsSessionStore },
+    );
+
+    expect(JSON.parse(result)).toEqual({
+      sessionID: 'ses_stats_test',
+      agent: 'fae',
+      isCompacting: false,
+      lastTokens: {
+        input: 1234,
+        output: 567,
+        cache: { read: 89, write: 21 },
+      },
+      model: {
+        provider: 'anthropic',
+        id: 'claude-sonnet',
+      },
+      loadedSkills: 2,
+    });
+  });
+
+  it('S2: returns defaults when session state is missing', async () => {
+    const statsSessionStore = new SessionStore();
+
+    const tool = createContextManageTool(distillLLM, summaryClient);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'stats' },
+      { sessionID: 'ses_missing_stats', sessionStore: statsSessionStore },
+    );
+
+    expect(JSON.parse(result)).toEqual({
+      sessionID: 'ses_missing_stats',
+      agent: null,
+      isCompacting: false,
+      lastTokens: {
+        input: 0,
+        output: 0,
+        cache: { read: 0, write: 0 },
+      },
+      model: {
+        provider: null,
+        id: null,
+      },
+      loadedSkills: 0,
+    });
+  });
+
+  it('S3: reflects compacting state correctly', async () => {
+    const statsSessionStore = new SessionStore();
+    statsSessionStore.markCompacting('ses_compacting_stats', Date.now());
+
+    const tool = createContextManageTool(distillLLM, summaryClient);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'stats', session_id: 'ses_compacting_stats' },
+      { sessionID: 'ses_main', sessionStore: statsSessionStore },
+    );
+
+    expect(JSON.parse(result)).toMatchObject({
+      sessionID: 'ses_compacting_stats',
+      isCompacting: true,
+    });
+  });
+});
+
 describe('context_manage: handleDump', () => {
   beforeEach(() => {
     vi.clearAllMocks();

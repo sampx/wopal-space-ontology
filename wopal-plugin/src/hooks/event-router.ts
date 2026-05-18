@@ -62,7 +62,17 @@ const result = await client.session.get({ path: { id: sessionID } })
       }
     }
 
-    if (eventType === "message.part.delta") {
+    if (eventType === "message.updated") {
+      if (sessionID) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const info = (props as any)?.info
+        if (info?.agent) {
+          ctx.sessionStore.upsert(sessionID, (s) => {
+            s.agent = info.agent
+          })
+        }
+      }
+    } else if (eventType === "message.part.delta") {
       if (sessionID) {
         const task = ctx.taskManager?.findBySession(sessionID)
         if (task && task.status === "running") {
@@ -77,7 +87,8 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
   const t = part.tokens
   const cache = t.cache ?? {}
   const isTask = !!ctx.taskManager?.findBySession(sessionID)
-  const agent = ctx.sessionStore.get(sessionID)?.agent ?? "?"
+  const state = ctx.sessionStore.get(sessionID)
+  const agent = state?.agent ?? "?"
 
   const used = (t.input ?? 0) + (cache.read ?? 0)
 

@@ -1,9 +1,9 @@
 /**
  * context_manage Tool - Session Context Management
  *
- * Manages session-level state including summaries and status.
+ * Manages session-level state including summaries and stats.
  * - summary: Generate session summary via LLM and update session title
- * - status: View current session context state and staleness
+ * - stats: View current session context usage statistics
  */
 
 import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
@@ -15,7 +15,7 @@ import {
 } from "../memory/session-context.js";
 import type { SessionMessage, SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "../hooks/message-context.js";
-import type { SessionStore } from "../session-store.js";
+import type { SessionState, SessionStore } from "../session-store.js";
 import { SessionStore as SessionStoreClass } from "../session-store.js";
 import { createDebugLog, formatSessionID } from "../debug.js";
 import { writeContextDump, findActualKey } from "./dump-formatter.js";
@@ -61,6 +61,8 @@ export function createContextManageTool(
       "Session context tool. Actions:\n" +
       "- 'summary': Generate ≤50 char summary via LLM and update session title.\n" +
       "  MUST only call when user explicitly requests (e.g. \"摘要本次会话\"). Do not repeat after success.\n" +
+      "- 'stats': Return current session context usage stats from session store.\n" +
+      "  Includes agent, compaction status, last token usage, model/provider, and loaded skills count.\n" +
       "- 'dump': Export session context to file.\n" +
       "  Default: dump current session (no session_id needed).\n" +
       "  Optional session_id: dump specific session (accepts 'ses_xxx' or 'wopal-task-xxx').\n" +
@@ -70,8 +72,8 @@ export function createContextManageTool(
       "  Optional session_id: compact specific session (accepts 'ses_xxx' or 'wopal-task-xxx'). Default: current session.",
     args: {
       action: tool.schema
-        .enum(["summary", "dump", "compact"] as const)
-        .describe("'summary' to generate summary and update title, 'dump' to export session context, 'compact' to compact session"),
+        .enum(["summary", "stats", "dump", "compact"] as const)
+        .describe("'summary' to generate summary and update title, 'stats' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
       session_id: tool.schema
         .string()
         .optional()
@@ -85,9 +87,23 @@ export function createContextManageTool(
     execute: async (args, context: ToolContext): Promise<string> => {
       const sessionID = context.sessionID;
 
-      // Only log caller session for summary/dump; compact has dedicated target session log
+      // Only log caller session for summary/stats/dump; compact has dedicated target session log
       if (args.action !== "compact") {
         debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+      }
+
+      // Get sessionStore from context (tests inject it directly)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ctxStore = (context as any).sessionStore as SessionStore | undefined;
+      const activeStore = ctxStore ?? store;
+
+      if (args.action === "stats") {
+        const rawSessionID = args.session_id ?? sessionID;
+        if (!rawSessionID) {
+          return "Failed: no session ID available for stats.";
+        }
+        const statsSessionID = normalizeSessionID(rawSessionID);
+        return handleStats(statsSessionID, activeStore);
       }
 
       if (args.action === "dump") {
@@ -144,12 +160,7 @@ export function createContextManageTool(
 
         debugLog(`[context_manage] compact ${formatSessionID(compactSessionID, isTask)}`);
 
-        // Get sessionStore from context (tests inject it directly)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ctxStore = (context as any).sessionStore as SessionStore | undefined;
-        const sessionStore = ctxStore ?? store;
-
-        return await handleCompact(compactSessionID, client, sessionStore, baseDir, isTask);
+        return await handleCompact(compactSessionID, client, activeStore, baseDir, isTask);
       }
 
       if (!sessionID) {
@@ -163,6 +174,55 @@ export function createContextManageTool(
       return "Unknown action.";
     },
   });
+}
+
+function handleStats(sessionID: string, sessionStore: SessionStore): string {
+  const state = sessionStore.get(sessionID);
+
+  return JSON.stringify(
+    {
+      sessionID,
+      ...buildStatsPayload(state),
+    },
+    null,
+    2,
+  );
+}
+
+function buildStatsPayload(state?: SessionState): {
+  agent: string | null;
+  isCompacting: boolean;
+  lastTokens: {
+    input: number;
+    output: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  model: {
+    provider: string | null;
+    id: string | null;
+  };
+  loadedSkills: number;
+} {
+  return {
+    agent: state?.agent ?? null,
+    isCompacting: state?.isCompacting ?? false,
+    lastTokens: {
+      input: state?.lastTokens?.input ?? 0,
+      output: state?.lastTokens?.output ?? 0,
+      cache: {
+        read: state?.lastTokens?.cache?.read ?? 0,
+        write: state?.lastTokens?.cache?.write ?? 0,
+      },
+    },
+    model: {
+      provider: state?.providerID ?? null,
+      id: state?.modelID ?? null,
+    },
+    loadedSkills: state?.loadedSkills.size ?? 0,
+  };
 }
 
 async function handleSummary(
