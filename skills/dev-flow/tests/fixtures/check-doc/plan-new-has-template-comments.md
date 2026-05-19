@@ -32,8 +32,6 @@ Current architecture description.
 
 ## Acceptance Criteria
 
-<!-- agent-verify-guard -->
-
 ### Agent Verification
 
 - [ ] `rg -c 'pattern' test.py` ≥ 1

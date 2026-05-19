@@ -34,7 +34,6 @@ Current architecture description.
 
 ### Agent Verification
 
-<!-- agent-verify-guard -->
 - [ ] 代码构建通过（纯描述，不可执行）
 - [ ] 单元测试通过（纯描述，不可执行）
 

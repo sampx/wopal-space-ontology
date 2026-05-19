@@ -89,8 +89,6 @@
   这是 readability 设计，不是 TDD 执行机制——TDD 约束在 Task 级别生效。
 -->
 
-<!-- agent-verify-guard -->
-
 ### Agent Verification
 
 <!--
