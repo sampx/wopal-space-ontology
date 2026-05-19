@@ -16,7 +16,10 @@
             },
             "fae": {
               "model": "wopal-ai/glm-5.1"
-            },            
+            },
+            "rook": {
+              "model": "github-copilot/gpt-5.4"
+            },         
             "wsf-planner": {
               "model": "github-copilot/gpt-5.4"
             },
