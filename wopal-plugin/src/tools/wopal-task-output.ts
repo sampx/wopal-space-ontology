@@ -2,16 +2,14 @@ import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import { getErrorMessage, extractMessages, extractAssistantContent, extractBySection, type OutputSection } from "../tasks/session-messages.js"
 import { consumeNewMessages } from "../tasks/session-cursor.js"
-import { analyzeProgress } from "../tasks/progress-analyzer.js"
+import { analyzeProgress } from "../tasks/progress.js"
 import { detectLoop } from "../tasks/loop-detector.js"
-import { createDebugLog } from "../debug.js"
 import {
-  getTaskModelInfo,
+  getSessionModelInfo,
   getContextUsage,
   formatProgressOutput,
 } from "./output-helpers.js"
-
-const debugLog = createDebugLog("[wopal-task]", "task")
+import { getDisplayStatus, isIdleTask } from "../tasks/task-phase.js"
 
 export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
@@ -35,7 +33,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
       }
 
       let result = `**Task:** ${task.id}\n`
-      const statusDisplay = task.idleNotified ? 'idle (awaiting judgment)' : task.status
+      const statusDisplay = getDisplayStatus(task)
       result += `**Status:** ${statusDisplay}\n`
       result += `**Description:** ${task.description}\n`
       result += `**Agent:** ${task.agent}\n`
@@ -43,7 +41,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
       // 获取模型信息（仅当有 sessionID 时）
       if (task.sessionID) {
         const client = manager.getClient()
-        const modelInfo = await getTaskModelInfo(client, task.sessionID)
+        const modelInfo = await getSessionModelInfo(client, task.sessionID)
         if (modelInfo) {
           result += `**Model:** ${modelInfo.providerID}/${modelInfo.modelID}\n`
         }
@@ -54,7 +52,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
       result += `**Concurrency:** ${concurrency.used}/${concurrency.limit} used, ${concurrency.available} available\n`
 
       // idle task: awaiting Wopal judgment
-      if (task.idleNotified) {
+      if (isIdleTask(task)) {
         result += `\n\n**Idle:** awaiting your judgment`
         result += `\nUse wopal_task_reply with interrupt=true to abort and redirect.`
       }
@@ -91,22 +89,19 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
         let sessionStatus = "unknown"
         try {
           if (typeof client.session?.status === "function") {
-            debugLog(`[progress] fetching session status for ${task.sessionID}`)
             const statusResult = await client.session.status()
             if (statusResult && typeof statusResult === "object") {
-              const statusData = statusResult as Record<string, { type?: string }>
-              sessionStatus = statusData[task.sessionID]?.type ?? "unknown"
+              const statusMap = (statusResult.data ?? statusResult) as Record<string, { type?: string }>
+              sessionStatus = statusMap[task.sessionID]?.type ?? "unknown"
             }
           }
         } catch {
           // Graceful degradation: session status not available
-          debugLog(`[progress] session.status not available, using unknown`)
         }
 
         // Fetch messages for progress analysis
         if (typeof client.session?.messages === "function") {
           try {
-            debugLog(`[progress] fetching messages for taskId=${task.id}`)
             const messagesResult = await client.session.messages({
               path: { id: task.sessionID },
             })
@@ -122,7 +117,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
               const progress = analyzeProgress(messages, newMessages)
               const loopWarning = detectLoop(messages)
               const recentOutput = extractAssistantContent(newMessages) || null
-              const contextUsage = await getContextUsage(client, task.sessionID!, manager.getDirectory())
+              const contextUsage = await getContextUsage(client, task.sessionID!, manager.getDirectory(), manager.getSessionStore())
 
               result += formatProgressOutput(progress, loopWarning, sessionStatus, recentOutput)
               if (contextUsage) {
@@ -131,7 +126,6 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
             }
           } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err)
-            debugLog(`[progress] error fetching messages: ${errorMsg}`)
             result += `\n\n**Progress:** Unable to fetch (error: ${errorMsg})`
             result += `\nTask is still running.`
           }
@@ -151,7 +145,6 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
         const client = manager.getClient()
         if (typeof client.session?.messages === "function") {
           try {
-            debugLog(`[section] fetching section="${fetchSection}" for waiting task ${task.id}`)
             const messagesResult = await client.session.messages({
               path: { id: task.sessionID },
             })
@@ -182,7 +175,6 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
         const client = manager.getClient()
         if (typeof client.session?.messages === "function") {
           try {
-            debugLog(`[section] fetching section="${section}" for task ${task.id}`)
             const messagesResult = await client.session.messages({
               path: { id: task.sessionID },
             })

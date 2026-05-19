@@ -5,7 +5,6 @@ import { SessionStore } from "../session-store.js"
 function createEventRouterWithTaskManager(taskManager: {
   markTaskCompletedBySession?: ReturnType<typeof vi.fn>
   markTaskErrorBySession: ReturnType<typeof vi.fn>
-  markTaskWaitingBySession?: ReturnType<typeof vi.fn>
   notifyParent: ReturnType<typeof vi.fn>
   findBySession?: ReturnType<typeof vi.fn>
   getClient?: ReturnType<typeof vi.fn>
@@ -19,7 +18,6 @@ function createEventRouterWithTaskManager(taskManager: {
         messages: vi.fn().mockResolvedValue({ data: [] }),
       },
     }),
-    markTaskWaitingBySession: vi.fn(),
     markTaskCompletedBySession: vi.fn(),
     releaseConcurrencySlot: vi.fn(),
     recoverFromSession: vi.fn().mockResolvedValue(undefined),
@@ -45,19 +43,12 @@ function createEventRouterWithTaskManager(taskManager: {
 describe("OpenCodeRulesRuntime event handling", () => {
   it("marks running task idle on session.idle and notifies parent", async () => {
     const mockTask = { id: "task-1", sessionID: "child-1", status: "running" }
-    // Mock messages with an assistant message that has finish: "stop" and no question
-    const mockMessages = [
-      {
-        info: { role: "assistant", finish: "stop" },
-        parts: [{ type: "text", text: "Task completed successfully." }],
-      },
-    ]
 
     const sessionStore = new SessionStore({ max: 10 });
     const ctx = {
       client: {
         session: {
-          messages: vi.fn().mockResolvedValue({ data: mockMessages }),
+          messages: vi.fn().mockResolvedValue({ data: [] }),
           promptAsync: vi.fn().mockResolvedValue(undefined),
         },
       },
@@ -68,7 +59,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
         findBySession: vi.fn().mockReturnValue(mockTask),
         markTaskCompletedBySession: vi.fn(),
         markTaskErrorBySession: vi.fn(),
-        markTaskWaitingBySession: vi.fn(),
         notifyParent: vi.fn().mockResolvedValue(undefined),
         releaseConcurrencySlot: vi.fn(),
         recoverFromSession: vi.fn().mockResolvedValue(undefined),
@@ -81,7 +71,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
     })
 
     expect(ctx.taskManager.findBySession).toHaveBeenCalledWith("child-1")
-    // Phase 3: idle sets idleNotified flag instead of markTaskCompletedBySession
     expect(mockTask.idleNotified).toBe(true)
     expect(ctx.taskManager.markTaskCompletedBySession).not.toHaveBeenCalled()
     expect(ctx.taskManager.notifyParent).toHaveBeenCalledWith("task-1")
@@ -146,7 +135,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
   })
 
   it("does not notify when idle event arrives after task already finalized", async () => {
-    // Task is in completed state (not running), so markTaskCompletedBySession returns undefined
+    // Task is in completed state (not running), so no notification
     const completedTask = { id: "task-1", sessionID: "child-1", status: "completed" }
     const { hooks, taskManager } = createEventRouterWithTaskManager({
       findBySession: vi.fn().mockReturnValue(completedTask),
@@ -175,5 +164,499 @@ describe("OpenCodeRulesRuntime event handling", () => {
     })
 
     expect(taskManager.notifyParent).not.toHaveBeenCalled()
+  })
+
+  // Task 3: session.compacted event handling tests
+  describe("session.compacted event handling", () => {
+    it("sends auto-continue message for main session when needsAutoContinue is true", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+      
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
+          getClient: vi.fn().mockReturnValue({
+            session: {
+              messages: vi.fn().mockResolvedValue({ data: [] }),
+            },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskErrorBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+      
+      // Pre-condition: Plugin-initiated compact (via context_manage tool)
+      sessionStore.markCompacting("main-session", Date.now(), "plugin")
+      sessionStore.upsert("main-session", (state) => {
+        state.loadedSkills = new Set(["space-master"])
+      })
+      
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "main-session" } },
+      })
+
+      // Verify markCompacted was called and then consumed by recovery
+      const state = sessionStore.get("main-session")
+      expect(state?.compactingTrigger).toBeUndefined() // consumed by event handler
+
+      // Verify promptAsync was called with recovery message
+      expect(mockPromptAsync).toHaveBeenCalledWith({
+        path: { id: "main-session" },
+        body: {
+          noReply: false,
+          parts: [{
+            type: "text",
+            text: expect.stringContaining("The session context has been compacted"),
+            synthetic: true,
+          }],
+        },
+      })
+
+      // Verify message contains recovery protocol and skill reload instruction
+      const callArgs = mockPromptAsync.mock.calls[0][0]
+      const messageText = callArgs.body.parts[0].text
+      expect(messageText).toContain("Execute recovery protocol immediately")
+      expect(messageText).toContain("Reload previously loaded skills: space-master")
+      expect(messageText).toContain("<CRITICAL_RULE>")
+      expect(messageText).toContain("Search and load task-relevant memories")
+    })
+
+    it("sends compacted notification for child session when needsAutoContinue is true", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+      
+      const mockTask = {
+        id: "wopal-task-123",
+        sessionID: "child-session",
+        description: "Test task",
+        parentSessionID: "parent-session",
+      }
+      
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(mockTask), // Has task = child session
+          getClient: vi.fn().mockReturnValue({
+            session: {
+              messages: vi.fn().mockResolvedValue({ data: [] }),
+            },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskErrorBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+      
+      // Pre-condition: Plugin-initiated compact (via context_manage tool)
+      sessionStore.markCompacting("child-session", Date.now(), "plugin")
+      
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "child-session" } },
+      })
+
+      // Verify markCompacted was called and then consumed by notification
+      const state = sessionStore.get("child-session")
+      expect(state?.compactingTrigger).toBeUndefined() // consumed by event handler
+
+      // Verify promptAsync was called to parent session with [WOPAL TASK COMPACTED]
+      expect(mockPromptAsync).toHaveBeenCalledWith({
+        path: { id: "parent-session" },
+        body: {
+          noReply: false,
+          parts: [{
+            type: "text",
+            text: expect.stringContaining("[WOPAL TASK COMPACTED]"),
+            synthetic: true,
+          }],
+        },
+      })
+
+      // Verify message contains task info and recovery instruction
+      const callArgs = mockPromptAsync.mock.calls[0][0]
+      const messageText = callArgs.body.parts[0].text
+      expect(messageText).toContain("Task ID: wopal-task-123")
+      expect(messageText).toContain("Description: Test task")
+      expect(messageText).toContain("Use wopal_task_reply to send recovery instructions")
+    })
+
+    it("skips recovery when session was not compacting before event (non-Plugin trigger)", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+      
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+          getClient: vi.fn().mockReturnValue({
+            session: {
+              messages: vi.fn().mockResolvedValue({ data: [] }),
+            },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskErrorBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+      
+      const hooks = createEventRouter(ctx as never)
+
+      // Simulate compacted event WITHOUT prior compacting state
+      // (This happens when EllaMaka auto-compacts or other non-Plugin triggers)
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "main-session" } },
+      })
+
+      // markCompacted should still be called (sets needsAutoContinue=true)
+      const state = sessionStore.get("main-session")
+      expect(state?.needsAutoContinue).toBe(true)
+      
+      // But there's no compactingSince record, so Plugin should skip recovery
+      expect(state?.compactingSince).toBeUndefined()
+      expect(mockPromptAsync).not.toHaveBeenCalled()
+    })
+  })
+
+  // Task 4: message/token tracking tests
+  describe("message.token tracking", () => {
+    it("stores agent info on message.updated event", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const ctx = {
+        client: { session: { messages: vi.fn().mockResolvedValue({ data: [] }) } },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            sessionID: "session-1",
+            info: { agent: "fae" },
+          },
+        },
+      })
+
+      const state = sessionStore.get("session-1")
+      expect(state?.agent).toBe("fae")
+    })
+
+    it("stores token usage on step-finish part", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockConfig = vi.fn().mockResolvedValue({
+        data: {
+          providers: [{
+            id: "anthropic",
+            models: {
+              "claude-3": { limit: { context: 100000 } }
+            }
+          }]
+        }
+      })
+
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({
+              data: [{
+                info: {
+                  role: "assistant",
+                  providerID: "anthropic",
+                  modelID: "claude-3",
+                }
+              }]
+            }),
+          },
+          config: { providers: mockConfig },
+        },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "message.part.updated",
+          properties: {
+            sessionID: "session-1",
+            part: {
+              type: "step-finish",
+              tokens: {
+                input: 5000,
+                output: 2000,
+                cache: { read: 1000, write: 500 },
+              },
+            },
+          },
+        },
+      })
+
+      const state = sessionStore.get("session-1")
+      expect(state?.lastTokens).toMatchObject({
+        input: 5000,
+        output: 2000,
+        cache: { read: 1000, write: 500 },
+      })
+      expect(state?.providerID).toBe("anthropic")
+      expect(state?.modelID).toBe("claude-3")
+      expect(state?.contextLimit).toBe(100000)
+    })
+
+    it("skips token storage for non-step-finish parts", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const ctx = {
+        client: { session: { messages: vi.fn() } },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: { findBySession: vi.fn() } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "message.part.updated",
+          properties: {
+            sessionID: "session-1",
+            part: { type: "text", tokens: { input: 100 } },
+          },
+        },
+      })
+
+      const state = sessionStore.get("session-1")
+      expect(state?.lastTokens).toBeUndefined()
+    })
+  })
+
+  // Task 4: permission/question relay tests
+  describe("permission.asked relay", () => {
+    it("relays permission request for child session", async () => {
+      const mockTask = { id: "task-1", sessionID: "child-1", parentSessionID: "parent-1" }
+      const mockPermissionReply = vi.fn().mockResolvedValue(undefined)
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+
+      const ctx = {
+        client: {
+          permission: { reply: mockPermissionReply },
+          session: { promptAsync: mockPromptAsync },
+        },
+        sessionStore: new SessionStore({ max: 10 }),
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(mockTask),
+          getClient: vi.fn().mockReturnValue({
+            permission: { reply: mockPermissionReply },
+            session: { promptAsync: mockPromptAsync },
+          }),
+          getTask: vi.fn().mockReturnValue(mockTask),
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "permission.asked",
+          properties: {
+            sessionID: "child-1",
+            id: "perm-123",
+            permission: "bash",
+            patterns: ["npm install"],
+          },
+        },
+      })
+
+      // Should auto-reply 'once' for child session
+      expect(mockPermissionReply).toHaveBeenCalledWith({
+        requestID: "perm-123",
+        reply: "once",
+      })
+
+      // Should notify parent session
+      expect(mockPromptAsync).toHaveBeenCalledWith({
+        path: { id: "parent-1" },
+        body: {
+          noReply: true,
+          parts: [{
+            type: "text",
+            text: expect.stringContaining("[WOPAL TASK PERMISSION]"),
+            synthetic: true,
+          }],
+        },
+      })
+    })
+
+    it("skips permission relay for main session", async () => {
+      const mockPermissionReply = vi.fn()
+      const ctx = {
+        client: { permission: { reply: mockPermissionReply } },
+        sessionStore: new SessionStore({ max: 10 }),
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "permission.asked",
+          properties: {
+            sessionID: "main-session",
+            id: "perm-123",
+            permission: "bash",
+          },
+        },
+      })
+
+      expect(mockPermissionReply).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("question.asked relay", () => {
+    it("relays question request for child session and sets waiting status", async () => {
+      const mockTask = {
+        id: "task-1",
+        sessionID: "child-1",
+        status: "running",
+        parentSessionID: "parent-1",
+        description: "Test task",
+      }
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+
+      const ctx = {
+        client: { session: { promptAsync: mockPromptAsync } },
+        sessionStore: new SessionStore({ max: 10 }),
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(mockTask),
+          getClient: vi.fn().mockReturnValue({ session: { promptAsync: mockPromptAsync } }),
+          getTask: vi.fn().mockReturnValue(mockTask),
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "question.asked",
+          properties: {
+            sessionID: "child-1",
+            id: "q-123",
+            questions: [{
+              header: "Choice",
+              question: "Which option?",
+              options: [
+                { label: "Option A", description: "First choice" },
+                { label: "Option B", description: "Second choice" },
+              ],
+            }],
+          },
+        },
+      })
+
+      // Should set task to waiting status
+      expect(mockTask.status).toBe("waiting")
+      expect(mockTask.pendingQuestionID).toBe("q-123")
+      expect(mockTask.waitingReason).toBe("question_tool")
+
+      // Should notify parent session
+      expect(mockPromptAsync).toHaveBeenCalledWith({
+        path: { id: "parent-1" },
+        body: {
+          noReply: true,
+          parts: [{
+            type: "text",
+            text: expect.stringContaining("[WOPAL TASK QUESTION]"),
+            synthetic: true,
+          }],
+        },
+      })
+
+      const callArgs = mockPromptAsync.mock.calls[0][0]
+      const messageText = callArgs.body.parts[0].text
+      expect(messageText).toContain("**Task ID:** `task-1`")
+      expect(messageText).toContain("Which option?")
+      expect(messageText).toContain("Option A — First choice")
+    })
+
+    it("skips question relay for main session", async () => {
+      const mockPromptAsync = vi.fn()
+      const ctx = {
+        client: { session: { promptAsync: mockPromptAsync } },
+        sessionStore: new SessionStore({ max: 10 }),
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: {
+          type: "question.asked",
+          properties: {
+            sessionID: "main-session",
+            id: "q-123",
+            questions: [{ question: "Test?" }],
+          },
+        },
+      })
+
+      expect(mockPromptAsync).not.toHaveBeenCalled()
+    })
   })
 })

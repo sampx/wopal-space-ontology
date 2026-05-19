@@ -24,11 +24,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, _find_workspace_root
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn
+from dev_flow.core.workspace import find_workspace_root
+from dev_flow.core.status import update_plan_status
+from dev_flow.core.workflow import guard_status, resolve_space_repo
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue
 from dev_flow.domain.plan.metadata import (
     get_plan_field,
     get_plan_issue,
-    set_plan_field,
 )
 from dev_flow.domain.validation.check_doc import (
     ValidationError,
@@ -46,63 +49,8 @@ from dev_flow.domain.issue.sync import (
 
 
 # ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str, file=None) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=file or sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-# ============================================
 # Helpers
 # ============================================
-
-def _resolve_repo(repo: str = None) -> str:
-    """Resolve repository name (owner/repo format)."""
-    if repo:
-        return repo
-    try:
-        result = subprocess.run(
-            ['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-            capture_output=True, text=True, check=True
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
-
-
-def _update_plan_status(plan_path: str, new_status: str) -> bool:
-    """
-    Update Plan status field in metadata section.
-    """
-    path = Path(plan_path)
-    if not path.exists():
-        return False
-
-    content = path.read_text()
-    pattern = r'^\- \*\*Status\*\*:\s*\w+'
-    new_line = f'- **Status**: {new_status}'
-    new_content = re.sub(pattern, new_line, content, count=1, flags=re.MULTILINE)
-
-    if new_content == content:
-        log_warn("Status field not found or unchanged")
-        return False
-
-    path.write_text(new_content)
-    return True
-
 
 def _is_pr_merged(pr_url: str) -> bool:
     """
@@ -225,7 +173,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_error("Usage: flow.sh verify <issue-or-plan> [--confirm]")
         return 1
 
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
 
     # 1. Find Plan file (smart lookup: Issue number or plan name)
     try:
@@ -246,27 +194,15 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return 1
 
     # 3. Validate state is "verifying"
-    if current_status != "verifying":
-        log_error(f"Plan must be in verifying state to verify (current: {current_status})")
-        log_error("")
-
-        suggestion_map = {
-            "planning": f"Run: flow.sh approve {input_ref} --confirm",
-            "executing": f"Run: flow.sh complete {input_ref}",
-            "done": f"Run: flow.sh archive {input_ref}",
-        }
-
-        suggestion = suggestion_map.get(current_status, "Check plan status")
-        log_error(suggestion)
-
+    if not guard_status(current_status, "verifying", input_ref):
         return 1
 
-    # 4. Resolve repo and issue
-    repo = _resolve_repo()
-
-    # Extract Issue number from Plan metadata
+    # 4. Extract Issue number from Plan metadata
     plan_issue = get_plan_issue(plan_path)
     effective_issue = plan_issue
+
+    # Resolve repo lazily for Issue sync / PR lookup
+    repo = resolve_space_repo(effective_issue, workspace_root)
 
     # 5. Check PR merge status (PR path detection)
     is_pr_path = False
@@ -356,7 +292,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return 1
 
     # 9. Update Plan status to done
-    if _update_plan_status(plan_path, target_status):
+    if update_plan_status(plan_path, target_status):
         log_success(f"Plan status updated: {target_status}")
     else:
         log_error("Failed to update Plan status")

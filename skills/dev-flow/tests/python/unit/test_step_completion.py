@@ -12,10 +12,11 @@
 import unittest
 import sys
 import os
+from pathlib import Path
 
-# Add scripts directory to path for imports
-SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-sys.path.insert(0, os.path.join(SCRIPTS_DIR, 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from support.bootstrap import ensure_scripts_path
+ensure_scripts_path()
 
 from dev_flow.domain.validation import check_step_completion, ValidationError
 
@@ -242,6 +243,182 @@ N/A
         plan_file = self._write_temp_plan(content, 'test-no-step-format.md')
         # Should pass - no Step format checkboxes found
         check_step_completion(plan_file)
+
+
+class TestDoneCompletion(unittest.TestCase):
+    """Test _check_done_completion for new template Done checkboxes"""
+
+    def setUp(self):
+        self.fixtures_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            'fixtures', 'plans'
+        )
+        self.new_tmpl_dir = os.path.join(self.fixtures_dir, 'new-template')
+        self.temp_dir = os.path.join('/tmp', 'dev-flow-done-tests')
+        os.makedirs(self.temp_dir, exist_ok=True)
+
+    def tearDown(self):
+        import shutil
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _write_temp_plan(self, content: str, filename: str) -> str:
+        path = os.path.join(self.temp_dir, filename)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return path
+
+    def test_done_unchecked_rejected(self):
+        """New template: unchecked Done checkbox should reject"""
+        plan_file = os.path.join(self.new_tmpl_dir, 'plan-new-valid.md')
+        with self.assertRaises(ValidationError) as context:
+            check_step_completion(plan_file)
+        error_msg = str(context.exception)
+        self.assertIn('Done', error_msg, f"Should mention Done: {error_msg}")
+
+    def test_done_checked_passes(self):
+        """New template: all Done checkboxes checked should pass"""
+        content = """# test-plan
+
+## Metadata
+- **Status**: executing
+
+## Technical Context
+
+### Architecture Context
+
+Some architecture info.
+
+## Acceptance Criteria
+
+### Agent Verification
+
+- [x] All tests pass
+
+### User Validation
+
+- [x] User confirmed
+
+## Implementation
+
+### Task 1: Test Task
+
+**Verification Intent**: AC#1
+
+**Behavior**: Task does something.
+
+**Files**: `test.py`
+
+**Design**:
+Implement function.
+
+**TDD**: false
+
+**Changes**:
+1. Implement function A.
+
+**Verify**: `pytest tests/`
+
+**Done**:
+任务产出：test.py 实现完成
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+
+---
+
+## Delegation Strategy
+
+N/A
+"""
+        plan_file = self._write_temp_plan(content, 'test-done-checked.md')
+        check_step_completion(plan_file)
+
+    def test_done_no_checkbox_rejected(self):
+        """New template: Done field without checkbox should reject"""
+        plan_file = os.path.join(self.new_tmpl_dir, 'plan-new-done-no-checkbox.md')
+        with self.assertRaises(ValidationError) as context:
+            check_step_completion(plan_file)
+        error_msg = str(context.exception)
+        self.assertIn('Done', error_msg, f"Should mention Done: {error_msg}")
+
+    def test_multiple_tasks_aggregate_done_errors(self):
+        """New template: multiple Tasks with unchecked Done should aggregate errors"""
+        content = """# test-plan
+
+## Metadata
+- **Status**: executing
+
+## Technical Context
+
+### Architecture Context
+
+Some architecture info.
+
+## Acceptance Criteria
+
+### Agent Verification
+
+- [x] All tests pass
+
+## Implementation
+
+### Task 1: First Task
+
+**Verification Intent**: AC#1
+
+**Behavior**: Task does something.
+
+**Files**: `a.py`
+
+**Design**:
+Implement A.
+
+**TDD**: false
+
+**Changes**:
+1. Implement A.
+
+**Verify**: `pytest a.py`
+
+**Done**:
+产出：a.py
+- [ ] Agent done checkbox unchecked
+
+---
+
+### Task 2: Second Task
+
+**Verification Intent**: AC#1
+
+**Behavior**: Task does something else.
+
+**Files**: `b.py`
+
+**Design**:
+Implement B.
+
+**TDD**: false
+
+**Changes**:
+1. Implement B.
+
+**Verify**: `pytest b.py`
+
+**Done**:
+产出：b.py
+- [ ] Agent done checkbox unchecked
+
+---
+
+## Delegation Strategy
+
+N/A
+"""
+        plan_file = self._write_temp_plan(content, 'test-multi-done-unchecked.md')
+        with self.assertRaises(ValidationError) as context:
+            check_step_completion(plan_file)
+        error_msg = str(context.exception)
+        self.assertIn('First Task', error_msg, f"Should mention First Task: {error_msg}")
+        self.assertIn('Second Task', error_msg, f"Should mention Second Task: {error_msg}")
 
 
 if __name__ == '__main__':

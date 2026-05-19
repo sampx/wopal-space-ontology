@@ -1,8 +1,11 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
-import { createDebugLog, createWarnLog, type DebugLog } from "../debug.js"
+import { createDebugLog, createWarnLog, formatSessionID, type DebugLog } from "../debug.js"
+import { toErrorMessage } from "./utils.js"
+import { sendNotification } from "./task-notifier.js"
+import type { OpenCodeClient } from "../types.js"
 
-const defaultDebugLog = createDebugLog("[wopal-task]", "task")
-const defaultWarnLog = createWarnLog("[wopal-task]")
+const defaultDebugLog = createDebugLog("[task]", "task")
+const defaultWarnLog = createWarnLog("[task]")
 
 export interface PermissionAskedEvent {
   sessionID: string
@@ -25,7 +28,7 @@ export interface PermissionAskedEvent {
 export async function handlePermissionAsked(
   event: PermissionAskedEvent,
   taskManager: SimpleTaskManager,
-  client?: unknown,
+  client?: OpenCodeClient,
   debugLog?: DebugLog,
 ): Promise<boolean> {
   const log = debugLog ?? defaultDebugLog
@@ -37,7 +40,7 @@ export async function handlePermissionAsked(
   const task = taskManager.findBySession(sessionID)
   if (!task) {
     // 主会话，让 TUI 处理
-    log(`[permission] main session, skipping auto-reply: sessionID=${sessionID}`)
+    log(`[permission] ${formatSessionID(sessionID, false)} skipping auto-reply (main session)`)
     return false
   }
 
@@ -46,8 +49,7 @@ export async function handlePermissionAsked(
 
   // 获取客户端（v1 SDK: postSessionIdPermissionsPermissionId）
   const actualClient = client ?? taskManager.getClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const clientAny = actualClient as any
+  const clientAny = actualClient
 
   // v2 SDK: client.permission.reply({ requestID, reply: "once" })
   // v1 SDK: client.postSessionIdPermissionsPermissionId({ path: { id, permissionID }, body: { response } })
@@ -94,6 +96,12 @@ async function notifyParentPermission(
 ): Promise<void> {
   const log = debugLog ?? defaultDebugLog
 
+  const task = taskManager.getTask(taskId)
+  if (!task) {
+    log(`[permission] task not found for notification: ${taskId}`)
+    return
+  }
+
   const notification = `<system-reminder>
 [WOPAL TASK PERMISSION]
 **Task ID:** \`${taskId}\`
@@ -103,49 +111,8 @@ ${patterns && patterns.length > 0 ? `**Patterns:** ${patterns.join(", ")}` : ""}
 Permission was auto-approved for this background task.
 </system-reminder>`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = taskManager.getClient() as any
-  const task = taskManager.getTask(taskId)
+  const client = taskManager.getClient()
 
-  if (!task) {
-    log(`[permission] task not found for notification: ${taskId}`)
-    return
-  }
-
-  if (typeof client?.session?.promptAsync !== "function") {
-    log(`[permission] session.promptAsync unavailable for notification`)
-    return
-  }
-
-  try {
-    await client.session.promptAsync({
-      path: { id: task.parentSessionID },
-      body: {
-        noReply: true,
-        parts: [{ type: "text", text: notification, synthetic: true }],
-      },
-    })
-    log(`[permission] notified parent for task ${taskId}`)
-  } catch (err) {
-    // 捕获异常，不传播
-    log(`[permission] notify parent failed for task ${taskId}: ${toErrorMessage(err)}`)
-  }
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-  if (typeof error === "string" && error.length > 0) {
-    return error
-  }
-  try {
-    const serialized = JSON.stringify(error)
-    if (serialized && serialized !== "{}") {
-      return serialized
-    }
-  } catch {
-    // Ignore JSON serialization failures
-  }
-  return String(error)
+  await sendNotification({ client, debugLog: log }, task.parentSessionID, notification, true)
+  log(`[permission] notified parent for task ${taskId}`)
 }

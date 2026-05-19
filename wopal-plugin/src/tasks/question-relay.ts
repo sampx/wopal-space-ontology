@@ -1,7 +1,9 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
-import { createDebugLog, type DebugLog } from "../debug.js"
+import { createDebugLog, formatSessionID, type DebugLog } from "../debug.js"
+import { toErrorMessage } from "./utils.js"
+import type { OpenCodeClient } from "../types.js"
 
-const defaultDebugLog = createDebugLog("[wopal-task]", "task")
+const defaultDebugLog = createDebugLog("[task]", "task")
 
 export interface QuestionAskedEvent {
   sessionID: string
@@ -37,7 +39,7 @@ export async function handleQuestionAsked(
   const task = taskManager.findBySession(sessionID)
   if (!task) {
     // 主会话，让 TUI 处理
-    log(`[question] main session, skipping relay: sessionID=${sessionID}`)
+    log(`[question] ${formatSessionID(sessionID, false)} skipping relay (main session)`)
     return false
   }
 
@@ -97,8 +99,7 @@ async function notifyParentQuestion(
 This question requires your attention. The background task is waiting.
 </system-reminder>`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = taskManager.getClient() as any
+  const client = taskManager.getClient() as OpenCodeClient
 
   if (typeof client?.session?.promptAsync !== "function") {
     log(`[question] session.promptAsync unavailable for notification`)
@@ -116,24 +117,6 @@ This question requires your attention. The background task is waiting.
     log(`[question] notified parent for task ${taskId}`)
   } catch (err) {
     log(`[question] notify parent failed for task ${taskId}: ${toErrorMessage(err)}`)
-    throw err // Re-throw to be caught by caller
+    throw err // Re-throw so caller knows it failed
   }
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-  if (typeof error === "string" && error.length > 0) {
-    return error
-  }
-  try {
-    const serialized = JSON.stringify(error)
-    if (serialized && serialized !== "{}") {
-      return serialized
-    }
-  } catch {
-    // Ignore JSON serialization failures
-  }
-  return String(error)
 }

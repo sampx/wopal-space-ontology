@@ -97,8 +97,7 @@ export function createMemoryManageTool(
           if (importance !== undefined) updateOpts.importance = importance;
           if (project !== undefined) updateOpts.project = project;
           if (tags !== undefined) updateOpts.tags = tags.split(",").map(s => s.trim()).filter(Boolean);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return (await updateMemory(store, embedder, id ?? "", updateOpts as any)) + ECHO_REMINDER;
+          return (await updateMemory(store, embedder, id ?? "", updateOpts)) + ECHO_REMINDER;
         }
         case "injected":
           return await formatInjected(sessionStore, context.sessionID);

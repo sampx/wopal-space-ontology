@@ -31,9 +31,6 @@ export interface WopalTask {
   progress?: TaskProgress
   errorCategory?: ErrorCategory
   concurrencyKey?: string | undefined
-  // Progress notification tracking
-  lastNotifyMessageCount?: number
-  lastNotifyTime?: Date
   // Idle diagnostic fields
   waitingReason?: string
   lastAssistantMessage?: string
@@ -42,13 +39,14 @@ export interface WopalTask {
   // Stuck detection
   stuckNotified?: boolean
   stuckNotifiedAt?: Date
+  // Progress notification: dedup fields
+  lastNotifyTimeQuota?: number
+  lastNotifyContextPct?: number
+  lastNotifyMessageCount?: number
   // Concurrency slot key for waiting tasks
   waitingConcurrencyKey?: string
   // Idle notification (Phase 3: judgment delegated to Wopal)
   idleNotified?: boolean
-  // Context usage tracking
-  lastNotifyContextUsage?: number  // percentage at last notification (for growth detection)
-  lastContextUsage?: number        // last successfully fetched percentage (cached for tick display)
 }
 
 export interface LaunchInput {
@@ -116,3 +114,107 @@ export type InterruptResult =
 export type CancelResult = InterruptResult
 
 // SNAPSHOT-TEST [2026-04-14 17:20:08]
+
+// System prompt metadata types (pending @opencode-ai/plugin release)
+// These will be provided by ellamaka's hook input at runtime
+export type SystemPromptSectionKind =
+  | "agent-prompt"
+  | "provider-prompt"
+  | "environment"
+  | "instruction"
+  | "skill"
+  | "structured-output"
+  | "user-system"
+  | "custom"
+
+export interface SystemPromptSection {
+  kind: SystemPromptSectionKind
+  content: string
+  source?: string | undefined
+}
+
+export interface SystemPromptMetadata {
+  version: 1
+  sections: SystemPromptSection[]
+}
+
+// EllaMaka SDK client types (minimal interface for plugin usage)
+// Return types use `unknown` because the SDK returns discriminated unions
+// (data/error) that are consumed via optional chaining throughout the plugin.
+
+export interface OpenCodeSession {
+  get(args: { path: { id: string } }): Promise<unknown>
+  messages(args: { path: { id: string }; query?: { limit?: number } }): Promise<unknown>
+  promptAsync(args: {
+    path: { id: string }
+    body: {
+      agent?: string
+      parts: unknown[]
+      noReply?: boolean
+      tools?: Record<string, boolean>
+    }
+  }): Promise<unknown>
+  abort(args: { path: { id: string } }): Promise<unknown>
+  update(args: { path: { id: string }; body: { title: string } }): Promise<unknown>
+  delete(args: { path: { id: string } }): Promise<unknown>
+  children(args: { path: { id: string } }): Promise<unknown>
+  status(): Promise<unknown>
+  summarize?(args: {
+    path: { id: string }
+    body: { providerID: string; modelID: string }
+    query?: { directory?: string }
+  }): Promise<unknown>
+}
+
+export interface OpenCodePermission {
+  reply(args: { requestID: string; reply: string }): Promise<unknown>
+}
+
+export interface OpenCodeQuestion {
+  reply(args: { requestID: string; answers: string[][] }): Promise<unknown>
+}
+
+export interface OpenCodeConfig {
+  providers(args: { query?: { directory?: string } }): Promise<{ data?: { providers?: Array<{
+    id: string
+    models?: Record<string, { limit?: { context?: number } }>
+  }> } }>
+}
+
+export interface OpenCodeClient {
+  session?: OpenCodeSession
+  permission?: OpenCodePermission
+  question?: OpenCodeQuestion
+  config?: OpenCodeConfig
+  // v1 SDK compatibility (deprecated)
+  postSessionIdPermissionsPermissionId?(args: { path: { id: string; permissionID: string }; body: { response: string } }): Promise<unknown>
+}
+
+// Narrowing helpers for event properties
+
+export interface EventInfo {
+  agent?: string
+}
+
+export interface EventProperties {
+  sessionID?: string
+  info?: EventInfo
+  part?: {
+    type?: string
+    tokens?: {
+      input?: number
+      output?: number
+      reasoning?: number
+      cache?: { read?: number; write?: number }
+    }
+  }
+  error?: { name?: string }
+  id?: string  // requestID for permission/question events
+  permission?: string
+  patterns?: string[]
+  questions?: Array<{ header?: string; question?: string; options?: Array<{ label: string; description: string }> }>
+}
+
+export function hasEventInfo(props: unknown): props is EventProperties {
+  return typeof props === "object" && props !== null
+}

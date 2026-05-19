@@ -3,14 +3,18 @@ import type { SessionStore } from "../session-store.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DiscoveredRule } from "../rules/index.js";
+import type { SystemPromptMetadata, OpenCodeClient } from "../types.js";
+import type { MessageWithInfo } from "./message-context.js";
 import { createCommandHooks } from "./command-hooks.js";
 import { createMessageHooks } from "./message-hooks.js";
 import { createSystemTransformHooks } from "./system-transform.js";
 import { createEventRouter } from "./event-router.js";
 import { createCompactionHooks } from "./compaction.js";
+import type { RuleInjectorContext } from "./rule-injector.js";
+import type { MemoryInjectorContext } from "./memory-injection-utils.js";
 
 export interface HookContextOptions {
-  client: unknown;
+  client: OpenCodeClient;
   directory: string;
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
@@ -19,21 +23,33 @@ export interface HookContextOptions {
   now?: () => number;
   taskManager?: SimpleTaskManager;
   memoryInjector?: MemoryInjector | undefined;
+  systemSnapshots?: Map<string, string[]>;
+  systemMetadataMap?: Map<string, SystemPromptMetadata>;
+  systemInjectionsMap?: Map<string, string[]>;
+  rulesInjectionEnabled?: boolean;    // Default true
+  memoryInjectionEnabled?: boolean;   // Default true
 }
 
 export interface HookContext {
-  client: unknown;
+  client: OpenCodeClient;
   directory: string;
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
   sessionStore: SessionStore;
-  debugLog: DebugLog;
-  taskDebugLog: DebugLog;
-  injectDebugLog: DebugLog;
+  pluginDebugLog: DebugLog;     // Plugin lifecycle (passed from index.ts)
+  rulesDebugLog: DebugLog;      // Rule discovery and injection
+  taskDebugLog: DebugLog;       // Task delegation and monitoring
+  memoryDebugLog: DebugLog;     // Memory system (store, retrieval)
+  contextDebugLog: DebugLog;    // Session state, snapshots, compaction
   now: () => number;
   taskManager: SimpleTaskManager | undefined;
   memoryInjector: MemoryInjector | undefined;
   childSessionCache: Map<string, boolean>;
+  systemSnapshots: Map<string, string[]>;
+  systemMetadataMap: Map<string, SystemPromptMetadata>;
+  systemInjectionsMap: Map<string, string[]>;
+  rulesInjectionEnabled: boolean;
+  memoryInjectionEnabled: boolean;
 }
 
 export function createHookContext(opts: HookContextOptions): HookContext {
@@ -43,63 +59,116 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     projectDirectory: opts.projectDirectory,
     ruleFiles: opts.ruleFiles,
     sessionStore: opts.sessionStore,
-    debugLog: opts.debugLog ?? createDebugLog(),
-    taskDebugLog: createDebugLog("[wopal-task]", "task"),
-    injectDebugLog: createDebugLog("[wopal-memory]", "memory"),
+    pluginDebugLog: opts.debugLog ?? createDebugLog("[plugin]", "plugin"),
+    rulesDebugLog: createDebugLog("[rules]", "rules"),
+    taskDebugLog: createDebugLog("[task]", "task"),
+    memoryDebugLog: createDebugLog("[memory]", "memory"),
+    contextDebugLog: createDebugLog("[context]", "context"),
     now: opts.now ?? (() => Date.now()),
     taskManager: opts.taskManager ?? undefined,
     memoryInjector: opts.memoryInjector,
     childSessionCache: new Map<string, boolean>(),
+    systemSnapshots: opts.systemSnapshots ?? new Map(),
+    systemMetadataMap: opts.systemMetadataMap ?? new Map(),
+    systemInjectionsMap: opts.systemInjectionsMap ?? new Map(),
+    rulesInjectionEnabled: opts.rulesInjectionEnabled ?? true,
+    memoryInjectionEnabled: opts.memoryInjectionEnabled ?? true,
   };
 }
 
-export function createAllHooks(ctx: HookContext): Record<string, unknown> {
+export interface AllHooksResult {
+  [key: string]: unknown;
+  hooks: Record<string, unknown>;
+  transformedMessagesMap: Map<string, MessageWithInfo[]>;
+}
+
+export function createAllHooks(ctx: HookContext): AllHooksResult {
+  // Shared map for transformed messages (contains synthetic parts)
+  const transformedMessagesMap = new Map<string, MessageWithInfo[]>();
+
   const commandHooks = createCommandHooks({
     sessionStore: ctx.sessionStore,
-    debugLog: ctx.debugLog,
+    contextDebugLog: ctx.contextDebugLog,
     projectDirectory: ctx.projectDirectory,
   });
 
   const messageHooks = createMessageHooks({
     sessionStore: ctx.sessionStore,
-    debugLog: ctx.debugLog,
+    contextDebugLog: ctx.contextDebugLog,
     projectDirectory: ctx.projectDirectory,
+    transformedMessagesMap,
+    skillReloadCtx: {
+      sessionStore: ctx.sessionStore,
+      contextDebugLog: ctx.contextDebugLog,
+    },
+    ruleMessageCtx: {
+      sessionStore: ctx.sessionStore,
+      ruleInjectorCtx: {
+        directory: ctx.directory,
+        ruleFiles: ctx.ruleFiles,
+        rulesDebugLog: ctx.rulesDebugLog,
+      } satisfies RuleInjectorContext,
+      client: ctx.client,
+      taskManager: ctx.taskManager,
+      childSessionCache: ctx.childSessionCache,
+      rulesDebugLog: ctx.rulesDebugLog,
+      rulesInjectionEnabled: ctx.rulesInjectionEnabled,
+    },
+    memoryMessageCtx: {
+      memoryInjectorCtx: {
+        client: ctx.client,
+        sessionStore: ctx.sessionStore,
+        memoryDebugLog: ctx.memoryDebugLog,
+        memoryInjector: ctx.memoryInjector,
+        childSessionCache: ctx.childSessionCache,
+        taskManager: ctx.taskManager,
+      } satisfies MemoryInjectorContext,
+      memoryInjector: ctx.memoryInjector,
+      sessionStore: ctx.sessionStore,
+      memoryDebugLog: ctx.memoryDebugLog,
+      memoryInjectionEnabled: ctx.memoryInjectionEnabled,
+    },
   });
 
   const systemTransformHooks = createSystemTransformHooks({
     client: ctx.client,
     directory: ctx.directory,
     projectDirectory: ctx.projectDirectory,
-    ruleFiles: ctx.ruleFiles,
     sessionStore: ctx.sessionStore,
-    debugLog: ctx.debugLog,
-    injectDebugLog: ctx.injectDebugLog,
+    memoryDebugLog: ctx.memoryDebugLog,
+    contextDebugLog: ctx.contextDebugLog,
     now: ctx.now,
-    memoryInjector: ctx.memoryInjector,
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
+    systemSnapshots: ctx.systemSnapshots,
+    systemMetadataMap: ctx.systemMetadataMap,
+    systemInjectionsMap: ctx.systemInjectionsMap,
+    transformedMessagesMap,
   });
 
   const eventRouter = createEventRouter({
     client: ctx.client,
     sessionStore: ctx.sessionStore,
-    debugLog: ctx.debugLog,
+    contextDebugLog: ctx.contextDebugLog,
     taskDebugLog: ctx.taskDebugLog,
     taskManager: ctx.taskManager,
   });
 
   const compactionHooks = createCompactionHooks({
     sessionStore: ctx.sessionStore,
-    debugLog: ctx.debugLog,
+    contextDebugLog: ctx.contextDebugLog,
     now: ctx.now,
   });
 
   return {
-    ...commandHooks,
-    ...messageHooks,
-    ...systemTransformHooks,
-    ...eventRouter,
-    ...compactionHooks,
+    hooks: {
+      ...commandHooks,
+      ...messageHooks,
+      ...systemTransformHooks,
+      ...eventRouter,
+      ...compactionHooks,
+    },
+    transformedMessagesMap,
   };
 }
 

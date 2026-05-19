@@ -1,6 +1,10 @@
-import { extractSessionID, extractLatestUserPrompt, normalizeContextPath, toExtractableMessages, type MessageWithInfo } from "./message-context.js";
+import { extractSessionID, extractLatestUserPrompt, extractAgentName, type MessageWithInfo } from "./message-context.js";
 import type { SessionStore } from "../session-store.js";
 import type { DebugLog } from "../debug.js";
+import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
+import { injectSkillReload, type SkillReloadInjectorContext } from "./skill-reload-injector.js";
+import { injectRulesToMessage, type RuleMessageInjectorContext } from "./rule-message-injector.js";
+import { injectMemoryToMessage, type MemoryMessageInjectorContext } from "./memory-message-injector.js";
 
 /** Max recent messages to store for short-query context enrichment */
 const MAX_RECENT_MESSAGES = 10;
@@ -11,8 +15,13 @@ interface MessagesTransformOutput {
 
 export interface MessageHookContext {
   sessionStore: SessionStore;
-  debugLog: DebugLog;
+  contextDebugLog: DebugLog;
   projectDirectory: string;
+  transformedMessagesMap: Map<string, MessageWithInfo[]>;
+  skillReloadCtx: SkillReloadInjectorContext;
+  ruleMessageCtx: RuleMessageInjectorContext;
+  taskManager?: SimpleTaskManager | undefined;
+  memoryMessageCtx: MemoryMessageInjectorContext;
 }
 
 export function createMessageHooks(ctx: MessageHookContext) {
@@ -22,50 +31,53 @@ export function createMessageHooks(ctx: MessageHookContext) {
   ): Promise<MessagesTransformOutput> {
     const sessionID = extractSessionID(output.messages);
     if (!sessionID) {
-      ctx.debugLog("No sessionID found in messages");
       return output;
     }
 
     const existingState = ctx.sessionStore.get(sessionID);
-    if (existingState && existingState.seededFromHistory) {
-      ctx.debugLog(`Session ${sessionID} already seeded, skipping rescan`);
-      return output;
+    const shouldSeed = !existingState?.seededFromHistory;
+    const isTask = !!ctx.taskManager?.findBySession(sessionID);
+    const agentName = extractAgentName(output.messages);
+
+    if (shouldSeed) {
+      const userPrompt = extractLatestUserPrompt(output.messages);
+      const recentMessages = output.messages.slice(-MAX_RECENT_MESSAGES);
+
+      ctx.sessionStore.upsert(sessionID, (state) => {
+        if (userPrompt && !state.lastUserPrompt) {
+          state.lastUserPrompt = userPrompt;
+        }
+        state.needsMemoryInjection = true;
+        state.seededFromHistory = true;
+        state.seedCount = (state.seedCount ?? 0) + 1;
+        state.recentMessages = recentMessages;
+        state.agent = agentName;
+        state.isTask = isTask;
+      });
+    } else {
+      ctx.sessionStore.upsert(sessionID, (state) => {
+        state.agent = agentName;
+        state.isTask = isTask;
+      });
     }
 
-    const contextPaths = extractFilePathsFromMessages(
-      toExtractableMessages(output.messages),
-    );
-    const userPrompt = extractLatestUserPrompt(output.messages);
-
-    // Store recent messages for context enrichment (last N messages)
-    const recentMessages = output.messages.slice(-MAX_RECENT_MESSAGES);
-
-    ctx.sessionStore.upsert(sessionID, (state) => {
-      for (const p of contextPaths) {
-        state.contextPaths.add(normalizeContextPath(p, ctx.projectDirectory));
+    // Skill Reload injection: find last user message first, then consume
+    let lastUserMsg: MessageWithInfo | undefined;
+    for (let i = output.messages.length - 1; i >= 0; i--) {
+      const message = output.messages[i];
+      const role = message.info?.role ?? message.role;
+      if (role === "user") {
+        lastUserMsg = message;
+        break;
       }
-      if (userPrompt && !state.lastUserPrompt) {
-        state.lastUserPrompt = userPrompt;
-      }
-      state.needsMemoryInjection = true;
-      state.seededFromHistory = true;
-      state.seedCount = (state.seedCount ?? 0) + 1;
-      state.recentMessages = recentMessages;
-    });
-
-    if (contextPaths.length > 0) {
-      ctx.debugLog(
-        `Seeded ${contextPaths.length} context path(s) for session ${sessionID}: ${contextPaths
-          .slice(0, 5)
-          .join(", ")}${contextPaths.length > 5 ? "..." : ""}`,
-      );
     }
 
-    if (userPrompt) {
-      ctx.debugLog(
-        `Seeded user prompt for session ${sessionID} (len=${userPrompt.length})`,
-      );
-    }
+    await injectSkillReload(ctx.skillReloadCtx, sessionID, lastUserMsg);
+    await injectRulesToMessage(ctx.ruleMessageCtx, sessionID, output.messages, lastUserMsg);
+    await injectMemoryToMessage(ctx.memoryMessageCtx, sessionID, output.messages, lastUserMsg);
+
+    // Store transformed messages for auto dump
+    ctx.transformedMessagesMap.set(sessionID, output.messages);
 
     return output;
   }
@@ -79,7 +91,6 @@ export function createMessageHooks(ctx: MessageHookContext) {
   ): Promise<void> {
     const sessionID = input?.sessionID;
     if (!sessionID) {
-      ctx.debugLog("No sessionID in chat.message hook input");
       return;
     }
 
@@ -116,10 +127,6 @@ export function createMessageHooks(ctx: MessageHookContext) {
           state.lastUserPrompt = userPrompt;
           state.needsMemoryInjection = true;
         });
-
-        ctx.debugLog(
-          `Updated lastUserPrompt for session ${sessionID} (len=${userPrompt.length}, parts=${textParts.length})`,
-        );
       }
     }
   }
@@ -129,7 +136,3 @@ export function createMessageHooks(ctx: MessageHookContext) {
     "chat.message": onChatMessage,
   };
 }
-
-// Re-export extractFilePathsFromMessages from message-context for onMessagesTransform
-// (This is from rules/ path-extractor, used internally)
-import { extractFilePathsFromMessages } from "../rules/index.js";

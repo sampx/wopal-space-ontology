@@ -1,5 +1,4 @@
 import path from "path";
-import type { Message, MessagePart } from "../rules/index.js";
 
 export interface MessagePartWithSession {
   type?: string;
@@ -16,7 +15,21 @@ export interface MessageWithInfo {
     role?: string;
     sessionID?: string;
     id?: string | number;
+    agent?: string;
   };
+}
+
+/**
+ * Extract agent name from messages.
+ * Traverses from the end of messages backwards, returning the agent value
+ * of the first message that has info.agent defined.
+ */
+export function extractAgentName(messages: MessageWithInfo[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const agent = messages[i].info?.agent;
+    if (agent) return agent;
+  }
+  return undefined;
 }
 
 /**
@@ -93,25 +106,4 @@ export function extractLatestUserPrompt(
   }
 
   return undefined;
-}
-
-/**
- * Convert MessageWithInfo[] to Message[] by filtering out messages
- * that lack required fields (role, non-empty parts array).
- */
-export function toExtractableMessages(messages: MessageWithInfo[]): Message[] {
-  const result: Message[] = [];
-  for (const msg of messages) {
-    if (
-      typeof msg.role === "string" &&
-      Array.isArray(msg.parts) &&
-      msg.parts.length > 0
-    ) {
-      result.push({
-        role: msg.role,
-        parts: msg.parts as MessagePart[],
-      });
-    }
-  }
-  return result;
 }

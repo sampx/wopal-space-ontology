@@ -39,50 +39,21 @@ import re
 from pathlib import Path
 from datetime import date
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name, _find_workspace_root
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, find_plan_by_name
 from dev_flow.domain.plan.naming import make_plan_name, validate_plan_name, ValidationError
 from dev_flow.domain.plan.metadata import get_plan_status
 from dev_flow.domain.issue.title import extract_scope, extract_type
+from dev_flow.domain.issue.sync import ensure_label_exists, sync_status_label_group
 from dev_flow.domain.labels import normalize_plan_type
 from dev_flow.domain.workflow import PLAN_STATES
 from dev_flow.domain.validation import check_doc_plan
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # Helpers
 # ============================================
-
-def _get_space_repo() -> str:
-    """Get space repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure gh CLI is configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def _get_issue_info(issue_number: int, repo: str) -> dict:
@@ -107,6 +78,31 @@ def _extract_project_from_labels(issue_info: dict) -> str:
         if name.startswith("project/"):
             return name[8:]  # Remove "project/" prefix
     return ""
+
+
+def _extract_project_metadata_from_body(issue_info: dict) -> tuple[str | None, str | None]:
+    """Extract Project Type and Project Path from Issue body metadata section.
+    
+    Args:
+        issue_info: Issue info dict from GitHub
+        
+    Returns:
+        Tuple of (project_type, project_path) - both may be None if not present
+    """
+    body = issue_info.get("body", "")
+    
+    if not body:
+        return None, None
+    
+    # Look for metadata fields in Issue body
+    # Pattern: "- **Project Type**: <value>" or "- **Project Path**: <value>"
+    project_type_match = re.search(r'^-\s*\*\*Project Type\*\*:\s*(.+)$', body, re.MULTILINE)
+    project_path_match = re.search(r'^-\s*\*\*Project Path\*\*:\s*(.+)$', body, re.MULTILINE)
+    
+    project_type = project_type_match.group(1).strip() if project_type_match else None
+    project_path = project_path_match.group(1).strip() if project_path_match else None
+    
+    return project_type, project_path
 
 
 def _title_to_slug(title: str) -> str:
@@ -139,21 +135,6 @@ def _resolve_plan_dir(project: str, workspace_root: Path) -> Path:
         return workspace_root / "docs" / "products" / project / "plans"
     else:
         return workspace_root / "docs" / "products" / "plans"
-
-
-def _ensure_issue_labels(issue_number: int, plan_file: str, repo: str) -> None:
-    """Ensure Issue has status/planning label."""
-    # Get current labels
-    issue_info = _get_issue_info(issue_number, repo)
-    current_labels = [l["name"] for l in issue_info.get("labels", [])]
-    
-    # Add status/planning if not present
-    if "status/planning" not in current_labels:
-        subprocess.run(
-            ["gh", "issue", "edit", str(issue_number), "--repo", repo, "--add-label", "status/planning"],
-            capture_output=True,
-            text=True,
-        )
 
 
 def _print_existing_plan_info(plan_file: str, target_ref: str) -> None:
@@ -192,6 +173,8 @@ def create_plan_from_template(
     workspace_root: Path,
     prd_path: str | None = None,
     deep_mode: bool = False,
+    project_path: str | None = None,
+    project_type: str | None = None,
 ) -> Path:
     """Create Plan file from template.
     
@@ -204,6 +187,8 @@ def create_plan_from_template(
         workspace_root: Workspace root path
         prd_path: Optional PRD file path
         deep_mode: Whether to enable deep mode for plan structure
+        project_path: Optional project path (for ontology-worktree type)
+        project_type: Optional project type (e.g., "ontology-worktree")
         
     Returns:
         Path to created plan file
@@ -239,6 +224,18 @@ def create_plan_from_template(
     
     type_line = f"- **Type**: {plan_type}"
     project_line = f"- **Target Project**: {project}"
+    
+    # Project path and type lines (for ontology-worktree projects)
+    if project_path:
+        project_path_line = f"- **Project Path**: {project_path}"
+    else:
+        project_path_line = ""
+    
+    if project_type:
+        project_type_line = f"- **Project Type**: {project_type}"
+    else:
+        project_type_line = ""
+    
     created_date = date.today().strftime("%Y-%m-%d")
     
     # Replace placeholders
@@ -246,6 +243,8 @@ def create_plan_from_template(
     content = content.replace("{issue_line}", issue_line)
     content = content.replace("{type_line}", type_line)
     content = content.replace("{project_line}", project_line)
+    content = content.replace("{project_path_line}", project_path_line)
+    content = content.replace("{project_type_line}", project_type_line)
     content = content.replace("{date}", created_date)
     
     # Handle --deep and --prd placeholders if present in template
@@ -305,8 +304,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
     deep_mode = args.deep
     check_only = args.check
     
-    workspace_root = _find_workspace_root()
-    repo = _get_space_repo()
+    workspace_root = find_workspace_root()
+    repo = detect_space_repo(workspace_root)
     
     # Resolve input_ref: digits → issue_number, string → plan name for check mode
     if input_ref and re.match(r'^\d+$', input_ref):
@@ -445,6 +444,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
     # ========================================
     # Create new plan
     # ========================================
+    issue_project_type = None
+    issue_project_path = None
+    
     if issue_number:
         # Issue mode: fetch info from Issue
         log_info(f"Fetching Issue #{issue_number}")
@@ -493,6 +495,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
         except ValidationError as e:
             log_error(str(e))
             return 1
+        
+        # Extract Project Type and Project Path from Issue body
+        issue_project_type, issue_project_path = _extract_project_metadata_from_body(issue_info)
     else:
         # No-issue mode: use provided title, project, type, scope
         if not scope:
@@ -524,6 +529,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
             workspace_root,
             prd_path=prd_path,
             deep_mode=deep_mode,
+            project_path=issue_project_path,
+            project_type=issue_project_type,
         )
         log_success(f"Plan created: {plan_file}")
     except (FileExistsError, FileNotFoundError) as e:
@@ -532,7 +539,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
     
     # Issue mode: Update Issue labels
     if issue_number:
-        _ensure_issue_labels(issue_number, str(plan_file), repo)
+        ensure_label_exists("status/planning", repo)
+        sync_status_label_group(issue_number, "status/planning", repo)
         
         # Output summary
         print(f"Plan: {plan_file}")

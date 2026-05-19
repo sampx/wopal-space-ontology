@@ -11,54 +11,7 @@ import re
 import subprocess
 from pathlib import Path
 
-
-def _find_workspace_root(workspace_root: str = None) -> Path:
-    """
-    Find workspace root directory.
-    
-    Args:
-        workspace_root: Optional explicit workspace root path
-        
-    Returns:
-        Path to workspace root
-    """
-    if workspace_root:
-        return Path(workspace_root)
-    
-    # Fallback: search upward for .wopal or .git
-    current = Path.cwd()
-    while current != current.parent:
-        if (current / '.wopal').exists() or (current / '.git').exists():
-            return current
-        current = current.parent
-    
-    return Path.cwd()
-
-
-def _resolve_repo(repo: str = None) -> str:
-    """
-    Resolve repository name.
-    
-    Args:
-        repo: Optional explicit repo (owner/repo format)
-        
-    Returns:
-        Repository name in owner/repo format
-    """
-    if repo:
-        return repo
-    
-    # Try to get from gh CLI
-    try:
-        result = subprocess.run(
-            ['gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
+from dev_flow.core.workspace import find_workspace_root
 
 
 def _build_relative_path(archived_file: str, workspace_root: Path) -> str:
@@ -109,7 +62,7 @@ def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspa
         4. Updates Plan link in Related Resources table
         5. Updates Issue via gh CLI
     """
-    workspace = _find_workspace_root(workspace_root)
+    workspace = Path(workspace_root) if workspace_root else find_workspace_root()
     
     if not os.path.isfile(plan_file):
         print(f"Warning: Archived plan file not found: {plan_file}")

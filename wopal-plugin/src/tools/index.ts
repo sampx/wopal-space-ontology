@@ -8,7 +8,6 @@ import { createWopalTaskTool } from "./wopal-task.js"
 import { createWopalOutputTool } from "./wopal-task-output.js"
 import { createWopalReplyTool } from "./wopal-task-reply.js"
 import { createWopalTaskDeleteTool } from "./wopal-task-delete.js"
-// import { createWopalTaskDiffTool } from "./wopal-task-diff.js" // 暂时禁用 (Issue #133 backlog)
 import { createMemoryManageTool } from "./memory-manage/index.js"
 
 export function createWopalTools(
@@ -25,7 +24,6 @@ export function createWopalTools(
     wopal_task_output: createWopalOutputTool(manager),
     wopal_task_reply: createWopalReplyTool(manager),
     wopal_task_delete: createWopalTaskDeleteTool(manager),
-    // wopal_task_diff: createWopalTaskDiffTool(manager), // 暂时禁用 (Issue #133 backlog)
   }
 
   if (store) {

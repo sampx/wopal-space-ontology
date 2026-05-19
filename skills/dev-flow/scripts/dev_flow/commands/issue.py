@@ -21,63 +21,26 @@ from dev_flow.domain.issue.title import (
     ValidationError,
 )
 from dev_flow.domain.issue.body import build_structured_issue_body
-from dev_flow.domain.issue.link import build_repo_blob_url
+from dev_flow.domain.issue.sync import (
+    ensure_label_exists,
+    sync_type_label_group,
+    sync_project_label_group,
+)
 from dev_flow.domain.labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
 )
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+from dev_flow.domain.plan.project import (
+    resolve_project_info,
+    ProjectType,
+)
+from dev_flow.core.logging import log_info, log_success, log_error
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
-
-
-def ensure_label_exists(label: str, repo: str) -> None:
-    """Ensure a label exists in the repo."""
-    # Check if label exists
-    result = subprocess.run(
-        ["gh", "label", "list", "--repo", repo, "--json", "name", "-q", f'.[] | select(.name == "{label}")'],
-        capture_output=True,
-        text=True,
-    )
-    if result.stdout.strip():
-        return  # Label exists
-    
-    # Create label with default color
-    subprocess.run(
-        ["gh", "label", "create", label, "--repo", repo, "--color", "dddddd"],
-        capture_output=True,
-        text=True,
-    )
 
 
 def ensure_flow_labels_exist(repo: str) -> None:
@@ -244,64 +207,6 @@ def update_structured_issue_body(body: str, **kwargs) -> str:
     return updated_body
 
 
-def sync_type_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync type label group - remove others, add desired."""
-    type_labels = ["type/feature", "type/bug", "type/perf", "type/refactor", "type/docs", "type/test", "type/chore"]
-    
-    # Get current labels
-    issue_info = get_issue_info(issue_number, repo)
-    current_labels = [l["name"] for l in issue_info.get("labels", [])]
-    
-    # Build add/remove args
-    add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in type_labels if l in current_labels and l != desired_label]
-    
-    if not add_labels and not remove_labels:
-        return
-    
-    # Ensure desired label exists
-    if desired_label:
-        ensure_label_exists(desired_label, repo)
-    
-    # Single gh call with all label ops
-    args = ["gh", "issue", "edit", issue_number, "--repo", repo]
-    for label in remove_labels:
-        args.extend(["--remove-label", label])
-    for label in add_labels:
-        args.extend(["--add-label", label])
-    
-    subprocess.run(args, capture_output=True, text=True)
-
-
-def sync_project_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync project label group - remove others, add desired."""
-    project_labels = ["project/ontology", "project/wopal-cli", "project/space"]
-    
-    # Get current labels
-    issue_info = get_issue_info(issue_number, repo)
-    current_labels = [l["name"] for l in issue_info.get("labels", [])]
-    
-    # Build add/remove args
-    add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in project_labels if l in current_labels and l != desired_label]
-    
-    if not add_labels and not remove_labels:
-        return
-    
-    # Ensure desired label exists
-    if desired_label:
-        ensure_label_exists(desired_label, repo)
-    
-    # Single gh call with all label ops
-    args = ["gh", "issue", "edit", issue_number, "--repo", repo]
-    for label in remove_labels:
-        args.extend(["--remove-label", label])
-    for label in add_labels:
-        args.extend(["--add-label", label])
-    
-    subprocess.run(args, capture_output=True, text=True)
-
-
 # ============================================
 # issue create command
 # ============================================
@@ -359,36 +264,68 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         log_error(f"Unsupported type mapping: {plan_type}")
         return 1
     
-    # Build structured body
-    body_kwargs = {
-        "type": plan_type,
-        "goal": args.goal or "",
-        "background": args.background or "",
-        "scope": args.scope or "",
-        "out_of_scope": args.out_of_scope or "",
-        "reference": args.reference or "",
-        "confirmed_bugs": args.confirmed_bugs or "",
-        "content_model_defects": args.content_model_defects or "",
-        "cleanup_scope": args.cleanup_scope or "",
-        "key_findings": args.key_findings or "",
-        "baseline": args.baseline or "",
-        "target": args.target or "",
-        "affected_components": args.affected_components or "",
-        "refactor_strategy": args.refactor_strategy or "",
-        "target_documents": args.target_documents or "",
-        "audience": args.audience or "",
-        "test_scope": args.test_scope or "",
-        "test_strategy": args.test_strategy or "",
-    }
-    
-    # Use provided body or build structured body
-    if args.body and not any(v for k, v in body_kwargs.items() if k != "type" and v):
-        body = args.body
+    # Determine body content
+    if getattr(args, 'body_file', None):
+        # --body-file: read body from file
+        body_file = args.body_file
+        if not os.path.isfile(body_file):
+            log_error(f"body-file not found: {body_file}")
+            return 1
+        with open(body_file, 'r') as f:
+            body = f.read()
+        
+        # Warn if structured params also provided (they will be ignored)
+        structured_params = [
+            args.goal, args.background, args.scope, args.out_of_scope,
+            args.reference, args.confirmed_bugs, args.content_model_defects,
+            args.cleanup_scope, args.key_findings, args.baseline, args.target,
+            args.affected_components, args.refactor_strategy, args.target_documents,
+            args.audience, args.test_scope, args.test_strategy,
+        ]
+        if any(structured_params):
+            log_info("Warning: --body-file provided, ignoring structured params (--goal, --background, etc.)")
     else:
-        body = build_structured_issue_body(**body_kwargs)
+        # Build structured body from params
+        body_kwargs = {
+            "type": plan_type,
+            "goal": args.goal or "",
+            "background": args.background or "",
+            "scope": args.scope or "",
+            "out_of_scope": args.out_of_scope or "",
+            "reference": args.reference or "",
+            "confirmed_bugs": args.confirmed_bugs or "",
+            "content_model_defects": args.content_model_defects or "",
+            "cleanup_scope": args.cleanup_scope or "",
+            "key_findings": args.key_findings or "",
+            "baseline": args.baseline or "",
+            "target": args.target or "",
+            "affected_components": args.affected_components or "",
+            "refactor_strategy": args.refactor_strategy or "",
+            "target_documents": args.target_documents or "",
+            "audience": args.audience or "",
+            "test_scope": args.test_scope or "",
+            "test_strategy": args.test_strategy or "",
+        }
+        
+        # Use provided body or build structured body
+        if args.body and not any(v for k, v in body_kwargs.items() if k != "type" and v):
+            body = args.body
+        else:
+            body = build_structured_issue_body(**body_kwargs)
+    
+    # Inject project type metadata for ontology-worktree projects
+    workspace_root = find_workspace_root()
+    project_type, project_path = resolve_project_info(project, workspace_root)
+    if project_type == ProjectType.ONTOLOGY_WORKTREE and project_path:
+        injection = (
+            f"- **Project Type**: {project_type.value}\n"
+            f"- **Project Path**: {project_path}\n"
+            "\n"
+        )
+        body = injection + body
     
     # Get repo and ensure labels
-    repo = get_space_repo()
+    repo = detect_space_repo(workspace_root)
     ensure_flow_labels_exist(repo)
     ensure_label_exists(type_label, repo)
     ensure_label_exists(f"project/{project}", repo)
@@ -435,7 +372,7 @@ def cmd_issue_update(args: argparse.Namespace) -> int:
         log_error("Missing issue number")
         return 1
     
-    repo = get_space_repo()
+    repo = detect_space_repo(find_workspace_root())
     
     # Get current issue info
     issue_info = get_issue_info(issue_number, repo)
@@ -553,6 +490,7 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     create_parser.add_argument("--project", required=False, help="Project name (lowercase alphanumeric with hyphens)")
     create_parser.add_argument("--type", help="Issue type (feat/fix/perf/refactor/docs/test/chore/enhance)")
     create_parser.add_argument("--body", help="Raw issue body (fallback)")
+    create_parser.add_argument("--body-file", help="Read issue body from file (overrides structured params)")
     create_parser.add_argument("--goal", help="One-line goal description")
     create_parser.add_argument("--background", help="Background context")
     create_parser.add_argument("--scope", help="In-scope items (comma-separated)")

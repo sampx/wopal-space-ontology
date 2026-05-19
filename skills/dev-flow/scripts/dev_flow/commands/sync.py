@@ -18,50 +18,28 @@ import os
 import re
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan_by_issue, _find_workspace_root
-from dev_flow.domain.issue.link import build_repo_blob_url
+from dev_flow.domain.plan.find import find_plan_by_issue
+from dev_flow.domain.issue.sync import (
+    sync_status_label_group,
+    sync_type_label_group,
+    sync_project_label_group,
+    ensure_label_exists,
+    plan_status_to_issue_label,
+    plan_project_to_issue_label,
+)
 from dev_flow.domain.labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
     ValidationError,
 )
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
+from dev_flow.domain.plan.body import build_issue_body_from_plan as _build_issue_body
+from dev_flow.core.logging import log_info, log_success, log_warn, log_error
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def get_issue_info(issue_number: str, repo: str) -> dict:
@@ -77,25 +55,6 @@ def get_issue_info(issue_number: str, repo: str) -> dict:
         raise RuntimeError("gh issue view failed")
     
     return json.loads(result.stdout)
-
-
-def ensure_label_exists(label: str, repo: str) -> None:
-    """Ensure a label exists in the repo."""
-    # Check if label exists
-    result = subprocess.run(
-        ["gh", "label", "list", "--repo", repo, "--json", "name", "-q", f'.[] | select(.name == "{label}")'],
-        capture_output=True,
-        text=True,
-    )
-    if result.stdout.strip():
-        return  # Label exists
-    
-    # Create label with default color
-    subprocess.run(
-        ["gh", "label", "create", label, "--repo", repo, "--color", "dddddd"],
-        capture_output=True,
-        text=True,
-    )
 
 
 # ============================================
@@ -164,245 +123,8 @@ def extract_primary_plan_issue(plan_file: str) -> str:
 
 
 # ============================================
-# Plan Content Extraction (from plan-sync.sh)
+# Sync Operations
 # ============================================
-
-def _extract_plan_section(plan_file: str, section: str, limit: int = 0) -> str:
-    """
-    Extract a markdown section body from a plan file.
-    
-    Handles fenced code blocks (```) — only matches ## headings outside code blocks.
-    """
-    content = []
-    in_code = False
-    found = False
-    count = 0
-    
-    with open(plan_file, 'r') as f:
-        for line in f:
-            if line.strip().startswith('```'):
-                in_code = not in_code
-                continue
-            
-            if not in_code and line.strip() == f"## {section}":
-                found = True
-                continue
-            
-            if found and not in_code and line.startswith("##") and not line.startswith(f"## {section}"):
-                break
-            
-            if found and not in_code:
-                content.append(line)
-                count += 1
-                if limit > 0 and count >= limit:
-                    break
-    
-    return ''.join(content).strip()
-
-
-def _extract_technical_context_subsection(plan_file: str, subsection: str) -> str:
-    """
-    Extract a named subsection from Technical Context.
-    
-    Subsection names: Confirmed Bugs, Content Model Defects, Cleanup Scope, Key Findings
-    """
-    content = []
-    in_subsection = False
-    
-    with open(plan_file, 'r') as f:
-        for line in f:
-            if line.strip() == f"### {subsection}":
-                in_subsection = True
-                continue
-            
-            if in_subsection and (line.startswith("###") or (line.startswith("##") and not line.startswith("###"))):
-                break
-            
-            if in_subsection:
-                content.append(line)
-    
-    return ''.join(content).strip()
-
-
-def _plan_has_audit_subsections(plan_file: str) -> bool:
-    """Check if Plan has Technical Context named subsections."""
-    subsections = ["Confirmed Bugs", "Content Model Defects", "Cleanup Scope", "Key Findings"]
-    
-    with open(plan_file, 'r') as f:
-        content = f.read()
-    
-    for subsection in subsections:
-        if f"### {subsection}" in content:
-            return True
-    
-    return False
-
-
-def _extract_acceptance_criteria(plan_file: str) -> str:
-    """Extract Acceptance Criteria section (including Agent/User sub-sections)."""
-    content = []
-    in_section = False
-    
-    with open(plan_file, 'r') as f:
-        for line in f:
-            if line.strip() == "## Acceptance Criteria":
-                in_section = True
-                continue
-            
-            if in_section and line.startswith("## ") and not line.startswith("## Acceptance Criteria"):
-                break
-            
-            if in_section:
-                content.append(line)
-    
-    return ''.join(content).strip()
-
-
-def _extract_technical_context_top(plan_file: str) -> str:
-    """Extract Technical Context top-level content (before first ### subsection)."""
-    content = []
-    in_section = False
-    
-    with open(plan_file, 'r') as f:
-        for line in f:
-            if line.strip() == "## Technical Context":
-                in_section = True
-                continue
-            
-            if in_section and line.startswith("## ") and not line.startswith("## Technical Context"):
-                break
-            
-            if in_section and line.startswith("###"):
-                break
-            
-            if in_section:
-                content.append(line)
-    
-    # Remove empty lines
-    return '\n'.join(line for line in content if line.strip())
-
-
-# ============================================
-# Issue Body Construction (from plan-sync.sh)
-# ============================================
-
-def _render_issue_section(heading: str, content: str, placeholder: str = "") -> str:
-    """Render a markdown section with heading."""
-    if not content:
-        content = placeholder
-    
-    return f"## {heading}\n\n{content}\n"
-
-
-def _render_related_resources_table(reference: str, plan_link: str) -> str:
-    """Render Related Resources table."""
-    rows = []
-    
-    if reference:
-        rows.append(f"| Research | {reference} |")
-    
-    rows.append(f"| Plan | {plan_link} |")
-    
-    return "## Related Resources\n\n" + "\n".join(rows) + "\n"
-
-
-def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str) -> str:
-    """
-    Build normalized issue body from approved plan content.
-    
-    This preserves checkbox states from Agent Verification.
-    """
-    has_audit_sections = _plan_has_audit_subsections(plan_file)
-    
-    # Extract Goal
-    goal = _extract_plan_section(plan_file, "Goal", 5)
-    
-    # Extract Background based on Plan structure
-    if has_audit_sections:
-        background = _extract_technical_context_top(plan_file)
-        confirmed_bugs = _extract_technical_context_subsection(plan_file, "Confirmed Bugs")
-        content_model_defects = _extract_technical_context_subsection(plan_file, "Content Model Defects")
-        cleanup_scope = _extract_technical_context_subsection(plan_file, "Cleanup Scope")
-        key_findings = _extract_technical_context_subsection(plan_file, "Key Findings")
-    else:
-        background = _extract_plan_section(plan_file, "Technical Context", 20)
-        confirmed_bugs = ""
-        content_model_defects = ""
-        cleanup_scope = ""
-        key_findings = ""
-    
-    # Extract scope sections
-    in_scope = _extract_plan_section(plan_file, "In Scope", 50)
-    out_of_scope = _extract_plan_section(plan_file, "Out of Scope", 20)
-    
-    # Extract Acceptance Criteria
-    acceptance_criteria = _extract_acceptance_criteria(plan_file)
-    
-    # Get project and status
-    metadata = get_plan_metadata(plan_file)
-    project = metadata.get('project', '')
-    plan_status = metadata.get('status', 'draft')
-    
-    # Build Plan link — only use real link when Plan is approved (executing+)
-    if plan_status in ('planning', 'draft'):
-        plan_link = "_待关联_"
-    else:
-        if project:
-            plan_path = f"docs/products/{project}/plans/{plan_name}.md"
-        else:
-            plan_path = f"docs/products/plans/{plan_name}.md"
-        github_url = build_repo_blob_url(repo, plan_path)
-        plan_link = f"[{plan_name}]({github_url})"
-    
-    # Build sections
-    sections = ""
-    
-    # Goal section
-    sections += _render_issue_section("Goal", goal, "<目标描述>")
-    sections += "\n"
-    
-    # Background section
-    sections += _render_issue_section("Background", background, "<背景描述>")
-    sections += "\n"
-    
-    # Audit sections (only for Plans with subsections)
-    if has_audit_sections:
-        if confirmed_bugs:
-            sections += _render_issue_section("Confirmed Bugs", confirmed_bugs, "")
-            sections += "\n"
-        
-        if content_model_defects:
-            sections += _render_issue_section("Content Model Defects", content_model_defects, "")
-            sections += "\n"
-        
-        if cleanup_scope:
-            sections += _render_issue_section("Cleanup Scope", cleanup_scope, "")
-            sections += "\n"
-        
-        if key_findings:
-            sections += _render_issue_section("Key Findings", key_findings, "")
-            sections += "\n"
-    
-    # In Scope section
-    in_scope_text = in_scope if in_scope else "- 范围项 1"
-    sections += _render_issue_section("In Scope", in_scope_text, "- 范围项 1")
-    sections += "\n"
-    
-    # Out of Scope section
-    out_of_scope_text = out_of_scope if out_of_scope else "- 不做的项（原因）"
-    sections += _render_issue_section("Out of Scope", out_of_scope_text, "- 不做的项（原因）")
-    sections += "\n"
-    
-    # Acceptance Criteria section
-    ac_text = acceptance_criteria if acceptance_criteria else "- 验收条件 1"
-    sections += _render_issue_section("Acceptance Criteria", ac_text, "- 验收条件 1")
-    sections += "\n"
-    
-    # Related Resources table
-    sections += _render_related_resources_table("", plan_link)
-    
-    return sections
-
 
 # ============================================
 # Sync Operations
@@ -426,7 +148,7 @@ def sync_plan_to_issue(issue_number: str, plan_file: str, repo: str) -> int:
     log_info(f"Syncing plan to Issue #{issue_number}...")
     
     plan_name = get_plan_name(plan_file)
-    new_body = build_issue_body_from_plan(plan_file, plan_name, repo)
+    new_body = _build_issue_body(plan_file, plan_name, repo)
     
     # Update Issue body
     result = subprocess.run(
@@ -441,108 +163,6 @@ def sync_plan_to_issue(issue_number: str, plan_file: str, repo: str) -> int:
     
     log_success(f"Issue #{issue_number} updated with plan content")
     return 0
-
-
-def plan_status_to_issue_label(plan_status: str) -> str:
-    """Map plan status to Issue label (4-state model)."""
-    mapping = {
-        'planning': 'status/planning',
-        'executing': 'status/in-progress',
-        'verifying': 'status/verifying',
-        'done': 'status/done',
-    }
-    return mapping.get(plan_status, '')
-
-
-def plan_project_to_issue_label(project: str) -> str:
-    """Map project name to Issue label."""
-    valid_projects = ['ontology', 'wopal-cli', 'space']
-    if project in valid_projects:
-        return f"project/{project}"
-    return ''
-
-
-def sync_status_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync status label group - remove others, add desired."""
-    status_labels = ["status/planning", "status/in-progress", "status/verifying", "status/done"]
-    
-    # Get current labels
-    issue_info = get_issue_info(issue_number, repo)
-    current_labels = [l['name'] for l in issue_info.get('labels', [])]
-    
-    # Build add/remove args
-    add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in status_labels if l in current_labels and l != desired_label]
-    
-    if not add_labels and not remove_labels:
-        return
-    
-    # Single gh call with all label ops
-    args = ["gh", "issue", "edit", issue_number, "--repo", repo]
-    for label in remove_labels:
-        args.extend(["--remove-label", label])
-    for label in add_labels:
-        args.extend(["--add-label", label])
-    
-    subprocess.run(args, capture_output=True, text=True)
-
-
-def sync_type_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync type label group - remove others, add desired."""
-    type_labels = ["type/feature", "type/bug", "type/perf", "type/refactor", "type/docs", "type/test", "type/chore"]
-    
-    # Get current labels
-    issue_info = get_issue_info(issue_number, repo)
-    current_labels = [l['name'] for l in issue_info.get('labels', [])]
-    
-    # Build add/remove args
-    add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in type_labels if l in current_labels and l != desired_label]
-    
-    if not add_labels and not remove_labels:
-        return
-    
-    # Ensure desired label exists
-    if desired_label:
-        ensure_label_exists(desired_label, repo)
-    
-    # Single gh call with all label ops
-    args = ["gh", "issue", "edit", issue_number, "--repo", repo]
-    for label in remove_labels:
-        args.extend(["--remove-label", label])
-    for label in add_labels:
-        args.extend(["--add-label", label])
-    
-    subprocess.run(args, capture_output=True, text=True)
-
-
-def sync_project_label_group(issue_number: str, desired_label: str, repo: str) -> None:
-    """Sync project label group - remove others, add desired."""
-    project_labels = ["project/ontology", "project/wopal-cli", "project/space"]
-    
-    # Get current labels
-    issue_info = get_issue_info(issue_number, repo)
-    current_labels = [l['name'] for l in issue_info.get('labels', [])]
-    
-    # Build add/remove args
-    add_labels = [desired_label] if desired_label else []
-    remove_labels = [l for l in project_labels if l in current_labels and l != desired_label]
-    
-    if not add_labels and not remove_labels:
-        return
-    
-    # Ensure desired label exists
-    if desired_label:
-        ensure_label_exists(desired_label, repo)
-    
-    # Single gh call with all label ops
-    args = ["gh", "issue", "edit", issue_number, "--repo", repo]
-    for label in remove_labels:
-        args.extend(["--remove-label", label])
-    for label in add_labels:
-        args.extend(["--add-label", label])
-    
-    subprocess.run(args, capture_output=True, text=True)
 
 
 def ensure_issue_labels(issue_number: str, plan_file: str, repo: str) -> int:
@@ -613,7 +233,7 @@ def find_plan(input: str) -> str:
         return find_plan_by_issue(int(input))
     
     # String input → search all plan directories
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
     search_dir = Path(workspace_root) / "docs" / "products"
     
     if not search_dir.exists():
@@ -682,7 +302,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         log_error(f"Plan has no linked Issue: {plan_file}")
         return 1
     
-    repo = get_space_repo()
+    repo = detect_space_repo(find_workspace_root())
     
     # Sync body (unless labels_only)
     if not labels_only:

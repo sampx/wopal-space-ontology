@@ -1,15 +1,15 @@
 /**
- * Memory Injector - Context Injection via system.transform Hook
+ * Memory Injector - Memory retrieval and formatting for injection
  *
- * Injects relevant memories into the system prompt as <system-reminder>.
- * Called from runtime.onSystemTransform — sub-session filtering happens there.
+ * Retrieves relevant memories and formats them for injection.
+ * Called from messages.transform hook via memory-message-injector.ts.
  */
 
 import type { MemoryRetriever } from "./retriever.js";
-import type { Memory, MemoryCategory } from "./store.js";
+import type { Memory } from "./store.js";
 import { createDebugLog } from "../debug.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
+const debugLog = createDebugLog("[memory]", "memory");
 
 export class MemoryInjector {
   private retriever: MemoryRetriever;
@@ -23,10 +23,10 @@ export class MemoryInjector {
   }
 
   /**
-   * Format memories for system prompt injection.
-   * Returns formatted string + memory IDs, or undefined if no memories found.
+   * Retrieve and format memories for injection.
+   * Returns formatted string (pure content, no wrapping tags), or undefined if no memories found.
    */
-  async formatForSystem(userQuery: string): Promise<string | undefined> {
+  async retrieveAndFormat(userQuery: string): Promise<string | undefined> {
     try {
       const memories = await this.retriever.retrieve(userQuery);
 
@@ -55,72 +55,34 @@ export class MemoryInjector {
     injectedIds: string[];
   } {
     const TOKEN_BUDGET = 1500;
-    const lines: string[] = ["# 相关记忆", ""];
+    const lines: string[] = [];
     let totalTokens = 0;
     const tokens = (s: string) => Math.ceil(s.length / 4);
     let injectedCount = 0;
     const injectedIds: string[] = [];
 
-    const categoryLabels: Record<string, string> = {
-      requirement: "约束",
-      gotcha: "避坑",
-      experience: "经验",
-      fact: "事实",
-      knowledge: "知识",
-      preference: "偏好",
-      profile: "画像",
-    };
-
-    const order: MemoryCategory[] = [
-      "requirement", "gotcha", "experience", "fact",
-      "knowledge", "preference", "profile",
-    ];
-
-    const groups = new Map<string, Memory[]>();
-    for (const m of memories) {
-      if (!groups.has(m.category)) groups.set(m.category, []);
-      groups.get(m.category)!.push(m);
-    }
-
-    const tryPush = (line: string): boolean => {
+    for (const memory of memories) {
+      const line = `- ${this.cleanBody(memory.text)}`;
       const t = tokens(line);
-      if (totalTokens + t > TOKEN_BUDGET) return false;
+      if (totalTokens + t > TOKEN_BUDGET) break;
       lines.push(line);
       totalTokens += t;
-      return true;
-    };
-
-    const injectGroup = (group: Memory[]) => {
-      for (const memory of group) {
-        const line = `- ${this.cleanBody(memory.text)}`;
-        if (!tryPush(line)) return;
-        injectedCount++;
-        const title = memory.text.split("\n")[0].slice(0, 40);
-        injectedIds.push(`${memory.id.slice(0, 8)}(${title})`);
-      }
-    };
-
-    for (const cat of order) {
-      const group = groups.get(cat);
-      if (!group) continue;
-
-      if (!tryPush(`## ${categoryLabels[cat] ?? cat}`)) break;
-      if (!tryPush("")) break;
-
-      injectGroup(group);
-      if (!tryPush("")) break;
+      injectedCount++;
+      const title = memory.text.split("\n")[0].slice(0, 40);
+      injectedIds.push(`${memory.id.slice(0, 8)}(${title})`);
     }
 
-    for (const [cat, group] of groups) {
-      if (order.includes(cat as MemoryCategory)) continue;
-      if (!tryPush(`## ${categoryLabels[cat] ?? cat}`)) break;
-      if (!tryPush("")) break;
-
-      injectGroup(group);
-      if (!tryPush("")) break;
+    if (lines.length === 0) {
+      return { formatted: "", injectedCount: 0, injectedIds: [] };
     }
 
-    return { formatted: this.wrapLines(lines), injectedCount, injectedIds };
+    const content =
+      "Relevant memories (ordered by relevance, first is most relevant):\n\n" +
+      "```markdown\n" +
+      lines.join("\n") +
+      "\n```";
+
+    return { formatted: content, injectedCount, injectedIds };
   }
 
   /**
@@ -135,9 +97,5 @@ export class MemoryInjector {
     cleaned = cleaned.replace(/^##\s*\[[^\]]+\]:\s*/, "");
     cleaned = cleaned.replace(/\*\*([^*]+)\*\*[:：]/g, "$1：");
     return cleaned.trim();
-  }
-
-  private wrapLines(lines: string[]): string {
-    return `<system-reminder>\n${lines.join("\n")}\n</system-reminder>`;
   }
 }

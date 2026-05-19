@@ -4,20 +4,20 @@ import type {
   WopalTask,
 } from "../types.js"
 import type { DebugLog } from "../debug.js"
+import { formatSessionID } from "../debug.js"
 import type { ConcurrencyManager } from "./concurrency-manager.js"
+import { toErrorMessage, isPromiseLike } from "./utils.js"
+import { sessionIDToTaskID } from "../session-ref.js"
 
 export const DEFAULT_CONCURRENCY_LIMIT = 5
 
-export function sessionIDToTaskID(sessionID: string): string {
-  const suffix = sessionID.replace(/^ses_/, '')
-  return `wopal-task-${suffix}`
-}
+export { sessionIDToTaskID } from "../session-ref.js"
 
 export interface TaskLauncherDeps {
   tasks: Map<string, WopalTask>
   client: {
     session?: {
-      create?: (args: { parentID: string; title: string }) => Promise<{
+      create?: (args: { body: { parentID: string; title: string } }) => Promise<{
         data?: { id?: string }
         id?: string
         info?: { id?: string }
@@ -30,7 +30,7 @@ export interface TaskLauncherDeps {
           tools?: Record<string, boolean>
         }
       }) => PromiseLike<unknown> | unknown
-      abort?: (args: { path: { id: string } }) => Promise<void>
+      abort?: (args: { path: { id: string } }) => Promise<unknown>
     }
   }
   debugLog: DebugLog
@@ -40,36 +40,18 @@ export interface TaskLauncherDeps {
   abortSession: (sessionID: string | undefined) => Promise<void>
 }
 
-export function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
-  if (typeof error === "string" && error.length > 0) {
-    return error
-  }
-
-  try {
-    const serialized = JSON.stringify(error)
-    if (serialized && serialized !== "{}") {
-      return serialized
-    }
-  } catch {
-    // Ignore JSON serialization failures and fall back to String().
-  }
-
-  return String(error)
-}
-
-export function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return typeof value === "object" && value !== null && "then" in value
-}
+export { toErrorMessage, isPromiseLike }
 
 export async function launchTask(
   deps: TaskLauncherDeps,
   input: LaunchInput,
 ): Promise<LaunchOutput> {
   const { tasks, client, debugLog, concurrency, concurrencyKey, failTask, abortSession } = deps
+
+  const releaseAndReturnError = (error: string): LaunchOutput => {
+    concurrency.release(concurrencyKey)
+    return { ok: false, status: 'error', error }
+  }
 
   debugLog(`[launch] starting: description="${input.description}" agent="${input.agent}" parentSessionID=${input.parentSessionID}`)
 
@@ -80,27 +62,22 @@ export async function launchTask(
 
   if (!input.parentSessionID) {
     debugLog(`[launch] failed: parent session ID is required`)
-    return {
-      ok: false,
-      status: 'error',
-      error: "Background task launch failed: parent session ID is required",
-    }
+    return releaseAndReturnError("Background task launch failed: parent session ID is required")
   }
 
   if (typeof client.session?.create !== "function") {
     debugLog(`[launch] failed: session.create is unavailable`)
-    return {
-      ok: false,
-      status: 'error',
-      error: "Background task launch failed: session.create is unavailable",
-    }
+    return releaseAndReturnError("Background task launch failed: session.create is unavailable")
   }
 
   let sessionID: string | undefined
   try {
     const session = await client.session.create({
-      parentID: input.parentSessionID,
-      title: input.description,
+      body: {
+        parentID: input.parentSessionID,
+        title: input.description,
+        agent: input.agent,
+      } as { parentID: string; title: string; agent?: string },
     })
 
     debugLog(`[launch] session.create returned: ${JSON.stringify(session)}`)
@@ -110,14 +87,12 @@ export async function launchTask(
     } else {
       const error = "Background task launch failed: child session did not provide an ID"
       debugLog(`[launch] failed: child session did not provide an ID`)
-      concurrency.release(concurrencyKey)
-      return { ok: false, status: 'error', error }
+      return releaseAndReturnError(error)
     }
   } catch (err) {
     debugLog(`[launch] session.create error: ${err}`)
     const error = `Background task launch failed: ${toErrorMessage(err)}`
-    concurrency.release(concurrencyKey)
-    return { ok: false, status: 'error', error }
+    return releaseAndReturnError(error)
   }
 
   const taskId = sessionIDToTaskID(sessionID)
@@ -181,7 +156,7 @@ export async function launchTask(
     }
   })
 
-  debugLog(`[launch] success: taskId=${taskId} sessionID=${task.sessionID}`)
+  debugLog(`[launch] success: taskId=${taskId} session=${formatSessionID(task.sessionID, true)}`)
 
   return { ok: true, taskId, status: 'running' }
 }

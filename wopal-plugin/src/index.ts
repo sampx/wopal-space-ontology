@@ -7,8 +7,9 @@
  */
 
 import type { PluginInput, Hooks } from "@opencode-ai/plugin";
+import type { SystemPromptMetadata, OpenCodeClient } from "./types.js";
 import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk/v2";
-import { discoverRuleFiles } from "./rules/index.js";
+import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
 import { createDebugLog, createWarnLog } from "./debug.js";
@@ -19,12 +20,13 @@ import { join } from "path";
 
 
 const debugLog = createDebugLog();
-const warnLog = createWarnLog("[wopal-plugin]");
+const warnLog = createWarnLog();
 
 function loadWopalEnv(rootDir: string): void {
   const envPath = join(rootDir, ".env");
   if (!existsSync(envPath)) return;
 
+  debugLog(`Loading env: ${envPath}`);
   try {
     const content = readFileSync(envPath, "utf-8");
     for (const line of content.split("\n")) {
@@ -38,8 +40,8 @@ function loadWopalEnv(rootDir: string): void {
         process.env[key] = value;
       }
     }
-  } catch {
-    // Silently ignore .env read errors
+  } catch (err) {
+    warnLog(`Failed to load .env: ${err}`);
   }
 }
 
@@ -52,6 +54,8 @@ let _memorySystem: {
 } | null = null;
 
 async function ensureMemorySystem(): Promise<typeof _memorySystem> {
+  const memoryDebugLog = createDebugLog("[memory]", "memory");
+
   if (_memorySystem) return _memorySystem;
 
   try {
@@ -72,7 +76,7 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
     const injector = new MemoryInjector(retriever);
 
     _memorySystem = { injector, distillEngine, store, embedder, llm };
-    debugLog("Memory system initialized (LanceDB + Embedding + LLM)");
+    memoryDebugLog("Memory system initialized (LanceDB + Embedding + LLM)");
     return _memorySystem;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -82,13 +86,37 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
 }
 
 const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => {
-  debugLog(`Plugin loaded! directory: ${pluginInput.directory}`);
+  const { directory } = pluginInput;
 
-  loadWopalEnv(pluginInput.directory);
+  debugLog(`Loading plugin: ${directory}`);
+  loadWopalEnv(directory);
 
-  const ruleFiles = await discoverRuleFiles(pluginInput.directory);
-  debugLog(`Discovered ${ruleFiles.length} rule file(s)`);
-    debugLog(`Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`);
+  // Read switches after loadWopalEnv (ensure .env has taken effect)
+  const rulesInjectionEnabled = process.env.WOPAL_RULES_INJECTION_ENABLED !== "false";
+  const memoryEnabled = process.env.WOPAL_MEMORY_ENABLED !== "false";
+  const memoryInjectionEnabled = process.env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
+
+  const rulesDebugLog = createDebugLog("[rules]", "rules");
+
+  // Rules module initialization
+  let ruleFiles: DiscoveredRule[];
+  if (rulesInjectionEnabled) {
+    ruleFiles = await discoverRuleFiles(pluginInput.directory, rulesDebugLog);
+  } else {
+    debugLog("Rules module disabled");
+    ruleFiles = [];
+  }
+
+  // Memory module initialization
+  let memory: typeof _memorySystem;
+  if (memoryEnabled) {
+    memory = await ensureMemorySystem();
+  } else {
+    debugLog("Memory module disabled");
+    memory = null;
+  }
+
+  debugLog(`Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`);
 
   // Extract the internal fetch from v1 client (which uses Server.Default().fetch
   // to route requests to the in-process Hono server, bypassing real HTTP).
@@ -107,12 +135,15 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     v2Client,
     pluginInput.directory,
     pluginInput.serverUrl,
+    sessionStore,
   );
 
-  const memory = await ensureMemorySystem();
+  const systemSnapshots = new Map<string, string[]>();
+  const systemMetadataMap = new Map<string, SystemPromptMetadata>();
+  const systemInjectionsMap = new Map<string, string[]>();
 
   const ctx = createHookContext({
-    client: pluginInput.client,
+    client: pluginInput.client as OpenCodeClient,
     directory: pluginInput.directory,
     projectDirectory: pluginInput.directory,
     ruleFiles,
@@ -120,9 +151,14 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     debugLog,
     taskManager,
     memoryInjector: memory?.injector,
+    systemSnapshots,
+    systemMetadataMap,
+    systemInjectionsMap,
+    rulesInjectionEnabled,
+    memoryInjectionEnabled,
   });
 
-  const hooks = createAllHooks(ctx);
+  const { hooks: hookHandlers, transformedMessagesMap } = createAllHooks(ctx);
 
   const tools = createWopalTools(taskManager, memory?.store, memory?.embedder, sessionStore, memory?.distillEngine, pluginInput.client);
 
@@ -132,13 +168,20 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     tools.context_manage = createContextManageTool(
       memory.llm,
       pluginInput.client,
+      systemSnapshots,
+      systemMetadataMap,
+      systemInjectionsMap,
+      transformedMessagesMap,
+      pluginInput.directory,
+      sessionStore,
+      taskManager,
     );
   }
 
   debugLog(`Plugin initialized: tools=[${Object.keys(tools).join(", ")}], memory=${!!memory}`);
 
   return {
-    ...hooks,
+    ...hookHandlers,
     tool: tools,
   };
 };

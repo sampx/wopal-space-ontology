@@ -1,19 +1,15 @@
 import type { CancelResult, WopalTask } from "../types.js"
 import type { DebugLog } from "../debug.js"
-import type { IdleDiagnostic } from "./idle-diagnostic.js"
-import { toErrorMessage, sessionIDToTaskID } from "./task-launcher.js"
-
-const CLEANUP_INTERVAL_MS = 600_000 // 10 minutes
-const CLEANUP_MAX_AGE_MS = 3600_000 // 1 hour
-const TASK_TTL_MS = 1_800_000       // 30 minutes for non-terminal tasks
-
-export { CLEANUP_INTERVAL_MS, CLEANUP_MAX_AGE_MS, TASK_TTL_MS }
+import { formatSessionID } from "../debug.js"
+import { toErrorMessage } from "./utils.js"
+import { sessionIDToTaskID } from "./task-launcher.js"
+import { isIdleTask } from "./task-phase.js"
 
 export interface TaskLifecycleDeps {
   tasks: Map<string, WopalTask>
   client: {
     session?: {
-      abort?: (args: { path: { id: string } }) => Promise<void>
+      abort?: (args: { path: { id: string } }) => Promise<unknown>
       delete?: (args: { path: { id: string } }) => Promise<{ data?: boolean; error?: unknown }>
     }
   }
@@ -55,7 +51,7 @@ export async function abortSession(
       path: { id: sessionID },
     })
   } catch (err) {
-    debugLog(`[abortSession] error for ${sessionID}: ${toErrorMessage(err)}`)
+    debugLog(`[abortSession] error for ${formatSessionID(sessionID, true)}: ${toErrorMessage(err)}`)
   }
 }
 
@@ -68,13 +64,13 @@ export function markTaskErrorBySession(
 
   const task = tasks.get(sessionIDToTaskID(sessionID))
   if (!task) {
-    debugLog(`[markError] skipped: no task found for sessionID=${sessionID}`)
+    debugLog(`[markError] skipped: no task found for ${formatSessionID(sessionID, true)}`)
     return undefined
   }
 
-  // Don't change status if task was already interrupted (idleNotified=true)
-  if (task.idleNotified && task.status === 'running') {
-    debugLog(`[markError] skipped: taskId=${task.id} was interrupted (idleNotified=true), preserving running state`)
+  // Don't change status if task was already interrupted (idle phase)
+  if (isIdleTask(task) && task.status === 'running') {
+    debugLog(`[markError] skipped: taskId=${task.id} was interrupted (idle phase), preserving running state`)
     return undefined
   }
 
@@ -83,29 +79,7 @@ export function markTaskErrorBySession(
     return undefined
   }
 
-  debugLog(`[markError] taskId=${task.id} sessionID=${sessionID} error="${error.substring(0, 100)}"`)
-  return task
-}
-
-export function markTaskWaitingBySession(
-  deps: TaskLifecycleDeps,
-  sessionID: string,
-  diagnostic: IdleDiagnostic,
-): WopalTask | undefined {
-  const { tasks, debugLog } = deps
-
-  const task = tasks.get(sessionIDToTaskID(sessionID))
-  if (!task || task.status !== 'running') {
-    return undefined
-  }
-
-  // Note: waiting state doesn't release concurrency slot, task may resume
-  task.status = 'waiting'
-  task.waitingReason = diagnostic.reason
-  if (diagnostic.lastMessage !== undefined) {
-    task.lastAssistantMessage = diagnostic.lastMessage
-  }
-  debugLog(`[markWaiting] taskId=${task.id} sessionID=${sessionID} reason=${diagnostic.reason}`)
+  debugLog(`[markError] taskId=${task.id} ${formatSessionID(sessionID, true)} error="${error.substring(0, 100)}"`)
   return task
 }
 
@@ -148,40 +122,6 @@ export async function interruptTask(
   }
 
   return 'interrupted'
-}
-
-export function cleanup(
-  deps: TaskLifecycleDeps,
-  maxAgeMs = 3600_000,
-): void {
-  const { tasks, debugLog, releaseConcurrencySlot } = deps
-  const now = Date.now()
-  let cleanedCount = 0
-
-  for (const [id, task] of tasks) {
-    if (task.status === 'error') {
-      if (task.completedAt && now - task.completedAt.getTime() > maxAgeMs) {
-        tasks.delete(id)
-        cleanedCount++
-      }
-      continue
-    }
-
-    const timestamp = task.status === 'pending'
-      ? task.createdAt?.getTime()
-      : task.startedAt?.getTime()
-
-    if (timestamp && now - timestamp > TASK_TTL_MS) {
-      releaseConcurrencySlot(task)
-      tasks.delete(id)
-      cleanedCount++
-      debugLog(`[cleanup] pruned stale ${task.status} task: ${id}`)
-    }
-  }
-
-  if (cleanedCount > 0) {
-    debugLog(`[cleanup] removed ${cleanedCount} old task(s)`)
-  }
 }
 
 export interface ShutdownDeps extends TaskLifecycleDeps {

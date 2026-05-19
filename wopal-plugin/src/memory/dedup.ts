@@ -12,8 +12,8 @@ import { createDebugLog, createWarnLog } from "../debug.js";
 import { validateCategory, getDefaultImportance } from "./categories.js";
 import { buildBatchDedupPrompt } from "./prompts.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-const warnLog = createWarnLog("[wopal-memory]");
+const debugLog = createDebugLog("[memory]", "memory");
+const warnLog = createWarnLog("[memory]");
 
 // Maximum L2 distance to consider "similar" for dedup purposes
 const DEDUP_MAX_DISTANCE = 1.0;

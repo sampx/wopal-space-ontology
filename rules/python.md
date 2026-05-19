@@ -1,8 +1,10 @@
 ---
 trigger: model_decision
 description: 开发 Python 项目和脚本时遵守此规则。
-globs:
-  - '**/*.py'
+keywords:
+  - 'python'
+  - 'py'
+  - '.py'
 ---
 
 # Python 开发规范

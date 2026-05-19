@@ -11,54 +11,19 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 import json
 import os
 import re
 from pathlib import Path
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, _find_workspace_root
-
-
-# ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_step(msg: str) -> None:
-    print(f"\033[0;36m[STEP]\033[0m {msg}")
+from dev_flow.domain.plan.find import find_plan
+from dev_flow.core.logging import log_info, log_success, log_warn, log_error, log_step
+from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
 # ============================================
 # GitHub CLI Helpers
 # ============================================
-
-def get_space_repo() -> str:
-    """Get current repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure you're in a git repo with gh CLI configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
 
 
 def get_issue_info(issue_number: str, repo: str) -> dict:
@@ -188,7 +153,7 @@ def cmd_query_status(args: argparse.Namespace) -> int:
     # If plan has an issue, fetch and display issue info
     if plan_issue_num:
         try:
-            repo = get_space_repo()
+            repo = detect_space_repo(find_workspace_root())
             log_step(f"Fetching Issue #{plan_issue_num} info...")
             issue_info = get_issue_info(str(plan_issue_num), repo)
             
@@ -219,8 +184,8 @@ def cmd_query_status(args: argparse.Namespace) -> int:
         worktree_path = ""
         
         if project:
-            workspace_root = _find_workspace_root()
-            worktree_path = str(Path(workspace_root) / ".worktrees" / f"{project}-{branch}")
+            workspace_root = find_workspace_root()
+            worktree_path = str(workspace_root / ".worktrees" / f"{project}-{branch}")
         
         if worktree_path and os.path.isdir(worktree_path):
             print("")
@@ -312,17 +277,17 @@ def cmd_query_list(args: argparse.Namespace) -> int:
     print("============")
     print("")
     
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
     
     # 1. Scan local Plan files
-    local_plans = _scan_local_plans(workspace_root)
+    local_plans = _scan_local_plans(str(workspace_root))
     
     # 2. Fetch active Issues from GitHub
     issue_numbers = set()
     issues_by_number = {}
     
     try:
-        repo = get_space_repo()
+        repo = detect_space_repo(find_workspace_root())
         result = subprocess.run(
             ["gh", "issue", "list", "--repo", repo, "--state", "open",
              "--search", "label:status/planning OR label:status/in-progress OR label:status/verifying",

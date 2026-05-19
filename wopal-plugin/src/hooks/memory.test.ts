@@ -1,137 +1,254 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import { createSystemTransformHooks } from './system-transform.js';
-import { createHookContext } from './index.js';
+import { injectMemoryToMessage, type MemoryMessageInjectorContext } from './memory-message-injector.js';
 import { SessionStore } from '../session-store.js';
+import type { MessageWithInfo } from './message-context.js';
+import type { MemoryInjector } from '../memory/index.js';
 
-// Helper: create a hook context with mocked memory injector
-function createHooksWithMemory(opts?: {
-  formatForSystem?: ReturnType<typeof vi.fn>;
-  isEmpty?: ReturnType<typeof vi.fn>;
-  isChildSession?: ReturnType<typeof vi.fn>;
-}) {
-  const sessionStore = new SessionStore({ max: 10 });
-  const ctx = createHookContext({
-    client: {
-      session: {
-        messages: vi.fn().mockResolvedValue({ data: [] }),
-      },
-      tool: { ids: vi.fn().mockResolvedValue({ data: [] }) },
-      mcp: { status: vi.fn().mockResolvedValue({ data: {} }) },
-    } as any,
-    directory: '/tmp',
-    projectDirectory: '/tmp',
-    ruleFiles: [],
-    sessionStore,
-    debugLog: () => {},
-    memoryInjector: {
-      isEmpty: opts?.isEmpty ?? vi.fn().mockResolvedValue(false),
-      formatForSystem:
-        opts?.formatForSystem ??
-        vi.fn().mockResolvedValue('<system-reminder>\n# 相关记忆\n\n## 知识\n\n- test memory\n\n</system-reminder>'),
-    } as any,
-  });
+let savedInjectionEnv: Record<string, string | undefined>;
 
-  const hooks = createSystemTransformHooks(ctx as never);
-
-  return { hooks, sessionStore, ctx };
+function saveAndClearInjectionEnv() {
+  savedInjectionEnv = {
+    WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
+    WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
+  };
+  delete process.env.WOPAL_RULES_INJECTION_ENABLED;
+  delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
 }
 
-describe('OpenCodeRulesRuntime memory injection state', () => {
+function restoreInjectionEnv() {
+  if (savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_RULES_INJECTION_ENABLED = savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED;
+  }
+  if (savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_MEMORY_INJECTION_ENABLED = savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED;
+  }
+}
+
+// Helper: create a memory message injector context with mocked dependencies
+function createMemoryCtx(opts?: {
+  retrieveAndFormat?: ReturnType<typeof vi.fn>;
+  isEmpty?: ReturnType<typeof vi.fn>;
+  isChildSession?: boolean;
+  memoryInjectionEnabled?: boolean;
+}) {
+  const sessionStore = new SessionStore({ max: 10 });
+  const childSessionCache = new Map<string, boolean>();
+
+  if (opts?.isChildSession !== undefined) {
+    // Will be set per session in tests
+  }
+
+  const memoryInjector = {
+    isEmpty: opts?.isEmpty ?? vi.fn().mockResolvedValue(false),
+    retrieveAndFormat:
+      opts?.retrieveAndFormat ??
+      vi.fn().mockResolvedValue('Relevant memories (ordered by relevance, first is most relevant):\n\n```markdown\n- test memory\n```'),
+  } as unknown as MemoryInjector;
+
+  const ctx: MemoryMessageInjectorContext = {
+    memoryInjectorCtx: {
+      client: {
+        session: {
+          get: vi.fn().mockResolvedValue({ data: {} }),
+        },
+      } as any,
+      sessionStore,
+      memoryDebugLog: () => {},
+      memoryInjector,
+      childSessionCache,
+      taskManager: undefined,
+    },
+    memoryInjector,
+    sessionStore,
+    memoryDebugLog: () => {},
+    memoryInjectionEnabled: opts?.memoryInjectionEnabled ?? true,
+  };
+
+  return { ctx, sessionStore, childSessionCache, memoryInjector };
+}
+
+function createUserMsg(text: string): MessageWithInfo {
+  return {
+    role: 'user',
+    parts: [{ type: 'text', text }],
+  };
+}
+
+describe('injectMemoryToMessage', () => {
+  beforeEach(() => {
+    saveAndClearInjectionEnv();
+  });
+
+  afterEach(() => {
+    restoreInjectionEnv();
+  });
+
   it('stores injectedRawText after successful injection', async () => {
-    const { hooks, sessionStore } = createHooksWithMemory();
+    const { ctx, sessionStore } = createMemoryCtx();
 
     sessionStore.upsert('ses_1', (state) => {
       state.lastUserPrompt = 'show me memory';
       state.needsMemoryInjection = true;
     });
 
-    const result = await hooks._onSystemTransform(
-      { sessionID: 'ses_1', model: { providerID: 'test', modelID: 'test' } },
-      { system: ['Base prompt.'] },
-    );
+    const lastUserMsg = createUserMsg('show me memory');
+    const messages: MessageWithInfo[] = [
+      { role: 'assistant', parts: [{ type: 'text', text: 'hi' }] },
+      lastUserMsg,
+    ];
 
-    expect(result.system.join('\n')).toContain('# 相关记忆');
-    expect(sessionStore.get('ses_1')?.injectedRawText).toContain('# 相关记忆');
+    await injectMemoryToMessage(ctx, 'ses_1', messages, lastUserMsg);
+
+    // Should have a synthetic part with <memory-context> wrapper
+    expect(lastUserMsg.parts!.length).toBe(2);
+    const injected = lastUserMsg.parts![1]!;
+    expect(injected.synthetic).toBe(true);
+    expect(injected.text).toContain('<memory-context>');
+    expect(injected.text).toContain('Relevant memories (ordered by relevance');
+    expect(injected.text).toContain('</memory-context>');
+
+    expect(sessionStore.get('ses_1')?.injectedRawText).toContain('Relevant memories (ordered by relevance');
+    expect(sessionStore.get('ses_1')?.needsMemoryInjection).toBe(false);
   });
 
-  it('clears injectedRawText when current turn skips memory injection', async () => {
-    const { hooks, sessionStore } = createHooksWithMemory();
+  it('clears injectedRawText when current turn skips memory injection (command)', async () => {
+    const { ctx, sessionStore } = createMemoryCtx();
 
     sessionStore.upsert('ses_2', (state) => {
       state.lastUserPrompt = '/memory list';
       state.needsMemoryInjection = true;
-      state.injectedRawText = '<system-reminder>old memory</system-reminder>';
+      state.injectedRawText = 'old memory';
     });
 
-    const result = await hooks._onSystemTransform(
-      { sessionID: 'ses_2', model: { providerID: 'test', modelID: 'test' } },
-      { system: ['Base prompt.'] },
-    );
+    const lastUserMsg = createUserMsg('/memory list');
+    const messages: MessageWithInfo[] = [lastUserMsg];
 
-    expect(result.system).toEqual(['Base prompt.']);
+    await injectMemoryToMessage(ctx, 'ses_2', messages, lastUserMsg);
+
+    // No extra part should be added (command is filtered by buildEnrichedQuery)
+    expect(lastUserMsg.parts!.length).toBe(1);
     expect(sessionStore.get('ses_2')?.injectedRawText).toBeUndefined();
   });
 
   it('clears injectedRawText when no relevant memories are found', async () => {
-    const { hooks, sessionStore } = createHooksWithMemory({
-      formatForSystem: vi.fn().mockResolvedValue(undefined),
+    const { ctx, sessionStore } = createMemoryCtx({
+      retrieveAndFormat: vi.fn().mockResolvedValue(undefined),
     });
 
     sessionStore.upsert('ses_3', (state) => {
       state.lastUserPrompt = 'unrelated query';
       state.needsMemoryInjection = true;
-      state.injectedRawText = '<system-reminder>old memory</system-reminder>';
+      state.injectedRawText = 'old memory';
     });
 
-    const result = await hooks._onSystemTransform(
-      { sessionID: 'ses_3', model: { providerID: 'test', modelID: 'test' } },
-      { system: ['Base prompt.'] },
-    );
+    const lastUserMsg = createUserMsg('unrelated query');
+    const messages: MessageWithInfo[] = [lastUserMsg];
 
-    expect(result.system).toEqual(['Base prompt.']);
+    await injectMemoryToMessage(ctx, 'ses_3', messages, lastUserMsg);
+
+    expect(lastUserMsg.parts!.length).toBe(1);
     expect(sessionStore.get('ses_3')?.injectedRawText).toBeUndefined();
   });
 
   it('skips memory injection for child sessions (task tool)', async () => {
-    const formatForSystem = vi.fn().mockResolvedValue('<memory>');
-    const { hooks, sessionStore, ctx } = createHooksWithMemory({
-      formatForSystem,
+    const retrieveAndFormat = vi.fn().mockResolvedValue('<memory>');
+    const { ctx, sessionStore, childSessionCache } = createMemoryCtx({
+      retrieveAndFormat,
     });
-    // Override isChildSession
-    ctx.childSessionCache.set('ses_child', true);
+    childSessionCache.set('ses_child', true);
 
     sessionStore.upsert('ses_child', (state) => {
       state.lastUserPrompt = 'do something';
       state.needsMemoryInjection = true;
     });
 
-    const result = await hooks._onSystemTransform(
-      { sessionID: 'ses_child', model: { providerID: 'test', modelID: 'test' } },
-      { system: ['Base prompt.'] },
-    );
+    const lastUserMsg = createUserMsg('do something');
+    const messages: MessageWithInfo[] = [lastUserMsg];
 
-    expect(result.system).toEqual(['Base prompt.']);
-    expect(formatForSystem).not.toHaveBeenCalled();
+    await injectMemoryToMessage(ctx, 'ses_child', messages, lastUserMsg);
+
+    expect(lastUserMsg.parts!.length).toBe(1);
+    expect(retrieveAndFormat).not.toHaveBeenCalled();
     expect(sessionStore.get('ses_child')?.injectedRawText).toBeUndefined();
   });
 
-  it('does not call buildEnrichedQuery for child sessions', async () => {
-    const { hooks, sessionStore, ctx } = createHooksWithMemory();
-    ctx.childSessionCache.set('ses_child2', true);
+  it('does not inject when needsMemoryInjection flag is false', async () => {
+    const retrieveAndFormat = vi.fn().mockResolvedValue('# memory');
+    const { ctx, sessionStore } = createMemoryCtx({ retrieveAndFormat });
 
-    sessionStore.upsert('ses_child2', (state) => {
+    sessionStore.upsert('ses_4', (state) => {
+      state.lastUserPrompt = 'hello';
+      state.needsMemoryInjection = false;
+    });
+
+    const lastUserMsg = createUserMsg('hello');
+    const messages: MessageWithInfo[] = [lastUserMsg];
+
+    await injectMemoryToMessage(ctx, 'ses_4', messages, lastUserMsg);
+
+    expect(lastUserMsg.parts!.length).toBe(1);
+    expect(retrieveAndFormat).not.toHaveBeenCalled();
+  });
+
+  it('skips injection when memoryInjectionEnabled is false', async () => {
+    const retrieveAndFormat = vi.fn().mockResolvedValue('# memory');
+    const { ctx, sessionStore } = createMemoryCtx({
+      retrieveAndFormat,
+      memoryInjectionEnabled: false,
+    });
+
+    sessionStore.upsert('ses_5', (state) => {
       state.lastUserPrompt = 'hello';
       state.needsMemoryInjection = true;
     });
 
-    const result = await hooks._onSystemTransform(
-      { sessionID: 'ses_child2', model: { providerID: 'test', modelID: 'test' } },
-      { system: ['Base prompt.'] },
-    );
+    const lastUserMsg = createUserMsg('hello');
+    const messages: MessageWithInfo[] = [lastUserMsg];
 
-    // For child sessions, should skip memory injection entirely
-    expect(result.system).toEqual(['Base prompt.']);
-    expect(sessionStore.get('ses_child2')?.injectedRawText).toBeUndefined();
+    await injectMemoryToMessage(ctx, 'ses_5', messages, lastUserMsg);
+
+    expect(lastUserMsg.parts!.length).toBe(1);
+    expect(retrieveAndFormat).not.toHaveBeenCalled();
+    // Flag not consumed when disabled
+    expect(sessionStore.get('ses_5')?.needsMemoryInjection).toBe(true);
+  });
+
+  it('clears injectedRawText when lastUserMsg is undefined', async () => {
+    const { ctx, sessionStore } = createMemoryCtx();
+
+    sessionStore.upsert('ses_6', (state) => {
+      state.lastUserPrompt = 'hello';
+      state.needsMemoryInjection = true;
+      state.injectedRawText = 'old memory';
+    });
+
+    await injectMemoryToMessage(ctx, 'ses_6', [], undefined);
+
+    expect(sessionStore.get('ses_6')?.injectedRawText).toBeUndefined();
+  });
+
+  it('uses messages parameter for enriched query (not API)', async () => {
+    const retrieveAndFormat = vi.fn().mockResolvedValue('# memory');
+    const { ctx, sessionStore } = createMemoryCtx({ retrieveAndFormat });
+
+    sessionStore.upsert('ses_7', (state) => {
+      state.lastUserPrompt = 'what did we discuss?';
+      state.needsMemoryInjection = true;
+    });
+
+    const lastUserMsg = createUserMsg('what did we discuss?');
+    const messages: MessageWithInfo[] = [
+      { role: 'user', parts: [{ type: 'text', text: 'previous question' }] },
+      { role: 'assistant', parts: [{ type: 'text', text: 'previous answer' }] },
+      lastUserMsg,
+    ];
+
+    await injectMemoryToMessage(ctx, 'ses_7', messages, lastUserMsg);
+
+    expect(retrieveAndFormat).toHaveBeenCalledTimes(1);
+    // The enriched query should contain context from the messages
+    const enrichedQuery = retrieveAndFormat.mock.calls[0]![0] as string;
+    expect(enrichedQuery).toContain('what did we discuss?');
   });
 });

@@ -27,13 +27,21 @@ import glob as glob_mod
 from pathlib import Path
 from datetime import date
 
-from dev_flow.domain.plan.find import find_plan, find_plan_by_issue, _find_workspace_root
+from dev_flow.core.logging import log_info, log_success, log_error, log_warn, log_step
+from dev_flow.core.workspace import find_workspace_root
+from dev_flow.core.workflow import guard_status, resolve_space_repo
+from dev_flow.domain.plan.find import find_plan, find_plan_by_issue
 from dev_flow.domain.plan.metadata import (
     get_plan_project,
     get_plan_type,
     get_plan_issue,
     get_plan_status,
     get_plan_worktree,
+    get_plan_field,
+)
+from dev_flow.domain.plan.project import (
+    resolve_project_path,
+    get_current_branch,
 )
 from dev_flow.domain.workflow import parse_plan_status
 from dev_flow.domain.plan.link import update_issue_plan_link
@@ -55,62 +63,122 @@ from dev_flow.infra.git import (
 
 
 # ============================================
-# Logging
-# ============================================
-
-def log_info(msg: str) -> None:
-    print(f"\033[0;34m[INFO]\033[0m {msg}")
-
-
-def log_success(msg: str) -> None:
-    print(f"\033[0;32m[OK]\033[0m {msg}")
-
-
-def log_error(msg: str) -> None:
-    print(f"\033[0;31m[ERROR]\033[0m {msg}", file=sys.stderr)
-
-
-def log_warn(msg: str) -> None:
-    print(f"\033[0;33m[WARN]\033[0m {msg}")
-
-
-def log_step(msg: str) -> None:
-    print(f"\033[0;36m[STEP]\033[0m {msg}")
-
-
-# ============================================
 # Helpers
 # ============================================
 
-def _get_space_repo() -> str:
-    """Get space repo in owner/repo format."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log_error("Cannot get repo info. Ensure gh CLI is configured")
-        raise RuntimeError("gh repo view failed")
-    return result.stdout.strip()
+# Plan type to git commit type mapping
+_PLAN_TYPE_TO_COMMIT = {
+    'feature': 'feat',
+    'enhance': 'enhance',
+    'fix': 'fix',
+    'refactor': 'refactor',
+    'docs': 'docs',
+    'test': 'test',
+    'chore': 'chore',
+    'perf': 'perf',
+}
+
+_MAX_COMMIT_FIRST_LINE = 72
 
 
-def _find_project_path(project: str, workspace_root: Path) -> Path | None:
-    """Find project directory path.
-
-    Args:
-        project: Project name from Plan metadata
-        workspace_root: Workspace root path
+def _get_issue_title(issue_number: int, repo: str) -> str | None:
+    """Get Issue title via gh CLI.
 
     Returns:
-        Project directory path, or None if not found
+        Issue title string, or None on failure.
     """
-    project_path = workspace_root / "projects" / project
+    try:
+        result = subprocess.run(
+            ['gh', 'issue', 'view', str(issue_number), '--repo', repo,
+             '--json', 'title', '--jq', '.title'],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip() or None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
 
-    if project_path.exists():
-        return project_path
 
-    return None
+def _parse_plan_name_for_commit(plan_name: str) -> tuple[str, str]:
+    """Parse plan name to (type, rest) for commit message.
+
+    Plan name format (after stripping issue prefix and date prefix):
+        <type>-<scope>-<slug>
+
+    Returns (type, rest) where *rest* covers scope + slug as one string.
+    Hyphens in *rest* are later converted to spaces for the description.
+
+    This avoids the ambiguity of separating scope from slug when both
+    may contain hyphens (e.g., scope ``dev-flow`` vs slug starting with ``flow-…``).
+
+    Returns:
+        Tuple of (type, rest). Falls back to ('chore', full_name)
+        if the name cannot be parsed.
+    """
+    name = Path(plan_name).stem
+    # Strip YYYYMMDD- prefix from archived plan names
+    name = re.sub(r'^\d{8}-', '', name)
+    # Strip leading issue number prefix (e.g., "142-")
+    name = re.sub(r'^[0-9]+-', '', name)
+
+    # Extract type (first segment) and rest (everything after)
+    match = re.match(r'^([a-z]+)-(.+)$', name)
+    if match:
+        return match.group(1), match.group(2)
+    return 'chore', name
+
+
+def _slug_to_description(slug: str) -> str:
+    """Convert hyphen-separated slug to space-separated description."""
+    return slug.replace('-', ' ')
+
+
+def _build_commit_message(
+    plan_name: str,
+    plan_type: str,
+    issue_number: int | None,
+    repo: str | None,
+) -> str:
+    """Build descriptive commit message from Issue title or Plan name.
+
+    - Issue-driven: ``<Issue title> (#N)``  (≤72 chars, truncates if needed)
+    - No Issue: ``<type>: <description>``  (≤72 chars)
+
+    Args:
+        plan_name: Plan file name (with or without .md).
+        plan_type: Plan type from metadata (e.g., 'chore', 'feature').
+        issue_number: Issue number (optional).
+        repo: Space repo for gh CLI (optional).
+
+    Returns:
+        Commit message string (first line ≤ 72 chars).
+    """
+    # --- Issue-driven: use Issue title directly ---
+    if issue_number and repo:
+        title = _get_issue_title(issue_number, repo)
+        if title:
+            suffix = f" (#{issue_number})"
+            total_len = len(title) + len(suffix)
+            if total_len <= _MAX_COMMIT_FIRST_LINE:
+                return f"{title}{suffix}"
+            # Truncate description portion to fit
+            m = re.match(r'^([a-z]+\([^)]+\):\s*)(.*)$', title)
+            if m:
+                prefix, desc = m.group(1), m.group(2)
+                max_desc = _MAX_COMMIT_FIRST_LINE - len(prefix) - len(suffix)
+                return f"{prefix}{desc[:max_desc]}{suffix}"
+
+    # --- No Issue (or title fetch failed): parse plan name ---
+    parsed_type, slug = _parse_plan_name_for_commit(plan_name)
+    effective_type = _PLAN_TYPE_TO_COMMIT.get(parsed_type, plan_type) or 'chore'
+    description = _slug_to_description(slug)
+    msg = f"{effective_type}: {description}"
+    if len(msg) > _MAX_COMMIT_FIRST_LINE:
+        prefix_len = len(f"{effective_type}: ")
+        description = description[:_MAX_COMMIT_FIRST_LINE - prefix_len]
+        msg = f"{effective_type}: {description}"
+    return msg
 
 
 # ============================================
@@ -195,10 +263,105 @@ def _is_pr_path(plan_path: str, issue_number: int, repo: str) -> bool:
     return "pr/opened" in labels
 
 
+def _commit_ontology_worktree(
+    workspace_root: Path,
+    plan_type: str,
+    issue_number: int | None,
+    plan_name: str | None = None,
+    repo: str | None = None,
+) -> bool:
+    """Auto-commit and push ontology worktree changes.
+
+    Ontology worktree (.wopal/) is a special case:
+    - Located at workspace_root/.wopal
+    - Branch is space/<space-name> (e.g., space/main for main space)
+    - Pushes to fork (e.g., sampx/wopal-space-ontology)
+
+    Args:
+        workspace_root: Workspace root path
+        plan_type: Plan type for commit message
+        issue_number: Issue number for commit message
+        plan_name: Plan name for building descriptive commit message
+        repo: Space repo for fetching Issue title
+
+    Returns:
+        True if commit and push succeeded
+    """
+    ontology_path = workspace_root / ".wopal"
+
+    if not ontology_path.exists():
+        log_error("Ontology worktree path not found: .wopal/")
+        return False
+
+    # Check for uncommitted changes
+    if not has_uncommitted_changes(str(ontology_path)):
+        log_info("No uncommitted changes in ontology worktree")
+        return True
+
+    # Get current branch (dynamically, e.g., space/main, space/xxx)
+    branch = get_current_branch(ontology_path)
+    if not branch:
+        log_error("Cannot resolve ontology worktree branch")
+        return False
+
+    # Build commit message from Issue title or plan name
+    if plan_name:
+        commit_msg = _build_commit_message(plan_name, plan_type, issue_number, repo)
+    else:
+        commit_type = _PLAN_TYPE_TO_COMMIT.get(plan_type, 'chore')
+        if issue_number:
+            commit_msg = f"{commit_type}: implement plan changes (#{issue_number})"
+        else:
+            commit_msg = f"{commit_type}: implement plan changes"
+
+    log_step(f"Committing ontology changes to {branch}...")
+
+    # Stage all
+    subprocess.run(
+        ["git", "add", "-A"],
+        cwd=str(ontology_path),
+        capture_output=True,
+    )
+
+    # Commit
+    result = subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=str(ontology_path),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        if "nothing to commit" in result.stdout:
+            log_info("No changes to commit in ontology worktree")
+            return True
+        log_error(f"Ontology commit failed: {result.stderr.strip()}")
+        return False
+
+    log_success(f"Ontology committed: {commit_msg}")
+
+    # Push to origin
+    result = subprocess.run(
+        ["git", "push", "origin", branch],
+        cwd=str(ontology_path),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        log_error(f"Ontology push failed: {result.stderr.strip()}")
+        return False
+
+    log_success(f"Ontology pushed to origin/{branch}")
+    return True
+
+
 def _commit_project_changes(
     project_path: str,
     plan_type: str,
     issue_number: int | None,
+    plan_name: str | None = None,
+    repo: str | None = None,
 ) -> bool:
     """Auto-commit and push project repo changes.
 
@@ -206,28 +369,21 @@ def _commit_project_changes(
         project_path: Path to project directory
         plan_type: Plan type for commit message
         issue_number: Issue number for commit message
+        plan_name: Plan name for building descriptive commit message
+        repo: Space repo for fetching Issue title
 
     Returns:
         True if commit and push succeeded
     """
-    # Normalize plan type to valid git commit type
-    plan_type_to_commit = {
-        'feature': 'feat',
-        'enhance': 'enhance',
-        'fix': 'fix',
-        'refactor': 'refactor',
-        'docs': 'docs',
-        'test': 'test',
-        'chore': 'chore',
-        'perf': 'perf',
-    }
-    commit_type = plan_type_to_commit.get(plan_type, 'chore')
-
-    # Build commit message
-    if issue_number:
-        commit_msg = f"{commit_type}: implement plan changes (#{issue_number})"
+    # Build commit message from Issue title or plan name
+    if plan_name:
+        commit_msg = _build_commit_message(plan_name, plan_type, issue_number, repo)
     else:
-        commit_msg = f"{commit_type}: implement plan changes"
+        commit_type = _PLAN_TYPE_TO_COMMIT.get(plan_type, 'chore')
+        if issue_number:
+            commit_msg = f"{commit_type}: implement plan changes (#{issue_number})"
+        else:
+            commit_msg = f"{commit_type}: implement plan changes"
 
     # Stage all
     subprocess.run(
@@ -399,6 +555,11 @@ def archive_plan_file(plan_path: str, workspace_root: Path) -> str:
         log_error(f"Plan file not found: {plan_path}")
         raise FileNotFoundError(f"Plan file not found: {plan_path}")
 
+    # Idempotency: if already under done/, return as-is
+    if plan_file.parent.name == "done":
+        log_info(f"Plan already archived: {plan_path}")
+        return str(plan_file)
+
     # Determine destination
     plan_dir = plan_file.parent
     done_dir = plan_dir / "done"
@@ -495,13 +656,17 @@ def commit_archived_plan(
         return False
 
     # Build commit message
+    prefix = "chore: archive plan "
+    max_desc = 60  # hook limit
     if issue_number:
         commit_msg = f"chore: archive plan #{issue_number}"
     else:
         plan_name = Path(archived_file).stem
         # Strip YYYYMMDD- prefix for hook length limit (≤60 chars)
         plan_name = re.sub(r'^\d{8}-', '', plan_name)
-        commit_msg = f"chore: archive plan {plan_name}"
+        if len(prefix) + len(plan_name) > max_desc:
+            plan_name = plan_name[: max_desc - len(prefix) - 3] + "..."
+        commit_msg = f"{prefix}{plan_name}"
 
     # Commit
     result = subprocess.run(
@@ -559,7 +724,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
         log_error("Usage: flow.sh archive <issue-or-plan>")
         return 1
 
-    workspace_root = _find_workspace_root()
+    workspace_root = find_workspace_root()
 
     # 1. Find Plan file (smart lookup: Issue number or plan name)
     try:
@@ -576,26 +741,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
     if not current_status:
         current_status = get_plan_status(plan_path)
 
-    if current_status != "done":
-        log_error(f"Plan must be in done state to archive (current: {current_status})")
-        log_error("")
-
-        suggestion_map = {
-            "planning": f"Run: flow.sh approve {input_ref} --confirm",
-            "executing": f"Run: flow.sh complete {input_ref}",
-            "verifying": f"Run: flow.sh verify {input_ref} --confirm",
-        }
-
-        suggestion = suggestion_map.get(current_status, "Check plan status")
-        log_error(suggestion)
-
+    if not guard_status(current_status, "done", input_ref):
         return 1
 
     # Extract Plan metadata
     project = get_plan_project(plan_path)
     plan_type = get_plan_type(plan_path) or "chore"
     plan_issue = get_plan_issue(plan_path)
-    repo = _get_space_repo()
+    plan_name = Path(plan_path).stem  # Extract plan name for commit message
+    repo = resolve_space_repo(plan_issue, workspace_root)
+
+    if plan_issue and not repo:
+        log_warn(f"Cannot resolve space repo for Issue #{plan_issue}; skipping Issue sync")
+        plan_issue = None
 
     # 2.5. Sync Plan to Issue before archiving (if Issue exists)
     if plan_issue:
@@ -623,13 +781,28 @@ def cmd_archive(args: argparse.Namespace) -> int:
         log_success(f"Plan synced to Issue #{plan_issue}")
 
     # 3. Detect worktree and handle project changes
+    #    Special handling for ontology-worktree projects (.wopal/)
+    #    Standard projects follow the existing worktree detection/merge/cleanup flow
     worktree_handled = False
     project_committed = False
+    ontology_committed = False
 
-    if project:
-        project_path = _find_project_path(project, workspace_root)
+    # Read Project Type from Plan metadata
+    project_type_str = get_plan_field(plan_path, "Project Type")
+    is_ontology_worktree = project_type_str == "ontology-worktree"
 
-        if project_path and (project_path / '.git').exists():
+    if is_ontology_worktree:
+        # Ontology worktree: commit .wopal/ changes directly, skip worktree merge
+        log_step("Ontology worktree project detected — committing .wopal/ changes")
+        if _commit_ontology_worktree(workspace_root, plan_type, plan_issue, plan_name, repo):
+            ontology_committed = True
+        elif has_uncommitted_changes(str(workspace_root / ".wopal")):
+            log_error("Failed to commit ontology worktree changes")
+            return 1
+    elif project:
+        project_path = resolve_project_path(plan_path, project, workspace_root)
+
+        if project_path:
             wt = _detect_worktree(plan_path, project, workspace_root)
 
             if wt:
@@ -671,7 +844,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 # No worktree → check project repo for uncommitted changes
                 if has_uncommitted_changes(str(project_path)):
                     log_step(f"Auto-committing project changes in {project}...")
-                    if _commit_project_changes(str(project_path), plan_type, plan_issue):
+                    if _commit_project_changes(str(project_path), plan_type, plan_issue, plan_name, repo):
                         project_committed = True
                     else:
                         log_error("Failed to commit project changes")
@@ -723,6 +896,8 @@ def cmd_archive(args: argparse.Namespace) -> int:
         print(f"  Worktree: cleaned up")
     if project_committed:
         print(f"  Project: changes committed and pushed")
+    if ontology_committed:
+        print(f"  Ontology: .wopal/ changes committed and pushed")
 
     return 0
 

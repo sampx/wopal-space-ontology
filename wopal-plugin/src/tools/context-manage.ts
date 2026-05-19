@@ -1,52 +1,148 @@
 /**
- * context_manage Tool - Session Context Management
+ * context_manage Tool - Session Context Management (Orchestration Layer)
  *
- * Manages session-level state including summaries and status.
- * - summary: Generate session summary via LLM and update session title
- * - status: View current session context state and staleness
+ * Thin entry point for session context management actions.
+ * Action handlers extracted to context-manage-actions.ts.
+ * Target resolver extracted to context-target.ts.
  */
 
 import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
 import type { DistillLLMClient } from "../memory/llm-client.js";
+import type { SystemPromptMetadata } from "../types.js";
+import type { MessageWithInfo } from "../hooks/message-context.js";
+import type { SessionStore } from "../session-store.js";
+import { SessionStore as SessionStoreClass } from "../session-store.js";
+import { createDebugLog, formatSessionID } from "../debug.js";
+import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
+import type { OpenCodeClient } from "../types.js";
+import { resolveSessionTarget } from "./context-target.js";
 import {
-  loadSessionContext,
-  saveSessionContext,
-  type SessionContext,
-} from "../memory/session-context.js";
-import type { SessionMessage } from "../types.js";
-import { createDebugLog } from "../debug.js";
+  handleStatus,
+  handleDump,
+  handleSummary,
+  handleCompact,
+} from "./context-manage-actions.js";
 
-const debugLog = createDebugLog("[wopal-memory]", "memory");
-
-const STALENESS_THRESHOLD = 20;
+const debugLog = createDebugLog("[context]", "context");
 
 /**
  * Create context_manage tool
  *
  * @param distillLLM - Distill LLM client for summary generation
  * @param client - OpenCode client for session.messages() and session.update()
+ * @param systemSnapshots - Plugin injections (rules + memories)
+ * @param transformedMessagesMap - Messages with synthetic parts from hooks
  */
 export function createContextManageTool(
   distillLLM: DistillLLMClient,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
+  client: OpenCodeClient,
+  systemSnapshots?: Map<string, string[]>,
+  systemMetadataMap?: Map<string, SystemPromptMetadata>,
+  systemInjectionsMap?: Map<string, string[]>,
+  transformedMessagesMap?: Map<string, MessageWithInfo[]>,
+  workspaceDir?: string,
+  sessionStore?: SessionStore,
+  taskManager?: SimpleTaskManager,
 ): ToolDefinition {
+  const snapshotMap = systemSnapshots ?? new Map<string, string[]>();
+  const metadataMap = systemMetadataMap ?? new Map<string, SystemPromptMetadata>();
+  const injectionsMap = systemInjectionsMap ?? new Map<string, string[]>();
+  const messagesMap = transformedMessagesMap ?? new Map<string, MessageWithInfo[]>();
+  const baseDir = workspaceDir ?? ".";
+  const store = sessionStore ?? new SessionStoreClass();
+
   return tool({
     description:
-      "调用外部 LLM 模型生成当前会话摘要（≤50 字核心意图），并更新 session title。用于 session title 管理和语义检索增强。\n\n" +
-      "子命令: summary（调用 LLM 生成摘要 + 更新 title）, status（查看当前摘要状态 + 过时判断）。\n\n" +
-      "⚠️ 这是内部基础设施，不是会话回顾工具。Agent 禁止主动生成长格式会话摘要。" +
-      "⚠️ summary 调用一次即可，返回成功后不要重复调用。",
+      "Session context tool. Actions:\n" +
+      "- 'summary': Generate ≤50 char summary via LLM and update session title.\n" +
+      "  MUST only call when user explicitly requests (e.g. \"摘要本次会话\"). Do not repeat after success.\n" +
+      "- 'status': Return session context usage stats. For main sessions, also lists child tasks.\n" +
+      "  Use to inspect session state before/after actions (e.g., before compact, after launch).\n" +
+      "  Main sessions: include session payload + tasks array (child task summaries).\n" +
+      "  Child sessions: include session payload only (no tasks array).\n" +
+      "- 'dump': Export session context to file.\n" +
+      "  Default: dump current session (no session_id needed).\n" +
+      "  Optional session_id: dump specific session (accepts 'ses_xxx' or 'wopal-task-xxx').\n" +
+      "  Default is compact mode (truncates long content, recommended). Use detail=true only when user requests full content.\n" +
+      "- 'compact': Compact session context (manual compaction).\n" +
+      "  Reports current context usage and triggers compaction. No threshold parameter—agent decides when to compact.\n" +
+      "  Optional session_id: compact specific session (accepts 'ses_xxx' or 'wopal-task-xxx'). Default: current session.",
     args: {
       action: tool.schema
-        .enum(["summary", "status"] as const)
-        .describe("子命令: 'summary' 调用 LLM 生成摘要并更新 title, 'status' 查看当前状态"),
+        .enum(["summary", "status", "dump", "compact"] as const)
+        .describe("'summary' to generate summary and update title, 'status' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
+      session_id: tool.schema
+        .string()
+        .optional()
+        .describe("Optional session ID for cross-session operations. Accepts ses_xxx or wopal-task-xxx format."),
+      detail: tool.schema
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Use full content mode for dump (default false = compact mode)"),
     },
     execute: async (args, context: ToolContext): Promise<string> => {
       const sessionID = context.sessionID;
 
-      debugLog(`[context_manage] Action: ${args.action}, Session: ${sessionID ?? "N/A"}`);
+      // Log caller session for summary/status/dump; compact has dedicated target session log
+      // When querying a different session (args.session_id != caller), show both to prevent misleading duplicates
+      if (args.action !== "compact") {
+        if (args.session_id && args.session_id !== sessionID) {
+          const callerLabel = formatSessionID(sessionID ?? "?", false);
+          const target = await resolveSessionTarget(args.session_id, client as OpenCodeClient, taskManager);
+          const targetLabel = formatSessionID(target.sessionID, target.isTask);
+          debugLog(`[context_manage] action=${args.action} caller=${callerLabel} target=${targetLabel}`);
+        } else {
+          debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+        }
+      }
 
+      // Get sessionStore from context (tests inject it directly)
+      const ctxStore = (context as { sessionStore?: SessionStore }).sessionStore
+      const activeStore = ctxStore ?? store;
+
+      // === STATUS action ===
+      if (args.action === "status") {
+        const rawSessionID = args.session_id ?? sessionID;
+        if (!rawSessionID) {
+          return "Failed: no session ID available for status.";
+        }
+        const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
+        return handleStatus(target.sessionID, activeStore, target.isTask, taskManager);
+      }
+
+      // === DUMP action ===
+      if (args.action === "dump") {
+        const rawSessionID = args.session_id ?? sessionID;
+        if (!rawSessionID) {
+          return "Failed: no session ID available for dump.";
+        }
+        const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
+        return await handleDump(
+          target.sessionID,
+          target.isTask,
+          client,
+          baseDir,
+          snapshotMap,
+          metadataMap,
+          injectionsMap,
+          messagesMap,
+          args.detail ?? false,
+        );
+      }
+
+      // === COMPACT action ===
+      if (args.action === "compact") {
+        const rawSessionID = args.session_id ?? sessionID;
+        if (!rawSessionID) {
+          return "Failed: no session ID available for compact.";
+        }
+        const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
+        debugLog(`[context_manage] compact ${formatSessionID(target.sessionID, target.isTask)}`);
+        return await handleCompact(target.sessionID, target.isTask, client, activeStore, baseDir);
+      }
+
+      // === SUMMARY action (no session_id override) ===
       if (!sessionID) {
         return "Failed: current session ID is unavailable.";
       }
@@ -55,174 +151,7 @@ export function createContextManageTool(
         return await handleSummary(sessionID, distillLLM, client);
       }
 
-      if (args.action === "status") {
-        return await handleStatus(sessionID, client);
-      }
-
       return "Unknown action.";
     },
   });
-}
-
-async function handleSummary(
-  sessionID: string,
-  distillLLM: DistillLLMClient,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
-): Promise<string> {
-  if (typeof client?.session?.messages !== "function") {
-    return "Failed: session.messages API is unavailable.";
-  }
-
-  try {
-    const result = await client.session.messages({ path: { id: sessionID } });
-    const messages: SessionMessage[] = result?.data ?? [];
-
-    if (messages.length === 0) {
-      return "No messages in current session to summarize.";
-    }
-
-    const userTexts: string[] = [];
-    for (const msg of messages) {
-      if (msg.info?.role !== "user") continue;
-      if (!msg.parts) continue;
-
-      // Skip compaction messages
-      if (msg.parts.some((p) => p.type === "compaction")) continue;
-
-      for (const part of msg.parts) {
-        if (part.type === "text" && part.text) {
-          // Skip synthetic parts (system notifications injected as user text)
-          if (part.synthetic) continue;
-          userTexts.push(part.text);
-        }
-      }
-    }
-
-    if (userTexts.length === 0) {
-      return "No user messages found to summarize.";
-    }
-
-    const combinedText = userTexts.join("\n\n---\n\n");
-    const truncatedText = combinedText.length > 3000
-      ? combinedText.slice(-3000)
-      : combinedText;
-    const prompt = `根据以下用户消息，用一句话概括本次会话的核心意图，不超过 50 字。
-
-用户消息：
-${truncatedText}
-
-要求：
-- 用简洁的一句话描述用户想要做什么
-- 不超过 50 个汉字
-- 只输出摘要内容，不要其他解释`;
-
-    const summaryText = await distillLLM.complete(prompt);
-    const cleanedSummary = summaryText
-      .trim()
-      .replace(/^["「『]|["」』]$/g, "")
-      .slice(0, 80);
-
-    const existingCtx = loadSessionContext(sessionID);
-    const newCtx: SessionContext = {
-      sessionID,
-      title: existingCtx?.title ?? null,
-      ...existingCtx,
-      summary: {
-        text: cleanedSummary,
-        messageCount: messages.length,
-        generatedAt: new Date().toISOString(),
-      },
-    };
-
-    if (typeof client?.session?.update === "function") {
-      try {
-        await client.session.update({
-          path: { id: sessionID },
-          body: { title: cleanedSummary },
-        });
-        newCtx.title = cleanedSummary;
-      } catch (error) {
-        debugLog(`[context_manage.summary] Failed to update session title: ${error}`);
-      }
-    }
-
-    saveSessionContext(newCtx);
-
-    return [
-      "## ✅ Session Summary Generated",
-      "",
-      `**Summary:** ${cleanedSummary}`,
-      `**Message Count:** ${messages.length}`,
-      `**Generated At:** ${new Date().toISOString()}`,
-      "",
-      "> Important: This output is only visible to the calling agent. You must display the full content to the user.",
-    ].join("\n");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return `Failed to generate summary: ${message}`;
-  }
-}
-
-async function handleStatus(
-  sessionID: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
-): Promise<string> {
-  const ctx = loadSessionContext(sessionID);
-
-  if (!ctx) {
-    return "No session context found. Run `context_manage action=summary` to generate a summary.";
-  }
-
-  let currentMessageCount = 0;
-  try {
-    if (typeof client?.session?.messages === "function") {
-      const result = await client.session.messages({ path: { id: sessionID } });
-      currentMessageCount = result?.data?.length ?? 0;
-    }
-  } catch (error) {
-    debugLog(`[context_manage.status] Failed to get message count: ${error}`);
-  }
-
-  const lines: string[] = [
-    "## 📊 Session Context Status",
-    "",
-    `**Session ID:** ${sessionID}`,
-    `**Title:** ${ctx.title ?? "(未设置)"}`,
-  ];
-
-  if (ctx.summary) {
-    lines.push("", "### Summary");
-    lines.push(`- **Text:** ${ctx.summary.text}`);
-    lines.push(`- **Messages at generation:** ${ctx.summary.messageCount}`);
-    lines.push(`- **Generated at:** ${ctx.summary.generatedAt}`);
-
-    const newMessages = currentMessageCount - ctx.summary.messageCount;
-    if (currentMessageCount > 0 && newMessages > STALENESS_THRESHOLD) {
-      lines.push("");
-      lines.push(
-        `> ⚠️ **Summary may be stale:** ${newMessages} new messages since last summary (threshold: ${STALENESS_THRESHOLD})`,
-      );
-      lines.push(
-        "> Consider running `context_manage action=summary` to regenerate.",
-      );
-    } else if (newMessages > 0) {
-      lines.push(`- **New messages:** ${newMessages} (within threshold)`);
-    }
-  } else {
-    lines.push("", "### Summary");
-    lines.push(
-      "> No summary generated yet. Run `context_manage action=summary` to create one.",
-    );
-  }
-
-  if (ctx.distill) {
-    lines.push("", "### Distill State");
-    lines.push(`- **Messages at extraction:** ${ctx.distill.messageCount}`);
-    lines.push(`- **Depth:** ${ctx.distill.depth}`);
-    lines.push(`- **Extracted at:** ${ctx.distill.extractedAt}`);
-  }
-
-  return lines.join("\n");
 }

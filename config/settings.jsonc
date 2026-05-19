@@ -2,7 +2,18 @@
     "ellamaka": {
         "$schema": "https://opencode.ai/config.json",
         "default_agent": "wopal",
+        "compaction": {
+            "tail_turns": 0
+        },
         "agent": {
+            "plan": { "disable": true },
+            "build": { "disable": true },
+            "general": {
+                "model": "wopal-ai/glm-5.1"
+            },
+            "compaction": {                
+                "model": "wopal-ai/qwen-3.6-plus"
+            },
             "fae": {
               "model": "wopal-ai/glm-5.1"
             },            
@@ -23,16 +34,11 @@
             },
             "wsf-codebase-mapper": {
               "model": "wopal-ai/qwen-3.6-plus"
-            },
-            "compaction": {
-                "model": "wopal-ai/qwen-3.6-plus"
-            }
-
+            }  
         },
         "instructions": [
             ".workspace.md",
-            "USER.md",
-            "MEMORY.md"
+            "USER.md"
         ],
         // "skills": {
         //   "paths": ["/Users/sam/coding/wopal/wopal-workspace/.agents/skills"]
@@ -55,9 +61,6 @@
                 "/Users/sam/**": "allow",
                 "/tmp/**": "allow",
                 "/var/folders/**": "allow"
-            },
-            "skill": {
-                "*": "allow"
             },
             "bash": {
                 "rm -rf *": "ask",

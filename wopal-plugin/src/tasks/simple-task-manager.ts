@@ -3,64 +3,61 @@ import type {
   LaunchInput,
   LaunchOutput,
   WopalTask,
+  OpenCodeClient,
 } from "../types.js"
 import type { DebugLog } from "../debug.js"
-import type { IdleDiagnostic } from "./idle-diagnostic.js"
+import type { SessionStore } from "../session-store.js"
 import { createDebugLog } from "../debug.js"
-import { clearStuckState } from "./stuck-detector.js"
+import { sessionStore as globalSessionStore } from "../session-store-instance.js"
+import { clearStuckState } from "./task-monitor.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup.js"
 import {
   launchTask,
   DEFAULT_CONCURRENCY_LIMIT,
-  sessionIDToTaskID,
 } from "./task-launcher.js"
-import { notifyParent, notifyParentStuck } from "./task-notifier.js"
-import { sendProgressNotification } from "./task-notifier-internals.js"
+import { notifyParent, notifyParentStuck, sendProgressNotification } from "./task-notifier.js"
 import {
   checkProgressNotifications,
   checkStuckTasksAndNotify,
   logTickStatus,
-  getContextUsagePercent,
+  type ProgressNotifyTrigger,
 } from "./task-monitor.js"
 import {
   failTask,
   abortSession,
   markTaskErrorBySession,
-  markTaskWaitingBySession,
   interruptTask,
-  cleanup,
   shutdownManager,
-  CLEANUP_INTERVAL_MS,
-  CLEANUP_MAX_AGE_MS,
 } from "./task-lifecycle.js"
+import { sessionIDToTaskID } from "../session-ref.js"
+import { getDisplayStatus, isResumableTask, canDeleteTask } from "./task-phase.js"
 
-const defaultManagerLog = createDebugLog("[wopal-task]", "task")
+const defaultManagerLog = createDebugLog("[task]", "task")
 
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private client: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private v2Client: any
+  private client: OpenCodeClient
+  private v2Client: OpenCodeClient
   private serverUrl?: URL
   private directory: string
   private debugLog: DebugLog
-  private cleanupInterval: ReturnType<typeof setInterval> | undefined = undefined
+  private sessionStore: SessionStore
   private tickerInterval: ReturnType<typeof setInterval> | undefined = undefined
   private concurrency = new ConcurrencyManager()
   private readonly CONCURRENCY_KEY = 'default'
   private isShuttingDown = false
   private tickRunning = false
   private unregistered = false
+  private recoveredSessions = new Set<string>()
+  private recoveringSessions = new Set<string>()
 
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    client: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    v2Client: any,
+    client: OpenCodeClient,
+    v2Client: OpenCodeClient,
     directory: string,
     serverUrl?: URL,
+    sessionStore?: SessionStore,
     debugLog?: DebugLog,
   ) {
     this.client = client
@@ -69,13 +66,8 @@ export class SimpleTaskManager {
     if (serverUrl !== undefined) {
       this.serverUrl = serverUrl
     }
+    this.sessionStore = sessionStore ?? globalSessionStore
     this.debugLog = debugLog ?? defaultManagerLog
-
-    // Setup automatic cleanup interval
-    this.cleanupInterval = setInterval(() => {
-      cleanup(this.getLifecycleDeps(), CLEANUP_MAX_AGE_MS)
-    }, CLEANUP_INTERVAL_MS)
-    this.cleanupInterval.unref()
 
     // Setup stuck detection and progress notifications (every 30 seconds)
     this.tickerInterval = setInterval(() => {
@@ -107,13 +99,15 @@ export class SimpleTaskManager {
     return this.directory
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getClient(): any {
+  getSessionStore(): SessionStore {
+    return this.sessionStore
+  }
+
+  getClient(): OpenCodeClient {
     return this.client
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getV2Client(): any {
+  getV2Client(): OpenCodeClient {
     return this.v2Client
   }
 
@@ -122,10 +116,6 @@ export class SimpleTaskManager {
   }
 
   dispose(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval)
-    }
-    this.cleanupInterval = undefined
     if (this.tickerInterval) {
       clearInterval(this.tickerInterval)
     }
@@ -159,6 +149,37 @@ export class SimpleTaskManager {
     return task
   }
 
+  listTasksForParent(parentSessionID: string): Array<{
+    taskID: string
+    sessionID: string
+    status: string
+    description: string
+    agent: string
+  }> {
+    const result: Array<{
+      taskID: string
+      sessionID: string
+      status: string
+      description: string
+      agent: string
+    }> = []
+
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionID === parentSessionID) {
+        const effectiveStatus = getDisplayStatus(task)
+        result.push({
+          taskID: task.id,
+          sessionID: task.sessionID ?? '',
+          status: effectiveStatus,
+          description: task.description,
+          agent: task.agent,
+        })
+      }
+    }
+
+    return result
+  }
+
   findBySession(sessionID: string): WopalTask | undefined {
     return this.tasks.get(sessionIDToTaskID(sessionID))
   }
@@ -175,10 +196,6 @@ export class SimpleTaskManager {
     return markTaskErrorBySession(this.getLifecycleDeps(), sessionID, error)
   }
 
-  markTaskWaitingBySession(sessionID: string, diagnostic: IdleDiagnostic): WopalTask | undefined {
-    return markTaskWaitingBySession(this.getLifecycleDeps(), sessionID, diagnostic)
-  }
-
   async interrupt(id: string, parentSessionID: string): Promise<CancelResult> {
     return interruptTask(this.getLifecycleDeps(), id, parentSessionID)
   }
@@ -191,7 +208,7 @@ export class SimpleTaskManager {
       return { ok: false, message: "Task not found or not owned by this session" }
     }
 
-    if (task.status === 'running' && !task.idleNotified) {
+    if (!canDeleteTask(task)) {
       return { ok: false, message: "Task is still running. Please verify completion before deleting (use wopal_task_output to check status)." }
     }
 
@@ -222,10 +239,6 @@ export class SimpleTaskManager {
     await notifyParent({ client: this.client, debugLog: this.debugLog }, task)
   }
 
-  cleanup(maxAgeMs = 3600_000): void {
-    cleanup(this.getLifecycleDeps(), maxAgeMs)
-  }
-
   releaseConcurrencySlot(task: WopalTask): void {
     if (task.concurrencyKey) {
       this.concurrency.release(task.concurrencyKey)
@@ -234,7 +247,8 @@ export class SimpleTaskManager {
   }
 
   reacquireSlotOnWakeUp(task: WopalTask): void {
-    if (task.status === 'waiting' || task.idleNotified) {
+    // Reacquire slot for resumable tasks (waiting, idle, error)
+    if (isResumableTask(task)) {
       if (this.concurrency.tryAcquire(this.CONCURRENCY_KEY, DEFAULT_CONCURRENCY_LIMIT)) {
         task.concurrencyKey = this.CONCURRENCY_KEY
         this.debugLog(`[reacquireSlot] taskId=${task.id} acquired slot`)
@@ -254,32 +268,27 @@ export class SimpleTaskManager {
     }
   }
 
-  async cacheContextUsage(sessionID: string): Promise<void> {
-    const task = this.findBySession(sessionID)
-    if (!task?.sessionID) return
-    try {
-      const pct = await getContextUsagePercent(this.client, this.directory, sessionID, this.debugLog)
-      if (pct !== null) {
-        task.lastContextUsage = pct
-        this.debugLog(`[ctxCache] session=${sessionID.slice(0, 8)} cached=${pct}%`)
-      }
-    } catch {
-      // Graceful degradation
-    }
-  }
-
   async recoverFromSession(parentSessionID: string): Promise<void> {
+    if (this.recoveredSessions.has(parentSessionID)) {
+      return
+    }
+    if (this.recoveringSessions.has(parentSessionID)) {
+      return
+    }
+    this.recoveringSessions.add(parentSessionID)
+
     if (typeof this.client?.session?.children !== "function") {
       this.debugLog(`[recover] skipped: session.children is unavailable`)
+      this.recoveringSessions.delete(parentSessionID)
       return
     }
 
     try {
       const result = await this.client.session.children({ path: { id: parentSessionID } })
-      this.debugLog(`[recover] raw result keys: ${Object.keys(result ?? {}).join(', ')}`)
       const children = result?.data ?? result ?? []
       if (!Array.isArray(children)) {
         this.debugLog(`[recover] skipped: children is not an array, type=${typeof children}`)
+        this.recoveringSessions.delete(parentSessionID)
         return
       }
 
@@ -291,27 +300,37 @@ export class SimpleTaskManager {
         const taskID = sessionIDToTaskID(childSessionID)
         if (this.tasks.has(taskID)) continue
 
+        const now = new Date()
         const task: WopalTask = {
           id: taskID,
           sessionID: childSessionID,
-          status: 'pending',
+          status: 'running',
           description: child.title ?? '',
           agent: child.agent ?? 'unknown',
           prompt: '',
           parentSessionID,
           createdAt: new Date(child.time?.created ?? Date.now()),
+          startedAt: now,
+          progress: {
+            toolCalls: 0,
+            lastUpdate: now,
+            lastMeaningfulActivity: now,
+          },
           idleNotified: true,
         }
         this.tasks.set(taskID, task)
         recovered++
-        this.debugLog(`[recover] restored task=${taskID} session=${childSessionID.slice(0, 8)} title="${child.title?.substring(0, 40) ?? ''}"`)
+        this.debugLog(`[recover] restored task=${taskID} session=${childSessionID.slice(0, 16)} title="${child.title?.substring(0, 40) ?? ''}"`)
       }
 
       if (recovered > 0) {
-        this.debugLog(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 8)}`)
+        this.debugLog(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 16)}`)
       }
+      this.recoveredSessions.add(parentSessionID)
     } catch (err) {
       this.debugLog(`[recover] error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      this.recoveringSessions.delete(parentSessionID)
     }
   }
 
@@ -341,13 +360,14 @@ export class SimpleTaskManager {
   private getMonitorDeps() {
     return {
       tasks: this.tasks,
+      sessionStore: this.sessionStore,
       client: this.client,
       debugLog: this.debugLog,
       directory: this.directory,
       notifyParentStuckFn: async (task: WopalTask, durationText: string) =>
         await notifyParentStuck({ client: this.client, debugLog: this.debugLog }, task, durationText),
-      sendProgressNotificationFn: async (task: WopalTask, msgCount: number, ctx: number | null) =>
-        await sendProgressNotification({ client: this.client, debugLog: this.debugLog }, task, msgCount, ctx),
+      sendProgressNotificationFn: async (task: WopalTask, msgCount: number, ctx: number | null, trigger?: string) =>
+        await sendProgressNotification({ client: this.client, debugLog: this.debugLog }, task, msgCount, ctx, trigger as ProgressNotifyTrigger | undefined),
     }
   }
 }

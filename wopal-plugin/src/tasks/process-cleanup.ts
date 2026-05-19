@@ -1,6 +1,6 @@
 import { createDebugLog } from "../debug.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 

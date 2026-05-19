@@ -8,12 +8,13 @@ import { resetSessionState, getSessionStateSnapshot, _upsertSessionState } from 
 let testDir: string;
 let globalRulesDir: string;
 let projectRulesDir: string;
+let savedInjectionEnv: Record<string, string | undefined>;
 
 function setupTestDirs() {
   // Create a unique temporary directory for each test run
-  testDir = mkdtempSync(path.join(os.tmpdir(), "opencode-rules-test-"));
-  globalRulesDir = path.join(testDir, ".config", "opencode", "rules");
-  projectRulesDir = path.join(testDir, "project", ".opencode", "rules");
+  testDir = mkdtempSync(path.join(os.tmpdir(), "wopal-rules-test-"));
+  globalRulesDir = path.join(testDir, ".wopal", "rules");
+  projectRulesDir = path.join(testDir, "project", ".wopal", "rules");
   mkdirSync(globalRulesDir, { recursive: true });
   mkdirSync(projectRulesDir, { recursive: true });
 }
@@ -24,14 +25,35 @@ function teardownTestDirs() {
   }
 }
 
+// Save and clear injection toggle env vars so tests aren't affected by external config
+function saveAndClearInjectionEnv() {
+  savedInjectionEnv = {
+    WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
+    WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
+  };
+  delete process.env.WOPAL_RULES_INJECTION_ENABLED;
+  delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
+}
+
+function restoreInjectionEnv() {
+  if (savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_RULES_INJECTION_ENABLED = savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED;
+  }
+  if (savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED !== undefined) {
+    process.env.WOPAL_MEMORY_INJECTION_ENABLED = savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED;
+  }
+}
+
 describe("message-hooks", () => {
   beforeEach(() => {
     setupTestDirs();
+    saveAndClearInjectionEnv();
   });
 
   afterEach(async () => {
     teardownTestDirs();
     resetSessionState();
+    restoreInjectionEnv();
   });
 
   it("updates lastUserPrompt from chat.message", async () => {
@@ -61,22 +83,11 @@ describe("message-hooks", () => {
     expect(snapshot?.lastUserPrompt).toBe("please add tests");
   });
 
-  it("includes glob-conditional rule when tool hook records matching file path", async () => {
-    // Arrange rules
-    const originalEnv = process.env.XDG_CONFIG_HOME;
-    process.env.XDG_CONFIG_HOME = path.join(testDir, ".config");
+  it("seeds session state on messages.transform", async () => {
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
 
     try {
-      writeFileSync(
-        path.join(globalRulesDir, "typescript.mdc"),
-        `---
-globs:
-  - "src/components/**/*.tsx"
----
-
-Use React best practices.`,
-      );
-
       const { default: pluginDef } = await import("../index.js");
       const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
       const mockClient = { tool: { ids: vi.fn(async () => ({ data: [] })) } };
@@ -89,27 +100,29 @@ Use React best practices.`,
         serverUrl: new URL("http://localhost"),
       });
 
-      // Act: record file path via tool hook
-      const before = hooks["tool.execute.before"] as any;
-      expect(before).toBeDefined();
-
-      await before(
-        { tool: "read", sessionID: "ses_1", callID: "call_1" },
-        { args: { filePath: "src/components/Button.tsx" } },
-      );
-
-      const systemTransform = hooks[
-        "experimental.chat.system.transform"
+      const messagesTransform = hooks[
+        "experimental.chat.messages.transform"
       ] as any;
-      const result = await systemTransform(
-        { sessionID: "ses_1", model: { providerID: "test", modelID: "test" } },
-        { system: ["Base prompt."] },
+
+      await messagesTransform(
+        {},
+        {
+          messages: [
+            {
+              role: "user",
+              info: { sessionID: "ses_seed", role: "user" },
+              parts: [{ type: "text", text: "write a button component" }],
+            },
+          ],
+        },
       );
 
-      // Assert
-      expect(result.system.join("\n")).toContain("React best practices");
+      const snapshot = getSessionStateSnapshot("ses_seed");
+      expect(snapshot?.seededFromHistory).toBe(true);
+      expect(snapshot?.seedCount).toBe(1);
+      expect(snapshot?.lastUserPrompt).toBe("write a button component");
     } finally {
-      process.env.XDG_CONFIG_HOME = originalEnv;
+      process.env.HOME = originalHome;
     }
   });
 });

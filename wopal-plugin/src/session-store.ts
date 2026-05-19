@@ -1,7 +1,6 @@
 import type { MessageWithInfo } from "./hooks/message-context.js";
 
 export interface SessionState {
-  contextPaths: Set<string>;
   lastUserPrompt?: string;
   needsMemoryInjection?: boolean;
   lastUpdated: number;
@@ -17,6 +16,32 @@ export interface SessionState {
   loadedSkills: Set<string>;
   /** Set to true after compact completes when loadedSkills is non-empty */
   needsSkillReload?: boolean;
+  /** Set to true after compact completes, signals event-router to send recovery message */
+  needsAutoContinue?: boolean;
+  /** Set to "plugin" when compact was triggered by context_manage tool; checked by event-router to distinguish Plugin-initiated vs other compacts */
+  compactingTrigger?: "plugin";
+  /** Main-session compact requested during active tool run; trigger summarize after session.idle */
+  pendingCompactTrigger?: "plugin";
+  /** Agent name extracted from the most recent messages.transform cycle */
+  agent?: string | undefined;
+  /** Whether this session is a background task child session */
+  isTask?: boolean | undefined;
+  /** The user prompt for which rules were last injected (dedup) */
+  lastRulesPrompt?: string;
+  /** Model provider ID (from step-finish event) */
+  providerID?: string;
+  /** Model ID (from step-finish event) */
+  modelID?: string;
+  /** Context window limit in tokens (from provider config lookup) */
+  contextLimit?: number;
+  /** Last token usage captured from step-finish event (cumulative) */
+  lastTokens?: {
+    input: number;
+    output: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+    updatedAt: number; // timestamp for freshness check
+  };
 }
 
 export interface SessionStoreOptions {
@@ -47,10 +72,7 @@ export class SessionStore {
   snapshot(sessionID: string): SessionState | undefined {
     const s = this.stateMap.get(sessionID);
     if (!s) return undefined;
-    return {
-      ...s,
-      contextPaths: new Set(s.contextPaths),
-    };
+    return { ...s, loadedSkills: new Set(s.loadedSkills) };
   }
 
   reset(): void {
@@ -88,10 +110,13 @@ export class SessionStore {
     }
   }
 
-  markCompacting(sessionID: string, nowMs: number): void {
+  markCompacting(sessionID: string, nowMs: number, trigger?: "plugin"): void {
     this.upsert(sessionID, (state) => {
       state.isCompacting = true;
       state.compactingSince = nowMs;
+      if (trigger === "plugin") {
+        state.compactingTrigger = "plugin";
+      }
     });
   }
 
@@ -99,6 +124,8 @@ export class SessionStore {
     this.upsert(sessionID, (state) => {
       state.isCompacting = false;
       delete state.compactingSince;
+      // DO NOT delete compactingTrigger here — event-router reads it to distinguish Plugin-initiated
+      state.needsAutoContinue = true;
       if (state.loadedSkills.size > 0) {
         state.needsSkillReload = true;
       }
@@ -128,7 +155,6 @@ export class SessionStore {
 
   private createDefaultState(): SessionState {
     return {
-      contextPaths: new Set<string>(),
       lastUpdated: ++this.tick,
       seededFromHistory: false,
       seedCount: 0,

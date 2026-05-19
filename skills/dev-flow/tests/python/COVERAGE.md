@@ -78,7 +78,7 @@
 |----|----------|-------------|--------------|-------|-------------|--------|
 | U2-1 | Valid issue plan passes | Plan with correct structure → pass | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |
 | U2-2 | Valid no-issue plan passes | No-issue plan with correct structure → pass | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |
-| U2-3 | Numbered list Changes rejected | Plan using `1.` `2.` instead of `- [ ] Step` → reject | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |
+| U2-3 | Numbered list Changes rejected (legacy) | Legacy plan using `1.` `2.` instead of `- [ ] Step` → reject | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | **yes** | pending |
 | U2-4 | Empty Test Plan rejected | Plan with empty/hollow Test Plan section → reject | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |
 | U2-5 | No User Validation section → pass with warning (backward compat) | Missing section doesn't block, but warns | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |
 | U2-6 | Good User Validation checked passes | Checked checkbox → pass | `tests/python/unit/test_check_doc.py` | 2 (Task 2-1) | no | pending |

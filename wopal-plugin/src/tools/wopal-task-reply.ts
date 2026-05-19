@@ -1,11 +1,20 @@
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
+import type { WopalTask, OpenCodeClient } from "../types.js"
 import { createDebugLog } from "../debug.js"
-import { trackActivity } from "../tasks/progress-tracker.js"
+import { trackActivity } from "../tasks/progress.js"
+import { isResumableTask } from "../tasks/task-phase.js"
 
-const debugLog = createDebugLog("[wopal-task]", "task")
+const debugLog = createDebugLog("[task]", "task")
 
-async function replyQuestion(taskId: string, manager: SimpleTaskManager, client: Record<string, unknown>, requestID: string, message: string) {
+function resetTaskForResume(task: WopalTask): void {
+  task.status = "running"
+  delete task.idleNotified
+  delete task.waitingReason
+  trackActivity(task, "text")
+}
+
+async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientArg: OpenCodeClient, requestID: string, message: string) {
   const v2Client = manager.getV2Client()
   if (typeof v2Client?.question?.reply === "function") {
     const result = await v2Client.question.reply({
@@ -21,7 +30,7 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, client:
     return
   }
 
-  const questionClient = (client?.question ?? {}) as { reply?: (args: { requestID: string; answers: string[][] }) => Promise<unknown> }
+  const questionClient = (clientArg?.question ?? {}) as { reply?: (args: { requestID: string; answers: string[][] }) => Promise<unknown> }
   if (typeof questionClient.reply === "function") {
     await questionClient.reply({
       requestID,
@@ -35,8 +44,8 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, client:
     throw new Error("question.reply is unavailable")
   }
 
-  const clientAny = manager.getClient() as Record<string, unknown> | undefined
-  const internalClient = clientAny?._client as { getConfig?: () => { fetch?: typeof globalThis.fetch } } | undefined
+  const client = manager.getClient() as Record<string, unknown> | undefined
+  const internalClient = client?._client as { getConfig?: () => { fetch?: typeof globalThis.fetch } } | undefined
   const internalFetch = internalClient?.getConfig?.()?.fetch ?? globalThis.fetch
 
   const url = new URL(`/question/${requestID}/reply`, serverUrl)
@@ -79,15 +88,14 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
         return "Error: Task not found or not owned by this session"
       }
 
-      // interrupt only works on running tasks
+      // interrupt only works on running status tasks (any running, including idle)
       if (interrupt && task.status !== "running") {
         return `Error: interrupt only works on running tasks. Task is ${task.status}. Use reply without interrupt to resume.`
       }
 
-      // reply works on any non-running task (waiting, idle, or error)
-      // but not on running tasks (unless using interrupt mode)
-      // idleNotified tasks (running + idleNotified=true) can use reply without interrupt
-      if (!interrupt && task.status === "running" && !task.idleNotified) {
+      // reply without interrupt only works on resumable tasks (waiting, idle, error)
+      // running + idleNotified is resumable, but running without idleNotified needs interrupt
+      if (!interrupt && !isResumableTask(task)) {
         return `Error: Task is running. Use interrupt=true to abort and redirect, or wait for idle.`
       }
 
@@ -95,17 +103,15 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
         return "Error: Task has no active session"
       }
 
-      const client = manager.getClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clientAny = client as any
+      const client = manager.getClient() as OpenCodeClient
 
       // Handle interrupt mode
       if (interrupt) {
         try {
           // Abort current execution
-          if (typeof clientAny?.session?.abort === "function") {
+          if (typeof client?.session?.abort === "function") {
             try {
-              await clientAny.session.abort({ path: { id: task.sessionID } })
+              await client.session.abort({ path: { id: task.sessionID } })
               debugLog(`task ${task_id} aborted before interrupt reply`)
             } catch (abortErr) {
               debugLog(`abort failed (task may already be idle): ${abortErr}`)
@@ -113,25 +119,23 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           }
 
           // Send corrective message
-          if (typeof clientAny?.session?.promptAsync !== "function") {
+          if (typeof client?.session?.promptAsync !== "function") {
             return "Error: session.promptAsync is unavailable"
           }
 
-          await clientAny.session.promptAsync({
+          await client.session.promptAsync({
             path: { id: task.sessionID },
             body: {
+              agent: task.agent,
               parts: [{ type: "text", text: message }],
             },
           })
 
           // Reset state
-          task.status = "running"
-          delete task.idleNotified
-          delete task.waitingReason
+          resetTaskForResume(task)
           if (task.waitingConcurrencyKey) {
             manager.releaseConcurrencySlot(task)
           }
-          trackActivity(task, "text")
           debugLog(`task ${task_id} interrupted and resumed with new direction`)
 
           return `Interrupt sent to task ${task_id}. The background task will continue with new direction.`
@@ -149,35 +153,30 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           const questionID = task.pendingQuestionID
           debugLog(`resolving question deferred: requestID=${questionID}`)
 
-          await replyQuestion(task_id, manager, clientAny, questionID, message)
+          await replyQuestion(task_id, manager, client, questionID, message)
 
           debugLog(`question resolved: requestID=${questionID}`)
           delete task.pendingQuestionID
 
-          task.status = "running"
-          delete task.waitingReason
-          if (task.idleNotified) delete task.idleNotified
-          trackActivity(task, "text")
+          resetTaskForResume(task)
           debugLog(`task ${task_id} resumed via question.reply`)
 
           return `Reply sent to task ${task_id}. The background task will continue execution.`
         }
 
-        if (typeof clientAny?.session?.promptAsync !== "function") {
+        if (typeof client?.session?.promptAsync !== "function") {
           return "Error: session.promptAsync is unavailable"
         }
 
-        await clientAny.session.promptAsync({
+        await client.session.promptAsync({
           path: { id: task.sessionID },
           body: {
+            agent: task.agent,
             parts: [{ type: "text", text: message }],
           },
         })
 
-        task.status = "running"
-        delete task.waitingReason
-        if (task.idleNotified) delete task.idleNotified
-        trackActivity(task, "text")
+        resetTaskForResume(task)
         debugLog(`task ${task_id} resumed`)
 
         return `Reply sent to task ${task_id}. The background task will continue execution.`
