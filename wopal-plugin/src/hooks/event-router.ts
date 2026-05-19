@@ -89,23 +89,25 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
   const isTask = !!ctx.taskManager?.findBySession(sessionID)
   const state = ctx.sessionStore.get(sessionID)
   const agent = state?.agent ?? "?"
-
   const used = (t.input ?? 0) + (cache.read ?? 0)
 
-  // Get model info and context limit for percentage calculation
+  // Get model info and context limit for percentage calculation (fetch once, reuse)
   let model = "?"
   let pctText = ""
+  let modelInfo: { providerID: string; modelID: string } | null = null
+  let contextLimit: number | undefined = undefined
   try {
-    const modelInfo = await getSessionModelInfo(ctx.client, sessionID)
+    modelInfo = await getSessionModelInfo(ctx.client, sessionID)
     if (modelInfo) {
-      model = `${modelInfo.providerID}/${modelInfo.modelID}`
+      const info = modelInfo
+      model = `${info.providerID}/${info.modelID}`
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const configClient = ctx.client as any
       if (typeof configClient.config?.providers === "function") {
         const providersResult = await configClient.config.providers({ query: { directory: "" } })
         const providers = providersResult?.data?.providers ?? []
-        const provider = providers.find((p: { id: string }) => p.id === modelInfo.providerID)
-        const contextLimit = provider?.models?.[modelInfo.modelID]?.limit?.context
+        const provider = providers.find((p: { id: string }) => p.id === info.providerID)
+        contextLimit = provider?.models?.[info.modelID]?.limit?.context
         if (contextLimit && contextLimit > 0) {
           pctText = ` pct=${Math.round((used / contextLimit) * 100)}%`
         }
@@ -117,13 +119,15 @@ if (sessionID && part?.type === "step-finish" && part?.tokens) {
 
   contextLog(`${formatSessionID(sessionID, isTask)} agent=${agent} model=${model} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${pctText}`)
 
-  // Store token data in sessionStore for context usage calculation
+  // Store token data + context limit in sessionStore (reuse modelInfo/contextLimit from above)
   if (t.input || cache.read) {
-    const modelInfo = await getSessionModelInfo(ctx.client, sessionID).catch(() => null)
     ctx.sessionStore.upsert(sessionID, (state) => {
       if (modelInfo) {
         state.providerID = modelInfo.providerID
         state.modelID = modelInfo.modelID
+      }
+      if (contextLimit) {
+        state.contextLimit = contextLimit
       }
       state.isTask = isTask  // Ensure isTask is set for context usage logs
       const cache = t.cache ? { ...t.cache } : undefined

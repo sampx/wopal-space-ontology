@@ -4,12 +4,6 @@ import { formatSessionID } from "../debug.js"
 import { toErrorMessage } from "./utils.js"
 import { sessionIDToTaskID } from "./task-launcher.js"
 
-const CLEANUP_INTERVAL_MS = 600_000 // 10 minutes
-const CLEANUP_MAX_AGE_MS = 3600_000 // 1 hour
-const TASK_TTL_MS = 1_800_000       // 30 minutes for non-terminal tasks
-
-export { CLEANUP_INTERVAL_MS, CLEANUP_MAX_AGE_MS, TASK_TTL_MS }
-
 export interface TaskLifecycleDeps {
   tasks: Map<string, WopalTask>
   client: {
@@ -127,40 +121,6 @@ export async function interruptTask(
   }
 
   return 'interrupted'
-}
-
-export function cleanup(
-  deps: TaskLifecycleDeps,
-  maxAgeMs = 3600_000,
-): void {
-  const { tasks, debugLog, releaseConcurrencySlot } = deps
-  const now = Date.now()
-  let cleanedCount = 0
-
-  for (const [id, task] of tasks) {
-    if (task.status === 'error') {
-      if (task.completedAt && now - task.completedAt.getTime() > maxAgeMs) {
-        tasks.delete(id)
-        cleanedCount++
-      }
-      continue
-    }
-
-    const timestamp = task.status === 'pending'
-      ? task.createdAt?.getTime()
-      : task.startedAt?.getTime()
-
-    if (timestamp && now - timestamp > TASK_TTL_MS) {
-      releaseConcurrencySlot(task)
-      tasks.delete(id)
-      cleanedCount++
-      debugLog(`[cleanup] pruned stale ${task.status} task: ${id}`)
-    }
-  }
-
-  if (cleanedCount > 0) {
-    debugLog(`[cleanup] removed ${cleanedCount} old task(s)`)
-  }
 }
 
 export interface ShutdownDeps extends TaskLifecycleDeps {

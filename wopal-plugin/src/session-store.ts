@@ -32,6 +32,8 @@ export interface SessionState {
   providerID?: string;
   /** Model ID (from step-finish event) */
   modelID?: string;
+  /** Context window limit in tokens (from provider config lookup) */
+  contextLimit?: number;
   /** Last token usage captured from step-finish event (cumulative) */
   lastTokens?: {
     input: number;

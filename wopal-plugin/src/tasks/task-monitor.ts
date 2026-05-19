@@ -354,7 +354,7 @@ export async function checkProgressNotifications(
         messageCount,
         wasNotified: shouldNotify,
         contextUsage,
-        triggerReason,
+        ...(triggerReason ? { triggerReason } : {}),
       })
     } catch (err) {
       debugLog(`[progressNotify] error for ${task.id}: ${err instanceof Error ? err.message : String(err)}`)

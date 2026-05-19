@@ -27,6 +27,8 @@ function createMockClient() {
       create: vi.fn().mockResolvedValue({ id: "ses_child-session-1" }),
       promptAsync: vi.fn().mockResolvedValue(undefined),
       abort: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue({ data: true }),
+      children: vi.fn().mockResolvedValue({ data: [] }),
     },
   }
 }
@@ -281,6 +283,54 @@ describe("SimpleTaskManager", () => {
     })
   })
 
+  describe("recovery", () => {
+    it("restores child sessions as idle running tasks", async () => {
+      mockClient.session.children.mockResolvedValueOnce({
+        data: [{
+          id: "ses_recovered-old",
+          title: "Recovered task",
+          agent: "fae",
+          time: { created: Date.now() - 4_000_000 },
+        }],
+      })
+
+      await manager.recoverFromSession("parent-1")
+
+      const taskId = sessionIDToTaskID("ses_recovered-old")
+      const task = manager.getTaskForParent(taskId, "parent-1")
+
+      expect(task?.status).toBe("running")
+      expect(task?.idleNotified).toBe(true)
+      expect(task?.startedAt?.getTime()).toBeGreaterThan(Date.now() - 5_000)
+      expect(task?.progress).toMatchObject({ toolCalls: 0 })
+    })
+
+    it("allows parent to delete recovered idle task", async () => {
+      mockClient.session.children.mockResolvedValueOnce({
+        data: [{
+          id: "ses_recovered-delete",
+          title: "Recovered task",
+          agent: "fae",
+          time: { created: Date.now() - 4_000_000 },
+        }],
+      })
+
+      await manager.recoverFromSession("parent-1")
+
+      const taskId = sessionIDToTaskID("ses_recovered-delete")
+      const result = await manager.closeTask(taskId, "parent-1")
+
+      expect(result).toEqual({
+        ok: true,
+        message: "Task deleted successfully. Session removed from OpenCode.",
+      })
+      expect(mockClient.session.delete).toHaveBeenCalledWith({
+        path: { id: "ses_recovered-delete" },
+      })
+      expect(manager.getTask(taskId)).toBeUndefined()
+    })
+  })
+
   describe("interrupt", () => {
     it("aborts session but keeps status as running", async () => {
       const result = await manager.launch({
@@ -415,60 +465,8 @@ describe("SimpleTaskManager", () => {
     })
   })
 
-  describe("cleanup", () => {
-    it("removes old error tasks", async () => {
-      const result = await manager.launch({
-        description: "Test task",
-        prompt: "Do something",
-        agent: "general",
-        parentSessionID: "parent-1",
-      })
-
-      if (!result.ok) {
-        throw new Error("expected successful launch")
-      }
-
-      const task = manager.getTask(result.taskId)
-      if (!task) {
-        throw new Error("expected task")
-      }
-
-      task.status = "error"
-      task.completedAt = new Date(Date.now() - 4_000_000)
-
-      manager.cleanup(3_600_000)
-
-      expect(manager.getTask(result.taskId)).toBeUndefined()
-    })
-
-    it("keeps recent error tasks", async () => {
-      const result = await manager.launch({
-        description: "Test task",
-        prompt: "Do something",
-        agent: "general",
-        parentSessionID: "parent-1",
-      })
-
-      if (!result.ok) {
-        throw new Error("expected successful launch")
-      }
-
-      const task = manager.getTask(result.taskId)
-      if (!task) {
-        throw new Error("expected task")
-      }
-
-      task.status = "error"
-      task.completedAt = new Date(Date.now() - 1_000)
-
-      manager.cleanup(3_600_000)
-
-      expect(manager.getTask(result.taskId)).toBeDefined()
-    })
-  })
-
   describe("dispose", () => {
-    it("stops automatic cleanup interval", async () => {
+    it("stops progress ticker interval", async () => {
       const clearIntervalSpy = vi.spyOn(global, "clearInterval")
 
       // Create a manager and immediately dispose

@@ -6,6 +6,7 @@ import {
   _setPendingConfirmation,
 } from '../memory/distill.js';
 import { createContextManageTool } from './context-manage.js';
+import { SessionStore } from '../session-store.js';
 import { existsSync, readFileSync, rmSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -143,16 +144,17 @@ const dumpClient = {
 const dumpCtx = { sessionID: 'ses_test1' } as { sessionID: string };
 const testTmpDir = join(tmpdir(), 'wopal-test-dump');
 
-// --- Stats action tests ---
+// --- Status action tests ---
 
-describe('context_manage: handleStats', () => {
-  it('S1: returns complete stats for populated session state', async () => {
-    const statsSessionStore = new SessionStore();
-    statsSessionStore.upsert('ses_stats_test', (state) => {
+describe('context_manage: handleStatus', () => {
+  it('S1: returns complete status for populated session state', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_status_test', (state) => {
       state.agent = 'fae';
       state.isCompacting = false;
       state.providerID = 'anthropic';
       state.modelID = 'claude-sonnet';
+      state.contextLimit = 200000;
       state.lastTokens = {
         input: 1234,
         output: 567,
@@ -166,12 +168,12 @@ describe('context_manage: handleStats', () => {
     const tool = createContextManageTool(distillLLM, summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
-      { action: 'stats' },
-      { sessionID: 'ses_stats_test', sessionStore: statsSessionStore },
+      { action: 'status' },
+      { sessionID: 'ses_status_test', sessionStore: statusSessionStore },
     );
 
     expect(JSON.parse(result)).toEqual({
-      sessionID: 'ses_stats_test',
+      sessionID: 'ses_status_test',
       agent: 'fae',
       isCompacting: false,
       lastTokens: {
@@ -184,21 +186,22 @@ describe('context_manage: handleStats', () => {
         id: 'claude-sonnet',
       },
       loadedSkills: 2,
+      pct: 1,
     });
   });
 
   it('S2: returns defaults when session state is missing', async () => {
-    const statsSessionStore = new SessionStore();
+    const statusSessionStore = new SessionStore();
 
     const tool = createContextManageTool(distillLLM, summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
-      { action: 'stats' },
-      { sessionID: 'ses_missing_stats', sessionStore: statsSessionStore },
+      { action: 'status' },
+      { sessionID: 'ses_missing_status', sessionStore: statusSessionStore },
     );
 
     expect(JSON.parse(result)).toEqual({
-      sessionID: 'ses_missing_stats',
+      sessionID: 'ses_missing_status',
       agent: null,
       isCompacting: false,
       lastTokens: {
@@ -211,24 +214,111 @@ describe('context_manage: handleStats', () => {
         id: null,
       },
       loadedSkills: 0,
+      pct: null,
     });
   });
 
   it('S3: reflects compacting state correctly', async () => {
-    const statsSessionStore = new SessionStore();
-    statsSessionStore.markCompacting('ses_compacting_stats', Date.now());
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.markCompacting('ses_compacting_status', Date.now());
 
     const tool = createContextManageTool(distillLLM, summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
-      { action: 'stats', session_id: 'ses_compacting_stats' },
-      { sessionID: 'ses_main', sessionStore: statsSessionStore },
+      { action: 'status', session_id: 'ses_compacting_status' },
+      { sessionID: 'ses_main', sessionStore: statusSessionStore },
     );
 
     expect(JSON.parse(result)).toMatchObject({
-      sessionID: 'ses_compacting_stats',
+      sessionID: 'ses_compacting_status',
       isCompacting: true,
+      pct: null,
     });
+  });
+
+  it('S4: main session includes tasks array when taskManager provided', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_main_session', (state) => {
+      state.agent = 'wopal';
+      state.providerID = 'anthropic';
+      state.modelID = 'claude-sonnet';
+      state.lastTokens = {
+        input: 5000,
+        output: 1000,
+        updatedAt: Date.now(),
+      };
+    });
+
+    // Mock taskManager
+    const mockTaskManager = {
+      listTasksForParent: vi.fn().mockReturnValue([
+        { taskID: 'task-abc123', sessionID: 'ses_abc123', status: 'idle', description: 'Test task', agent: 'fae' },
+        { taskID: 'task-def456', sessionID: 'ses_def456', status: 'running', description: 'Another task', agent: 'fae' },
+      ]),
+    };
+
+    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status' },
+      { sessionID: 'ses_main_session', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.sessionID).toBe('ses_main_session');
+    expect(parsed.tasks).toBeDefined();
+    expect(parsed.tasks).toHaveLength(2);
+    expect(parsed.tasks[0]).toEqual({
+      taskID: 'task-abc123',
+      sessionID: 'ses_abc123',
+      status: 'idle',
+      description: 'Test task',
+      agent: 'fae',
+    });
+    expect(mockTaskManager.listTasksForParent).toHaveBeenCalledWith('ses_main_session');
+  });
+
+  it('S5: child session does not include tasks array', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_child123', (state) => {
+      state.agent = 'fae';
+      state.providerID = 'anthropic';
+      state.modelID = 'claude-sonnet';
+    });
+
+    const mockTaskManager = {
+      listTasksForParent: vi.fn(),
+    };
+
+    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status', session_id: 'wopal-task-child123' },
+      { sessionID: 'ses_main', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.sessionID).toBe('ses_child123');
+    expect(parsed.tasks).toBeUndefined();
+    expect(mockTaskManager.listTasksForParent).not.toHaveBeenCalled();
+  });
+
+  it('S6: main session without taskManager omits tasks array', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_no_manager', (state) => {
+      state.agent = 'wopal';
+    });
+
+    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status' },
+      { sessionID: 'ses_no_manager', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.sessionID).toBe('ses_no_manager');
+    expect(parsed.tasks).toBeUndefined();
   });
 });
 
@@ -334,8 +424,6 @@ function findDumpFiles(dir: string, pattern: string): string[] {
 }
 
 // --- Compact action tests (Task 2) ---
-
-import { SessionStore } from '../session-store.js';
 
 const compactMockSummarize = vi.fn();
 const compactMockGet = vi.fn();

@@ -28,10 +28,7 @@ import {
   abortSession,
   markTaskErrorBySession,
   interruptTask,
-  cleanup,
   shutdownManager,
-  CLEANUP_INTERVAL_MS,
-  CLEANUP_MAX_AGE_MS,
 } from "./task-lifecycle.js"
 
 const defaultManagerLog = createDebugLog("[task]", "task")
@@ -46,7 +43,6 @@ export class SimpleTaskManager {
   private directory: string
   private debugLog: DebugLog
   private sessionStore: SessionStore
-  private cleanupInterval: ReturnType<typeof setInterval> | undefined = undefined
   private tickerInterval: ReturnType<typeof setInterval> | undefined = undefined
   private concurrency = new ConcurrencyManager()
   private readonly CONCURRENCY_KEY = 'default'
@@ -73,12 +69,6 @@ export class SimpleTaskManager {
     }
     this.sessionStore = sessionStore ?? globalSessionStore
     this.debugLog = debugLog ?? defaultManagerLog
-
-    // Setup automatic cleanup interval
-    this.cleanupInterval = setInterval(() => {
-      cleanup(this.getLifecycleDeps(), CLEANUP_MAX_AGE_MS)
-    }, CLEANUP_INTERVAL_MS)
-    this.cleanupInterval.unref()
 
     // Setup stuck detection and progress notifications (every 30 seconds)
     this.tickerInterval = setInterval(() => {
@@ -129,10 +119,6 @@ export class SimpleTaskManager {
   }
 
   dispose(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval)
-    }
-    this.cleanupInterval = undefined
     if (this.tickerInterval) {
       clearInterval(this.tickerInterval)
     }
@@ -164,6 +150,37 @@ export class SimpleTaskManager {
       return undefined
     }
     return task
+  }
+
+  listTasksForParent(parentSessionID: string): Array<{
+    taskID: string
+    sessionID: string
+    status: string
+    description: string
+    agent: string
+  }> {
+    const result: Array<{
+      taskID: string
+      sessionID: string
+      status: string
+      description: string
+      agent: string
+    }> = []
+
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionID === parentSessionID) {
+        const effectiveStatus = task.idleNotified ? 'idle' : task.status
+        result.push({
+          taskID: task.id,
+          sessionID: task.sessionID ?? '',
+          status: effectiveStatus,
+          description: task.description,
+          agent: task.agent,
+        })
+      }
+    }
+
+    return result
   }
 
   findBySession(sessionID: string): WopalTask | undefined {
@@ -225,10 +242,6 @@ export class SimpleTaskManager {
     await notifyParent({ client: this.client, debugLog: this.debugLog }, task)
   }
 
-  cleanup(maxAgeMs = 3600_000): void {
-    cleanup(this.getLifecycleDeps(), maxAgeMs)
-  }
-
   releaseConcurrencySlot(task: WopalTask): void {
     if (task.concurrencyKey) {
       this.concurrency.release(task.concurrencyKey)
@@ -285,15 +298,22 @@ export class SimpleTaskManager {
         const taskID = sessionIDToTaskID(childSessionID)
         if (this.tasks.has(taskID)) continue
 
+        const now = new Date()
         const task: WopalTask = {
           id: taskID,
           sessionID: childSessionID,
-          status: 'pending',
+          status: 'running',
           description: child.title ?? '',
           agent: child.agent ?? 'unknown',
           prompt: '',
           parentSessionID,
           createdAt: new Date(child.time?.created ?? Date.now()),
+          startedAt: now,
+          progress: {
+            toolCalls: 0,
+            lastUpdate: now,
+            lastMeaningfulActivity: now,
+          },
           idleNotified: true,
         }
         this.tasks.set(taskID, task)

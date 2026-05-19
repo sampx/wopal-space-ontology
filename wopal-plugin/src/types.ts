@@ -145,7 +145,15 @@ export interface SystemPromptMetadata {
 export interface OpenCodeSession {
   get(args: { path: { id: string } }): Promise<unknown>
   messages(args: { path: { id: string }; query?: { limit?: number } }): Promise<unknown>
-  promptAsync(args: { path: { id: string }; body: { parts: unknown[]; noReply?: boolean } }): Promise<unknown>
+  promptAsync(args: {
+    path: { id: string }
+    body: {
+      agent?: string
+      parts: unknown[]
+      noReply?: boolean
+      tools?: Record<string, boolean>
+    }
+  }): Promise<unknown>
   abort(args: { path: { id: string } }): Promise<unknown>
   update(args: { path: { id: string }; body: { title: string } }): Promise<unknown>
   summarize?(args: {

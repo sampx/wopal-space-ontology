@@ -1,9 +1,9 @@
 /**
  * context_manage Tool - Session Context Management
  *
- * Manages session-level state including summaries and stats.
+ * Manages session-level state including summaries and status.
  * - summary: Generate session summary via LLM and update session title
- * - stats: View current session context usage statistics
+ * - status: View current session context usage statistics
  */
 
 import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
@@ -20,6 +20,7 @@ import { SessionStore as SessionStoreClass } from "../session-store.js";
 import { createDebugLog, formatSessionID } from "../debug.js";
 import { writeContextDump, findActualKey } from "./dump-formatter.js";
 import { fetchContextPercent } from "../tasks/task-monitor.js";
+import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 
 const debugLog = createDebugLog("[context]", "context");
 
@@ -48,6 +49,7 @@ export function createContextManageTool(
   transformedMessagesMap?: Map<string, MessageWithInfo[]>,
   workspaceDir?: string,
   sessionStore?: SessionStore,
+  taskManager?: SimpleTaskManager,
 ): ToolDefinition {
   const snapshotMap = systemSnapshots ?? new Map<string, string[]>();
   const metadataMap = systemMetadataMap ?? new Map<string, SystemPromptMetadata>();
@@ -61,8 +63,10 @@ export function createContextManageTool(
       "Session context tool. Actions:\n" +
       "- 'summary': Generate ≤50 char summary via LLM and update session title.\n" +
       "  MUST only call when user explicitly requests (e.g. \"摘要本次会话\"). Do not repeat after success.\n" +
-      "- 'stats': Return current session context usage stats from session store.\n" +
-      "  Includes agent, compaction status, last token usage, model/provider, and loaded skills count.\n" +
+      "- 'status': Return session context usage stats. For main sessions, also lists child tasks.\n" +
+      "  Use to inspect session state before/after actions (e.g., before compact, after launch).\n" +
+      "  Main sessions: include session payload + tasks array (child task summaries).\n" +
+      "  Child sessions: include session payload only (no tasks array).\n" +
       "- 'dump': Export session context to file.\n" +
       "  Default: dump current session (no session_id needed).\n" +
       "  Optional session_id: dump specific session (accepts 'ses_xxx' or 'wopal-task-xxx').\n" +
@@ -72,8 +76,8 @@ export function createContextManageTool(
       "  Optional session_id: compact specific session (accepts 'ses_xxx' or 'wopal-task-xxx'). Default: current session.",
     args: {
       action: tool.schema
-        .enum(["summary", "stats", "dump", "compact"] as const)
-        .describe("'summary' to generate summary and update title, 'stats' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
+        .enum(["summary", "status", "dump", "compact"] as const)
+        .describe("'summary' to generate summary and update title, 'status' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
       session_id: tool.schema
         .string()
         .optional()
@@ -87,9 +91,16 @@ export function createContextManageTool(
     execute: async (args, context: ToolContext): Promise<string> => {
       const sessionID = context.sessionID;
 
-      // Only log caller session for summary/stats/dump; compact has dedicated target session log
+      // Log caller session for summary/status/dump; compact has dedicated target session log
+      // When querying a different session (args.session_id != caller), show both to prevent misleading duplicates
       if (args.action !== "compact") {
-        debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+        if (args.session_id && args.session_id !== sessionID) {
+          const callerLabel = formatSessionID(sessionID ?? "?", false);
+          const targetLabel = formatSessionID(normalizeSessionID(args.session_id), args.session_id.startsWith("wopal-task-"));
+          debugLog(`[context_manage] action=${args.action} caller=${callerLabel} target=${targetLabel}`);
+        } else {
+          debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+        }
       }
 
       // Get sessionStore from context (tests inject it directly)
@@ -97,13 +108,15 @@ export function createContextManageTool(
       const ctxStore = (context as any).sessionStore as SessionStore | undefined;
       const activeStore = ctxStore ?? store;
 
-      if (args.action === "stats") {
+      if (args.action === "status") {
         const rawSessionID = args.session_id ?? sessionID;
         if (!rawSessionID) {
-          return "Failed: no session ID available for stats.";
+          return "Failed: no session ID available for status.";
         }
-        const statsSessionID = normalizeSessionID(rawSessionID);
-        return handleStats(statsSessionID, activeStore);
+        const statusSessionID = normalizeSessionID(rawSessionID);
+        // Determine if this is a child session (wopal-task-xxx prefix)
+        const isChildSession = rawSessionID.startsWith("wopal-task-");
+        return handleStatus(statusSessionID, activeStore, isChildSession, taskManager);
       }
 
       if (args.action === "dump") {
@@ -176,17 +189,32 @@ export function createContextManageTool(
   });
 }
 
-function handleStats(sessionID: string, sessionStore: SessionStore): string {
+function handleStatus(
+  sessionID: string,
+  sessionStore: SessionStore,
+  isChildSession: boolean,
+  taskManager?: SimpleTaskManager,
+): string {
   const state = sessionStore.get(sessionID);
+  const payload = {
+    sessionID,
+    ...buildStatsPayload(state),
+  };
 
-  return JSON.stringify(
-    {
-      sessionID,
-      ...buildStatsPayload(state),
-    },
-    null,
-    2,
-  );
+  // Add tasks array only for main sessions (not child sessions)
+  if (!isChildSession && taskManager) {
+    const tasks = taskManager.listTasksForParent(sessionID);
+    return JSON.stringify(
+      {
+        ...payload,
+        tasks,
+      },
+      null,
+      2,
+    );
+  }
+
+  return JSON.stringify(payload, null, 2);
 }
 
 function buildStatsPayload(state?: SessionState): {
@@ -205,7 +233,12 @@ function buildStatsPayload(state?: SessionState): {
     id: string | null;
   };
   loadedSkills: number;
+  pct: number | null;
 } {
+  const used = (state?.lastTokens?.input ?? 0) + (state?.lastTokens?.cache?.read ?? 0)
+  const ctxLimit = state?.contextLimit
+  const pct = ctxLimit && ctxLimit > 0 ? Math.round((used / ctxLimit) * 100) : null
+
   return {
     agent: state?.agent ?? null,
     isCompacting: state?.isCompacting ?? false,
@@ -222,6 +255,7 @@ function buildStatsPayload(state?: SessionState): {
       id: state?.modelID ?? null,
     },
     loadedSkills: state?.loadedSkills.size ?? 0,
+    pct,
   };
 }
 

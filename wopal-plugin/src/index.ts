@@ -174,6 +174,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
       transformedMessagesMap,
       pluginInput.directory,
       sessionStore,
+      taskManager,
     );
   }
 
