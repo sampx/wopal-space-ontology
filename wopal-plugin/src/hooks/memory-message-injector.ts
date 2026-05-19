@@ -9,11 +9,9 @@ import type { SessionStore } from "../session-store.js";
 import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { MessageWithInfo } from "./message-context.js";
-import {
-  isChildSession,
-  clearInjectedMemory,
-  type MemoryInjectorContext,
-} from "./memory-injector.js";
+import type { MemoryInjectorContext } from "./memory-injector.js";
+import { clearInjectedMemory } from "./memory-injector.js";
+import { isChildSession } from "./session-utils.js";
 import { buildEnrichedQuery } from "./conversation-context.js";
 
 export interface MemoryMessageInjectorContext {
@@ -61,7 +59,11 @@ export async function injectMemoryToMessage(
   }
 
   // Skip child sessions — check early to avoid wasted retrieval work
-  const isChild = await isChildSession(ctx.memoryInjectorCtx, sessionID);
+  const isChild = await isChildSession(sessionID, {
+    client: ctx.memoryInjectorCtx.client,
+    taskManager: ctx.memoryInjectorCtx.taskManager,
+    cache: ctx.memoryInjectorCtx.childSessionCache,
+  });
   if (isChild) {
     clearInjectedMemory(ctx.sessionStore, sessionID);
     ctx.memoryDebugLog("Skipped memory injection for child session");

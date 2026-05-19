@@ -2,12 +2,17 @@ import type { SessionStore } from "../session-store.js";
 import type { DebugLog } from "../debug.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
+import type { OpenCodeClient } from "../types.js";
 import { injectRules } from "./rule-injector.js";
 import { extractLatestUserPrompt, extractAgentName } from "./message-context.js";
+import { isChildSession } from "./session-utils.js";
 
 export interface RuleMessageInjectorContext {
   sessionStore: SessionStore;
   ruleInjectorCtx: RuleInjectorContext;
+  client: OpenCodeClient;
+  taskManager?: { findBySession: (sessionID: string) => unknown } | undefined;
+  childSessionCache: Map<string, boolean> | undefined;
   rulesDebugLog: DebugLog;
   rulesInjectionEnabled: boolean;
 }
@@ -17,7 +22,6 @@ export async function injectRulesToMessage(
   sessionID: string,
   messages: MessageWithInfo[],
   lastUserMsg: MessageWithInfo | undefined,
-  isTask?: boolean,
 ): Promise<void> {
   if (!ctx.rulesInjectionEnabled) return;
   if (!lastUserMsg) return;
@@ -27,6 +31,13 @@ export async function injectRulesToMessage(
   // Deduplication: skip if rules already injected for this user prompt
   const state = ctx.sessionStore.get(sessionID);
   if (state?.lastRulesPrompt && state.lastRulesPrompt === userPrompt) return;
+
+  // Use shared isChildSession() to avoid timing race with taskManager.findBySession()
+  const isTask = await isChildSession(sessionID, {
+    client: ctx.client,
+    taskManager: ctx.taskManager,
+    cache: ctx.childSessionCache,
+  });
 
   const agentName = extractAgentName(messages);
   const formattedRules = await injectRules(

@@ -73,7 +73,7 @@ export function createMessageHooks(ctx: MessageHookContext) {
     }
 
     await injectSkillReload(ctx.skillReloadCtx, sessionID, lastUserMsg);
-    await injectRulesToMessage(ctx.ruleMessageCtx, sessionID, output.messages, lastUserMsg, isTask);
+    await injectRulesToMessage(ctx.ruleMessageCtx, sessionID, output.messages, lastUserMsg);
     await injectMemoryToMessage(ctx.memoryMessageCtx, sessionID, output.messages, lastUserMsg);
 
     // Store transformed messages for auto dump

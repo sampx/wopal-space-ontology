@@ -15,9 +15,8 @@ import type { Model } from "@opencode-ai/sdk";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
   isChildSession,
-  type MemoryInjectorContext,
-  type SystemTransformOutput,
-} from "./memory-injector.js";
+} from "./session-utils.js";
+import type { SystemTransformOutput } from "./memory-injector.js";
 
 interface SystemTransformInput {
   sessionID?: string;
@@ -68,15 +67,11 @@ function buildAutoDumpFingerprint(input: {
 }
 
 export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
-  // MemoryInjectorContext for isChildSession (auto-dump prefix detection)
-  // memoryInjector is undefined - injection moved to messages.transform
-  const memoryInjectorCtx: MemoryInjectorContext = {
+  // ChildSessionCheckDeps for isChildSession (auto-dump prefix detection)
+  const childCheckDeps = {
     client: ctx.client,
-    sessionStore: ctx.sessionStore,
-    memoryDebugLog: ctx.memoryDebugLog,
-    memoryInjector: undefined,
-    childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
+    cache: ctx.childSessionCache,
   };
   const autoDumpFingerprintMap = new Map<string, string>();
 
@@ -135,7 +130,7 @@ async function onSystemTransform(
       autoDumpFingerprintMap.set(sessionID, fingerprint);
       void (async () => {
         try {
-          const isChild = await isChildSession(memoryInjectorCtx, sessionID);
+          const isChild = await isChildSession(sessionID, childCheckDeps);
           const prefix = isChild ? "AUTO-CTXDUMP-TASK" : "AUTO-CTXDUMP";
           await writeContextDump({
             sessionID,
@@ -163,7 +158,7 @@ async function onSystemTransform(
   return {
     "experimental.chat.system.transform": onSystemTransform,
     _isChildSession: (sessionID: string) =>
-      isChildSession(memoryInjectorCtx, sessionID),
+      isChildSession(sessionID, childCheckDeps),
     _onSystemTransform: onSystemTransform,
   };
 }

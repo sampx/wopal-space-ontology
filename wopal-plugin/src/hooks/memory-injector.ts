@@ -1,7 +1,7 @@
 /**
  * Memory Injector - Memory injection into system prompt
  *
- * Handles memory retrieval, child session detection,
+ * Handles memory retrieval, child session detection (via session-utils),
  * and delegates context building to conversation-context module.
  */
 
@@ -10,6 +10,7 @@ import type { MemoryInjector } from "../memory/index.js";
 import type { DebugLog } from "../debug.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { OpenCodeClient } from "../types.js";
+import { isChildSession } from "./session-utils.js";
 import { buildEnrichedQuery } from "./conversation-context.js";
 
 export interface MemoryInjectorContext {
@@ -23,47 +24,6 @@ export interface MemoryInjectorContext {
 
 export interface SystemTransformOutput {
   system: string[];
-}
-
-/**
- * Check if a session is a child session (has parentID).
- * Two checks: taskManager (wopal_task) + OpenCode session API (built-in task tool).
- */
-export async function isChildSession(
-  ctx: MemoryInjectorContext,
-  sessionID: string,
-): Promise<boolean> {
-  const cached = ctx.childSessionCache.get(sessionID);
-  if (cached !== undefined) return cached;
-
-  // Check 1: wopal_task tracked sessions
-  if (ctx.taskManager?.findBySession(sessionID)) {
-    ctx.childSessionCache.set(sessionID, true);
-    return true;
-  }
-
-  // Check 2: OpenCode session API — parentID means child session
-  try {
-    const client = ctx.client;
-    const sessionApi = client?.session;
-    if (sessionApi?.get && typeof sessionApi.get === "function") {
-      const result = await sessionApi.get({ path: { id: sessionID } });
-      const data = (result as { data?: { parentID?: string } } | undefined)?.data;
-      const hasParent = !!data?.parentID;
-      ctx.childSessionCache.set(sessionID, hasParent);
-      if (hasParent) {
-        ctx.memoryDebugLog(
-          `Session ${sessionID} is a child session (parentID=${data.parentID}), skipping memory injection`,
-        );
-      }
-      return hasParent;
-    }
-  } catch {
-    // API not available or failed — fall through to not-a-child
-  }
-
-  ctx.childSessionCache.set(sessionID, false);
-  return false;
 }
 
 /**
@@ -91,7 +51,11 @@ export async function injectMemoriesIntoSystem(
   });
 
   // Skip child sessions — check early to avoid wasted retrieval work
-  const isChild = await isChildSession(ctx, sessionID);
+  const isChild = await isChildSession(sessionID, {
+    client: ctx.client,
+    taskManager: ctx.taskManager,
+    cache: ctx.childSessionCache,
+  });
   if (isChild) {
     clearInjectedMemory(ctx.sessionStore, sessionID);
     ctx.memoryDebugLog("Skipped memory injection for child session");
