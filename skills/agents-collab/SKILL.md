@@ -82,13 +82,17 @@ wopal_task_reply({ task_id, message: "停止当前方向，改为...", interrupt
 - 任务出错 → `wopal_task_reply` 提供修复方向，让子 Agent 继续
 - 需要中止 → `wopal_task_reply({ interrupt: true })` 打断并重定向
 
-### wopal_task_delete — 清理已完成任务
+### wopal_task_finish — 终结任务
 
 ```typescript
-wopal_task_delete({ task_id })
+wopal_task_finish({ task_id })
 ```
 
-仅用于已完成（completed/cancelled）的任务。运行中的任务需先用 `wopal_task_reply({ interrupt: true })` 中止。
+直接终结 idle/completed 任务并删除子会话。子 Agent **不会**被唤醒。运行中任务需先 `wopal_task_reply({ interrupt: true })` 中止。
+
+**适用场景**：
+- 验收通过后主动释放资源（替代 TTL 自动清理）
+- 清理已完成/取消的任务记录
 
 ---
 
@@ -111,9 +115,9 @@ pending → running → completed
 | `pending` | 排队中 | 等待 |
 | `running` | 执行中 | 等待通知或 `wopal_task_output` 检查进度 |
 | `waiting` | 子 Agent 在提问 | `wopal_task_reply` 回答 |
-| `completed` | 已完成 | 验证产出 → 满意则 `wopal_task_delete`；不满意则 `wopal_task_reply` 返工 |
+| `completed` | 已完成 | 验证产出 → 满意则 `wopal_task_finish` 终结；不满意则 `wopal_task_reply` 返工 |
 | `error` | 会话级异常 | `wopal_task_output` 检查日志 → `wopal_task_reply` 引导修复 |
-| `cancelled` | 已取消 | `wopal_task_delete` 清理 |
+| `cancelled` | 已取消 | `wopal_task_finish` 清理 |
 
 **进度判断**：消息数增长 → 执行中；长时间无新消息 → 可能卡住，检查 reasoning。
 
@@ -128,7 +132,7 @@ pending → running → completed
 | 通知 | 触发条件 | 处理流程 |
 |------|---------|---------|
 | `[WOPAL TASK PROGRESS]` | 定期心跳 | 了解进度即可，无需行动 |
-| `[WOPAL TASK IDLE]` | 子 Agent session idle | ① `wopal_task_output(section="text")` 看输出 → ② 判断：完成则 `wopal_task_delete`；提问则 `wopal_task_reply` 回答；不确定则深入检查 reasoning |
+| `[WOPAL TASK IDLE]` | 子 Agent session idle | ① `wopal_task_output(section="text")` 看输出 → ② 判断：完成则什么都不做（TTL 自动清理）或 `wopal_task_finish` 主动释放；提问则 `wopal_task_reply` 回答；不确定则深入检查 reasoning |
 | `[WOPAL TASK WAITING]` | 子 Agent 使用 question tool | `wopal_task_reply` 回答 |
 | `[WOPAL TASK ERROR]` | 会话级错误 | `wopal_task_output` 查看日志 → `wopal_task_reply` 引导修复 |
 | `[WOPAL TASK STUCK]` | no_activity 或 loop_detected | ① `wopal_task_output(section="reasoning")` 检查思考 → ② 死循环/异常 → `wopal_task_reply({ interrupt: true })` 打断；正常推理 → 继续等待 |
@@ -138,6 +142,49 @@ pending → running → completed
 - bash 命令报错（exit 1）是正常任务执行，**不会**触发 `ERROR` 通知
 - `ERROR` 仅由会话级异常触发：session.crash、启动失败、promptAsync 失败
 - `wopal_task_reply` 无法更换 agent 类型 — agent 在创建时确定。需要换 agent 只能创建新 task
+
+---
+
+## IDLE 任务处理决策树
+
+收到 `[WOPAL TASK IDLE]` 通知后，按以下决策树处理：
+
+```
+IDLE 通知到达
+    ↓
+① wopal_task_output(section="text") 查看输出
+    ↓
+② 验收判定
+    ├─ 通过 → 两个选择：
+    │    ├─ 什么都不做 → TTL 30min 自动清理（默认）
+    │    └─ wopal_task_finish → 主动释放资源（用户要求清理时）
+    │
+    ├─ 不通过 → wopal_task_reply 要求返工
+    │    （⚠️ 高上下文 >50% 时不应这么做，见"高上下文返工"章节）
+    │
+    └─ 子 Agent 提问 → wopal_task_reply 回答
+```
+
+### 核心规则
+
+| 场景 | 正确操作 | 错误操作（禁止） |
+|------|---------|----------------|
+| 验收通过 | 什么都不做（等待 TTL）<br>或 `wopal_task_finish`（主动释放） | `wopal_task_reply("任务完成")`<br>❌ 子 Agent 会被唤醒重新运行 |
+| 验收不通过 | `wopal_task_reply` 返工要求 | `wopal_task_finish`<br>❌ 未返工直接终结 = 放弃质量 |
+| 子 Agent 提问 | `wopal_task_reply` 回答问题 | 什么都不做<br>❌ 任务永久阻塞 |
+
+### 为什么不能 reply "任务完成"
+
+**根本原因**：子 Agent **没有关闭自身会话的能力**（ellamaka 设计限制）
+
+**错误链条**：
+1. 主 Agent: `wopal_task_reply("任务完成，请关闭")`
+2. 子 Agent 被唤醒，收到消息
+3. 子 Agent: "我无法关闭自己，任务已完成"
+4. 主 Agent 再次收到 IDLE 通知
+5. 形成无意义循环，浪费 token
+
+**正确理解**：IDLE 状态本身就是"任务完成信号"，无需再次通知。
 
 ---
 

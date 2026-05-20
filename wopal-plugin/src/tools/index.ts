@@ -7,7 +7,7 @@ import type { DistillEngine } from "../memory/distill.js"
 import { createWopalTaskTool } from "./wopal-task.js"
 import { createWopalOutputTool } from "./wopal-task-output.js"
 import { createWopalReplyTool } from "./wopal-task-reply.js"
-import { createWopalTaskDeleteTool } from "./wopal-task-delete.js"
+import { createWopalTaskFinishTool } from "./wopal-task-finish.js"
 import { createMemoryManageTool } from "./memory-manage/index.js"
 
 export function createWopalTools(
@@ -23,7 +23,7 @@ export function createWopalTools(
     wopal_task: createWopalTaskTool(manager),
     wopal_task_output: createWopalOutputTool(manager),
     wopal_task_reply: createWopalReplyTool(manager),
-    wopal_task_delete: createWopalTaskDeleteTool(manager),
+    wopal_task_finish: createWopalTaskFinishTool(manager),
   }
 
   if (store) {
@@ -33,4 +33,4 @@ export function createWopalTools(
   return tools
 }
 
-export { createWopalTaskTool, createWopalOutputTool, createWopalReplyTool, createWopalTaskDeleteTool, createMemoryManageTool }
+export { createWopalTaskTool, createWopalOutputTool, createWopalReplyTool, createWopalTaskFinishTool, createMemoryManageTool }
