@@ -204,8 +204,11 @@ IDLE 通知到达
 ① wopal_task_output(section="text") 查看输出
     ↓
 ② 验收判定
-    ├─ 通过 → wopal_task_finish 释放资源
-    │         （或什么都不做 → TTL 30min 自动清理）
+    ├─ 通过、且无后续需要 → wopal_task_finish 释放资源（强制）
+    │                       ❌ 禁止什么都不做等 TTL —— 已验收通过的任务是僵尸
+    │                       占用并发槽位
+    │
+    ├─ 通过、但后续可能复用复审 → 保留（如 rook PASS 后 Plan 可能修改需再审）
     │
     ├─ 不通过 → wopal_task_reply 要求返工
     │            （⚠️ 高上下文 >50% 时不应这么做，见"高上下文返工"章节）
@@ -217,7 +220,8 @@ IDLE 通知到达
 
 | 场景 | 正确操作 | 错误操作（禁止） |
 |------|---------|----------------|
-| 验收通过 | `wopal_task_finish`（主动释放）<br>或什么都不做（等待 TTL） | `wopal_task_reply("任务完成")`<br>❌ 子 Agent 被唤醒重新运行 |
+| 验收通过、无后续复用 | `wopal_task_finish`（强制释放） | 什么都不做等 TTL<br>❌ 僵尸 task 占用并发槽位 |
+| 验收通过、可能复用复审 | 保留（如 rook PASS 后 Plan 可能修改需再审） | `wopal_task_finish`<br>❌ 复用场景下终结后只能新开 task |
 | 验收不通过 | `wopal_task_reply` 返工要求 | `wopal_task_finish`<br>❌ 未返工直接终结 = 放弃质量 |
 | 子 Agent 提问 | `wopal_task_reply` 回答问题 | 什么都不做<br>❌ 任务永久阻塞 |
 
