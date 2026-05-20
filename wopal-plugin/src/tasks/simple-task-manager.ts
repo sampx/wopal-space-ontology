@@ -38,6 +38,8 @@ const defaultManagerLog = createDebugLog("[task]", "task")
 
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
+  private taskSessions = new Set<string>()
+  private mainSessionID: string | null = null
   private client: OpenCodeClient
   private v2Client: OpenCodeClient
   private serverUrl?: URL
@@ -185,6 +187,18 @@ export class SimpleTaskManager {
     return this.tasks.get(sessionIDToTaskID(sessionID))
   }
 
+  registerTaskSession(sessionID: string): void {
+    this.taskSessions.add(sessionID)
+  }
+
+  isTaskSession(sessionID: string): boolean {
+    return this.taskSessions.has(sessionID)
+  }
+
+  setMainSession(sessionID: string): void {
+    this.mainSessionID = sessionID
+  }
+
   markTaskCompletedBySession(sessionID: string): WopalTask | undefined {
     const task = this.findBySession(sessionID)
     if (!task || task.status !== 'running') {
@@ -321,6 +335,7 @@ export class SimpleTaskManager {
           idleNotified: true,
         }
         this.tasks.set(taskID, task)
+        this.taskSessions.add(childSessionID)
         recovered++
         this.debugLog(`[recover] restored task=${taskID} session=${childSessionID.slice(0, 16)} title="${child.title?.substring(0, 40) ?? ''}"`)
       }
@@ -343,6 +358,7 @@ export class SimpleTaskManager {
       debugLog: this.debugLog,
       concurrency: this.concurrency,
       concurrencyKey: this.CONCURRENCY_KEY,
+      taskManager: this,
       failTask: (task: WopalTask, error: string) =>
         failTask(this.getLifecycleDeps(), task, error),
       abortSession: (sessionID: string | undefined) =>
@@ -366,6 +382,7 @@ export class SimpleTaskManager {
       client: this.client,
       debugLog: this.debugLog,
       directory: this.directory,
+      taskManager: this,
       notifyParentStuckFn: async (task: WopalTask, durationText: string) =>
         await notifyParentStuck({ client: this.client, debugLog: this.debugLog }, task, durationText),
       sendProgressNotificationFn: async (task: WopalTask, msgCount: number, ctx: number | null, trigger?: string) =>

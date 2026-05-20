@@ -120,7 +120,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
               const progress = analyzeProgress(messages, newMessages)
               const loopWarning = detectLoop(messages)
               const recentOutput = extractAssistantContent(newMessages) || null
-              const contextUsage = await getContextUsage(client, task.sessionID!, manager.getDirectory(), manager.getSessionStore())
+              const contextUsage = await getContextUsage(client, task.sessionID!, manager.getDirectory(), manager.getSessionStore(), manager)
 
               result += formatProgressOutput(progress, loopWarning, sessionStatus, recentOutput)
               if (contextUsage) {

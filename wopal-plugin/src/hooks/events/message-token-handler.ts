@@ -76,7 +76,7 @@ export async function handleMessagePartUpdated(
   if (sessionID && part?.type === "step-finish" && part?.tokens) {
     const t = part.tokens
     const cache = t.cache ?? {}
-    const isTask = !!ctx.taskManager?.findBySession(sessionID)
+    const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
     const state = ctx.sessionStore.get(sessionID)
     const agent = state?.agent ?? "?"
     const used = (t.input ?? 0) + (cache.read ?? 0)
@@ -119,7 +119,6 @@ export async function handleMessagePartUpdated(
         if (contextLimit) {
           state.contextLimit = contextLimit
         }
-        state.isTask = isTask
         const cacheData = t.cache ? { ...t.cache } : undefined
         state.lastTokens = {
           input: t.input ?? 0,
