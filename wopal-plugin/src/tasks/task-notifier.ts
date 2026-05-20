@@ -11,6 +11,7 @@ import {
   extractLastOutput,
   extractTodoSummary,
   formatTodoSummary,
+  formatTodoPercentage,
 } from "./notification-summary.js"
 
 export interface TaskNotifierDeps {
@@ -77,23 +78,24 @@ export async function sendProgressNotification(
   const todoSummary = extractTodoSummary(messages)
   const todoSummaryStr = formatTodoSummary(todoSummary)
   const todoLine = todoSummaryStr
-    ? `\n**Todos:** ${todoSummaryStr}`
+    ? `\n**Todos:** ${todoSummaryStr} (${formatTodoPercentage(todoSummary)})`
     : ''
 
   const notification = `<system-reminder>
 [WOPAL TASK PROGRESS]
 **ID:** \`${task.id}\`
+**Agent:** ${task.agent}
 **Description:** ${task.description}${elapsedStr}
 **Progress:** ${messageCount} messages${contextLine}${toolLine}${triggerLine}${todoLine}${outputLine}
 
 Task is still running. Use \`wopal_task_output(task_id="${task.id}")\` for details.
 </system-reminder>`
 
-  await sendNotification(deps, task.parentSessionID, notification)
+  const success = await sendNotification(deps, task.parentSessionID, notification)
 
   // Mirror to debug log with concise summary
   const debugSummary = `taskId=${task.id} msgs=${messageCount} runtime=${elapsedLine ?? 'unknown'} tools=${toolSummary.total} trigger=${triggerReason ?? 'unknown'}`
-  debugLog(`[progressNotify] sent: ${debugSummary}`)
+  debugLog(`[progressNotify] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
 }
 
 export async function sendNotification(
@@ -101,23 +103,27 @@ export async function sendNotification(
   parentSessionID: string,
   text: string,
   noReply?: boolean,
-): Promise<void> {
+): Promise<boolean> {
   const { client, debugLog } = deps
 
   if (typeof client.session?.promptAsync !== "function") {
     debugLog("[sendNotification] skipped: session.promptAsync unavailable")
-    return
+    return false
   }
 
-  await client.session.promptAsync({
-    path: { id: parentSessionID },
-    body: {
-      noReply: noReply ?? false,
-      parts: [{ type: "text", text }],
-    },
-  }).catch((err: unknown) => {
+  try {
+    await client.session.promptAsync({
+      path: { id: parentSessionID },
+      body: {
+        noReply: noReply ?? false,
+        parts: [{ type: "text", text }],
+      },
+    })
+    return true
+  } catch (err: unknown) {
     debugLog(`[sendNotification] error: ${toErrorMessage(err)}`)
-  })
+    return false
+  }
 }
 
 export async function notifyParent(
@@ -128,25 +134,24 @@ export async function notifyParent(
 
   const { client, debugLog } = deps
 
-  // Fetch session messages for enrichment
-  let messages: SessionMessage[] = []
-  try {
-    if (client.session?.messages) {
-      const messagesResult = await client.session.messages({ path: { id: task.sessionID } })
-      messages = extractMessages(messagesResult)
-    }
-  } catch (err) {
-    debugLog(`[notifyParent] failed to fetch messages: ${toErrorMessage(err)}`)
-  }
-
   const statusText = task.idleNotified ? 'IDLE' : task.status.toUpperCase()
 
   // Error notifications remain concise (no enrichment)
   const errorLine = task.error ? `\n**Error:** ${task.error}` : ''
 
-  // For IDLE notifications, add result summaries
+  // For IDLE notifications, add result summaries (fetch messages only if needed)
   let resultLine = ''
   if (task.idleNotified && !task.error) {
+    let messages: SessionMessage[] = []
+    try {
+      if (client.session?.messages) {
+        const messagesResult = await client.session.messages({ path: { id: task.sessionID } })
+        messages = extractMessages(messagesResult)
+      }
+    } catch (err) {
+      debugLog(`[notifyParent] failed to fetch messages: ${toErrorMessage(err)}`)
+    }
+
     const toolSummary = extractToolCallSummary(messages)
     const toolLine = toolSummary.total > 0
       ? `\n**Tools:** ${formatToolCallSummary(toolSummary)}`
@@ -159,8 +164,9 @@ export async function notifyParent(
 
     const todoSummary = extractTodoSummary(messages)
     const todoSummaryStr = formatTodoSummary(todoSummary)
+    const todoPercentageStr = formatTodoPercentage(todoSummary)
     const todoLine = todoSummaryStr
-      ? `\n**Todos:** ${todoSummaryStr}`
+      ? `\n**Todos:** ${todoSummaryStr} (${todoPercentageStr})`
       : ''
 
     resultLine = `${toolLine}${todoLine}${outputLine}`
@@ -169,17 +175,18 @@ export async function notifyParent(
   const notification = `<system-reminder>
 [WOPAL TASK ${statusText}]
 **ID:** \`${task.id}\`
+**Agent:** ${task.agent}
 **Description:** ${task.description}${errorLine}${resultLine}
 
 Use \`wopal_task_output(task_id="${task.id}")\` to retrieve the result.
 </system-reminder>`
 
-  await sendNotification(deps, task.parentSessionID, notification)
+  const success = await sendNotification(deps, task.parentSessionID, notification)
 
   // Mirror to debug log
   const status = task.idleNotified ? 'IDLE' : task.status
   const debugSummary = `taskId=${task.id} status=${status}`
-  debugLog(`[notifyParent] sent: ${debugSummary}`)
+  debugLog(`[notifyParent] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
 }
 
 export async function notifyParentStuck(
@@ -194,12 +201,13 @@ export async function notifyParentStuck(
   const notification = `<system-reminder>
 [WOPAL TASK STUCK]
 **ID:** \`${task.id}\`
+**Agent:** ${task.agent}
 **Description:** ${task.description}
 **Duration:** No meaningful output for ${durationText}
 
 The background task may be stuck in a reasoning loop. Use \`wopal_task_output(task_id="${task.id}", section="reasoning")\` to check its thinking content. If it's truly stuck, use \`wopal_task_reply(task_id="${task.id}", interrupt=true, message="Stop current attempt and report status")\` to interrupt it.
 </system-reminder>`
 
-  await sendNotification(deps, task.parentSessionID, notification)
-  debugLog(`[notifyParentStuck] sent: taskId=${task.id} duration=${durationText}`)
+  const success = await sendNotification(deps, task.parentSessionID, notification)
+  debugLog(`[notifyParentStuck] ${success ? 'sent' : 'failed'}: taskId=${task.id} duration=${durationText}`)
 }

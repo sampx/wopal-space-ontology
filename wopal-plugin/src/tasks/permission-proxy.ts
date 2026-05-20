@@ -113,6 +113,6 @@ Permission was auto-approved for this background task.
 
   const client = taskManager.getClient()
 
-  await sendNotification({ client, debugLog: log }, task.parentSessionID, notification, true)
-  log(`[permission] notified parent for task ${taskId}`)
+  const success = await sendNotification({ client, debugLog: log }, task.parentSessionID, notification, true)
+  log(`[permission] ${success ? 'sent' : 'failed'} notification for task ${taskId}`)
 }
