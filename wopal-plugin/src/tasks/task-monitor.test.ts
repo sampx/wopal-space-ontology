@@ -287,7 +287,6 @@ describe("checkProgressNotifications", () => {
     sessionStore.upsert("session-ctx", (state) => {
       state.providerID = "anthropic"
       state.modelID = "claude-3"
-      state.isTask = true
       state.lastTokens = {
         input: 50000,
         output: 1000,
@@ -403,6 +402,7 @@ describe("logTickStatus", () => {
       wasNotified: true,
       contextUsage: 30,
     }]
+
     const debugLog = vi.fn()
     logTickStatus(tasks, progressInfos, debugLog)
 
@@ -430,8 +430,8 @@ describe("logTickStatus", () => {
       wasNotified: false,
       contextUsage: 60, // Above CONTEXT_WARN_THRESHOLD
     }]
-    const debugLog = vi.fn()
 
+    const debugLog = vi.fn()
     logTickStatus(tasks, progressInfos, debugLog)
 
     expect(debugLog).toHaveBeenCalledTimes(1)
