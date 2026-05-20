@@ -184,6 +184,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
+          isTaskSession: vi.fn().mockReturnValue(false),
           getClient: vi.fn().mockReturnValue({
             session: {
               messages: vi.fn().mockResolvedValue({ data: [] }),
@@ -258,6 +259,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(mockTask), // Has task = child session
+          isTaskSession: vi.fn().mockReturnValue(true),
           getClient: vi.fn().mockReturnValue({
             session: {
               messages: vi.fn().mockResolvedValue({ data: [] }),
@@ -321,6 +323,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
+          isTaskSession: vi.fn().mockReturnValue(false),
           getClient: vi.fn().mockReturnValue({
             session: {
               messages: vi.fn().mockResolvedValue({ data: [] }),
@@ -415,6 +418,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
+          isTaskSession: vi.fn().mockReturnValue(false),
         } as never,
       }
 
@@ -492,6 +496,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(mockTask),
+          isTaskSession: vi.fn().mockReturnValue(true),
           getClient: vi.fn().mockReturnValue({
             permission: { reply: mockPermissionReply },
             session: { promptAsync: mockPromptAsync },
@@ -543,6 +548,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
         taskDebugLog: () => {},
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
+          isTaskSession: vi.fn().mockReturnValue(false),
         } as never,
       }
 

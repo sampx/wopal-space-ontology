@@ -47,6 +47,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           const result = await client.session.get({ path: { id: sessionID } })
           const session = (result as { data?: { parentID?: string } } | undefined)?.data
           if (session && !session.parentID) {
+            ctx.taskManager.setMainSession(sessionID)
             ctx.taskDebugLog(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
             void ctx.taskManager.recoverFromSession(sessionID)
           }
@@ -121,7 +122,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       const requestID = props?.id as string | undefined
       const permission = props?.permission as string | undefined
 
-      ctx.taskDebugLog(`[permission.asked] ${formatSessionID(sessionID ?? "?", !!ctx.taskManager?.findBySession(sessionID ?? ""))} id=${requestID} permission=${permission}`)
+      ctx.taskDebugLog(`[permission.asked] ${formatSessionID(sessionID ?? "?", !!sessionID && !!ctx.taskManager?.isTaskSession(sessionID))} id=${requestID} permission=${permission}`)
 
       if (sessionID && requestID && permission) {
         const { handlePermissionAsked } = await import("../tasks/permission-proxy.js")

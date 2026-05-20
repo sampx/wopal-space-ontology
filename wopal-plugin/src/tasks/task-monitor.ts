@@ -7,6 +7,9 @@
 
 import type { WopalTask } from "../types.js"
 import type { DebugLog } from "../debug.js"
+import { createTraceLog } from "../debug.js"
+
+const traceLog = createTraceLog("[task]", "task")
 
 // Re-export from specialized modules for backward compatibility
 export {
@@ -115,8 +118,9 @@ export async function checkStuckTasksAndNotify(
 export function logTickStatus(
   tasks: Map<string, WopalTask>,
   progressInfos: ProgressTaskInfo[],
-  debugLog: DebugLog,
+  _debugLog: DebugLog,
 ): void {
+  void _debugLog // retained for callers, unused after traceLog migration
   const runningTasks = Array.from(tasks.values())
     .filter(t => t.status === 'running' && !t.idleNotified)
 
@@ -145,5 +149,5 @@ export function logTickStatus(
     return `  [${i + 1}] wopal-task-${shortId} "${task.description}": ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
   })
 
-  debugLog(`[tick] ${runningTasks.length} tasks:\n${lines.join('\n')}`)
+  traceLog(`[tick] ${runningTasks.length} tasks:\n${lines.join('\n')}`)
 }

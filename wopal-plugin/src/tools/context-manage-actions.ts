@@ -20,6 +20,7 @@ import type { SessionMessage } from "../types.js"
 import { createDebugLog, formatSessionID } from "../debug.js"
 import { writeContextDump, findActualKey } from "./dump-formatter.js"
 import { fetchContextPercent } from "../session-runtime-info.js"
+import type { TaskSessionInspector } from "../session-runtime-info.js"
 
 const debugLog = createDebugLog("[context]", "context")
 
@@ -284,6 +285,7 @@ export async function handleCompact(
   client: OpenCodeClient,
   sessionStore: SessionStore,
   directory: string,
+  taskManager?: TaskSessionInspector,
 ): Promise<string> {
   const state = sessionStore.get(sessionID)
   if (state?.isCompacting) {
@@ -302,7 +304,7 @@ export async function handleCompact(
 
   let contextInfo = "Context: unknown"
   try {
-    const ctxInfo = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog)
+    const ctxInfo = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog, taskManager)
     if (ctxInfo) {
       const warning = ctxInfo.pct >= 75 ? " ⚠️" : ctxInfo.pct >= 55 ? " ⚡" : ""
       contextInfo = `Context: ${ctxInfo.pct}% used${warning} (${ctxInfo.used}/${ctxInfo.contextLimit} tokens)`

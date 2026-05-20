@@ -287,7 +287,6 @@ describe("checkProgressNotifications", () => {
     sessionStore.upsert("session-ctx", (state) => {
       state.providerID = "anthropic"
       state.modelID = "claude-3"
-      state.isTask = true
       state.lastTokens = {
         input: 50000,
         output: 1000,
@@ -389,7 +388,7 @@ describe("checkProgressNotifications", () => {
 })
 
 describe("logTickStatus", () => {
-  it("should log running tasks with progress info", () => {
+  it("should log running tasks with progress info (trace level)", () => {
     const task = createTask({
       id: "wopal-task-abc123",
       description: "Test logging",
@@ -403,16 +402,9 @@ describe("logTickStatus", () => {
       wasNotified: true,
       contextUsage: 30,
     }]
-    const debugLog = vi.fn()
 
-    logTickStatus(tasks, progressInfos, debugLog)
-
-    expect(debugLog).toHaveBeenCalled()
-    const logOutput = debugLog.mock.calls[0][0]
-    expect(logOutput).toContain("wopal-task-abc123")
-    expect(logOutput).toContain("15 msgs")
-    expect(logOutput).toContain("Test logging")
-    expect(logOutput).toContain("✓notified")
+    // logTickStatus now uses traceLog (no-op in vitest), should not throw
+    expect(() => logTickStatus(tasks, progressInfos, vi.fn())).not.toThrow()
   })
 
   it("should skip logging when no running tasks", () => {
@@ -425,7 +417,7 @@ describe("logTickStatus", () => {
     expect(debugLog).not.toHaveBeenCalled()
   })
 
-  it("should show warning emoji for high context usage", () => {
+  it("should not throw for high context usage (trace level)", () => {
     const task = createTask({ startedAt: new Date(Date.now() - 65_000) })
     const tasks = new Map([["task-1", task]])
     const progressInfos = [{
@@ -434,11 +426,8 @@ describe("logTickStatus", () => {
       wasNotified: false,
       contextUsage: 60, // Above CONTEXT_WARN_THRESHOLD
     }]
-    const debugLog = vi.fn()
 
-    logTickStatus(tasks, progressInfos, debugLog)
-
-    const logOutput = debugLog.mock.calls[0][0]
-    expect(logOutput).toContain("⚠️")
+    // logTickStatus now uses traceLog (no-op in vitest), should not throw
+    expect(() => logTickStatus(tasks, progressInfos, vi.fn())).not.toThrow()
   })
 })

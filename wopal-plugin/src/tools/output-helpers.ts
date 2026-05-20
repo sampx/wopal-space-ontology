@@ -1,5 +1,6 @@
 import { createDebugLog } from "../debug.js"
 import type { SessionStore } from "../session-store.js"
+import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { ProgressInfo } from "../tasks/progress.js"
 import type { LoopWarning } from "../tasks/loop-detector.js"
 import { fetchContextPercent, fetchSessionModelInfo, formatContextUsage } from "../session-runtime-info.js"
@@ -28,8 +29,9 @@ export async function getContextUsage(
   sessionID: string,
   directory: string,
   sessionStore: SessionStore,
+  taskManager?: SimpleTaskManager,
 ): Promise<string | null> {
-  const info = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog)
+  const info = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog, taskManager)
   return formatContextUsage(info)
 }
 

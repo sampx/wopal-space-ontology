@@ -47,6 +47,17 @@ export interface WopalTask {
   waitingConcurrencyKey?: string
   // Idle notification (Phase 3: judgment delegated to Wopal)
   idleNotified?: boolean
+  // Task-level model info (mirrors SessionState fields, managed by TaskManager)
+  providerID?: string
+  modelID?: string
+  contextLimit?: number
+  lastTokens?: {
+    input: number
+    output: number
+    reasoning?: number
+    cache?: { read?: number; write?: number }
+    updatedAt: number
+  }
 }
 
 export interface LaunchInput {
