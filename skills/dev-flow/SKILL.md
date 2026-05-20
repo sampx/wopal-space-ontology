@@ -88,8 +88,7 @@ Plan 切片 → 委派 fae 实施 → 委派 rook 审查 → 根据结果推进/
 
 **rook 委派时机**：
 1. Plan 写完后（approve 前）— 审方案质量
-2. fae 关键波次后 — 复核代码
-3. fae 最终交付后（complete 前）— 最终审查
+2. fae 最终交付后（complete 前）— 最终审查
 
 rook 契约格式见 agents-collab。委派 rook 前不预加载 df-plan-review / df-implement-review —— rook 自行加载。
 
