@@ -159,7 +159,8 @@ The session context has been compacted. Execute recovery protocol immediately an
 1. Read key files from the compaction summary (plans, specs, etc. — max 3)
 2. Search and load task-relevant memories (max 3)
 3. Reload previously loaded skills: ${skills}
-4. Briefly report what was recovered, then continue the previous work
+4. Respond in the user's preferred language (check USER.md if unsure)
+5. Briefly report what was recovered, then continue the previous work
 </CRITICAL_RULE>
 </system-reminder>`
 
