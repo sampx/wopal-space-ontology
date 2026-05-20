@@ -158,7 +158,6 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
     sessionStore: ctx.sessionStore,
     contextDebugLog: ctx.contextDebugLog,
     now: ctx.now,
-    taskManager: ctx.taskManager,
   });
 
   return {

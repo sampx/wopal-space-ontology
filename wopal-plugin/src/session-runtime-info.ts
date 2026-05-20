@@ -8,9 +8,7 @@
 import type { OpenCodeClient, OpenCodeConfig, SessionMessage } from "./types.js"
 import type { SessionStore } from "./session-store.js"
 import type { DebugLog } from "./debug.js"
-import { formatSessionID, createTraceLog } from "./debug.js"
-
-const traceLog = createTraceLog("[task]", "task")
+import { formatSessionID } from "./debug.js"
 
 export interface SessionModelInfo {
   providerID: string
@@ -30,10 +28,6 @@ export interface ProviderModelConfig {
   }>
 }
 
-export interface TaskSessionInspector {
-  isTaskSession: (sessionID: string) => boolean
-}
-
 /**
  * Fetch providers config from OpenCode client.
  * Returns null if config API unavailable or fails.
@@ -41,21 +35,20 @@ export interface TaskSessionInspector {
 export async function fetchProvidersConfig(
   config: OpenCodeConfig | undefined,
   directory: string,
-  _debugLog?: DebugLog,
+  debugLog?: DebugLog,
 ): Promise<ProviderModelConfig | null> {
-  void _debugLog // retained for callers, unused after traceLog migration
   if (typeof config?.providers !== "function") {
-    traceLog(`[providersConfig] no config.providers API`)
+    debugLog?.(`[providersConfig] no config.providers API`)
     return null
   }
 
   try {
     const result = await config.providers({ query: { directory } })
     const providers = result?.data?.providers ?? []
-    traceLog(`[providersConfig] fetched ${providers.length} providers`)
+    debugLog?.(`[providersConfig] fetched ${providers.length} providers`)
     return { providers }
   } catch (err) {
-    traceLog(`[providersConfig] error: ${err instanceof Error ? err.message : String(err)}`)
+    debugLog?.(`[providersConfig] error: ${err instanceof Error ? err.message : String(err)}`)
     return null
   }
 }
@@ -172,11 +165,10 @@ export function extractContextFromStore(
   sessionID: string,
   providers: ProviderModelConfig["providers"],
   debugLog?: DebugLog,
-  taskManager?: TaskSessionInspector,
 ): ContextUsageInfo | null {
   const state = sessionStore.get(sessionID)
   const tokens = state?.lastTokens
-  const isTask = taskManager?.isTaskSession(sessionID) ?? false
+  const isTask = state?.isTask ?? false
 
   if (!tokens) {
     debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} no lastTokens in store`)
@@ -186,7 +178,7 @@ export function extractContextFromStore(
   // Stale check: tokens older than 60s may be outdated
   const ageMs = Date.now() - tokens.updatedAt
   if (ageMs > 60_000) {
-    traceLog(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
+    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
     return null
   }
 
@@ -229,9 +221,9 @@ export async function fetchContextPercent(
   directory: string,
   sessionID: string,
   debugLog?: DebugLog,
-  taskManager?: TaskSessionInspector,
 ): Promise<ContextUsageInfo | null> {
-  const isTask = taskManager?.isTaskSession(sessionID) ?? false
+  const state = sessionStore.get(sessionID)
+  const isTask = state?.isTask ?? false
   const ctxLog = (msg: string) => debugLog?.(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
 
   try {
@@ -243,7 +235,7 @@ export async function fetchContextPercent(
     }
 
     // Cache-first: try sessionStore.lastTokens
-    const fromStore = extractContextFromStore(sessionStore, sessionID, configResult.providers, debugLog, taskManager)
+    const fromStore = extractContextFromStore(sessionStore, sessionID, configResult.providers, debugLog)
     if (fromStore) {
       ctxLog(`from store: ${fromStore.pct}%`)
       return fromStore
@@ -259,7 +251,7 @@ export async function fetchContextPercent(
       path: { id: sessionID },
     })
     const messages = (messagesResult as { data?: SessionMessage[] } | undefined)?.data ?? []
-    traceLog(`[ctxUsage] ${formatSessionID(sessionID, isTask)} fetched ${messages.length} messages (fallback)`)
+    ctxLog(`fetched ${messages.length} messages (fallback)`)
 
     const result = extractContextUsage(messages, configResult.providers, debugLog)
     if (result) {

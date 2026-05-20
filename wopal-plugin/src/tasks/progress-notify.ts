@@ -9,7 +9,7 @@ import type { WopalTask } from "../types.js"
 import type { OpenCodeClient } from "../types.js"
 import type { SessionStore } from "../session-store.js"
 import type { DebugLog } from "../debug.js"
-import { fetchContextPercent, type TaskSessionInspector } from "../session-runtime-info.js"
+import { fetchContextPercent } from "../session-runtime-info.js"
 
 // Progress notification thresholds
 export const PROGRESS_NOTIFY_MESSAGE_MODULO = 20
@@ -38,7 +38,6 @@ export interface ProgressNotifyDeps {
   client: OpenCodeClient
   debugLog: DebugLog
   directory: string
-  taskManager?: TaskSessionInspector
   sendProgressNotificationFn: (task: WopalTask, messageCount: number, contextUsage: number | null, triggerReason?: ProgressNotifyTrigger) => Promise<void>
 }
 
@@ -49,7 +48,7 @@ export interface ProgressNotifyDeps {
 export async function checkProgressNotifications(
   deps: ProgressNotifyDeps,
 ): Promise<ProgressTaskInfo[]> {
-  const { tasks, sessionStore, client, debugLog, directory, taskManager, sendProgressNotificationFn } = deps
+  const { tasks, sessionStore, client, debugLog, directory, sendProgressNotificationFn } = deps
   const taskInfos: ProgressTaskInfo[] = []
   const runningTasks = Array.from(tasks.values()).filter(t => t.status === 'running' && !t.idleNotified)
 
@@ -92,7 +91,7 @@ export async function checkProgressNotifications(
       }
 
       // Cache-first: prefer sessionStore.lastTokens to avoid streaming window returning null
-      const ctxInfo = await fetchContextPercent(client, sessionStore, directory, task.sessionID, debugLog, taskManager)
+      const ctxInfo = await fetchContextPercent(client, sessionStore, directory, task.sessionID, debugLog)
       const contextUsage = ctxInfo?.pct ?? null
 
       // Context threshold: notify once per modulo value (dedup by lastNotifyContextPct)

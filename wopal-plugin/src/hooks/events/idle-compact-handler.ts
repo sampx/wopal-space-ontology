@@ -96,8 +96,7 @@ export async function handleSessionCompacted(
 
   ctx.sessionStore.markCompacted(sessionID)
   const compactedState = ctx.sessionStore.get(sessionID)
-  const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
-  ctx.contextDebugLog(`${formatSessionID(sessionID, isTask)} compact completed (event-driven)`)
+  ctx.contextDebugLog(`${formatSessionID(sessionID, compactedState?.isTask ?? false)} compact completed (event-driven)`)
 
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
   const state = compactedState

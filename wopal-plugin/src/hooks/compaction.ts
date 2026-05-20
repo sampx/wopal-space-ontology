@@ -1,13 +1,11 @@
 import type { SessionStore } from "../session-store.js";
 import type { DebugLog } from "../debug.js";
-import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import { formatSessionID } from "../debug.js";
 
 export interface CompactionHookContext {
   sessionStore: SessionStore;
   contextDebugLog: DebugLog;
   now: () => number;
-  taskManager?: SimpleTaskManager;
 }
 
 export function createCompactionHooks(ctx: CompactionHookContext) {
@@ -22,8 +20,8 @@ export function createCompactionHooks(ctx: CompactionHookContext) {
     }
 
     ctx.sessionStore.markCompacting(sessionID, ctx.now());
-    const isTask = !!ctx.taskManager?.isTaskSession(sessionID);
-    ctx.contextDebugLog(`${formatSessionID(sessionID, isTask)} marked as compacting`);
+    const state = ctx.sessionStore.get(sessionID)
+    ctx.contextDebugLog(`${formatSessionID(sessionID, state?.isTask ?? false)} marked as compacting`);
   }
 
   return {

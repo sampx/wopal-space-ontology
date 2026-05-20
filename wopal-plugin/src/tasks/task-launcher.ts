@@ -36,9 +36,6 @@ export interface TaskLauncherDeps {
   debugLog: DebugLog
   concurrency: ConcurrencyManager
   concurrencyKey: string
-  taskManager: {
-    registerTaskSession: (sessionID: string) => void
-  }
   failTask: (task: WopalTask, error: string) => boolean
   abortSession: (sessionID: string | undefined) => Promise<void>
 }
@@ -49,7 +46,7 @@ export async function launchTask(
   deps: TaskLauncherDeps,
   input: LaunchInput,
 ): Promise<LaunchOutput> {
-  const { tasks, client, debugLog, concurrency, concurrencyKey, taskManager, failTask, abortSession } = deps
+  const { tasks, client, debugLog, concurrency, concurrencyKey, failTask, abortSession } = deps
 
   const releaseAndReturnError = (error: string): LaunchOutput => {
     concurrency.release(concurrencyKey)
@@ -112,7 +109,6 @@ export async function launchTask(
     concurrencyKey,
   }
   tasks.set(taskId, task)
-  taskManager.registerTaskSession(sessionID)
 
   if (typeof client.session?.promptAsync !== "function") {
     const error = "Background task launch failed: session.promptAsync is unavailable"

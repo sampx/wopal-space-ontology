@@ -79,7 +79,6 @@ describe("task-launcher", () => {
         debugLog: debugLogSpy,
         concurrency,
         concurrencyKey: "test",
-        taskManager: { registerTaskSession: vi.fn() },
         failTask: failTaskSpy,
         abortSession: abortSessionSpy,
       }

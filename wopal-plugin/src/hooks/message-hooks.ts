@@ -36,7 +36,7 @@ export function createMessageHooks(ctx: MessageHookContext) {
 
     const existingState = ctx.sessionStore.get(sessionID);
     const shouldSeed = !existingState?.seededFromHistory;
-    const isTask = !!ctx.taskManager?.isTaskSession(sessionID);
+    const isTask = !!ctx.taskManager?.findBySession(sessionID);
     const agentName = extractAgentName(output.messages);
 
     if (shouldSeed) {
@@ -52,10 +52,12 @@ export function createMessageHooks(ctx: MessageHookContext) {
         state.seedCount = (state.seedCount ?? 0) + 1;
         state.recentMessages = recentMessages;
         state.agent = agentName;
+        state.isTask = isTask;
       });
     } else {
       ctx.sessionStore.upsert(sessionID, (state) => {
         state.agent = agentName;
+        state.isTask = isTask;
       });
     }
 

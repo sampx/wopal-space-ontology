@@ -131,7 +131,7 @@ export function createContextManageTool(
         }
         const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
         debugLog(`[context_manage] compact ${formatSessionID(target.sessionID, target.isTask)}`);
-        return await handleCompact(target.sessionID, target.isTask, client, activeStore, baseDir, taskManager);
+        return await handleCompact(target.sessionID, target.isTask, client, activeStore, baseDir);
       }
 
       // === SUMMARY action (no session_id override) ===
