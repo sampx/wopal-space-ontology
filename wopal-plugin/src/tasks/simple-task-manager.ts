@@ -32,6 +32,7 @@ import {
 } from "./task-lifecycle.js"
 import { sessionIDToTaskID } from "../session-ref.js"
 import { getDisplayStatus, isResumableTask, canDeleteTask } from "./task-phase.js"
+import { isSessionDeleteResult } from "../types.js"
 
 const defaultManagerLog = createDebugLog("[task]", "task")
 
@@ -200,7 +201,7 @@ export class SimpleTaskManager {
     return interruptTask(this.getLifecycleDeps(), id, parentSessionID)
   }
 
-  async closeTask(taskId: string, parentSessionID: string): Promise<{ ok: boolean; message: string }> {
+  async finishTask(taskId: string, parentSessionID: string): Promise<{ ok: boolean; message: string }> {
     const { tasks, client, debugLog, releaseConcurrencySlot } = this.getLifecycleDeps()
 
     const task = this.getTaskForParent(taskId, parentSessionID)
@@ -209,18 +210,18 @@ export class SimpleTaskManager {
     }
 
     if (!canDeleteTask(task)) {
-      return { ok: false, message: "Task is still running. Please verify completion before deleting (use wopal_task_output to check status)." }
+      return { ok: false, message: "Task is actively running. Use wopal_task_abort or wopal_task_reply(interrupt=true) to stop first, then finish." }
     }
 
     if (task.sessionID && client.session?.delete) {
       try {
         const result = await client.session.delete({ path: { id: task.sessionID } })
-        if (result.error) {
-          debugLog(`[closeTask] session.delete error for taskId=${taskId}: ${String(result.error).substring(0, 200)}`)
+        if (isSessionDeleteResult(result) && result.error) {
+          debugLog(`[finishTask] session.delete error for taskId=${taskId}: ${String(result.error).substring(0, 200)}`)
           return { ok: false, message: `Failed to delete session: ${String(result.error)}` }
         }
       } catch (err) {
-        debugLog(`[closeTask] session.delete exception for taskId=${taskId}: ${String(err).substring(0, 200)}`)
+        debugLog(`[finishTask] session.delete exception for taskId=${taskId}: ${String(err).substring(0, 200)}`)
         return { ok: false, message: `Failed to delete session: ${String(err)}` }
       }
     }
@@ -229,8 +230,8 @@ export class SimpleTaskManager {
 
     releaseConcurrencySlot(task)
 
-    debugLog(`[closeTask] taskId=${taskId} deleted successfully`)
-    return { ok: true, message: "Task deleted successfully. Session removed from OpenCode." }
+    debugLog(`[finishTask] taskId=${taskId} finished successfully`)
+    return { ok: true, message: "Task finished successfully. Session deleted from OpenCode." }
   }
 
   async notifyParent(taskId: string): Promise<void> {
@@ -251,11 +252,11 @@ export class SimpleTaskManager {
     if (isResumableTask(task)) {
       if (this.concurrency.tryAcquire(this.CONCURRENCY_KEY, DEFAULT_CONCURRENCY_LIMIT)) {
         task.concurrencyKey = this.CONCURRENCY_KEY
-        this.debugLog(`[reacquireSlot] taskId=${task.id} acquired slot`)
+        delete task.waitingConcurrencyKey
+        this.debugLog(`[reacquireSlot] taskId=${task.id} acquired slot, cleared waitingConcurrencyKey`)
       } else {
-        this.debugLog(`[reacquireSlot] taskId=${task.id} concurrency limit reached, proceeding anyway`)
+        this.debugLog(`[reacquireSlot] taskId=${task.id} concurrency limit reached, waitingConcurrencyKey preserved for retry`)
       }
-      delete task.waitingConcurrencyKey
     }
   }
 
@@ -285,7 +286,8 @@ export class SimpleTaskManager {
 
     try {
       const result = await this.client.session.children({ path: { id: parentSessionID } })
-      const children = result?.data ?? result ?? []
+      const resultObj = result as Record<string, unknown> | undefined
+      const children = (resultObj?.data ?? result) as unknown
       if (!Array.isArray(children)) {
         this.debugLog(`[recover] skipped: children is not an array, type=${typeof children}`)
         this.recoveringSessions.delete(parentSessionID)

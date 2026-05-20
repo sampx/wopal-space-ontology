@@ -13,7 +13,7 @@ export interface TaskNotifierDeps {
           noReply?: boolean
           parts: Array<{ type: string; text: string; synthetic?: boolean }>
         }
-      }) => Promise<void>
+      }) => Promise<unknown>
     }
   }
   debugLog: DebugLog

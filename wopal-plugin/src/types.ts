@@ -237,3 +237,18 @@ export interface ToolState {
 export function hasToolState(part: unknown): part is { state: ToolState } {
   return typeof part === "object" && part !== null && "state" in part
 }
+
+// Type guard for session.delete result
+export interface SessionDeleteResult {
+  data?: boolean
+  error?: unknown
+}
+
+export function isSessionDeleteResult(result: unknown): result is SessionDeleteResult {
+  return typeof result === "object" && result !== null
+}
+
+// Type guard for session.messages result
+export function isMessagesResult(result: unknown): result is MessagesResult {
+  return typeof result === "object" && result !== null
+}

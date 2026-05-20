@@ -131,8 +131,8 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
   });
 
   const taskManager = new SimpleTaskManager(
-    pluginInput.client,
-    v2Client,
+    pluginInput.client as unknown as OpenCodeClient,
+    v2Client as unknown as OpenCodeClient,
     pluginInput.directory,
     pluginInput.serverUrl,
     sessionStore,
@@ -167,7 +167,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
 
     tools.context_manage = createContextManageTool(
       memory.llm,
-      pluginInput.client,
+      pluginInput.client as unknown as OpenCodeClient,
       systemSnapshots,
       systemMetadataMap,
       systemInjectionsMap,

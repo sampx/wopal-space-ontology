@@ -39,14 +39,14 @@ export function getDisplayStatus(task: WopalTask): string {
 
 /**
  * Check if task can be deleted by parent session.
- * Deletable: idle, error, or waiting (not actively running).
+ * Deletable: pending, idle, error, or waiting (not actively running).
  */
 export function canDeleteTask(task: WopalTask): boolean {
-  // Running tasks without idleNotified cannot be deleted
+  // Only actively running tasks (running without idleNotified) cannot be deleted
   if (task.status === "running" && !task.idleNotified) {
     return false
   }
-  // All other states (idle, error, waiting) are deletable
+  // All other states (pending, idle, error, waiting) are deletable
   return true
 }
 

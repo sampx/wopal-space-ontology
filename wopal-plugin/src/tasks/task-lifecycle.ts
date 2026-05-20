@@ -10,7 +10,7 @@ export interface TaskLifecycleDeps {
   client: {
     session?: {
       abort?: (args: { path: { id: string } }) => Promise<unknown>
-      delete?: (args: { path: { id: string } }) => Promise<{ data?: boolean; error?: unknown }>
+      delete?: (args: { path: { id: string } }) => Promise<unknown>
     }
   }
   debugLog: DebugLog

@@ -1,18 +1,19 @@
-import type { SessionMessage, MessagesResult } from "../types.js"
-import { hasToolState } from "../types.js"
+import type { SessionMessage } from "../types.js"
+import { hasToolState, isMessagesResult } from "../types.js"
 
 function isSessionMessage(value: unknown): value is SessionMessage {
   return typeof value === "object" && value !== null
 }
 
-export function getErrorMessage(value: MessagesResult): string | null {
-  if (Array.isArray(value)) return null
+export function getErrorMessage(value: unknown): string | null {
+  if (!isMessagesResult(value)) return null
   if (value.error === undefined || value.error === null) return null
   if (typeof value.error === "string" && value.error.length > 0) return value.error
   return String(value.error)
 }
 
-export function extractMessages(value: MessagesResult): SessionMessage[] {
+export function extractMessages(value: unknown): SessionMessage[] {
+  if (!isMessagesResult(value)) return []
   if (Array.isArray(value)) return value.filter(isSessionMessage)
   if (Array.isArray(value.data)) return value.data.filter(isSessionMessage)
   return []

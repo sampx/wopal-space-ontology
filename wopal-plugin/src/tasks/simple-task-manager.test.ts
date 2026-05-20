@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SimpleTaskManager } from "./simple-task-manager.js"
 import { sessionIDToTaskID } from "./task-launcher.js"
+import { ConcurrencyManager } from "./concurrency-manager.js"
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -318,11 +319,11 @@ describe("SimpleTaskManager", () => {
       await manager.recoverFromSession("parent-1")
 
       const taskId = sessionIDToTaskID("ses_recovered-delete")
-      const result = await manager.closeTask(taskId, "parent-1")
+      const result = await manager.finishTask(taskId, "parent-1")
 
       expect(result).toEqual({
         ok: true,
-        message: "Task deleted successfully. Session removed from OpenCode.",
+        message: "Task finished successfully. Session deleted from OpenCode.",
       })
       expect(mockClient.session.delete).toHaveBeenCalledWith({
         path: { id: "ses_recovered-delete" },
@@ -495,6 +496,246 @@ describe("SimpleTaskManager", () => {
       expect(clearIntervalSpy).toHaveBeenCalled()
 
       clearIntervalSpy.mockRestore()
+    })
+  })
+
+  describe("finishTask (real implementation)", () => {
+    it("rejects actively running task (running without idleNotified)", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      // Task is actively running (no idleNotified)
+      const finishResult = await manager.finishTask(result.taskId, "parent-1")
+
+      expect(finishResult.ok).toBe(false)
+      expect(finishResult.message).toContain("actively running")
+      expect(finishResult.message).toContain("wopal_task_abort")
+    })
+
+    it("accepts idle task (running + idleNotified)", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Mark as idle phase
+      task.idleNotified = true
+
+      const finishResult = await manager.finishTask(result.taskId, "parent-1")
+
+      expect(finishResult.ok).toBe(true)
+      expect(finishResult.message).toContain("finished successfully")
+      expect(mockClient.session.delete).toHaveBeenCalled()
+      expect(manager.getTask(result.taskId)).toBeUndefined()
+    })
+
+    it("accepts waiting task", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Mark as waiting
+      task.status = "waiting"
+      task.waitingReason = "question_detected"
+
+      const finishResult = await manager.finishTask(result.taskId, "parent-1")
+
+      expect(finishResult.ok).toBe(true)
+      expect(mockClient.session.delete).toHaveBeenCalled()
+    })
+
+    it("accepts error task", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Mark as error
+      task.status = "error"
+      task.error = "Something failed"
+
+      const finishResult = await manager.finishTask(result.taskId, "parent-1")
+
+      expect(finishResult.ok).toBe(true)
+      expect(mockClient.session.delete).toHaveBeenCalled()
+    })
+
+    it("accepts pending task (no session)", async () => {
+      // Create a pending task manually (not launched via session.create)
+      const pendingTaskId = "wopal-task-pending-1"
+      const pendingTask = {
+        id: pendingTaskId,
+        sessionID: undefined,
+        status: "pending",
+        description: "Pending task",
+        agent: "fae",
+        prompt: "Queued",
+        parentSessionID: "parent-1",
+        createdAt: new Date(),
+        concurrencyKey: undefined,
+      }
+
+      // Access internal tasks map to add pending task
+      // (pending tasks are created before session.create succeeds)
+      const internalTasks = (manager as unknown as { tasks: Map<string, unknown> }).tasks
+      internalTasks.set(pendingTaskId, pendingTask)
+
+      const finishResult = await manager.finishTask(pendingTaskId, "parent-1")
+
+      expect(finishResult.ok).toBe(true)
+      expect(finishResult.message).toContain("finished successfully")
+      // session.delete should NOT be called (pending has no sessionID)
+      expect(mockClient.session.delete).not.toHaveBeenCalled()
+    })
+
+    it("rejects wrong parent session", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const finishResult = await manager.finishTask(result.taskId, "parent-2")
+
+      expect(finishResult.ok).toBe(false)
+      expect(finishResult.message).toContain("not found or not owned")
+    })
+  })
+
+  describe("reacquireSlotOnWakeUp (real concurrency behavior)", () => {
+    it("success: acquires slot and clears waitingConcurrencyKey", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Simulate idle phase: task already has concurrencyKey from launch
+      // Set idleNotified + waitingConcurrencyKey
+      task.idleNotified = true
+      task.waitingConcurrencyKey = task.concurrencyKey
+      task.concurrencyKey = undefined
+
+      // Call reacquireSlotOnWakeUp with available slots
+      manager.reacquireSlotOnWakeUp(task)
+
+      // Verify: concurrencyKey restored, waitingConcurrencyKey cleared
+      expect(task.concurrencyKey).toBe("default")
+      expect(task.waitingConcurrencyKey).toBeUndefined()
+      
+      // Verify concurrency status reflects the acquisition
+      const status = manager.getConcurrencyStatus()
+      expect(status.used).toBeGreaterThan(0)
+    })
+
+    it("concurrency limit reached: preserves waitingConcurrencyKey for retry", async () => {
+      // First launch a task (succeeds because slots available)
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Task has concurrencyKey from launch
+      expect(task.concurrencyKey).toBe("default")
+      expect(manager.getConcurrencyStatus().used).toBe(1)
+
+      // Access internal concurrency manager to fill remaining slots
+      const internalConcurrency = (manager as unknown as { concurrency: ConcurrencyManager }).concurrency
+      
+      // Fill remaining 4 slots (limit is 5)
+      for (let i = 0; i < 4; i++) {
+        internalConcurrency.tryAcquire("default", 5)
+      }
+
+      // Verify limit reached
+      expect(manager.getConcurrencyStatus().used).toBe(5)
+      expect(manager.getConcurrencyStatus().available).toBe(0)
+
+      // Set idle phase state
+      task.idleNotified = true
+      task.waitingConcurrencyKey = task.concurrencyKey
+      task.concurrencyKey = undefined
+
+      // Call reacquireSlotOnWakeUp when limit is reached
+      manager.reacquireSlotOnWakeUp(task)
+
+      // Verify: concurrencyKey NOT set (acquisition failed)
+      // waitingConcurrencyKey preserved for retry
+      expect(task.concurrencyKey).toBeUndefined()
+      expect(task.waitingConcurrencyKey).toBe("default")
+      
+      // Task remains resumable (waitingConcurrencyKey preserved)
+      expect(task.idleNotified).toBe(true)
+    })
+
+    it("non-resumable task: reacquireSlotOnWakeUp does nothing", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+
+      // Task is actively running (not idle phase)
+      // Should NOT be resumable
+      expect(task.status).toBe("running")
+      expect(task.idleNotified).toBeUndefined()
+
+      // Call reacquireSlotOnWakeUp - should do nothing
+      manager.reacquireSlotOnWakeUp(task)
+
+      // Verify: no state change
+      expect(task.concurrencyKey).toBe("default") // Still has the original slot
+      expect(task.waitingConcurrencyKey).toBeUndefined()
     })
   })
 })

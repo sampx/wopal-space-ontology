@@ -11,6 +11,10 @@ function resetTaskForResume(task: WopalTask): void {
   task.status = "running"
   delete task.idleNotified
   delete task.waitingReason
+  // Note: waitingConcurrencyKey is NOT deleted here.
+  // It is only cleared by reacquireSlotOnWakeUp when tryAcquire succeeds.
+  // If tryAcquire failed (concurrency limit reached), waitingConcurrencyKey remains
+  // to preserve retry semantics.
   trackActivity(task, "text")
 }
 
@@ -69,11 +73,11 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientA
 
 export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
-    description: "Task communication channel. Resumes/redirects execution via message injection. Works on idle/waiting/error tasks. Running tasks: interrupt=true aborts + redirects. Re-acquires concurrency slot on wake-up.",
+    description: "Task communication channel. Resumes/redirects idle/waiting/error tasks via message injection. interrupt=true aborts active execution + sends redirect message. Re-acquires concurrency slot on wake-up. Use wopal_task_abort for pure stop (no message, no wake-up).",
     args: {
       task_id: tool.schema.string().describe("Task ID to communicate. Sources: (1) System notification [WOPAL TASK IDLE/STUCK/WAITING], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID"),
       message: tool.schema.string().describe("The message to send to the background task"),
-      interrupt: tool.schema.boolean().optional().default(false).describe("Abort current execution and send correction (only for running tasks)"),
+      interrupt: tool.schema.boolean().optional().default(false).describe("Abort active execution and send redirect message. Only for running tasks. Equivalent to wopal_task_abort + message injection. Use wopal_task_abort if you only want to stop without redirecting."),
     },
     execute: async (args: { task_id: string; message: string; interrupt?: boolean }, context: ToolContext) => {
       const { task_id, message, interrupt = false } = args
@@ -96,7 +100,7 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
       // reply without interrupt only works on resumable tasks (waiting, idle, error)
       // running + idleNotified is resumable, but running without idleNotified needs interrupt
       if (!interrupt && !isResumableTask(task)) {
-        return `Error: Task is running. Use interrupt=true to abort and redirect, or wait for idle.`
+        return `Error: Task is actively running. Use interrupt=true to abort and redirect, or use wopal_task_abort to stop without redirecting.`
       }
 
       if (!task.sessionID) {
@@ -107,19 +111,26 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
 
       // Handle interrupt mode
       if (interrupt) {
-        try {
-          // Abort current execution
-          if (typeof client?.session?.abort === "function") {
-            try {
-              await client.session.abort({ path: { id: task.sessionID } })
-              debugLog(`task ${task_id} aborted before interrupt reply`)
-            } catch (abortErr) {
-              debugLog(`abort failed (task may already be idle): ${abortErr}`)
-            }
+        // Phase 1: Abort current execution
+        if (typeof client?.session?.abort === "function") {
+          try {
+            await client.session.abort({ path: { id: task.sessionID } })
+            debugLog(`task ${task_id} aborted before interrupt reply`)
+          } catch (abortErr) {
+            debugLog(`abort failed (task may already be idle): ${abortErr}`)
           }
+        }
 
-          // Send corrective message
+        // Phase 2: Re-acquire concurrency slot BEFORE sending message
+        // This must happen while task is still in idle phase (idleNotified=true)
+        // so reacquireSlotOnWakeUp can execute its logic
+        manager.reacquireSlotOnWakeUp(task)
+
+        // Phase 3: Send corrective message
+        try {
           if (typeof client?.session?.promptAsync !== "function") {
+            // Rollback: release the slot we just acquired
+            manager.releaseConcurrencySlot(task)
             return "Error: session.promptAsync is unavailable"
           }
 
@@ -131,21 +142,23 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
             },
           })
 
-          // Reset state
+          // Phase 4: Reset task state AFTER successful message injection
+          // Now safe to clear idleNotified, waitingReason, waitingConcurrencyKey
           resetTaskForResume(task)
-          if (task.waitingConcurrencyKey) {
-            manager.releaseConcurrencySlot(task)
-          }
+
           debugLog(`task ${task_id} interrupted and resumed with new direction`)
 
-          return `Interrupt sent to task ${task_id}. The background task will continue with new direction.`
+          return `Interrupt sent to task ${task_id}. Previous execution aborted, new message injected. Task will continue with new direction.`
         } catch (err) {
+          // Rollback: release the slot we acquired before the failed message
+          manager.releaseConcurrencySlot(task)
           debugLog(`wopal_reply interrupt error: ${err}`)
           return `Failed to send interrupt: ${err instanceof Error ? err.message : String(err)}`
         }
       }
 
-      // Re-acquire concurrency slot before resuming
+      // Non-interrupt mode
+      // Phase 1: Re-acquire concurrency slot BEFORE sending message
       manager.reacquireSlotOnWakeUp(task)
 
       try {
@@ -158,6 +171,7 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           debugLog(`question resolved: requestID=${questionID}`)
           delete task.pendingQuestionID
 
+          // Reset state after successful question reply
           resetTaskForResume(task)
           debugLog(`task ${task_id} resumed via question.reply`)
 
@@ -165,6 +179,8 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
         }
 
         if (typeof client?.session?.promptAsync !== "function") {
+          // Rollback: release the slot we just acquired
+          manager.releaseConcurrencySlot(task)
           return "Error: session.promptAsync is unavailable"
         }
 
@@ -176,11 +192,14 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           },
         })
 
+        // Reset state after successful promptAsync
         resetTaskForResume(task)
         debugLog(`task ${task_id} resumed`)
 
         return `Reply sent to task ${task_id}. The background task will continue execution.`
       } catch (err) {
+        // Rollback: release the slot we acquired before the failed operation
+        manager.releaseConcurrencySlot(task)
         debugLog(`wopal_reply error: ${err}`)
         return `Failed to send reply: ${err instanceof Error ? err.message : String(err)}`
       }

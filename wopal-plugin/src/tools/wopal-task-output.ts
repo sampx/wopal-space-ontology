@@ -54,7 +54,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
       // idle task: awaiting Wopal judgment
       if (isIdleTask(task)) {
         result += `\n\n**Idle:** awaiting your judgment`
-        result += `\nUse wopal_task_reply with interrupt=true to abort and redirect.`
+        result += `\nUse wopal_task_finish to delete, or wopal_task_reply to wake up and redirect.`
       }
 
       if (task.status === 'error') {
@@ -91,8 +91,11 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
           if (typeof client.session?.status === "function") {
             const statusResult = await client.session.status()
             if (statusResult && typeof statusResult === "object") {
-              const statusMap = (statusResult.data ?? statusResult) as Record<string, { type?: string }>
-              sessionStatus = statusMap[task.sessionID]?.type ?? "unknown"
+              const statusMap = (statusResult as Record<string, unknown>).data ?? statusResult
+              if (typeof statusMap === "object" && statusMap !== null) {
+                const statusObj = statusMap as Record<string, { type?: string }>
+                sessionStatus = statusObj[task.sessionID]?.type ?? "unknown"
+              }
             }
           }
         } catch {
@@ -171,7 +174,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
 
       // section 模式：按分类获取内容
       const shouldShowSection = section && task.status !== 'waiting' && task.sessionID
-      if (shouldShowSection) {
+      if (shouldShowSection && task.sessionID) {
         const client = manager.getClient()
         if (typeof client.session?.messages === "function") {
           try {

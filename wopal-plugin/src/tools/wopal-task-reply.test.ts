@@ -126,7 +126,7 @@ describe("wopal_task_reply", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(resultWithInterrupt).toBe(`Interrupt sent to task ${idleTask.id}. The background task will continue with new direction.`)
+    expect(resultWithInterrupt).toBe(`Interrupt sent to task ${idleTask.id}. Previous execution aborted, new message injected. Task will continue with new direction.`)
     expect(mockClient.session.abort).toHaveBeenCalled()
     expect(mockClient.session.promptAsync).toHaveBeenCalled()
     expect(idleTask.idleNotified).toBeUndefined()
@@ -273,7 +273,7 @@ describe("wopal_task_reply", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe(`Interrupt sent to task ${runningTask.id}. The background task will continue with new direction.`)
+    expect(result).toBe(`Interrupt sent to task ${runningTask.id}. Previous execution aborted, new message injected. Task will continue with new direction.`)
     expect(mockClient.session.abort).toHaveBeenCalledWith({ path: { id: runningTask.sessionID } })
     expect(mockClient.session.promptAsync).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -312,28 +312,96 @@ describe("wopal_task_reply", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe(`Interrupt sent to task ${runningTask.id}. The background task will continue with new direction.`)
+    expect(result).toBe(`Interrupt sent to task ${runningTask.id}. Previous execution aborted, new message injected. Task will continue with new direction.`)
     expect(mockClient.session.abort).toHaveBeenCalled()
     expect(mockClient.session.promptAsync).toHaveBeenCalled()
   })
 
-  it("interrupt=true clears waitingConcurrencyKey and releases slot", async () => {
+  it("interrupt=true from idle phase: reacquireSlotOnWakeUp clears waitingConcurrencyKey and acquires concurrency slot", async () => {
     const mockClient = createMockClient()
-    const runningTask = createWaitingTask({
+    const idleTask = createWaitingTask({
       status: "running" as WopalTask["status"],
       idleNotified: true,
-      waitingConcurrencyKey: "default",
       concurrencyKey: undefined,
+      waitingConcurrencyKey: "default",
     } as Partial<WopalTask>)
-    const mockManager = createMockTaskManager(runningTask, mockClient)
+    const mockManager = createMockTaskManager(idleTask, mockClient)
     const execute = getExecute(createWopalReplyTool(mockManager as never))
 
     const result = await execute(
-      { task_id: runningTask.id, message: "continue", interrupt: true },
+      { task_id: idleTask.id, message: "continue with new direction", interrupt: true },
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe(`Interrupt sent to task ${runningTask.id}. The background task will continue with new direction.`)
-    expect(mockManager.releaseConcurrencySlot).toHaveBeenCalled()
+    expect(result).toBe(`Interrupt sent to task ${idleTask.id}. Previous execution aborted, new message injected. Task will continue with new direction.`)
+    
+    // Verify abort was called
+    expect(mockClient.session.abort).toHaveBeenCalled()
+    expect(mockClient.session.promptAsync).toHaveBeenCalled()
+    
+    // Verify concurrency slot management via reacquireSlotOnWakeUp
+    // reacquireSlotOnWakeUp should be called to acquire slot and clear waitingConcurrencyKey
+    expect(mockManager.reacquireSlotOnWakeUp).toHaveBeenCalledWith(idleTask)
+    
+    // After successful promptAsync, resetTaskForResume clears all idle phase state
+    expect(idleTask.idleNotified).toBeUndefined()
+    expect(idleTask.status).toBe("running")
+    
+    // Note: waitingConcurrencyKey is cleared by reacquireSlotOnWakeUp (if tryAcquire succeeds)
+    // or remains preserved for retry (if tryAcquire fails due to concurrency limit)
+    // In this test mock doesn't execute real tryAcquire logic, so we verify the call instead
+  })
+
+  it("interrupt=true rollback releases slot when promptAsync fails", async () => {
+    const mockClient = createMockClient()
+    mockClient.session.promptAsync.mockRejectedValueOnce(new Error("Network error"))
+    const idleTask = createWaitingTask({
+      status: "running" as WopalTask["status"],
+      idleNotified: true,
+      concurrencyKey: undefined,
+      waitingConcurrencyKey: "default",
+    } as Partial<WopalTask>)
+    const mockManager = createMockTaskManager(idleTask, mockClient)
+    const execute = getExecute(createWopalReplyTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: idleTask.id, message: "continue", interrupt: true },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toBe("Failed to send interrupt: Network error")
+    
+    // Verify rollback: reacquireSlotOnWakeUp acquired slot, promptAsync failed, releaseConcurrencySlot called
+    expect(mockManager.reacquireSlotOnWakeUp).toHaveBeenCalledWith(idleTask)
+    expect(mockManager.releaseConcurrencySlot).toHaveBeenCalledWith(idleTask)
+    
+    // Task state should NOT be reset (failed before resetTaskForResume)
+    expect(idleTask.idleNotified).toBe(true)
+    expect(idleTask.status).toBe("running")
+  })
+
+  it("non-interrupt reply rollback releases slot when promptAsync fails", async () => {
+    const mockClient = createMockClient()
+    mockClient.session.promptAsync.mockRejectedValueOnce(new Error("Network error"))
+    const waitingTask = createWaitingTask({
+      concurrencyKey: undefined,
+      waitingConcurrencyKey: "default",
+    } as Partial<WopalTask>)
+    const mockManager = createMockTaskManager(waitingTask, mockClient)
+    const execute = getExecute(createWopalReplyTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: waitingTask.id, message: "test" },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toBe("Failed to send reply: Network error")
+    
+    // Verify rollback: reacquireSlotOnWakeUp acquired slot, promptAsync failed, releaseConcurrencySlot called
+    expect(mockManager.reacquireSlotOnWakeUp).toHaveBeenCalledWith(waitingTask)
+    expect(mockManager.releaseConcurrencySlot).toHaveBeenCalledWith(waitingTask)
+    
+    // Task state should NOT be reset (failed before resetTaskForResume)
+    expect(waitingTask.status).toBe("waiting")
   })
 })
