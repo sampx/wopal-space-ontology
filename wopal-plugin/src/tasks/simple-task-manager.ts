@@ -39,7 +39,6 @@ const defaultManagerLog = createDebugLog("[task]", "task")
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
   private taskSessions = new Set<string>()
-  private mainSessionID: string | null = null
   private client: OpenCodeClient
   private v2Client: OpenCodeClient
   private serverUrl?: URL
@@ -193,10 +192,6 @@ export class SimpleTaskManager {
 
   isTaskSession(sessionID: string): boolean {
     return this.taskSessions.has(sessionID)
-  }
-
-  setMainSession(sessionID: string): void {
-    this.mainSessionID = sessionID
   }
 
   markTaskCompletedBySession(sessionID: string): WopalTask | undefined {

@@ -20,6 +20,10 @@ export interface SessionState {
   needsAutoContinue?: boolean;
   /** Set to "plugin" when compact was triggered by context_manage tool; checked by event-router to distinguish Plugin-initiated vs other compacts */
   compactingTrigger?: "plugin";
+  /** Recovery instruction already sent via promptAsync (Plugin-triggered compact). Prevents duplicate injection in messages.transform */
+  recoverySent?: boolean;
+  /** Recovery protocol needs injection in messages.transform (manual/EllaMaka-triggered compact) */
+  needsRecoveryInjection?: boolean;
   /** Main-session compact requested during active tool run; trigger summarize after session.idle */
   pendingCompactTrigger?: "plugin";
   /** Agent name extracted from the most recent messages.transform cycle */
@@ -124,6 +128,12 @@ export class SessionStore {
       delete state.compactingSince;
       // DO NOT delete compactingTrigger here — event-router reads it to distinguish Plugin-initiated
       state.needsAutoContinue = true;
+
+      // Manual/EllaMaka-triggered compact: set needsRecoveryInjection for messages.transform injection
+      if (!state.compactingTrigger) {
+        state.needsRecoveryInjection = true;
+      }
+
       if (state.loadedSkills.size > 0) {
         state.needsSkillReload = true;
       }
@@ -149,6 +159,15 @@ export class SessionStore {
       delete s.needsSkillReload;
     });
     return skills;
+  }
+
+  consumeRecoveryInjection(sessionID: string): boolean {
+    const state = this.stateMap.get(sessionID);
+    if (!state?.needsRecoveryInjection) return false;
+    this.upsert(sessionID, (s) => {
+      delete s.needsRecoveryInjection;
+    });
+    return true;
   }
 
   private createDefaultState(): SessionState {

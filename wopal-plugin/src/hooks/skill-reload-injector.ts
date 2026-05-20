@@ -14,6 +14,47 @@ export async function injectSkillReload(
 ): Promise<void> {
   if (!lastUserMsg) return;
 
+  const state = ctx.sessionStore.get(sessionID);
+
+  // Dedup: Plugin-triggered compact already sent recovery via promptAsync
+  if (state?.recoverySent === true) {
+    ctx.contextDebugLog(
+      `Session ${sessionID} recovery already sent, skip injection`,
+    );
+    return;
+  }
+
+  // Check if full recovery protocol needs injection (manual/EllaMaka-triggered compact)
+  const needsInjection = ctx.sessionStore.consumeRecoveryInjection(sessionID);
+  if (needsInjection) {
+    const skills = state?.loadedSkills
+      ? Array.from(state.loadedSkills).join(", ")
+      : "none";
+
+    const recoveryText = `<system-reminder>
+The session context has been compacted. Execute recovery protocol immediately and continue working:
+<CRITICAL_RULE>
+1. Read key files from the compaction summary (plans, specs, etc. — max 3)
+2. Search and load task-relevant memories (max 3)
+3. Reload previously loaded skills: ${skills}
+4. Briefly report what was recovered, then continue the previous work
+</CRITICAL_RULE>
+</system-reminder>`;
+
+    lastUserMsg.parts ??= [];
+    lastUserMsg.parts.push({
+      type: "text",
+      text: recoveryText,
+      synthetic: true,
+    });
+
+    ctx.contextDebugLog(
+      `Injected full recovery protocol for session ${sessionID}`,
+    );
+    return;
+  }
+
+  // Legacy: skill-reload injection (when no full recovery needed)
   const skillsToReload = ctx.sessionStore.consumeSkillReload(sessionID);
   if (!skillsToReload || skillsToReload.length === 0) return;
 

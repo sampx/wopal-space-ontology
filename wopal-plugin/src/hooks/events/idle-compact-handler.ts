@@ -105,9 +105,9 @@ export async function handleSessionCompacted(
 
   const task = ctx.taskManager?.findBySession(sessionID)
 
-  // Clear compactingTrigger immediately to mark as processed
+  // Plugin-triggered: set recoverySent BEFORE sending (prevents messages.transform duplicate)
   ctx.sessionStore.upsert(sessionID, (s) => {
-    delete s.compactingTrigger
+    s.recoverySent = true
   })
 
   if (task) {
@@ -117,6 +117,11 @@ export async function handleSessionCompacted(
     // Main session: send auto-continue recovery message
     await sendAutoContinueForMain(ctx, sessionID, state)
   }
+
+  // Clear compactingTrigger AFTER recovery sent (messages.transform can check recoverySent)
+  ctx.sessionStore.upsert(sessionID, (s) => {
+    delete s.compactingTrigger
+  })
 
   // Clear needsAutoContinue after recovery/notification
   ctx.sessionStore.upsert(sessionID, (s) => {
@@ -151,7 +156,7 @@ The session context has been compacted. Execute recovery protocol immediately an
         path: { id: sessionID },
         body: {
           noReply: false,
-          parts: [{ type: "text", text: recoveryText, synthetic: true }],
+          parts: [{ type: "text", text: recoveryText }],
         },
       })
       ctx.taskDebugLog(`[autoContinue] sent recovery to main session: ${formatSessionID(sessionID, false)}`)
@@ -189,7 +194,7 @@ Use wopal_task_reply to send recovery instructions if the task should continue.
         path: { id: task.parentSessionID },
         body: {
           noReply: false,
-          parts: [{ type: "text", text: notification, synthetic: true }],
+          parts: [{ type: "text", text: notification }],
         },
       })
       ctx.taskDebugLog(`[compactedNotify] sent to parent: taskId=${task.id}`)

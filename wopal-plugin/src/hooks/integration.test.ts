@@ -971,4 +971,139 @@ describe("Skill Reload Migration", () => {
       process.env.HOME = originalHome;
     }
   });
+
+  it("injects full recovery protocol when needsRecoveryInjection is true (manual/EllaMaka compact)", async () => {
+    // Arrange
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+    
+    const { default: pluginDef } = await import("../index.js");
+    const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+    const hooks = await plugin({
+      client: {} as any,
+      project: {} as any,
+      directory: testDir,
+      worktree: testDir,
+      $: {} as any,
+      serverUrl: new URL("http://localhost"),
+    });
+
+    const sessionID = "ses_recovery_injection";
+    upsertSessionState(sessionID, (s) => {
+      s.loadedSkills = new Set(["space-master"]);
+      s.needsRecoveryInjection = true;
+    });
+
+    const messages = [
+      { info: { role: "user", sessionID }, parts: [{ type: "text", text: "continue" }] },
+    ];
+
+    try {
+      // Act
+      const messagesTransform = hooks["experimental.chat.messages.transform"] as any;
+      const result = await messagesTransform({}, { messages });
+
+      // Assert - full recovery protocol injected
+      const syntheticPart = result.messages[0].parts.find((p: any) => p.synthetic === true);
+      expect(syntheticPart).toBeDefined();
+      expect(syntheticPart.text).toContain("The session context has been compacted");
+      expect(syntheticPart.text).toContain("Execute recovery protocol immediately");
+      expect(syntheticPart.text).toContain("<CRITICAL_RULE>");
+      expect(syntheticPart.text).toContain("Read key files from the compaction summary");
+      expect(syntheticPart.text).toContain("Reload previously loaded skills: space-master");
+      expect(syntheticPart.text).toContain("Search and load task-relevant memories");
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
+  it("skips recovery injection when recoverySent is true (Plugin-triggered compact)", async () => {
+    // Arrange
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+    
+    const { default: pluginDef } = await import("../index.js");
+    const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+    const hooks = await plugin({
+      client: {} as any,
+      project: {} as any,
+      directory: testDir,
+      worktree: testDir,
+      $: {} as any,
+      serverUrl: new URL("http://localhost"),
+    });
+
+    const sessionID = "ses_recovery_sent";
+    upsertSessionState(sessionID, (s) => {
+      s.loadedSkills = new Set(["space-master"]);
+      s.recoverySent = true; // Plugin already sent recovery via promptAsync
+    });
+
+    const messages = [
+      { info: { role: "user", sessionID }, parts: [{ type: "text", text: "continue" }] },
+    ];
+
+    try {
+      // Act
+      const messagesTransform = hooks["experimental.chat.messages.transform"] as any;
+      const result = await messagesTransform({}, { messages });
+
+      // Assert - no recovery injection (recoverySent prevents duplicate)
+      const syntheticPart = result.messages[0].parts.find((p: any) => p.synthetic === true);
+      expect(syntheticPart).toBeUndefined();
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
+  it("recoveryInjection is one-time consumption", async () => {
+    // Arrange
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+    
+    const { default: pluginDef } = await import("../index.js");
+    const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+    const hooks = await plugin({
+      client: {} as any,
+      project: {} as any,
+      directory: testDir,
+      worktree: testDir,
+      $: {} as any,
+      serverUrl: new URL("http://localhost"),
+    });
+
+    const sessionID = "ses_recovery_once";
+    upsertSessionState(sessionID, (s) => {
+      s.loadedSkills = new Set(["dev-flow"]);
+      s.needsRecoveryInjection = true;
+    });
+
+    const messages1 = [
+      { info: { role: "user", sessionID }, parts: [{ type: "text", text: "first" }] },
+    ];
+
+    const messages2 = [
+      { info: { role: "user", sessionID }, parts: [{ type: "text", text: "second" }] },
+    ];
+
+    try {
+      // Act - first call
+      const messagesTransform = hooks["experimental.chat.messages.transform"] as any;
+      const result1 = await messagesTransform({}, { messages: messages1 });
+
+      // Assert - recovery protocol injected
+      const synthetic1 = result1.messages[0].parts.find((p: any) => p.synthetic === true);
+      expect(synthetic1).toBeDefined();
+      expect(synthetic1.text).toContain("Execute recovery protocol immediately");
+
+      // Act - second call
+      const result2 = await messagesTransform({}, { messages: messages2 });
+
+      // Assert - no recovery (already consumed)
+      const synthetic2 = result2.messages[0].parts.find((p: any) => p.synthetic === true);
+      expect(synthetic2).toBeUndefined();
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
 });

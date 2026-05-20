@@ -222,7 +222,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           parts: [{
             type: "text",
             text: expect.stringContaining("The session context has been compacted"),
-            synthetic: true,
           }],
         },
       })
@@ -294,7 +293,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           parts: [{
             type: "text",
             text: expect.stringContaining("[WOPAL TASK COMPACTED]"),
-            synthetic: true,
           }],
         },
       })
@@ -352,6 +350,53 @@ describe("OpenCodeRulesRuntime event handling", () => {
       // But there's no compactingSince record, so Plugin should skip recovery
       expect(state?.compactingSince).toBeUndefined()
       expect(mockPromptAsync).not.toHaveBeenCalled()
+    })
+
+    it("sets recoverySent before sending recovery (prevents duplicate injection)", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+      
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        contextDebugLog: () => {},
+        taskDebugLog: () => {},
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+          isTaskSession: vi.fn().mockReturnValue(false),
+          getClient: vi.fn().mockReturnValue({
+            session: {
+              messages: vi.fn().mockResolvedValue({ data: [] }),
+            },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskErrorBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+      
+      // Pre-condition: Plugin-initiated compact
+      sessionStore.markCompacting("main-session", Date.now(), "plugin")
+      sessionStore.upsert("main-session", (state) => {
+        state.loadedSkills = new Set(["space-master"])
+      })
+      
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "main-session" } },
+      })
+
+      // Verify recoverySent was set during recovery
+      const stateAfter = sessionStore.get("main-session")
+      expect(stateAfter?.recoverySent).toBe(true)
     })
   })
 
