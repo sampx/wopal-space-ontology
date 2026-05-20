@@ -1,68 +1,144 @@
-# 命令速查
+# 命令参考
 
-## `flow.sh issue create`
+对所有命令，使用 `flow.sh <cmd> --help` 获取完整参数列表和说明。本文档仅补充 `--help` 不覆盖的使用模式和边缘场景。
 
-创建规范化 Issue。
+---
+
+## 命令概览
+
+### 工作流命令（状态机推进）
+
+| 命令 | 说明 |
+|------|------|
+| `plan <issue>` | 创建或定位 Plan |
+| `approve <issue>` | 方案评审 |
+| `approve <issue> --confirm [--worktree]` | 用户审批通过，开始实施 |
+| `complete <issue> [--pr]` | 实施完成，进入用户验证 |
+| `verify <issue> --confirm` | 用户验证通过 |
+| `archive <issue>` | 归档 Plan，push 代码 |
+| `verify-switch <issue> [--merge]` | worktree 验证切换 |
+
+### Issue 管理
+
+| 命令 | 说明 |
+|------|------|
+| `issue create --title "..." --project <name> --goal "..."` | 创建 Issue |
+| `issue update <issue>` | 更新 Issue |
+| `decompose-prd <prd-path> [--dry-run]` | 从 PRD 拆分 Issue |
+
+### 查询与诊断
+
+| 命令 | 说明 |
+|------|------|
+| `status <issue>` | 查看 Issue + Plan 状态 |
+| `list` | 列出所有活跃 Plan |
+| `sync <issue> [--body-only\|--labels-only]` | Plan → Issue 同步 |
+| `reset <issue>` | 重置 Plan 到 planning 状态 |
+
+### 工具
+
+| 命令 | 说明 |
+|------|------|
+| `query` | 低层数据查询（内部用） |
+
+---
+
+## 使用模式
+
+### issue create 参数速记
 
 ```bash
-flow.sh issue create --title "<type>(<scope>): <description>" --project <name> [options]
+# 最小创建
+flow.sh issue create --title "feat(scope): desc" --project <name> --goal "一句话目标"
+
+# 常用附加
+--background "背景说明" --scope "范围" --out-of-scope "不包括"
 ```
 
-**必填参数**：
-- `--goal "<一句话目标>"` — 必填
-- title 的 `<description>` 必须是英文祈使句（≤50 chars）
+类型专属参数：
+- `fix`: `--confirmed-bugs` / `--cleanup-scope` / `--key-findings`
+- `refactor`: `--affected-components` / `--refactor-strategy`
+- `perf`: `--baseline` / `--target`
+- `docs`: `--target-documents` / `--audience`
+- `test`: `--test-scope` / `--test-strategy`
 
-**常用参数**：`--background`、`--scope`、`--out-of-scope`、`--reference`
-
-类型专属参数按需使用：perf（`--baseline`/`--target`）、refactor（`--affected-components`/`--refactor-strategy`）、docs（`--target-documents`/`--audience`）、test（`--test-scope`/`--test-strategy`）、fix（`--confirmed-bugs`/`--cleanup-scope`/`--key-findings`）
-
-## `flow.sh issue update`
+### issue update
 
 ```bash
 flow.sh issue update <issue> [options]
 ```
+参数与 `issue create` 相同，用于补充 Issue 字段。
 
-适合补充 Goal、Background、Scope、Acceptance Criteria 及各类型特定字段。
-
-## `flow.sh sync`
-
-手动把 Plan 同步回 Issue，不推进状态。
+### plan（无 Issue 模式）
 
 ```bash
-flow.sh sync <issue>
-flow.sh sync <issue> --body-only
-flow.sh sync <issue> --labels-only
+flow.sh plan --title "feat(scope): desc" --project <name> --type <type>
 ```
 
-## `flow.sh status`
+### plan --check
 
 ```bash
-flow.sh status <issue-or-plan-name>
+flow.sh plan <issue> --check
 ```
+校验 Plan 质量，不推进状态。
 
-显示：Issue 标题 / 状态 / labels、对应 Plan、Plan 状态、worktree 信息。
-
-## `flow.sh list`
+### sync
 
 ```bash
-flow.sh list
+flow.sh sync <issue>           # 全量同步（body + labels）
+flow.sh sync <issue> --body-only    # 仅 body
+flow.sh sync <issue> --labels-only  # 仅 labels
 ```
 
-扫描 GitHub Issues 和本地 Plan 文件，合并展示。无 Issue 关联的 Plan 显示为 `[status] <plan-name> (no issue)`。
-
-## `flow.sh decompose-prd`
+### approve --confirm
 
 ```bash
-flow.sh decompose-prd <prd-path> [--dry-run] [--project <name>]
+flow.sh approve <issue> --confirm              # 直接开始实施
+flow.sh approve <issue> --confirm --worktree   # 隔离 worktree 中实施
 ```
 
-建议先：`flow.sh decompose-prd <prd-path> --dry-run`
-
-## `flow.sh reset`
+### complete --pr
 
 ```bash
-flow.sh reset <issue>
-flow.sh reset <plan-name>
+flow.sh complete <issue> --pr    # PR 路径（默认不走 PR）
 ```
 
-破坏性操作，只在用户明确要求时执行。
+### verify-switch（worktree 验证专用）
+
+```bash
+# Phase 1: 切换到 feature 分支供用户验证
+flow.sh verify-switch <issue>
+
+# Phase 2: 合并回主分支 + verify --confirm（用户确认后 Wopal 自动执行）
+flow.sh verify-switch <issue> --merge
+```
+
+### decompose-prd
+
+```bash
+flow.sh decompose-prd docs/products/<project>/PRD.md --dry-run   # 预览
+flow.sh decompose-prd docs/products/<project>/PRD.md --project <name>  # 创建
+```
+
+### reset（破坏性）
+
+```bash
+flow.sh reset <issue>       # Issue 驱动
+flow.sh reset <plan-name>   # Plan 驱动
+```
+仅用户明确要求时使用。
+
+---
+
+## 边缘场景
+
+| 场景 | 处理 |
+|------|------|
+| 已有 Plan 再次 `plan` | 不重复创建，继续推进 |
+| `complete` 时 Done 未勾选 | 先勾选再 complete |
+| `complete` 时 Agent Verification 未完成 | 先补齐再 complete |
+| rook BLOCK 后 complete | 停止，修复后重新 rook 审查 |
+| rook 连续 3 轮 BLOCK/REVISE | 保留分歧注释，用户裁决 |
+| `verify --confirm` 时 PR 未 merge | 等 merge |
+| 目标项目工作区不干净 | 清理/提交 或 `--worktree` |
+| 参数选择 | Issue 驱动传 issue number；无 Issue 传 plan-name |

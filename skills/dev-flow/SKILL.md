@@ -160,14 +160,14 @@ flow.sh approve <issue> --confirm --worktree
 
 ## 参考
 
-按需读取：
+对所有命令，使用 `flow.sh <cmd> --help` 获取完整参数。以下文档补充使用模式和边缘场景：
 
 | 文件 | 用途 |
 |------|------|
-| `references/commands.md` | 7 个 flow.sh 子命令的完整参数和用法 |
+| `references/commands.md` | 命令概览、使用模式、边缘场景 |
 | `references/delegation-templates.md` | 委派 prompt 格式、Task 字段顺序、TDD 规则 |
 | `references/plan-quality.md` | Plan 质量门、AC 分类（Agent vs User Validation） |
-| `references/troubleshooting.md` | 边缘场景与错误处理 |
+| `references/troubleshooting.md` | 错误处理速查 |
 | `references/pr-workflow.md` | PR 工作流（可选） |
 | `templates/plan.md` | Plan 骨架模板 |
 | `templates/issue*.md` | 各类型 Issue 模板 |

@@ -108,6 +108,9 @@ def main(argv: list[str] | None = None) -> int:
         print("Utility commands:")
         print("  decompose-prd   Create Issues from PRD phases")
         print("  reset           Reset Plan to planning status")
+        print("  query           Low-level data queries")
+        print("")
+        print("For detailed options: flow.sh <command> --help")
         return 0
 
     # Dispatch issue subcommand
