@@ -53,20 +53,12 @@ export function createContextManageTool(
 
   return tool({
     description:
-      "Session context tool. Actions:\n" +
-      "- 'summary': Generate ≤50 char summary via LLM and update session title.\n" +
-      "  MUST only call when user explicitly requests (e.g. \"摘要本次会话\"). Do not repeat after success.\n" +
-      "- 'status': Return session context usage stats. For main sessions, also lists child tasks.\n" +
-      "  Use to inspect session state before/after actions (e.g., before compact, after launch).\n" +
-      "  Main sessions: include session payload + tasks array (child task summaries).\n" +
-      "  Child sessions: include session payload only (no tasks array).\n" +
-      "- 'dump': Export session context to file.\n" +
-      "  Default: dump current session (no session_id needed).\n" +
-      "  Optional session_id: dump specific session (accepts 'ses_xxx' or 'wopal-task-xxx').\n" +
-      "  Default is compact mode (truncates long content, recommended). Use detail=true only when user requests full content.\n" +
-      "- 'compact': Compact session context (manual compaction).\n" +
-      "  Reports current context usage and triggers compaction. No threshold parameter—agent decides when to compact.\n" +
-      "  Optional session_id: compact specific session (accepts 'ses_xxx' or 'wopal-task-xxx'). Default: current session.",
+      "Cross-session context manager. Operates on main OR child sessions via optional session_id (accepts 'ses_xxx' or 'wopal-task-xxx', defaults to current).\n" +
+      "Actions:\n" +
+      "- 'status': Session stats + active tasks list (main sessions only).\n" +
+      "- 'summary': Generate title summary (main sessions only, user-requested).\n" +
+      "- 'dump': Export context to file. Default: compact mode (detail=false). Use detail=true only when user explicitly requests full content.\n" +
+      "- 'compact': Trigger context compaction (manual or sub-session recovery).",
     args: {
       action: tool.schema
         .enum(["summary", "status", "dump", "compact"] as const)

@@ -15,7 +15,7 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
   return tool({
     description: "Get status and output for a background task. Use `section` param: 'tools' (tool calls), 'reasoning' (thinking), 'text' (output). Omit for summary.",
     args: {
-      task_id: tool.schema.string().describe("Task ID returned by wopal_task"),
+      task_id: tool.schema.string().describe("Task ID to query. Sources: (1) System notification [WOPAL TASK IDLE/STUCK/ERROR], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID for all active tasks"),
       section: tool.schema.enum(["tools", "reasoning", "text"]).optional().describe("Content section to retrieve: 'tools' (tool calls & results), 'reasoning' (thinking process), 'text' (text output). Omit for summary only."),
       last_n: tool.schema.number().optional().describe("Only output the last N messages. Default: all messages."),
     },
