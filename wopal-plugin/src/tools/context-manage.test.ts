@@ -34,6 +34,57 @@ const summaryClient = {
 
 const summaryCtx = { sessionID: 'ses-summary-test' } as { sessionID: string };
 
+describe('context_manage: schema', () => {
+  it('marks session_id as optional and detail as optional with default', () => {
+    const tool = createContextManageTool(distillLLM, summaryClient) as {
+      args: {
+        session_id: { type: string }
+        detail: { type: string; def?: { type: string; defaultValue?: unknown } }
+      }
+    }
+
+    expect(tool.args.session_id.type).toBe('optional')
+    expect(tool.args.detail.type).toBe('default')
+    expect(tool.args.detail.def?.defaultValue).toBe(false)
+  })
+
+  it('falls back to context sessionID when session_id is empty string', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_empty_str_fallback', (state) => {
+      state.agent = 'wopal';
+    });
+
+    const tool = createContextManageTool(distillLLM, summaryClient);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status', session_id: '' },
+      { sessionID: 'ses_empty_str_fallback', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.sessionID).toBe('ses_empty_str_fallback');
+    expect(parsed.agent).toBe('wopal');
+  })
+
+  it('falls back to context sessionID when session_id is undefined', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_undefined_fallback', (state) => {
+      state.agent = 'wopal';
+    });
+
+    const tool = createContextManageTool(distillLLM, summaryClient);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status' },
+      { sessionID: 'ses_undefined_fallback', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.sessionID).toBe('ses_undefined_fallback');
+    expect(parsed.agent).toBe('wopal');
+  })
+})
+
 describe('context_manage: handleSummary', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -95,7 +95,7 @@ export function createContextManageTool(
 
       // === STATUS action ===
       if (args.action === "status") {
-        const rawSessionID = args.session_id ?? sessionID;
+        const rawSessionID = args.session_id || sessionID;
         if (!rawSessionID) {
           return "Failed: no session ID available for status.";
         }
@@ -105,7 +105,7 @@ export function createContextManageTool(
 
       // === DUMP action ===
       if (args.action === "dump") {
-        const rawSessionID = args.session_id ?? sessionID;
+        const rawSessionID = args.session_id || sessionID;
         if (!rawSessionID) {
           return "Failed: no session ID available for dump.";
         }
@@ -125,7 +125,7 @@ export function createContextManageTool(
 
       // === COMPACT action ===
       if (args.action === "compact") {
-        const rawSessionID = args.session_id ?? sessionID;
+        const rawSessionID = args.session_id || sessionID;
         if (!rawSessionID) {
           return "Failed: no session ID available for compact.";
         }
