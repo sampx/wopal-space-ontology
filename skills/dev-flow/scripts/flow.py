@@ -20,6 +20,7 @@ from dev_flow.commands.verify import register_verify_parser, cmd_verify
 from dev_flow.commands.plan import register_plan_parser, cmd_plan
 from dev_flow.commands.decompose import register_decompose_parser, cmd_decompose
 from dev_flow.commands.reset import register_reset_parser, cmd_reset
+from dev_flow.commands.verify_switch import run_verify_switch
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -71,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
     # Register list as top-level command
     list_parser = subparsers.add_parser("list", help="List active Plans")
 
+    # Register verify-switch subcommand
+    vs_parser = subparsers.add_parser("verify-switch", help="Switch .wopal/ to feature branch for verification")
+    vs_parser.add_argument("issue", help="Issue number or plan name")
+    vs_parser.add_argument("--merge", action="store_true", help="Phase 2: merge feature branch back to main")
+
     return parser
 
 
@@ -96,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  approve         Review and approve a Plan")
         print("  complete        Mark implementation complete")
         print("  verify          Verify and confirm completion")
+        print("  verify-switch   Switch .wopal/ for worktree verification")
         print("  archive         Archive a completed Plan")
         print("")
         print("Utility commands:")
@@ -146,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch list as top-level command
     if args.command == "list":
         return cmd_query_list(args)
+
+    # Dispatch verify-switch
+    if args.command == "verify-switch":
+        return 0 if run_verify_switch(args.issue, merge=args.merge) else 1
 
     return 0
 

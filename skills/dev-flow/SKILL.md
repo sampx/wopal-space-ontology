@@ -108,23 +108,19 @@ rook 契约格式见 agents-collab。委派 rook 前不预加载 df-plan-review 
 
 `complete` 后代码在 feature 分支。用户验证需切换运行时环境：
 
-**ontology-worktree**：
+**Phase 1 — 切换验证**：
 ```bash
-# 移除隔离 worktree
-git -C ~/.wopal/ontologies/wopal-space-ontology worktree remove .worktrees/ontology-issue-<N>-<slug> --force
-# 切换运行时
-git -C .wopal checkout <feature-branch>
-# 提示用户重启验证
+flow.sh verify-switch <issue>
 ```
+自动完成：移除隔离 worktree → 检出 feature 分支 → 记录主分支。提示用户重启验证。
 
-**Wopal 自动执行**：用户确认验证通过后，必须自动执行三步——用户只需说"验证通过"：
+**Phase 2 — 合并回主分支**（用户确认验证通过后，Wopal 自动执行）：
 ```bash
-git -C .wopal checkout space/main
-git -C .wopal merge <feature-branch>
-flow.sh verify <issue> --confirm
+flow.sh verify-switch <issue> --merge
 ```
+自动完成：检出主分支 → merge feature 分支 → `flow.sh verify <issue> --confirm`。
 
-**严禁**在验证前 merge feature 分支到主分支——提前 merge 后回退需 revert，revert 会在后续 merge 时产生大量冲突。
+**⚠️ 硬约束**：合并（Phase 2）**必须**在用户明确确认验证通过后执行。禁止手动 merge，统一使用本命令。
 
 ### E. 用户验证通过后进入 done
 
