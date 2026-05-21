@@ -36,7 +36,7 @@ export class MemoryInjector {
       const { formatted, injectedCount, injectedIds } = this.formatMemories(memories);
       const tokens = Math.ceil(formatted.length / 4);
       const idLines = injectedIds.map((id, i) => `  [${i + 1}] ${id}`).join("\n");
-      memoryLogger.debug(
+      memoryLogger.info(
         `[inject] retrieved=${memories.length}, injected=${injectedCount}, tokens=${tokens}\n${idLines}`
       );
 

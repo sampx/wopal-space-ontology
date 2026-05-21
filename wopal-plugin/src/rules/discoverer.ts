@@ -317,7 +317,7 @@ export async function discoverRuleFiles(
 
   // Single-line summary log
   if (rulesDebugLog && files.length > 0) {
-    rulesDebugLog.debug(
+    rulesDebugLog.info(
       `Discovered ${files.length} rule file(s): ${files.map((r) => r.relativePath).join(", ")}`,
     );
   }

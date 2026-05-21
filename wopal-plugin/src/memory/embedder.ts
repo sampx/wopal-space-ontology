@@ -44,7 +44,7 @@ export class EmbeddingClient {
       timeout: 60_000,
     });
 
-    memoryLogger.debug(`EmbeddingClient ready: ${this.model} @ ${baseURL}`);
+    memoryLogger.info(`EmbeddingClient ready: ${this.model} @ ${baseURL}`);
   }
 
   /**

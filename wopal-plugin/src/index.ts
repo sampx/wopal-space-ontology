@@ -171,7 +171,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     );
   }
 
-  coreLogger.debug({ tools: Object.keys(tools).join(", "), memory: !!memory }, "Plugin initialized");
+  coreLogger.info({ tools: Object.keys(tools).join(", "), memory: !!memory }, "Plugin initialized");
 
   return {
     ...hookHandlers,

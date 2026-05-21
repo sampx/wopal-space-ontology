@@ -144,7 +144,7 @@ export class MemoryStore {
       }
 
       this.initialized = true;
-      memoryLogger.debug(`MemoryStore initialized (LanceDB at ${this.dbPath})`);
+      memoryLogger.info(`MemoryStore initialized (LanceDB at ${this.dbPath})`);
     } catch (error) {
       memoryLogger.warn(`MemoryStore init failed, gracefully degrading: ${error}`);
       this.initialized = false;

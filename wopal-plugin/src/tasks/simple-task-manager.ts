@@ -334,7 +334,7 @@ export class SimpleTaskManager {
       }
 
       if (recovered > 0) {
-        this.debugLog.debug(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 16)}`)
+        this.debugLog.info(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 16)}`)
       }
       this.recoveredSessions.add(parentSessionID)
     } catch (err) {

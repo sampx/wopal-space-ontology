@@ -45,7 +45,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           const result = await client.session.get({ path: { id: sessionID } })
           const session = (result as { data?: { parentID?: string } } | undefined)?.data
           if (session && !session.parentID) {
-            ctx.taskLogger.debug(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
+            ctx.taskLogger.info(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
             void ctx.taskManager.recoverFromSession(sessionID)
           }
         } catch {

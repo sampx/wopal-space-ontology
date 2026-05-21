@@ -39,7 +39,7 @@ export class DistillLLMClient {
       apiKey,
     });
 
-    memoryLogger.debug(`DistillLLMClient ready: ${this.model}`);
+    memoryLogger.info(`DistillLLMClient ready: ${this.model}`);
   }
 
   /**
