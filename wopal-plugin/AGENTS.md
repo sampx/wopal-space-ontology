@@ -292,7 +292,6 @@ WOPAL_PLUGIN_LOG_MODULES=task,memory            # Task + Memory
 WOPAL_PLUGIN_LOG_MODULES=core,rules,context     # 多模块
 
 # 日志文件路径（默认 <cwd>/.wopal-space/logs/wopal-plugin.log）
-WOPAL_PLUGIN_LOG_FILE=/tmp/wopal-plugin.log
 
 # 功能模块开关
 WOPAL_RULES_INJECTION_ENABLED=false             # 禁用 Rules 模块
