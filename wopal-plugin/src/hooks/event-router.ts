@@ -9,7 +9,7 @@ import type { SessionStore } from "../session-store.js"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { LoggerInstance } from "../logger.js"
 import type { OpenCodeClient } from "../types.js"
-import { contextLogger, formatSessionID } from "../logger.js"
+import { formatSessionID } from "../logger.js"
 
 // Import specialized handlers
 import { handleMessageUpdated, handleMessagePartDelta, handleMessagePartUpdated } from "./events/message-token-handler.js"
@@ -61,20 +61,20 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       if (sessionID) {
         const info = props?.info as { agent?: string } | undefined
         handleMessageUpdated(
-          { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
+          { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: ctx.contextLogger },
           sessionID,
           info,
         )
       }
     } else if (eventType === "message.part.delta") {
       handleMessagePartDelta(
-        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
+        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: ctx.contextLogger },
         sessionID,
       )
     } else if (eventType === "message.part.updated") {
       const part = props?.part as { type?: string; tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } } } | undefined
       await handleMessagePartUpdated(
-        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
+        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: ctx.contextLogger },
         sessionID,
         part,
       )

@@ -69,11 +69,13 @@ function flushAutoDump(): Promise<void> {
 describe('system-transform auto dump deduplication', () => {
   beforeEach(() => {
     process.env.WOPAL_PLUGIN_LOG_LEVEL = 'trace';
+    process.env.WOPAL_PLUGIN_LOG_MODULES = 'context';
     vi.mocked(writeContextDump).mockClear();
   });
 
   afterEach(() => {
     delete process.env.WOPAL_PLUGIN_LOG_LEVEL;
+    delete process.env.WOPAL_PLUGIN_LOG_MODULES;
     vi.resetAllMocks();
   });
 

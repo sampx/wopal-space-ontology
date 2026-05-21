@@ -76,7 +76,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
       },
       sessionStore,
-      debugLog: () => {},
       taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
       taskManager: {
@@ -204,7 +203,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           },
         },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -281,7 +279,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           },
         },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -345,7 +342,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           },
         },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -393,7 +389,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           },
         },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -437,7 +432,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const ctx = {
         client: { session: { messages: vi.fn().mockResolvedValue({ data: [] }) } },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -490,7 +484,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           config: { providers: mockConfig },
         },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -534,7 +527,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const ctx = {
         client: { session: { messages: vi.fn() } },
         sessionStore,
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: { findBySession: vi.fn() } as never,
@@ -570,7 +562,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
           session: { promptAsync: mockPromptAsync },
         },
         sessionStore: new SessionStore({ max: 10 }),
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -622,7 +613,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const ctx = {
         client: { permission: { reply: mockPermissionReply } },
         sessionStore: new SessionStore({ max: 10 }),
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -662,7 +652,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const ctx = {
         client: { session: { promptAsync: mockPromptAsync } },
         sessionStore: new SessionStore({ max: 10 }),
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {
@@ -722,7 +711,6 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const ctx = {
         client: { session: { promptAsync: mockPromptAsync } },
         sessionStore: new SessionStore({ max: 10 }),
-        contextDebugLog: () => {},
         taskLogger: createMockLogger(),
     contextLogger: createMockLogger(),
         taskManager: {

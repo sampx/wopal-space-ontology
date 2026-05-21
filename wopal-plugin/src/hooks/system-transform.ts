@@ -115,8 +115,13 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
       ctx.systemInjectionsMap.set(sessionID, output.system.slice(initialSystemLength));
     }
 
-    // Auto-dump: controlled by WOPAL_PLUGIN_LOG_LEVEL=trace + WOPAL_PLUGIN_LOG_MODULES=context (handled by logger.ts)
+    // Auto-dump: only when WOPAL_PLUGIN_LOG_MODULES explicitly includes "context"
     if (sessionID) {
+      const modulesEnv = process.env.WOPAL_PLUGIN_LOG_MODULES
+      if (!modulesEnv || !modulesEnv.split(',').some(m => m.trim().toLowerCase() === 'context')) {
+        return output
+      }
+
       const fingerprint = buildAutoDumpFingerprint({
         snapshot: ctx.systemSnapshots?.get(sessionID) ?? output.system,
         metadata: ctx.systemMetadataMap?.get(sessionID),

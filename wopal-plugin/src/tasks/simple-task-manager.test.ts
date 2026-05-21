@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SimpleTaskManager } from "./simple-task-manager.js"
 import { sessionIDToTaskID } from "./task-launcher.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
+import type { LoggerInstance } from "../logger.js"
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -34,15 +35,26 @@ function createMockClient() {
   }
 }
 
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  }
+}
+
 describe("SimpleTaskManager", () => {
   let manager: SimpleTaskManager
   let mockClient: ReturnType<typeof createMockClient>
-  const mockDebugLog = vi.fn()
+  const mockDebugLog = createMockLogger()
 
   beforeEach(() => {
     mockClient = createMockClient()
-    manager = new SimpleTaskManager(mockClient, "/test/dir", mockDebugLog)
-    mockDebugLog.mockClear()
+    manager = new SimpleTaskManager(mockClient, mockClient, "/test/dir", undefined, undefined, mockDebugLog)
+    mockDebugLog.debug.mockClear()
   })
 
   afterEach(() => {
@@ -139,7 +151,7 @@ describe("SimpleTaskManager", () => {
 
     it("fails when session.create is unavailable", async () => {
       const client = { session: { promptAsync: vi.fn(), abort: vi.fn() } }
-      const failingManager = new SimpleTaskManager(client, "/test/dir", mockDebugLog)
+      const failingManager = new SimpleTaskManager(client, client, "/test/dir", undefined, undefined, mockDebugLog)
 
       const result = await failingManager.launch({
         description: "Test task",
@@ -198,7 +210,7 @@ describe("SimpleTaskManager", () => {
           abort: vi.fn().mockResolvedValue(undefined),
         },
       }
-      const failingManager = new SimpleTaskManager(client, "/test/dir", mockDebugLog)
+      const failingManager = new SimpleTaskManager(client, client, "/test/dir", undefined, undefined, mockDebugLog)
 
       const result = await failingManager.launch({
         description: "Test task",
@@ -490,7 +502,7 @@ describe("SimpleTaskManager", () => {
       const clearIntervalSpy = vi.spyOn(global, "clearInterval")
 
       // Create a manager and immediately dispose
-      const newManager = new SimpleTaskManager(mockClient, "/test/dir", mockDebugLog)
+      const newManager = new SimpleTaskManager(mockClient, mockClient, "/test/dir", undefined, undefined, mockDebugLog)
       newManager.dispose()
 
       expect(clearIntervalSpy).toHaveBeenCalled()
@@ -688,7 +700,7 @@ describe("SimpleTaskManager", () => {
           time: { created: Date.now() - 4_000_000 },
         }],
       })
-      const recoveryManager = new SimpleTaskManager(mockClient, "/test/dir", mockDebugLog)
+      const recoveryManager = new SimpleTaskManager(mockClient, mockClient, "/test/dir", undefined, undefined, mockDebugLog)
 
       await recoveryManager.recoverFromSession("parent-1")
       expect(recoveryManager.isTaskSession("ses_recovered-reg")).toBe(true)
