@@ -40,8 +40,9 @@
             }  
         },
         "instructions": [
-            ".workspace.md",
-            "USER.md"
+            ".wopal-space/.workspace.md",
+            ".wopal-space/AGENT.md",            
+            ".wopal-space/memory/USER.md"
         ],
         // "skills": {
         //   "paths": ["/Users/sam/coding/wopal/wopal-workspace/.agents/skills"]
