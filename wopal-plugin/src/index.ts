@@ -12,21 +12,19 @@ import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
-import { createDebugLog, createWarnLog } from "./debug.js";
+import { coreLogger, memoryLogger, rulesLogger } from "./logger.js";
 import { SimpleTaskManager } from "./tasks/simple-task-manager.js";
 import { createWopalTools } from "./tools/index.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 
-const debugLog = createDebugLog();
-const warnLog = createWarnLog();
 
 function loadWopalEnv(rootDir: string): void {
   const envPath = join(rootDir, ".wopal", ".env");
   if (!existsSync(envPath)) return;
 
-  debugLog(`Loading env: ${envPath}`);
+  coreLogger.debug(`Loading env: ${envPath}`);
   try {
     const content = readFileSync(envPath, "utf-8");
     for (const line of content.split("\n")) {
@@ -41,7 +39,7 @@ function loadWopalEnv(rootDir: string): void {
       }
     }
   } catch (err) {
-    warnLog(`Failed to load .env: ${err}`);
+    coreLogger.warn({ err }, "Failed to load .env");
   }
 }
 
@@ -54,8 +52,6 @@ let _memorySystem: {
 } | null = null;
 
 async function ensureMemorySystem(): Promise<typeof _memorySystem> {
-  const memoryDebugLog = createDebugLog("[memory]", "memory");
-
   if (_memorySystem) return _memorySystem;
 
   try {
@@ -76,11 +72,10 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
     const injector = new MemoryInjector(retriever);
 
     _memorySystem = { injector, distillEngine, store, embedder, llm };
-    memoryDebugLog("Memory system initialized (LanceDB + Embedding + LLM)");
+    memoryLogger.info("Memory system initialized (LanceDB + Embedding + LLM)");
     return _memorySystem;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    warnLog(`Memory system initialization failed (non-fatal): ${message}`);
+    coreLogger.warn({ err: error instanceof Error ? error : new Error(String(error)) }, "Memory system initialization failed (non-fatal)");
     return null;
   }
 }
@@ -88,7 +83,7 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
 const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => {
   const { directory } = pluginInput;
 
-  debugLog(`Loading plugin: ${directory}`);
+  coreLogger.debug(`Loading plugin: ${directory}`);
   loadWopalEnv(directory);
 
   // Read switches after loadWopalEnv (ensure .env has taken effect)
@@ -96,14 +91,12 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
   const memoryEnabled = process.env.WOPAL_MEMORY_ENABLED !== "false";
   const memoryInjectionEnabled = process.env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
 
-  const rulesDebugLog = createDebugLog("[rules]", "rules");
-
   // Rules module initialization
   let ruleFiles: DiscoveredRule[];
   if (rulesInjectionEnabled) {
-    ruleFiles = await discoverRuleFiles(pluginInput.directory, rulesDebugLog);
+    ruleFiles = await discoverRuleFiles(pluginInput.directory, rulesLogger);
   } else {
-    debugLog("Rules module disabled");
+    coreLogger.info("Rules module disabled");
     ruleFiles = [];
   }
 
@@ -112,11 +105,11 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
   if (memoryEnabled) {
     memory = await ensureMemorySystem();
   } else {
-    debugLog("Memory module disabled");
+    coreLogger.debug("Memory module disabled");
     memory = null;
   }
 
-  debugLog(`Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`);
+  coreLogger.debug(`Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`);
 
   // Extract the internal fetch from v1 client (which uses Server.Default().fetch
   // to route requests to the in-process Hono server, bypassing real HTTP).
@@ -148,7 +141,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     projectDirectory: pluginInput.directory,
     ruleFiles,
     sessionStore,
-    debugLog,
+    coreLogger: coreLogger,
     taskManager,
     memoryInjector: memory?.injector,
     systemSnapshots,
@@ -178,7 +171,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     );
   }
 
-  debugLog(`Plugin initialized: tools=[${Object.keys(tools).join(", ")}], memory=${!!memory}`);
+  coreLogger.debug({ tools: Object.keys(tools).join(", "), memory: !!memory }, "Plugin initialized");
 
   return {
     ...hookHandlers,

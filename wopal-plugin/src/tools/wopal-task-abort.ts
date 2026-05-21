@@ -1,9 +1,7 @@
 import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
-import { createDebugLog } from "../debug.js"
+import { taskLogger } from "../logger.js"
 import { toErrorMessage } from "../tasks/utils.js"
-
-const debugLog = createDebugLog("[task]", "task")
 
 export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
@@ -17,7 +15,7 @@ export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefini
       }
 
       const { task_id } = args
-      debugLog(`wopal_abort called: task_id=${task_id}`)
+      taskLogger.debug(`wopal_abort called: task_id=${task_id}`)
 
       const task = manager.getTaskForParent(task_id, context.sessionID)
       if (!task) {
@@ -45,9 +43,9 @@ export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefini
         if (typeof client?.session?.abort === "function") {
           try {
             await client.session.abort({ path: { id: task.sessionID } })
-            debugLog(`task ${task_id} aborted`)
+            taskLogger.debug(`task ${task_id} aborted`)
           } catch (abortErr) {
-            debugLog(`abort failed (task may already be idle): ${toErrorMessage(abortErr)}`)
+            taskLogger.debug(`abort failed (task may already be idle): ${toErrorMessage(abortErr)}`)
           }
         }
 
@@ -63,11 +61,11 @@ export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefini
         // Release concurrency slot
         manager.releaseConcurrencySlot(task)
 
-        debugLog(`task ${task_id} aborted, now in idle phase`)
+        taskLogger.debug(`task ${task_id} aborted, now in idle phase`)
 
         return `Task ${task_id} aborted. Execution stopped. Task is now in idle phase awaiting your judgment: (1) wopal_task_finish to delete, or (2) TTL 30min auto cleanup. Use wopal_task_reply to wake up and redirect if needed.`
       } catch (err) {
-        debugLog(`wopal_abort error: ${err}`)
+        taskLogger.debug(`wopal_abort error: ${err}`)
         return `Failed to abort task: ${err instanceof Error ? err.message : String(err)}`
       }
     },

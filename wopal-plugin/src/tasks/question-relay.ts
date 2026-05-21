@@ -1,9 +1,9 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
-import { createDebugLog, formatSessionID, type DebugLog } from "../debug.js"
+import { taskLogger, formatSessionID, type LoggerInstance } from "../logger.js"
 import { toErrorMessage } from "./utils.js"
 import type { OpenCodeClient } from "../types.js"
 
-const defaultDebugLog = createDebugLog("[task]", "task")
+const defaultDebugLog = taskLogger
 
 export interface QuestionAskedEvent {
   sessionID: string
@@ -29,7 +29,7 @@ export interface QuestionAskedEvent {
 export async function handleQuestionAsked(
   event: QuestionAskedEvent,
   taskManager: SimpleTaskManager,
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): Promise<boolean> {
   const log = debugLog ?? defaultDebugLog
 
@@ -39,7 +39,7 @@ export async function handleQuestionAsked(
   const task = taskManager.findBySession(sessionID)
   if (!task) {
     // 主会话，让 TUI 处理
-    log(`[question] ${formatSessionID(sessionID, false)} skipping relay (main session)`)
+    log.debug(`[question] ${formatSessionID(sessionID, false)} skipping relay (main session)`)
     return false
   }
 
@@ -50,17 +50,17 @@ export async function handleQuestionAsked(
     if (requestID) {
       task.pendingQuestionID = requestID
     }
-    log(`[question] set task ${task.id} to waiting (question_tool), requestID=${requestID ?? "N/A"}`)
+    log.debug(`[question] set task ${task.id} to waiting (question_tool), requestID=${requestID ?? "N/A"}`)
   }
 
-  log(`[question] child session, relaying to parent: taskID=${task.id}`)
+  log.debug(`[question] child session, relaying to parent: taskID=${task.id}`)
 
   try {
     await notifyParentQuestion(taskManager, task.id, question, log)
     return true
   } catch (err) {
     // 捕获异常，不传播
-    log(`[question] relay failed for task ${task.id}: ${toErrorMessage(err)}`)
+    log.debug(`[question] relay failed for task ${task.id}: ${toErrorMessage(err)}`)
     return false
   }
 }
@@ -69,13 +69,13 @@ async function notifyParentQuestion(
   taskManager: SimpleTaskManager,
   taskId: string,
   question: QuestionAskedEvent["question"],
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): Promise<void> {
   const log = debugLog ?? defaultDebugLog
 
   const task = taskManager.getTask(taskId)
   if (!task) {
-    log(`[question] task not found: ${taskId}`)
+    log.debug(`[question] task not found: ${taskId}`)
     return
   }
 
@@ -102,7 +102,7 @@ This question requires your attention. The background task is waiting.
   const client = taskManager.getClient() as OpenCodeClient
 
   if (typeof client?.session?.promptAsync !== "function") {
-    log(`[question] session.promptAsync unavailable for notification`)
+    log.debug(`[question] session.promptAsync unavailable for notification`)
     return
   }
 
@@ -114,9 +114,9 @@ This question requires your attention. The background task is waiting.
         parts: [{ type: "text", text: notification, synthetic: true }],
       },
     })
-    log(`[question] notified parent for task ${taskId}`)
+    log.debug(`[question] notified parent for task ${taskId}`)
   } catch (err) {
-    log(`[question] notify parent failed for task ${taskId}: ${toErrorMessage(err)}`)
+    log.debug(`[question] notify parent failed for task ${taskId}: ${toErrorMessage(err)}`)
     throw err // Re-throw so caller knows it failed
   }
 }

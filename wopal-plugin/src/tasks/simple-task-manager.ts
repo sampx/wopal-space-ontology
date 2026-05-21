@@ -5,9 +5,9 @@ import type {
   WopalTask,
   OpenCodeClient,
 } from "../types.js"
-import type { DebugLog } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
 import type { SessionStore } from "../session-store.js"
-import { createDebugLog } from "../debug.js"
+import { taskLogger } from "../logger.js"
 import { sessionStore as globalSessionStore } from "../session-store-instance.js"
 import { clearStuckState } from "./task-monitor.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
@@ -34,8 +34,6 @@ import { sessionIDToTaskID } from "../session-ref.js"
 import { getDisplayStatus, isResumableTask, canDeleteTask } from "./task-phase.js"
 import { isSessionDeleteResult } from "../types.js"
 
-const defaultManagerLog = createDebugLog("[task]", "task")
-
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
   private taskSessions = new Set<string>()
@@ -43,7 +41,7 @@ export class SimpleTaskManager {
   private v2Client: OpenCodeClient
   private serverUrl?: URL
   private directory: string
-  private debugLog: DebugLog
+  private debugLog: LoggerInstance
   private sessionStore: SessionStore
   private tickerInterval: ReturnType<typeof setInterval> | undefined = undefined
   private concurrency = new ConcurrencyManager()
@@ -60,7 +58,7 @@ export class SimpleTaskManager {
     directory: string,
     serverUrl?: URL,
     sessionStore?: SessionStore,
-    debugLog?: DebugLog,
+    debugLog?: LoggerInstance,
   ) {
     this.client = client
     this.v2Client = v2Client
@@ -69,7 +67,7 @@ export class SimpleTaskManager {
       this.serverUrl = serverUrl
     }
     this.sessionStore = sessionStore ?? globalSessionStore
-    this.debugLog = debugLog ?? defaultManagerLog
+    this.debugLog = debugLog ?? taskLogger
 
     // Setup stuck detection and progress notifications (every 30 seconds)
     this.tickerInterval = setInterval(() => {
@@ -226,11 +224,11 @@ export class SimpleTaskManager {
       try {
         const result = await client.session.delete({ path: { id: task.sessionID } })
         if (isSessionDeleteResult(result) && result.error) {
-          debugLog(`[finishTask] session.delete error for taskId=${taskId}: ${String(result.error).substring(0, 200)}`)
+          debugLog.debug(`[finishTask] session.delete error for taskId=${taskId}: ${String(result.error).substring(0, 200)}`)
           return { ok: false, message: `Failed to delete session: ${String(result.error)}` }
         }
       } catch (err) {
-        debugLog(`[finishTask] session.delete exception for taskId=${taskId}: ${String(err).substring(0, 200)}`)
+        debugLog.debug(`[finishTask] session.delete exception for taskId=${taskId}: ${String(err).substring(0, 200)}`)
         return { ok: false, message: `Failed to delete session: ${String(err)}` }
       }
     }
@@ -239,7 +237,7 @@ export class SimpleTaskManager {
 
     releaseConcurrencySlot(task)
 
-    debugLog(`[finishTask] taskId=${taskId} finished successfully`)
+    debugLog.debug(`[finishTask] taskId=${taskId} finished successfully`)
     return { ok: true, message: "Task finished successfully. Session deleted from OpenCode." }
   }
 
@@ -262,9 +260,9 @@ export class SimpleTaskManager {
       if (this.concurrency.tryAcquire(this.CONCURRENCY_KEY, DEFAULT_CONCURRENCY_LIMIT)) {
         task.concurrencyKey = this.CONCURRENCY_KEY
         delete task.waitingConcurrencyKey
-        this.debugLog(`[reacquireSlot] taskId=${task.id} acquired slot, cleared waitingConcurrencyKey`)
+        this.debugLog.debug(`[reacquireSlot] taskId=${task.id} acquired slot, cleared waitingConcurrencyKey`)
       } else {
-        this.debugLog(`[reacquireSlot] taskId=${task.id} concurrency limit reached, waitingConcurrencyKey preserved for retry`)
+        this.debugLog.debug(`[reacquireSlot] taskId=${task.id} concurrency limit reached, waitingConcurrencyKey preserved for retry`)
       }
     }
   }
@@ -288,7 +286,7 @@ export class SimpleTaskManager {
     this.recoveringSessions.add(parentSessionID)
 
     if (typeof this.client?.session?.children !== "function") {
-      this.debugLog(`[recover] skipped: session.children is unavailable`)
+      this.debugLog.debug(`[recover] skipped: session.children is unavailable`)
       this.recoveringSessions.delete(parentSessionID)
       return
     }
@@ -298,7 +296,7 @@ export class SimpleTaskManager {
       const resultObj = result as Record<string, unknown> | undefined
       const children = (resultObj?.data ?? result) as unknown
       if (!Array.isArray(children)) {
-        this.debugLog(`[recover] skipped: children is not an array, type=${typeof children}`)
+        this.debugLog.debug(`[recover] skipped: children is not an array, type=${typeof children}`)
         this.recoveringSessions.delete(parentSessionID)
         return
       }
@@ -332,15 +330,15 @@ export class SimpleTaskManager {
         this.tasks.set(taskID, task)
         this.taskSessions.add(childSessionID)
         recovered++
-        this.debugLog(`[recover] restored task=${taskID} session=${childSessionID.slice(0, 16)} title="${child.title?.substring(0, 40) ?? ''}"`)
+        this.debugLog.debug(`[recover] restored task=${taskID} session=${childSessionID.slice(0, 16)} title="${child.title?.substring(0, 40) ?? ''}"`)
       }
 
       if (recovered > 0) {
-        this.debugLog(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 16)}`)
+        this.debugLog.debug(`[recover] recovered ${recovered} task(s) from parent=${parentSessionID.slice(0, 16)}`)
       }
       this.recoveredSessions.add(parentSessionID)
     } catch (err) {
-      this.debugLog(`[recover] error: ${err instanceof Error ? err.message : String(err)}`)
+      this.debugLog.debug(`[recover] error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       this.recoveringSessions.delete(parentSessionID)
     }

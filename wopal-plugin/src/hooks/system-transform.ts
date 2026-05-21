@@ -8,7 +8,7 @@
 import { createHash } from 'node:crypto';
 
 import type { SessionStore } from "../session-store.js";
-import type { DebugLog } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
 import type { SystemPromptMetadata, OpenCodeClient } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { Model } from "@opencode-ai/sdk";
@@ -32,8 +32,8 @@ export interface SystemTransformHookContext {
   directory: string;
   projectDirectory: string;
   sessionStore: SessionStore;
-  memoryDebugLog: DebugLog;
-  contextDebugLog: DebugLog;
+  memoryLogger: LoggerInstance;
+  contextLogger: LoggerInstance;
   now: () => number;
   childSessionCache: Map<string, boolean>;
   taskManager: { findBySession: (sessionID: string) => unknown } | undefined;
@@ -78,7 +78,7 @@ export function createSystemTransformHooks(ctx: SystemTransformHookContext) {
   };
   const autoDumpFingerprintMap = new Map<string, string>();
 
-async function onSystemTransform(
+  async function onSystemTransform(
     hookInput: SystemTransformInput,
     output: SystemTransformOutput | null,
   ): Promise<SystemTransformOutput> {
@@ -115,10 +115,8 @@ async function onSystemTransform(
       ctx.systemInjectionsMap.set(sessionID, output.system.slice(initialSystemLength));
     }
 
-    // Auto-dump: requires explicit "context" module (not triggered by "all" wildcard)
-    const debug = process.env.WOPAL_PLUGIN_DEBUG;
-    const explicitContext = debug && debug.toLowerCase().split(",").map(m => m.trim()).includes("context");
-    if (sessionID && explicitContext) {
+    // Auto-dump: controlled by WOPAL_PLUGIN_LOG_LEVEL=trace + WOPAL_PLUGIN_LOG_MODULES=context (handled by logger.ts)
+    if (sessionID) {
       const fingerprint = buildAutoDumpFingerprint({
         snapshot: ctx.systemSnapshots?.get(sessionID) ?? output.system,
         metadata: ctx.systemMetadataMap?.get(sessionID),
@@ -150,7 +148,7 @@ async function onSystemTransform(
           if (autoDumpFingerprintMap.get(sessionID) === fingerprint) {
             autoDumpFingerprintMap.delete(sessionID);
           }
-          ctx.contextDebugLog(`[auto-dump] error: ${err}`);
+          ctx.contextLogger.debug(`[auto-dump] error: ${err}`);
         }
       })();
     }

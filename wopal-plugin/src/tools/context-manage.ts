@@ -12,7 +12,7 @@ import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "../hooks/message-context.js";
 import type { SessionStore } from "../session-store.js";
 import { SessionStore as SessionStoreClass } from "../session-store.js";
-import { createDebugLog, formatSessionID } from "../debug.js";
+import { contextLogger, formatSessionID } from "../logger.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { OpenCodeClient } from "../types.js";
 import { resolveSessionTarget } from "./context-target.js";
@@ -22,8 +22,6 @@ import {
   handleSummary,
   handleCompact,
 } from "./context-manage-actions.js";
-
-const debugLog = createDebugLog("[context]", "context");
 
 /**
  * Create context_manage tool
@@ -83,9 +81,9 @@ export function createContextManageTool(
           const callerLabel = formatSessionID(sessionID ?? "?", false);
           const target = await resolveSessionTarget(args.session_id, client as OpenCodeClient, taskManager);
           const targetLabel = formatSessionID(target.sessionID, target.isTask);
-          debugLog(`[context_manage] action=${args.action} caller=${callerLabel} target=${targetLabel}`);
+          contextLogger.debug(`[context_manage] action=${args.action} caller=${callerLabel} target=${targetLabel}`);
         } else {
-          debugLog(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
+          contextLogger.debug(`[context_manage] action=${args.action} ${formatSessionID(sessionID ?? "?", false)}`);
         }
       }
 
@@ -130,7 +128,7 @@ export function createContextManageTool(
           return "Failed: no session ID available for compact.";
         }
         const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
-        debugLog(`[context_manage] compact ${formatSessionID(target.sessionID, target.isTask)}`);
+        contextLogger.debug(`[context_manage] compact ${formatSessionID(target.sessionID, target.isTask)}`);
         return await handleCompact(target.sessionID, target.isTask, client, activeStore, baseDir, taskManager);
       }
 

@@ -17,12 +17,10 @@ import {
   type SessionContext,
 } from "../memory/session-context.js"
 import type { SessionMessage } from "../types.js"
-import { createDebugLog, formatSessionID } from "../debug.js"
+import { contextLogger, formatSessionID } from "../logger.js"
 import { writeContextDump, findActualKey } from "./dump-formatter.js"
 import { fetchContextPercent } from "../session-runtime-info.js"
 import type { TaskSessionInspector } from "../session-runtime-info.js"
-
-const debugLog = createDebugLog("[context]", "context")
 
 export interface StatusPayload {
   sessionID: string
@@ -255,7 +253,7 @@ ${truncatedText}
         })
         newCtx.title = cleanedSummary
       } catch (error) {
-        debugLog(`[context_manage.summary] Failed to update session title: ${error}`)
+        contextLogger.debug(`[context_manage.summary] Failed to update session title: ${error}`)
       }
     }
 
@@ -304,7 +302,7 @@ export async function handleCompact(
 
   let contextInfo = "Context: unknown"
   try {
-    const ctxInfo = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog, taskManager)
+    const ctxInfo = await fetchContextPercent(client, sessionStore, directory, sessionID, contextLogger, taskManager)
     if (ctxInfo) {
       const warning = ctxInfo.pct >= 75 ? " ⚠️" : ctxInfo.pct >= 55 ? " ⚡" : ""
       contextInfo = `Context: ${ctxInfo.pct}% used${warning} (${ctxInfo.used}/${ctxInfo.contextLimit} tokens)`
@@ -320,7 +318,7 @@ export async function handleCompact(
     sessionStore.upsert(sessionID, (next) => {
       next.pendingCompactTrigger = "plugin"
     })
-    debugLog(`[handleCompact] ${formatSessionID(sessionID, false)} scheduled main-session compact for next idle`)
+    contextLogger.debug(`[handleCompact] ${formatSessionID(sessionID, false)} scheduled main-session compact for next idle`)
     return [
       `Compacting session ${formatSessionID(sessionID, false)}...`,
       contextInfo,

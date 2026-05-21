@@ -1,6 +1,26 @@
 import { describe, expect, it, vi } from "vitest"
 import { createEventRouter } from "./event-router.js"
 import { SessionStore } from "../session-store.js"
+import type { LoggerInstance } from "../logger.js"
+
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  }
+}
+
+const mockLoggers = {
+  coreLogger: createMockLogger(),
+  rulesLogger: createMockLogger(),
+  taskLogger: createMockLogger(),
+  memoryLogger: createMockLogger(),
+  contextLogger: createMockLogger(),
+}
 
 function createEventRouterWithTaskManager(taskManager: {
   markTaskCompletedBySession?: ReturnType<typeof vi.fn>
@@ -32,8 +52,11 @@ function createEventRouterWithTaskManager(taskManager: {
       },
     },
     sessionStore,
-    debugLog: () => {},
-    taskDebugLog: () => {},
+    coreLogger: createMockLogger(),
+    rulesLogger: createMockLogger(),
+    taskLogger: createMockLogger(),
+    memoryLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
     taskManager: fullTaskManager as never,
   };
   const hooks = createEventRouter(ctx as never);
@@ -54,7 +77,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
       },
       sessionStore,
       debugLog: () => {},
-      taskDebugLog: () => {},
+      taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
       taskManager: {
         findBySession: vi.fn().mockReturnValue(mockTask),
         markTaskCompletedBySession: vi.fn(),
@@ -181,7 +205,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
           isTaskSession: vi.fn().mockReturnValue(false),
@@ -257,7 +282,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(mockTask), // Has task = child session
           isTaskSession: vi.fn().mockReturnValue(true),
@@ -320,7 +346,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
           isTaskSession: vi.fn().mockReturnValue(false),
@@ -367,7 +394,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
           isTaskSession: vi.fn().mockReturnValue(false),
@@ -410,7 +438,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         client: { session: { messages: vi.fn().mockResolvedValue({ data: [] }) } },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
         } as never,
@@ -462,7 +491,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined),
           isTaskSession: vi.fn().mockReturnValue(false),
@@ -505,7 +535,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         client: { session: { messages: vi.fn() } },
         sessionStore,
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: { findBySession: vi.fn() } as never,
       }
 
@@ -540,7 +571,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
         sessionStore: new SessionStore({ max: 10 }),
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(mockTask),
           isTaskSession: vi.fn().mockReturnValue(true),
@@ -591,7 +623,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         client: { permission: { reply: mockPermissionReply } },
         sessionStore: new SessionStore({ max: 10 }),
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
           isTaskSession: vi.fn().mockReturnValue(false),
@@ -630,7 +663,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         client: { session: { promptAsync: mockPromptAsync } },
         sessionStore: new SessionStore({ max: 10 }),
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(mockTask),
           getClient: vi.fn().mockReturnValue({ session: { promptAsync: mockPromptAsync } }),
@@ -689,7 +723,8 @@ describe("OpenCodeRulesRuntime event handling", () => {
         client: { session: { promptAsync: mockPromptAsync } },
         sessionStore: new SessionStore({ max: 10 }),
         contextDebugLog: () => {},
-        taskDebugLog: () => {},
+        taskLogger: createMockLogger(),
+    contextLogger: createMockLogger(),
         taskManager: {
           findBySession: vi.fn().mockReturnValue(undefined), // No task = main session
         } as never,

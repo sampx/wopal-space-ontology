@@ -11,6 +11,18 @@ import {
 } from "./task-monitor.js"
 import type { WopalTask } from "./types.js"
 import { SessionStore } from "../session-store.js"
+import type { LoggerInstance } from "../logger.js"
+
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  }
+}
 
 function createTask(overrides: Partial<WopalTask> = {}): WopalTask {
   return {
@@ -256,7 +268,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -288,7 +300,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -329,7 +341,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages }, config: { providers: mockConfig } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -372,7 +384,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages }, config: { providers: mockConfig } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -414,7 +426,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages }, config: { providers: mockConfig } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -456,7 +468,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages }, config: { providers: mockConfig } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -495,7 +507,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages }, config: { providers: mockConfig } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -523,7 +535,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -554,7 +566,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -587,7 +599,7 @@ describe("checkProgressNotifications", () => {
       tasks,
       sessionStore,
       client: { session: { messages: mockMessages } },
-      debugLog: () => {},
+      debugLog: createMockLogger(),
       directory: "/test",
       notifyParentStuckFn: vi.fn(),
       sendProgressNotificationFn: sendNotification,
@@ -617,22 +629,22 @@ describe("logTickStatus", () => {
       contextUsage: 30,
     }]
 
-    const debugLog = vi.fn()
+    const debugLog = createMockLogger()
     logTickStatus(tasks, progressInfos, debugLog)
 
-    expect(debugLog).toHaveBeenCalledTimes(1)
-    expect(debugLog).toHaveBeenCalledWith(expect.stringContaining("[tick] 1 tasks:"))
-    expect(debugLog).toHaveBeenCalledWith(expect.stringContaining("wopal-task-abc123"))
+    expect(debugLog.debug).toHaveBeenCalledTimes(1)
+    expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("[tick] 1 tasks:"))
+    expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("wopal-task-abc123"))
   })
 
   it("should skip logging when no running tasks", () => {
     const task = createTask({ status: "completed" })
     const tasks = new Map([["task-1", task]])
-    const debugLog = vi.fn()
+    const debugLog = createMockLogger()
 
     logTickStatus(tasks, [], debugLog)
 
-    expect(debugLog).not.toHaveBeenCalled()
+    expect(debugLog.debug).not.toHaveBeenCalled()
   })
 
   it("should not throw for high context usage (debug level)", () => {
@@ -645,9 +657,9 @@ describe("logTickStatus", () => {
       contextUsage: 60, // Above CONTEXT_WARN_THRESHOLD
     }]
 
-    const debugLog = vi.fn()
+    const debugLog = createMockLogger()
     logTickStatus(tasks, progressInfos, debugLog)
 
-    expect(debugLog).toHaveBeenCalledTimes(1)
+    expect(debugLog.debug).toHaveBeenCalledTimes(1)
   })
 })

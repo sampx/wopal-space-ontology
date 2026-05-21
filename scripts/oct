@@ -91,6 +91,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# --- 计算新日志环境变量 ---
+if [ "$TRACE_MODE" = true ]; then
+    LOG_LEVEL="trace"
+    LOG_MODULES="${TRACE_MODULES}"
+elif [ "$DEBUG_MODE" = true ]; then
+    LOG_LEVEL="debug"
+    LOG_MODULES="${DEBUG_MODULES}"
+else
+    LOG_LEVEL=""
+    LOG_MODULES=""
+fi
+
 # --- 后端管理 ---
 
 is_backend_running() {
@@ -114,8 +126,8 @@ start_backend() {
     local serve_args=(serve --port $BACKEND_PORT --mdns --mdns-domain opencode.local --print-logs --log-level $log_level)
 
     nohup env \
-        WOPAL_PLUGIN_DEBUG="${DEBUG_MODULES}" \
-        WOPAL_PLUGIN_TRACE="${TRACE_MODULES}" \
+        WOPAL_PLUGIN_LOG_LEVEL="${LOG_LEVEL}" \
+        WOPAL_PLUGIN_LOG_MODULES="${LOG_MODULES}" \
         WOPAL_PLUGIN_LOG_FILE="$LOG_DIR/wopal-plugins-debug.log" \
         opencode "${serve_args[@]}" > "$BACKEND_LOG" 2>&1 &
 
@@ -235,7 +247,7 @@ case "$COMMAND" in
         mkdir -p "$LOG_DIR"
         [ "$DEBUG_MODE" = true ] && {
             : > "$LOG_DIR/wopal-plugins-debug.log"
-            echo "oct: 调试模式 [$DEBUG_MODULES] → logs/"
+            echo "oct: 调试模式 [$LOG_LEVEL${LOG_MODULES:+:$LOG_MODULES}] → logs/"
         }
         start_backend
         echo -n "oct: 等待后端就绪"
@@ -287,7 +299,7 @@ create_session() {
     fi
 
     mkdir -p "$LOG_DIR"
-    [ "$DEBUG_MODE" = true ] && { : > "$LOG_DIR/wopal-plugins-debug.log"; echo "oct: 调试模式 [$DEBUG_MODULES] → logs/"; }
+    [ "$DEBUG_MODE" = true ] && { : > "$LOG_DIR/wopal-plugins-debug.log"; echo "oct: 调试模式 [$LOG_LEVEL${LOG_MODULES:+:$LOG_MODULES}] → logs/"; }
 
     echo "oct: 创建会话 \"$name\"$([ "$ATTACH_MODE" = true ] && echo " [attach]") → $CWD"
 
@@ -308,11 +320,11 @@ create_session() {
     else
         local tmux_env=() debug_args=()
         if [ "$DEBUG_MODE" = true ]; then
-            tmux_env=(-e "WOPAL_PLUGIN_DEBUG=$DEBUG_MODULES")
+            tmux_env=(-e "WOPAL_PLUGIN_LOG_LEVEL=$LOG_LEVEL")
             debug_args=(--log-level DEBUG)
         fi
         if [ "$TRACE_MODE" = true ]; then
-            tmux_env+=(-e "WOPAL_PLUGIN_TRACE=$TRACE_MODULES")
+            tmux_env+=(-e "WOPAL_PLUGIN_LOG_MODULES=$LOG_MODULES")
         fi
         tmux_env+=(-e "WOPAL_PLUGIN_LOG_FILE=$LOG_DIR/wopal-plugins-debug.log")
 

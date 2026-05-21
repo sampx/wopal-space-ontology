@@ -1,10 +1,10 @@
 import type { SessionStore } from "../session-store.js";
-import type { DebugLog } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
 import type { MessageWithInfo } from "./message-context.js";
 
 export interface SkillReloadInjectorContext {
   sessionStore: SessionStore;
-  contextDebugLog: DebugLog;
+  contextLogger: LoggerInstance;
 }
 
 export async function injectSkillReload(
@@ -22,7 +22,7 @@ export async function injectSkillReload(
       delete s.recoverySent; // Clear sticky flag (one-time dedup)
       delete s.needsSkillReload;
     });
-    ctx.contextDebugLog(
+    ctx.contextLogger.debug(
       `Session ${sessionID} recovery already sent, skip injection`,
     );
     return;
@@ -57,7 +57,7 @@ The session context has been compacted. Execute recovery protocol immediately an
       delete s.needsSkillReload;
     });
 
-    ctx.contextDebugLog(
+    ctx.contextLogger.debug(
       `Injected full recovery protocol for session ${sessionID}`,
     );
     return;
@@ -81,7 +81,7 @@ The session context has been compacted. Execute recovery protocol immediately an
     synthetic: true,
   });
 
-  ctx.contextDebugLog(
+  ctx.contextLogger.debug(
     `Injected Skill Reload for session ${sessionID}: ${skillsToReload.join(", ")}`,
   );
 }

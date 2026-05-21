@@ -6,11 +6,11 @@
  */
 
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
-import type { DebugLog } from "../../debug.js"
+import type { LoggerInstance } from "../../logger.js"
 
 export interface ErrorHandlerContext {
   taskManager: SimpleTaskManager | undefined
-  taskDebugLog: DebugLog
+  taskLogger: LoggerInstance
 }
 
 /**
@@ -48,7 +48,7 @@ export function handleSessionError(
   // Bug 2 fix: filter MessageAbortedError (user-initiated abort, not a real error)
   const errorObj = error as { name?: string } | undefined
   if (errorObj?.name === "MessageAbortedError") {
-    ctx.taskDebugLog(`[session.error] filtered MessageAbortedError`)
+    ctx.taskLogger.debug(`[session.error] filtered MessageAbortedError`)
     return
   }
 
@@ -57,9 +57,9 @@ export function handleSessionError(
   if (sessionID) {
     const task = ctx.taskManager?.markTaskErrorBySession(sessionID, errorText)
     if (task) {
-      ctx.taskDebugLog(`task ${task.id} error: ${errorText}`)
+      ctx.taskLogger.debug(`task ${task.id} error: ${errorText}`)
       ctx.taskManager?.notifyParent(task.id).catch((err) => {
-        ctx.taskDebugLog(`[notifyParent] error for ${task.id}: ${err instanceof Error ? err.message : String(err)}`)
+        ctx.taskLogger.debug(`[notifyParent] error for ${task.id}: ${err instanceof Error ? err.message : String(err)}`)
       })
     }
   }

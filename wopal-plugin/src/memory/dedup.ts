@@ -8,12 +8,9 @@ import type { MemoryCategory } from "./types.js";
 import type { MemoryStore } from "./store.js";
 import type { EmbeddingClient } from "./embedder.js";
 import type { DistillLLMClient } from "./llm-client.js";
-import { createDebugLog, createWarnLog } from "../debug.js";
+import { memoryLogger } from "../logger.js";
 import { validateCategory, getDefaultImportance } from "./categories.js";
 import { buildBatchDedupPrompt } from "./prompts.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
 
 // Maximum L2 distance to consider "similar" for dedup purposes
 const DEDUP_MAX_DISTANCE = 1.0;
@@ -121,7 +118,7 @@ export async function performDeduplication(
   );
 
   if (candidatesNeedingDedup.length === 0) {
-    debugLog(`[deduplicate] No existing similar memories found, all candidates created directly`);
+    memoryLogger.debug(`[deduplicate] No existing similar memories found, all candidates created directly`);
     return result;
   }
 
@@ -142,7 +139,7 @@ export async function performDeduplication(
   try {
     batchResult = await llm.completeJson<BatchDecision>(dedupPrompt);
   } catch (error) {
-    warnLog(`[deduplicate] Batch LLM failed: ${error}`);
+    memoryLogger.warn(`[deduplicate] Batch LLM failed: ${error}`);
     // On LLM failure, create all candidates that needed dedup as new memories
     for (let i = 0; i < validated.length; i++) {
       if (existingByCandidate.has(i + 1)) {
@@ -178,7 +175,7 @@ export async function performDeduplication(
       const existingList = existingByCandidate.get(dec.index);
       const matchedExisting = existingList?.[matchIdx - 1];
       if (!matchedExisting) {
-        warnLog(`[deduplicate] match ${matchIdx} out of range for candidate ${dec.index}`);
+        memoryLogger.warn(`[deduplicate] match ${matchIdx} out of range for candidate ${dec.index}`);
         result.create.push({ text: body, vector, category, importance, tags, metadata });
         continue;
       }

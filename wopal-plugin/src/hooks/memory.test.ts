@@ -4,6 +4,18 @@ import { injectMemoryToMessage, type MemoryMessageInjectorContext } from './memo
 import { SessionStore } from '../session-store.js';
 import type { MessageWithInfo } from './message-context.js';
 import type { MemoryInjector } from '../memory/index.js';
+import type { LoggerInstance } from '../logger.js';
+
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  };
+}
 
 let savedInjectionEnv: Record<string, string | undefined>;
 
@@ -54,14 +66,14 @@ function createMemoryCtx(opts?: {
         },
       } as any,
       sessionStore,
-      memoryDebugLog: () => {},
+      memoryLogger: createMockLogger(),
       memoryInjector,
       childSessionCache,
       taskManager: undefined,
     },
     memoryInjector,
     sessionStore,
-    memoryDebugLog: () => {},
+    memoryLogger: createMockLogger(),
     memoryInjectionEnabled: opts?.memoryInjectionEnabled ?? true,
   };
 

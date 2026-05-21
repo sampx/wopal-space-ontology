@@ -1,6 +1,6 @@
 import type { CancelResult, WopalTask } from "../types.js"
-import type { DebugLog } from "../debug.js"
-import { formatSessionID } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
+import { formatSessionID } from "../logger.js"
 import { toErrorMessage } from "./utils.js"
 import { sessionIDToTaskID } from "./task-launcher.js"
 import { isIdleTask } from "./task-phase.js"
@@ -13,7 +13,7 @@ export interface TaskLifecycleDeps {
       delete?: (args: { path: { id: string } }) => Promise<unknown>
     }
   }
-  debugLog: DebugLog
+  debugLog: LoggerInstance
   releaseConcurrencySlot: (task: WopalTask) => void
 }
 
@@ -25,7 +25,7 @@ export function failTask(
   const { debugLog, releaseConcurrencySlot } = deps
 
   if (task.status === 'error') {
-    debugLog(`[failTask] skipped: taskId=${task.id} status=${task.status} (already error)`)
+    debugLog.debug(`[failTask] skipped: taskId=${task.id} status=${task.status} (already error)`)
     return false
   }
 
@@ -33,13 +33,13 @@ export function failTask(
   task.status = 'error'
   task.error = error
   task.completedAt = task.completedAt ?? new Date()
-  debugLog(`[failTask] taskId=${task.id} error="${error.substring(0, 100)}"`)
+  debugLog.debug(`[failTask] taskId=${task.id} error="${error.substring(0, 100)}"`)
   return true
 }
 
 export async function abortSession(
   client: TaskLifecycleDeps["client"],
-  debugLog: DebugLog,
+  debugLog: LoggerInstance,
   sessionID: string | undefined,
 ): Promise<void> {
   if (!sessionID || typeof client.session?.abort !== "function") {
@@ -51,7 +51,7 @@ export async function abortSession(
       path: { id: sessionID },
     })
   } catch (err) {
-    debugLog(`[abortSession] error for ${formatSessionID(sessionID, true)}: ${toErrorMessage(err)}`)
+    debugLog.debug(`[abortSession] error for ${formatSessionID(sessionID, true)}: ${toErrorMessage(err)}`)
   }
 }
 
@@ -64,22 +64,22 @@ export function markTaskErrorBySession(
 
   const task = tasks.get(sessionIDToTaskID(sessionID))
   if (!task) {
-    debugLog(`[markError] skipped: no task found for ${formatSessionID(sessionID, true)}`)
+    debugLog.debug(`[markError] skipped: no task found for ${formatSessionID(sessionID, true)}`)
     return undefined
   }
 
   // Don't change status if task was already interrupted (idle phase)
   if (isIdleTask(task) && task.status === 'running') {
-    debugLog(`[markError] skipped: taskId=${task.id} was interrupted (idle phase), preserving running state`)
+    debugLog.debug(`[markError] skipped: taskId=${task.id} was interrupted (idle phase), preserving running state`)
     return undefined
   }
 
   if (!failTask(deps, task, error)) {
-    debugLog(`[markError] skipped: taskId=${task.id} status=${task.status} (already terminal)`)
+    debugLog.debug(`[markError] skipped: taskId=${task.id} status=${task.status} (already terminal)`)
     return undefined
   }
 
-  debugLog(`[markError] taskId=${task.id} ${formatSessionID(sessionID, true)} error="${error.substring(0, 100)}"`)
+  debugLog.debug(`[markError] taskId=${task.id} ${formatSessionID(sessionID, true)} error="${error.substring(0, 100)}"`)
   return task
 }
 
@@ -93,11 +93,11 @@ export async function interruptTask(
   const task = tasks.get(id) ?? [...tasks.values()].find(t => t.id === id)
 
   if (!task || task.parentSessionID !== parentSessionID) {
-    debugLog(`[interrupt] failed: taskId=${id} not found or ownership mismatch`)
+    debugLog.debug(`[interrupt] failed: taskId=${id} not found or ownership mismatch`)
     return 'not_found'
   }
   if (task.status !== 'running') {
-    debugLog(`[interrupt] failed: taskId=${id} status=${task.status}`)
+    debugLog.debug(`[interrupt] failed: taskId=${id} status=${task.status}`)
     return 'not_running'
   }
 
@@ -115,9 +115,9 @@ export async function interruptTask(
       await client.session?.abort?.({
         path: { id: task.sessionID },
       })
-      debugLog(`[interrupt] aborted session for taskId=${id}`)
+      debugLog.debug(`[interrupt] aborted session for taskId=${id}`)
     } catch (err) {
-      debugLog(`[interrupt] abort error (task may already be idle): ${toErrorMessage(err)}`)
+      debugLog.debug(`[interrupt] abort error (task may already be idle): ${toErrorMessage(err)}`)
     }
   }
 
@@ -134,7 +134,7 @@ export async function shutdownManager(
 ): Promise<void> {
   const { tasks, debugLog, concurrency, releaseConcurrencySlot, abortSessionFn } = deps
 
-  debugLog('[shutdown] initiating graceful shutdown')
+  debugLog.debug('[shutdown] initiating graceful shutdown')
 
   // 2. Cancel all waiting tasks in concurrency queue
   concurrency.clear()
@@ -145,7 +145,7 @@ export async function shutdownManager(
   )
 
   for (const task of runningTasks) {
-    debugLog(`[shutdown] aborting task: ${task.id}`)
+    debugLog.debug(`[shutdown] aborting task: ${task.id}`)
     releaseConcurrencySlot(task)
     await abortSessionFn(task.sessionID)
     // Shutdown sets error status to mark task as terminated
@@ -164,5 +164,5 @@ export async function shutdownManager(
     await new Promise((r) => setTimeout(r, 100))
   }
 
-  debugLog('[shutdown] completed')
+  debugLog.debug('[shutdown] completed')
 }

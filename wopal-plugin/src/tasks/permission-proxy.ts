@@ -1,11 +1,11 @@
 import type { SimpleTaskManager } from "./simple-task-manager.js"
-import { createDebugLog, createWarnLog, formatSessionID, type DebugLog } from "../debug.js"
+import { taskLogger, formatSessionID, type LoggerInstance } from "../logger.js"
 import { toErrorMessage } from "./utils.js"
 import { sendNotification } from "./task-notifier.js"
 import type { OpenCodeClient } from "../types.js"
 
-const defaultDebugLog = createDebugLog("[task]", "task")
-const defaultWarnLog = createWarnLog("[task]")
+const defaultDebugLog = taskLogger
+const defaultWarnLog = taskLogger
 
 export interface PermissionAskedEvent {
   sessionID: string
@@ -29,7 +29,7 @@ export async function handlePermissionAsked(
   event: PermissionAskedEvent,
   taskManager: SimpleTaskManager,
   client?: OpenCodeClient,
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): Promise<boolean> {
   const log = debugLog ?? defaultDebugLog
   const warnLog = defaultWarnLog
@@ -40,12 +40,12 @@ export async function handlePermissionAsked(
   const task = taskManager.findBySession(sessionID)
   if (!task) {
     // 主会话，让 TUI 处理
-    log(`[permission] ${formatSessionID(sessionID, false)} skipping auto-reply (main session)`)
+    log.debug(`[permission] ${formatSessionID(sessionID, false)} skipping auto-reply (main session)`)
     return false
   }
 
   // 子会话，自动批准权限
-  log(`[permission] child session, auto-replying: taskID=${task.id} permission=${permission} requestID=${requestID}`)
+  log.debug(`[permission] child session, auto-replying: taskID=${task.id} permission=${permission} requestID=${requestID}`)
 
   // 获取客户端（v1 SDK: postSessionIdPermissionsPermissionId）
   const actualClient = client ?? taskManager.getClient()
@@ -62,11 +62,11 @@ export async function handlePermissionAsked(
         path: { id: sessionID, permissionID: requestID },
         body: { response: "once" },
       })
-      log(`[permission] auto-replied 'once' via v1 SDK for task ${task.id}`)
+      log.debug(`[permission] auto-replied 'once' via v1 SDK for task ${task.id}`)
       await notifyParentPermission(taskManager, task.id, permission, patterns, log)
       return true
     } catch (err) {
-      warnLog(`[permission] v1 reply failed for task ${task.id}: ${toErrorMessage(err)}`)
+      warnLog.warn(`[permission] v1 reply failed for task ${task.id}: ${toErrorMessage(err)}`)
       return false
     }
   }
@@ -74,16 +74,16 @@ export async function handlePermissionAsked(
   if (typeof v2Reply === "function") {
     try {
       await v2Reply.call(clientAny.permission, { requestID, reply: "once" })
-      log(`[permission] auto-replied 'once' via v2 SDK for task ${task.id}`)
+      log.debug(`[permission] auto-replied 'once' via v2 SDK for task ${task.id}`)
       await notifyParentPermission(taskManager, task.id, permission, patterns, log)
       return true
     } catch (err) {
-      warnLog(`[permission] v2 reply failed for task ${task.id}: ${toErrorMessage(err)}`)
+      warnLog.warn(`[permission] v2 reply failed for task ${task.id}: ${toErrorMessage(err)}`)
       return false
     }
   }
 
-  warnLog(`[permission] no permission reply API available for task ${task.id}`)
+  warnLog.warn(`[permission] no permission reply API available for task ${task.id}`)
   return false
 }
 
@@ -92,13 +92,13 @@ async function notifyParentPermission(
   taskId: string,
   permission: string,
   patterns?: string[],
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): Promise<void> {
   const log = debugLog ?? defaultDebugLog
 
   const task = taskManager.getTask(taskId)
   if (!task) {
-    log(`[permission] task not found for notification: ${taskId}`)
+    log.debug(`[permission] task not found for notification: ${taskId}`)
     return
   }
 
@@ -114,5 +114,5 @@ Permission was auto-approved for this background task.
   const client = taskManager.getClient()
 
   const success = await sendNotification({ client, debugLog: log }, task.parentSessionID, notification, true)
-  log(`[permission] ${success ? 'sent' : 'failed'} notification for task ${taskId}`)
+  log.debug(`[permission] ${success ? 'sent' : 'failed'} notification for task ${taskId}`)
 }

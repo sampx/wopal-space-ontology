@@ -1,4 +1,4 @@
-import { createDebugLog, type DebugLog } from "../debug.js";
+import { coreLogger, rulesLogger, taskLogger, memoryLogger, contextLogger, type LoggerInstance } from "../logger.js";
 import type { SessionStore } from "../session-store.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { MemoryInjector } from "../memory/index.js";
@@ -19,7 +19,7 @@ export interface HookContextOptions {
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
   sessionStore: SessionStore;
-  debugLog?: DebugLog;
+  coreLogger?: LoggerInstance;
   now?: () => number;
   taskManager?: SimpleTaskManager;
   memoryInjector?: MemoryInjector | undefined;
@@ -36,11 +36,11 @@ export interface HookContext {
   projectDirectory: string;
   ruleFiles: DiscoveredRule[];
   sessionStore: SessionStore;
-  pluginDebugLog: DebugLog;     // Plugin lifecycle (passed from index.ts)
-  rulesDebugLog: DebugLog;      // Rule discovery and injection
-  taskDebugLog: DebugLog;       // Task delegation and monitoring
-  memoryDebugLog: DebugLog;     // Memory system (store, retrieval)
-  contextDebugLog: DebugLog;    // Session state, snapshots, compaction
+  coreLogger: LoggerInstance;     // Plugin lifecycle (passed from index.ts)
+  rulesLogger: LoggerInstance;      // Rule discovery and injection
+  taskLogger: LoggerInstance;       // Task delegation and monitoring
+  memoryLogger: LoggerInstance;     // Memory system (store, retrieval)
+  contextLogger: LoggerInstance;    // Session state, snapshots, compaction
   now: () => number;
   taskManager: SimpleTaskManager | undefined;
   memoryInjector: MemoryInjector | undefined;
@@ -59,11 +59,11 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     projectDirectory: opts.projectDirectory,
     ruleFiles: opts.ruleFiles,
     sessionStore: opts.sessionStore,
-    pluginDebugLog: opts.debugLog ?? createDebugLog("[plugin]", "plugin"),
-    rulesDebugLog: createDebugLog("[rules]", "rules"),
-    taskDebugLog: createDebugLog("[task]", "task"),
-    memoryDebugLog: createDebugLog("[memory]", "memory"),
-    contextDebugLog: createDebugLog("[context]", "context"),
+    coreLogger: opts.coreLogger ?? coreLogger,
+    rulesLogger: rulesLogger,
+    taskLogger: taskLogger,
+    memoryLogger: memoryLogger,
+    contextLogger: contextLogger,
     now: opts.now ?? (() => Date.now()),
     taskManager: opts.taskManager ?? undefined,
     memoryInjector: opts.memoryInjector,
@@ -88,44 +88,44 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
 
   const commandHooks = createCommandHooks({
     sessionStore: ctx.sessionStore,
-    contextDebugLog: ctx.contextDebugLog,
+    contextLogger: ctx.contextLogger,
     projectDirectory: ctx.projectDirectory,
   });
 
   const messageHooks = createMessageHooks({
     sessionStore: ctx.sessionStore,
-    contextDebugLog: ctx.contextDebugLog,
+    contextLogger: ctx.contextLogger,
     projectDirectory: ctx.projectDirectory,
     transformedMessagesMap,
     skillReloadCtx: {
       sessionStore: ctx.sessionStore,
-      contextDebugLog: ctx.contextDebugLog,
+      contextLogger: ctx.contextLogger,
     },
     ruleMessageCtx: {
       sessionStore: ctx.sessionStore,
       ruleInjectorCtx: {
         directory: ctx.directory,
         ruleFiles: ctx.ruleFiles,
-        rulesDebugLog: ctx.rulesDebugLog,
+        rulesLogger: ctx.rulesLogger,
       } satisfies RuleInjectorContext,
       client: ctx.client,
       taskManager: ctx.taskManager,
       childSessionCache: ctx.childSessionCache,
-      rulesDebugLog: ctx.rulesDebugLog,
+      rulesLogger: ctx.rulesLogger,
       rulesInjectionEnabled: ctx.rulesInjectionEnabled,
     },
     memoryMessageCtx: {
       memoryInjectorCtx: {
         client: ctx.client,
         sessionStore: ctx.sessionStore,
-        memoryDebugLog: ctx.memoryDebugLog,
+        memoryLogger: ctx.memoryLogger,
         memoryInjector: ctx.memoryInjector,
         childSessionCache: ctx.childSessionCache,
         taskManager: ctx.taskManager,
       } satisfies MemoryInjectorContext,
       memoryInjector: ctx.memoryInjector,
       sessionStore: ctx.sessionStore,
-      memoryDebugLog: ctx.memoryDebugLog,
+      memoryLogger: ctx.memoryLogger,
       memoryInjectionEnabled: ctx.memoryInjectionEnabled,
     },
   });
@@ -135,8 +135,8 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
     directory: ctx.directory,
     projectDirectory: ctx.projectDirectory,
     sessionStore: ctx.sessionStore,
-    memoryDebugLog: ctx.memoryDebugLog,
-    contextDebugLog: ctx.contextDebugLog,
+    memoryLogger: ctx.memoryLogger,
+    contextLogger: ctx.contextLogger,
     now: ctx.now,
     childSessionCache: ctx.childSessionCache,
     taskManager: ctx.taskManager,
@@ -149,14 +149,14 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
   const eventRouter = createEventRouter({
     client: ctx.client,
     sessionStore: ctx.sessionStore,
-    contextDebugLog: ctx.contextDebugLog,
-    taskDebugLog: ctx.taskDebugLog,
+    contextLogger: ctx.contextLogger,
+    taskLogger: ctx.taskLogger,
     taskManager: ctx.taskManager,
   });
 
   const compactionHooks = createCompactionHooks({
     sessionStore: ctx.sessionStore,
-    contextDebugLog: ctx.contextDebugLog,
+    contextLogger: ctx.contextLogger,
     now: ctx.now,
     ...(ctx.taskManager ? { taskManager: ctx.taskManager } : {}),
   });

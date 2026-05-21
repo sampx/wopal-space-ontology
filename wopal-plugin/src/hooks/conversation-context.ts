@@ -4,7 +4,7 @@
  * Provides conversation context extraction and enriched query building.
  */
 
-import type { DebugLog } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
 import { loadSessionContext } from "../memory/session-context.js";
 import type { MessageWithInfo } from "./message-context.js";
 
@@ -107,7 +107,7 @@ export function extractConversationContext(
  * Build context-enriched query for memory retrieval.
  */
 export function buildEnrichedQuery(
-  debugLog: DebugLog,
+  debugLog: LoggerInstance,
   sessionID: string,
   userQuery: string,
   messages: MessageWithInfo[],
@@ -134,17 +134,17 @@ export function buildEnrichedQuery(
 
   if (conversation) {
     const result = `当前意图: ${trimmed}\n---\n${summaryText}${conversation}`;
-    debugLog(`[enrichedQuery]\n${result}`);
+    debugLog.debug(`[enrichedQuery]\n${result}`);
     return result;
   }
 
   // No conversation found — use summary + raw query or just raw query
   if (summaryText) {
     const result = `当前意图: ${trimmed}\n---\n${summaryText}`;
-    debugLog(`[enrichedQuery] (no conversation)\n${result}`);
+    debugLog.debug(`[enrichedQuery] (no conversation)\n${result}`);
     return result;
   }
 
-  debugLog(`[enrichedQuery] (raw query only): ${trimmed}`);
+  debugLog.debug(`[enrichedQuery] (raw query only): ${trimmed}`);
   return trimmed;
 }

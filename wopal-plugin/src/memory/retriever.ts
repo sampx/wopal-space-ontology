@@ -9,9 +9,7 @@
 
 import type { MemoryStore, Memory } from "./store.js";
 import type { EmbeddingClient } from "./embedder.js";
-import { createDebugLog } from "../debug.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
+import { memoryLogger } from "../logger.js";
 
 const DEFAULT_LIMIT = 8;
 
@@ -70,7 +68,7 @@ export class MemoryRetriever {
     const vectorResults = await this.store.search(queryVector, limit * 2);
 
     if (vectorResults.length === 0) {
-      debugLog("No vector search results");
+      memoryLogger.debug("No vector search results");
       return [];
     }
 

@@ -10,15 +10,12 @@ import type { MemoryCategory } from "./types.js";
 import type { EmbeddingClient } from "./embedder.js";
 import type { DistillLLMClient } from "./llm-client.js";
 import type { SessionMessage } from "../types.js";
-import { createDebugLog, createWarnLog, formatSessionID } from "../debug.js";
+import { memoryLogger, formatSessionID } from "../logger.js";
 import { loadSessionContext, saveSessionContext, clearSessionContext, type SessionContext } from "./session-context.js";
 import { CATEGORY_LABELS, validateCategory, getDefaultImportance } from "./categories.js";
 import { MIN_CONVERSATION_LENGTH, extractConversationText } from "./conversation.js";
 import { buildExtractionPrompt, type ExtractResult } from "./prompts.js";
 import { performDeduplication, type DedupResult } from "./dedup.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
 
 /**
  * Result of distillation process
@@ -88,17 +85,17 @@ export class DistillEngine {
    * Distill memories from session messages
    */
   async distill(sessionID: string, messages: SessionMessage[], project: string = "wopal-space"): Promise<DistillResult> {
-    debugLog(`[distill] ${formatSessionID(sessionID, false)} project=${project} messages=${messages.length}`);
+    memoryLogger.debug(`[distill] ${formatSessionID(sessionID, false)} project=${project} messages=${messages.length}`);
 
     const existingState = loadExtractionState(sessionID);
     if (existingState?.distill) {
-      debugLog(`[distill] Already extracted at ${existingState.distill.extractedAt}`);
+      memoryLogger.debug(`[distill] Already extracted at ${existingState.distill.extractedAt}`);
       return { memoriesCreated: 0, memoriesMerged: 0, memoriesSkipped: 0, title: existingState.title, depth: "shallow" };
     }
 
     const conversation = extractConversationText(messages);
     if (conversation.length < MIN_CONVERSATION_LENGTH) {
-      debugLog(`[distill] Too short (${conversation.length} chars), skip`);
+      memoryLogger.debug(`[distill] Too short (${conversation.length} chars), skip`);
       return { memoriesCreated: 0, memoriesMerged: 0, memoriesSkipped: 0, title: null, depth: "shallow" };
     }
 
@@ -107,12 +104,12 @@ export class DistillEngine {
     try {
       extractResult = await this.llm.completeJson<ExtractResult>(extractionPrompt);
     } catch (error) {
-      warnLog(`[distill] LLM extraction failed: ${error}`);
+      memoryLogger.warn(`[distill] LLM extraction failed: ${error}`);
       return { memoriesCreated: 0, memoriesMerged: 0, memoriesSkipped: 0, title: null, depth: "shallow" };
     }
 
     if (!extractResult.memories || extractResult.memories.length === 0) {
-      debugLog(`[distill] No memories extracted`);
+      memoryLogger.debug(`[distill] No memories extracted`);
       return { memoriesCreated: 0, memoriesMerged: 0, memoriesSkipped: 0, title: extractResult.title ?? null, depth: "shallow" };
     }
 
@@ -129,7 +126,7 @@ export class DistillEngine {
     };
     saveSessionContext(ctx);
 
-    debugLog(`[distill] Done: created=${dedupResult.create.length}, merged=${dedupResult.merge.length}, skipped=${dedupResult.skip.length}`);
+    memoryLogger.debug(`[distill] Done: created=${dedupResult.create.length}, merged=${dedupResult.merge.length}, skipped=${dedupResult.skip.length}`);
     return {
       memoriesCreated: dedupResult.create.length,
       memoriesMerged: dedupResult.merge.length,
@@ -143,11 +140,11 @@ export class DistillEngine {
    * Preview memories from session messages without writing to database
    */
   async preview(sessionID: string, messages: SessionMessage[]): Promise<{ candidates: PreviewCandidate[]; title: string | null }> {
-    debugLog(`[preview] ${formatSessionID(sessionID, false)} messages=${messages.length}`);
+    memoryLogger.debug(`[preview] ${formatSessionID(sessionID, false)} messages=${messages.length}`);
 
     const conversation = extractConversationText(messages);
     if (conversation.length < MIN_CONVERSATION_LENGTH) {
-      debugLog(`[preview] Too short (${conversation.length} chars), skip`);
+      memoryLogger.debug(`[preview] Too short (${conversation.length} chars), skip`);
       return { candidates: [], title: null };
     }
 
@@ -156,12 +153,12 @@ export class DistillEngine {
     try {
       extractResult = await this.llm.completeJson<ExtractResult>(extractionPrompt);
     } catch (error) {
-      warnLog(`[preview] LLM extraction failed: ${error}`);
+      memoryLogger.warn(`[preview] LLM extraction failed: ${error}`);
       return { candidates: [], title: null };
     }
 
     if (!extractResult.memories || extractResult.memories.length === 0) {
-      debugLog(`[preview] No memories extracted`);
+      memoryLogger.debug(`[preview] No memories extracted`);
       return { candidates: [], title: extractResult.title ?? null };
     }
 
@@ -170,7 +167,7 @@ export class DistillEngine {
       return { category: validated.category, body: validated.body, tags: m.tags ?? [], importance: getDefaultImportance(validated.category) };
     });
 
-    debugLog(`[preview] ${candidates.length} candidates`);
+    memoryLogger.debug(`[preview] ${candidates.length} candidates`);
     return { candidates, title: extractResult.title ?? null };
   }
 
@@ -186,7 +183,7 @@ export class DistillEngine {
       return { created: 0, merged: 0, skipped: 0, mergeDetails: [] };
     }
 
-    debugLog(`[confirm] Starting dedup for ${candidates.length} candidates`);
+    memoryLogger.debug(`[confirm] Starting dedup for ${candidates.length} candidates`);
 
     const dedupResult = await performDeduplication(
       candidates.map((c) => ({ category: c.category, body: c.body, tags: c.tags })),
@@ -195,7 +192,7 @@ export class DistillEngine {
 
     await this.writeDedupResult(dedupResult, sessionID, project);
 
-    debugLog(`[confirm] Done: created=${dedupResult.create.length}, merged=${dedupResult.merge.length}, skipped=${dedupResult.skip.length}`);
+    memoryLogger.debug(`[confirm] Done: created=${dedupResult.create.length}, merged=${dedupResult.merge.length}, skipped=${dedupResult.skip.length}`);
     return {
       created: dedupResult.create.length,
       merged: dedupResult.merge.length,

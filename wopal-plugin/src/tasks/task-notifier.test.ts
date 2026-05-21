@@ -1,14 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { WopalTask, OpenCodeClient, SessionMessage } from "../types.js"
+import type { LoggerInstance } from "../logger.js"
 import {
   sendProgressNotification,
   notifyParent,
   notifyParentStuck,
   sendNotification,
 } from "./task-notifier.js"
-import { createDebugLog } from "../debug.js"
 
-const mockDebugLog = vi.fn()
+const mockLogger: LoggerInstance = {
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn(),
+};
 
 describe("task-notifier", () => {
   beforeEach(() => {
@@ -53,7 +60,7 @@ describe("task-notifier", () => {
       }
 
       await sendProgressNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         task,
         42,
         65,
@@ -97,18 +104,18 @@ describe("task-notifier", () => {
       }
 
       await sendProgressNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         task,
         42,
         50,
         "context_milestone",
       )
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[progressNotify] sent:")
       )
-      expect(mockDebugLog.mock.calls[0][0]).toContain("taskId=wopal-task-123")
-      expect(mockDebugLog.mock.calls[0][0]).toContain("msgs=42")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("taskId=wopal-task-123")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("msgs=42")
     })
 
     it("logs debug summary on failure", async () => {
@@ -130,14 +137,14 @@ describe("task-notifier", () => {
       }
 
       await sendProgressNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         task,
         42,
         null,
         "time_quota",
       )
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[progressNotify] failed:")
       )
     })
@@ -166,14 +173,14 @@ describe("task-notifier", () => {
 
       // Should not throw
       await sendProgressNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         task,
         42,
         null,
       )
 
       expect(mockPromptAsync).toHaveBeenCalledOnce()
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[progressNotify] failed to fetch messages")
       )
     })
@@ -214,7 +221,7 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
       expect(mockPromptAsync).toHaveBeenCalledOnce()
       const notificationText = mockPromptAsync.mock.calls[0][0].body.parts[0].text
@@ -251,7 +258,7 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
       expect(mockPromptAsync).toHaveBeenCalledOnce()
       expect(mockMessages).not.toHaveBeenCalled() // No message fetch for error
@@ -283,13 +290,13 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[notifyParent] sent:")
       )
-      expect(mockDebugLog.mock.calls[0][0]).toContain("taskId=wopal-task-123")
-      expect(mockDebugLog.mock.calls[0][0]).toContain("status=IDLE")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("taskId=wopal-task-123")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("status=IDLE")
     })
 
     it("logs debug summary on failure", async () => {
@@ -309,9 +316,9 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[notifyParent] failed:")
       )
     })
@@ -338,7 +345,7 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
       expect(mockMessages).not.toHaveBeenCalled()
     })
@@ -365,7 +372,7 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParent({ client, debugLog: mockDebugLog }, task)
+      await notifyParent({ client, debugLog: mockLogger }, task)
 
       expect(mockMessages).toHaveBeenCalledOnce()
     })
@@ -389,7 +396,7 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParentStuck({ client, debugLog: mockDebugLog }, task, "2m 30s")
+      await notifyParentStuck({ client, debugLog: mockLogger }, task, "2m 30s")
 
       expect(mockPromptAsync).toHaveBeenCalledOnce()
       const notificationText = mockPromptAsync.mock.calls[0][0].body.parts[0].text
@@ -418,13 +425,13 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParentStuck({ client, debugLog: mockDebugLog }, task, "1m 45s")
+      await notifyParentStuck({ client, debugLog: mockLogger }, task, "1m 45s")
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[notifyParentStuck] sent:")
       )
-      expect(mockDebugLog.mock.calls[0][0]).toContain("taskId=wopal-task-123")
-      expect(mockDebugLog.mock.calls[0][0]).toContain("duration=1m 45s")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("taskId=wopal-task-123")
+      expect(mockLogger.debug.mock.calls[0][0]).toContain("duration=1m 45s")
     })
 
     it("logs debug summary on failure", async () => {
@@ -444,9 +451,9 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      await notifyParentStuck({ client, debugLog: mockDebugLog }, task, "2m")
+      await notifyParentStuck({ client, debugLog: mockLogger }, task, "2m")
 
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[notifyParentStuck] failed:")
       )
     })
@@ -460,7 +467,7 @@ describe("task-notifier", () => {
       } as OpenCodeClient
 
       const result = await sendNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         "parent-123",
         "Test notification",
       )
@@ -482,13 +489,13 @@ describe("task-notifier", () => {
       } as OpenCodeClient
 
       const result = await sendNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         "parent-123",
         "Test notification",
       )
 
       expect(result).toBe(false)
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining("[sendNotification] error:")
       )
     })
@@ -499,13 +506,13 @@ describe("task-notifier", () => {
       } as OpenCodeClient
 
       const result = await sendNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         "parent-123",
         "Test notification",
       )
 
       expect(result).toBe(false)
-      expect(mockDebugLog).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         "[sendNotification] skipped: session.promptAsync unavailable"
       )
     })
@@ -517,7 +524,7 @@ describe("task-notifier", () => {
       } as OpenCodeClient
 
       await sendNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         "parent-123",
         "Task notification",
       )
@@ -532,7 +539,7 @@ describe("task-notifier", () => {
       } as OpenCodeClient
 
       await sendNotification(
-        { client, debugLog: mockDebugLog },
+        { client, debugLog: mockLogger },
         "parent-123",
         "Permission notification",
         true,

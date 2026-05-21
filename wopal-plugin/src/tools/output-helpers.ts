@@ -1,4 +1,4 @@
-import { createDebugLog } from "../debug.js"
+import { taskLogger } from "../logger.js"
 import type { SessionStore } from "../session-store.js"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { ProgressInfo } from "../tasks/progress.js"
@@ -6,7 +6,6 @@ import type { LoopWarning } from "../tasks/loop-detector.js"
 import { fetchContextPercent, fetchSessionModelInfo, formatContextUsage } from "../session-runtime-info.js"
 import type { OpenCodeClient } from "../types.js"
 
-const debugLog = createDebugLog("[task]", "task")
 export const MAX_RECENT_OUTPUT = 800
 
 /**
@@ -21,7 +20,7 @@ export async function getSessionModelInfo(
   client: OpenCodeClient,
   sessionID: string,
 ): Promise<{ providerID: string; modelID: string } | null> {
-  return fetchSessionModelInfo(client, sessionID, debugLog)
+  return fetchSessionModelInfo(client, sessionID, taskLogger)
 }
 
 export async function getContextUsage(
@@ -31,7 +30,7 @@ export async function getContextUsage(
   sessionStore: SessionStore,
   taskManager?: SimpleTaskManager,
 ): Promise<string | null> {
-  const info = await fetchContextPercent(client, sessionStore, directory, sessionID, debugLog, taskManager)
+  const info = await fetchContextPercent(client, sessionStore, directory, sessionID, taskLogger, taskManager)
   return formatContextUsage(info)
 }
 

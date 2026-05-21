@@ -3,8 +3,8 @@ import type {
   LaunchOutput,
   WopalTask,
 } from "../types.js"
-import type { DebugLog } from "../debug.js"
-import { formatSessionID } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
+import { formatSessionID } from "../logger.js"
 import type { ConcurrencyManager } from "./concurrency-manager.js"
 import { toErrorMessage, isPromiseLike } from "./utils.js"
 import { sessionIDToTaskID } from "../session-ref.js"
@@ -33,7 +33,7 @@ export interface TaskLauncherDeps {
       abort?: (args: { path: { id: string } }) => Promise<unknown>
     }
   }
-  debugLog: DebugLog
+  debugLog: LoggerInstance
   concurrency: ConcurrencyManager
   concurrencyKey: string
   taskManager: {
@@ -56,20 +56,20 @@ export async function launchTask(
     return { ok: false, status: 'error', error }
   }
 
-  debugLog(`[launch] starting: description="${input.description}" agent="${input.agent}" parentSessionID=${input.parentSessionID}`)
+  debugLog.debug(`[launch] starting: description="${input.description}" agent="${input.agent}" parentSessionID=${input.parentSessionID}`)
 
   if (!concurrency.tryAcquire(concurrencyKey, DEFAULT_CONCURRENCY_LIMIT)) {
-    debugLog(`[launch] concurrency limit reached (${DEFAULT_CONCURRENCY_LIMIT}/${DEFAULT_CONCURRENCY_LIMIT})`)
+    debugLog.debug(`[launch] concurrency limit reached (${DEFAULT_CONCURRENCY_LIMIT}/${DEFAULT_CONCURRENCY_LIMIT})`)
     return { ok: false, status: 'error', error: `Concurrency limit reached (${DEFAULT_CONCURRENCY_LIMIT}/${DEFAULT_CONCURRENCY_LIMIT}). Wait for running tasks to finish.` }
   }
 
   if (!input.parentSessionID) {
-    debugLog(`[launch] failed: parent session ID is required`)
+    debugLog.debug(`[launch] failed: parent session ID is required`)
     return releaseAndReturnError("Background task launch failed: parent session ID is required")
   }
 
   if (typeof client.session?.create !== "function") {
-    debugLog(`[launch] failed: session.create is unavailable`)
+    debugLog.debug(`[launch] failed: session.create is unavailable`)
     return releaseAndReturnError("Background task launch failed: session.create is unavailable")
   }
 
@@ -83,17 +83,17 @@ export async function launchTask(
       } as { parentID: string; title: string; agent?: string },
     })
 
-    debugLog(`[launch] session.create returned: ${JSON.stringify(session)}`)
+    debugLog.debug(`[launch] session.create returned: ${JSON.stringify(session)}`)
     const extractedSessionID = session?.data?.id ?? session?.id ?? session?.info?.id
     if (extractedSessionID) {
       sessionID = extractedSessionID
     } else {
       const error = "Background task launch failed: child session did not provide an ID"
-      debugLog(`[launch] failed: child session did not provide an ID`)
+      debugLog.debug(`[launch] failed: child session did not provide an ID`)
       return releaseAndReturnError(error)
     }
   } catch (err) {
-    debugLog(`[launch] session.create error: ${err}`)
+    debugLog.debug(`[launch] session.create error: ${err}`)
     const error = `Background task launch failed: ${toErrorMessage(err)}`
     return releaseAndReturnError(error)
   }
@@ -116,7 +116,7 @@ export async function launchTask(
 
   if (typeof client.session?.promptAsync !== "function") {
     const error = "Background task launch failed: session.promptAsync is unavailable"
-    debugLog(`[launch] failed: session.promptAsync is unavailable`)
+    debugLog.debug(`[launch] failed: session.promptAsync is unavailable`)
     await abortSession(task.sessionID)
     failTask(task, error)
     return { ok: false, taskId, status: 'error', error }
@@ -135,7 +135,7 @@ export async function launchTask(
 
   if (!isPromiseLike(promptResult)) {
     const error = "Background task launch failed: session.promptAsync did not return a promise"
-    debugLog(`[launch] failed: promptAsync did not return a promise`)
+    debugLog.debug(`[launch] failed: promptAsync did not return a promise`)
     await abortSession(task.sessionID)
     failTask(task, error)
     return { ok: false, taskId, status: 'error', error }
@@ -147,11 +147,11 @@ export async function launchTask(
 
   void Promise.resolve(promptResult).catch(async (err: unknown) => {
     const error = `Background task execution failed: ${toErrorMessage(err)}`
-    debugLog(`[launch] promptAsync error for ${taskId}: idleNotified=${task.idleNotified} status=${task.status}`)
+    debugLog.debug(`[launch] promptAsync error for ${taskId}: idleNotified=${task.idleNotified} status=${task.status}`)
 
     // If task was already idle (interrupted by user), don't override state
     if (task.idleNotified) {
-      debugLog(`[launch] skipping failTask: task ${taskId} was idle, promptAsync rejection is expected after abort`)
+      debugLog.debug(`[launch] skipping failTask: task ${taskId} was idle, promptAsync rejection is expected after abort`)
       return
     }
 
@@ -160,7 +160,7 @@ export async function launchTask(
     }
   })
 
-  debugLog(`[launch] success: taskId=${taskId} session=${formatSessionID(task.sessionID, true)}`)
+  debugLog.debug(`[launch] success: taskId=${taskId} session=${formatSessionID(task.sessionID, true)}`)
 
   return { ok: true, taskId, status: 'running' }
 }

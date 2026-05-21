@@ -1,6 +1,4 @@
-import { createDebugLog } from "../debug.js"
-
-const debugLog = createDebugLog("[task]", "task")
+import { taskLogger } from "../logger.js"
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
@@ -35,14 +33,14 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
   cleanupRegistered = true
 
   const cleanupAll = () => {
-    debugLog(`[cleanup] triggered, managers: ${cleanupManagers.size}`)
+    taskLogger.debug(`[cleanup] triggered, managers: ${cleanupManagers.size}`)
     for (const m of cleanupManagers) {
       try {
         void Promise.resolve(m.shutdown()).catch((error) => {
-          debugLog(`[cleanup] error during async shutdown: ${error}`)
+          taskLogger.debug(`[cleanup] error during async shutdown: ${error}`)
         })
       } catch (error) {
-        debugLog(`[cleanup] error during shutdown: ${error}`)
+        taskLogger.debug(`[cleanup] error during shutdown: ${error}`)
       }
     }
   }
@@ -60,7 +58,7 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
   registerSignal("beforeExit", false)
   registerSignal("exit", false)
 
-  debugLog("[cleanup] handlers registered")
+  taskLogger.debug("[cleanup] handlers registered")
 }
 
 export function unregisterManagerForCleanup(manager: CleanupTarget): void {
@@ -73,7 +71,7 @@ export function unregisterManagerForCleanup(manager: CleanupTarget): void {
   }
   cleanupHandlers.clear()
   cleanupRegistered = false
-  debugLog("[cleanup] handlers unregistered")
+  taskLogger.debug("[cleanup] handlers unregistered")
 }
 
 /** @internal — test-only reset for module-level singleton state */

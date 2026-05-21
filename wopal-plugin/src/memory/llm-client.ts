@@ -6,10 +6,7 @@
  */
 
 import OpenAI from "openai";
-import { createDebugLog, createWarnLog } from "../debug.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
+import { memoryLogger } from "../logger.js";
 
 const LLM_TIMEOUT_MS = 120000;
 
@@ -42,7 +39,7 @@ export class DistillLLMClient {
       apiKey,
     });
 
-    debugLog(`DistillLLMClient ready: ${this.model}`);
+    memoryLogger.debug(`DistillLLMClient ready: ${this.model}`);
   }
 
   /**
@@ -68,7 +65,7 @@ export class DistillLLMClient {
       return content;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      warnLog(`[LLM.complete] Failed: ${message}`);
+      memoryLogger.warn(`[LLM.complete] Failed: ${message}`);
       throw new Error(`LLM complete failed: ${message}`);
     }
   }
@@ -89,8 +86,8 @@ export class DistillLLMClient {
     const jsonStr = this.extractJson(rawResponse);
 
     if (!jsonStr) {
-      warnLog(`[LLM.completeJson] No JSON found in response`);
-      warnLog(`[LLM.completeJson] Response first 500 chars:\n${rawResponse.substring(0, 500)}`);
+      memoryLogger.warn(`[LLM.completeJson] No JSON found in response`);
+      memoryLogger.warn(`[LLM.completeJson] Response first 500 chars:\n${rawResponse.substring(0, 500)}`);
       throw new Error("No JSON found in LLM response");
     }
 
@@ -108,8 +105,8 @@ export class DistillLLMClient {
       return JSON.parse(repaired) as T;
     } catch (parseError) {
       const message = parseError instanceof Error ? parseError.message : String(parseError);
-      warnLog(`[LLM.completeJson] Parse failed: ${message}`);
-      warnLog(`[LLM.completeJson] Failed JSON:\n${repaired.substring(0, 500)}`);
+      memoryLogger.warn(`[LLM.completeJson] Parse failed: ${message}`);
+      memoryLogger.warn(`[LLM.completeJson] Failed JSON:\n${repaired.substring(0, 500)}`);
       throw new Error(`Failed to parse JSON after repair: ${message}`);
     }
   }

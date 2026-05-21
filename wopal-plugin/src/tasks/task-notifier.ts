@@ -1,5 +1,5 @@
 import type { WopalTask, OpenCodeClient, SessionMessage } from "../types.js"
-import type { DebugLog } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
 import type { ProgressNotifyTrigger } from "./task-monitor.js"
 import { toErrorMessage } from "./utils.js"
 import { CONTEXT_WARN_THRESHOLD } from "./task-monitor.js"
@@ -16,7 +16,7 @@ import {
 
 export interface TaskNotifierDeps {
   client: OpenCodeClient
-  debugLog: DebugLog
+  debugLog: LoggerInstance
 }
 
 const TRIGGER_LABELS: Record<ProgressNotifyTrigger, string> = {
@@ -41,7 +41,7 @@ export async function sendProgressNotification(
       messages = extractMessages(messagesResult)
     }
   } catch (err) {
-    debugLog(`[progressNotify] failed to fetch messages: ${toErrorMessage(err)}`)
+    debugLog.debug(`[progressNotify] failed to fetch messages: ${toErrorMessage(err)}`)
   }
 
   // Elapsed runtime
@@ -93,7 +93,7 @@ Task is still running. Use \`wopal_task_output(task_id="${task.id}")\` for detai
 
   // Mirror to debug log with concise summary
   const debugSummary = `taskId=${task.id} msgs=${messageCount} runtime=${elapsedLine ?? 'unknown'} tools=${toolSummary.total} trigger=${triggerReason ?? 'unknown'}`
-  debugLog(`[progressNotify] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
+  debugLog.debug(`[progressNotify] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
 }
 
 export async function sendNotification(
@@ -105,7 +105,7 @@ export async function sendNotification(
   const { client, debugLog } = deps
 
   if (typeof client.session?.promptAsync !== "function") {
-    debugLog("[sendNotification] skipped: session.promptAsync unavailable")
+    debugLog.debug("[sendNotification] skipped: session.promptAsync unavailable")
     return false
   }
 
@@ -119,7 +119,7 @@ export async function sendNotification(
     })
     return true
   } catch (err: unknown) {
-    debugLog(`[sendNotification] error: ${toErrorMessage(err)}`)
+    debugLog.debug(`[sendNotification] error: ${toErrorMessage(err)}`)
     return false
   }
 }
@@ -147,7 +147,7 @@ export async function notifyParent(
         messages = extractMessages(messagesResult)
       }
     } catch (err) {
-      debugLog(`[notifyParent] failed to fetch messages: ${toErrorMessage(err)}`)
+      debugLog.debug(`[notifyParent] failed to fetch messages: ${toErrorMessage(err)}`)
     }
 
     const toolSummary = extractToolCallSummary(messages)
@@ -184,7 +184,7 @@ Use \`wopal_task_output(task_id="${task.id}")\` to retrieve the result.
   // Mirror to debug log
   const status = task.idleNotified ? 'IDLE' : task.status
   const debugSummary = `taskId=${task.id} status=${status}`
-  debugLog(`[notifyParent] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
+  debugLog.debug(`[notifyParent] ${success ? 'sent' : 'failed'}: ${debugSummary}`)
 }
 
 export async function notifyParentStuck(
@@ -207,5 +207,5 @@ The background task may be stuck in a reasoning loop. Use \`wopal_task_output(ta
 </system-reminder>`
 
   const success = await sendNotification(deps, task.parentSessionID, notification)
-  debugLog(`[notifyParentStuck] ${success ? 'sent' : 'failed'}: taskId=${task.id} duration=${durationText}`)
+  debugLog.debug(`[notifyParentStuck] ${success ? 'sent' : 'failed'}: taskId=${task.id} duration=${durationText}`)
 }

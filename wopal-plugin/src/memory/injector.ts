@@ -7,9 +7,7 @@
 
 import type { MemoryRetriever } from "./retriever.js";
 import type { Memory } from "./store.js";
-import { createDebugLog } from "../debug.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
+import { memoryLogger } from "../logger.js";
 
 export class MemoryInjector {
   private retriever: MemoryRetriever;
@@ -31,20 +29,20 @@ export class MemoryInjector {
       const memories = await this.retriever.retrieve(userQuery);
 
       if (memories.length === 0) {
-        debugLog(`[inject] No relevant memories found`);
+        memoryLogger.debug(`[inject] No relevant memories found`);
         return undefined;
       }
 
       const { formatted, injectedCount, injectedIds } = this.formatMemories(memories);
       const tokens = Math.ceil(formatted.length / 4);
       const idLines = injectedIds.map((id, i) => `  [${i + 1}] ${id}`).join("\n");
-      debugLog(
+      memoryLogger.debug(
         `[inject] retrieved=${memories.length}, injected=${injectedCount}, tokens=${tokens}\n${idLines}`
       );
 
       return formatted;
     } catch (error) {
-      debugLog(`[inject] Retrieval failed: ${error}`);
+      memoryLogger.debug(`[inject] Retrieval failed: ${error}`);
       return undefined;
     }
   }

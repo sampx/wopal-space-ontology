@@ -8,10 +8,7 @@
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, readdirSync } from "fs";
-import { createDebugLog, createWarnLog } from "../debug.js";
-
-const debugLog = createDebugLog("[context]", "context");
-const warnLog = createWarnLog("[context]");
+import { contextLogger } from "../logger.js";
 
 // State directory (same as legacy ExtractionState)
 const STATE_DIR = join(homedir(), ".wopal", "memory", "state");
@@ -70,13 +67,13 @@ export function loadSessionContext(sessionID: string): SessionContext | null {
 
     // Validate required fields
     if (!ctx.sessionID || ctx.sessionID !== sessionID) {
-      warnLog(`Invalid session context: sessionID mismatch or missing`);
+      contextLogger.warn(`Invalid session context: sessionID mismatch or missing`);
       return null;
     }
 
     return ctx;
   } catch (error) {
-    debugLog(`Failed to load session context: ${error}`);
+    contextLogger.debug(`Failed to load session context: ${error}`);
     return null;
   }
 }
@@ -96,9 +93,9 @@ export function saveSessionContext(ctx: SessionContext): void {
     }
     const filePath = join(STATE_DIR, `${ctx.sessionID}.json`);
     writeFileSync(filePath, JSON.stringify(ctx, null, 2));
-    debugLog(`Saved session context: ${filePath}`);
+    contextLogger.debug(`Saved session context: ${filePath}`);
   } catch (error) {
-    warnLog(`Failed to save session context: ${error}`);
+    contextLogger.warn(`Failed to save session context: ${error}`);
   }
 }
 
@@ -114,10 +111,10 @@ export function clearSessionContext(sessionID: string): void {
     const filePath = join(STATE_DIR, `${sessionID}.json`);
     if (existsSync(filePath)) {
       unlinkSync(filePath);
-      debugLog(`Cleared session context: ${filePath}`);
+      contextLogger.debug(`Cleared session context: ${filePath}`);
     }
   } catch (error) {
-    debugLog(`Failed to clear session context: ${error}`);
+    contextLogger.debug(`Failed to clear session context: ${error}`);
   }
 }
 
@@ -133,7 +130,7 @@ export function clearSessionContext(sessionID: string): void {
 export function cleanupLegacyStateFiles(): number {
   try {
     if (!existsSync(STATE_DIR)) {
-      debugLog(`State directory doesn't exist: ${STATE_DIR}`);
+      contextLogger.debug(`State directory doesn't exist: ${STATE_DIR}`);
       return 0;
     }
 
@@ -169,23 +166,23 @@ export function cleanupLegacyStateFiles(): number {
         if (hasLegacyFields || !hasValidStructure) {
           unlinkSync(filePath);
           cleanedCount++;
-          debugLog(`Cleaned legacy state file: ${file}`);
+          contextLogger.debug(`Cleaned legacy state file: ${file}`);
         }
       } catch (parseError) {
         // Invalid JSON file - delete it
         try {
           unlinkSync(filePath);
           cleanedCount++;
-          debugLog(`Cleaned invalid JSON file: ${file}`);
+          contextLogger.debug(`Cleaned invalid JSON file: ${file}`);
         } catch (deleteError) {
-          warnLog(`Failed to delete invalid file ${file}: ${deleteError}`);
+          contextLogger.warn(`Failed to delete invalid file ${file}: ${deleteError}`);
         }
       }
     }
 
     return cleanedCount;
   } catch (error) {
-    warnLog(`Failed to cleanup legacy state files: ${error}`);
+    contextLogger.warn(`Failed to cleanup legacy state files: ${error}`);
     return 0;
   }
 }

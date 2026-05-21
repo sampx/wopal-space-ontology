@@ -6,7 +6,7 @@
 
 import * as lancedb from "@lancedb/lancedb";
 import { makeArrowTable } from "@lancedb/lancedb";
-import { createDebugLog, createWarnLog } from "../debug.js";
+import { memoryLogger } from "../logger.js";
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
@@ -22,9 +22,6 @@ import {
 
 // Re-export types for backward compatibility
 export type { Memory, MemoryInput, MemoryCategory, QueryType } from "./types.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
 
 /** LanceDB connection and table manager */
 export class MemoryStore {
@@ -59,7 +56,7 @@ export class MemoryStore {
     try {
       if (!existsSync(this.dbPath)) {
         mkdirSync(this.dbPath, { recursive: true });
-        debugLog(`Created memory database directory: ${this.dbPath}`);
+        memoryLogger.debug(`Created memory database directory: ${this.dbPath}`);
       }
 
       this.db = await lancedb.connect(this.dbPath);
@@ -88,14 +85,14 @@ export class MemoryStore {
         ]);
         this.table = await this.db.createTable(this.tableName, schemaData);
         await this.table.delete("id = ''");
-        debugLog(`Table '${this.tableName}' created with schema`);
+        memoryLogger.debug(`Table '${this.tableName}' created with schema`);
       }
 
       // Schema migration: add 'tags' column if missing (upgrade from pre-83)
       const schema = await this.table.schema();
       const hasTags = schema.fields.some((f) => f.name === "tags");
       if (!hasTags) {
-        debugLog(`Schema migration: adding 'tags' column`);
+        memoryLogger.debug(`Schema migration: adding 'tags' column`);
         const allRows = await this.table.query().toArray();
         const migrated = allRows.map((row) => {
           const r = row as Record<string, unknown>;
@@ -123,7 +120,7 @@ export class MemoryStore {
         // Drop old table and recreate with tags column
         await this.db.dropTable(this.tableName);
         this.table = await this.db.createTable(this.tableName, makeArrowTable(migrated));
-        debugLog(`Migrated ${migrated.length} rows with 'tags' column`);
+        memoryLogger.debug(`Migrated ${migrated.length} rows with 'tags' column`);
       }
 
       await this.table.createIndex("text", {
@@ -143,13 +140,13 @@ export class MemoryStore {
           }),
         });
       } catch (idxErr) {
-        debugLog(`FTS index on 'tags' skipped (may already exist): ${idxErr}`);
+        memoryLogger.debug(`FTS index on 'tags' skipped (may already exist): ${idxErr}`);
       }
 
       this.initialized = true;
-      debugLog(`MemoryStore initialized (LanceDB at ${this.dbPath})`);
+      memoryLogger.debug(`MemoryStore initialized (LanceDB at ${this.dbPath})`);
     } catch (error) {
-      warnLog(`MemoryStore init failed, gracefully degrading: ${error}`);
+      memoryLogger.warn(`MemoryStore init failed, gracefully degrading: ${error}`);
       this.initialized = false;
     }
   }
@@ -238,7 +235,7 @@ export class MemoryStore {
       input.session_id,
     );
     if (existing) {
-      debugLog(`Skipped exact duplicate memory: ${existing.id} (${existing.category})`);
+      memoryLogger.debug(`Skipped exact duplicate memory: ${existing.id} (${existing.category})`);
       return existing;
     }
 
@@ -260,7 +257,7 @@ export class MemoryStore {
     };
 
     await this.table.add([this.toStoredRow(memory)]);
-    debugLog(`Added memory: ${memory.id} (${memory.category})`);
+    memoryLogger.debug(`Added memory: ${memory.id} (${memory.category})`);
 
     return memory;
   }
@@ -378,7 +375,7 @@ export class MemoryStore {
 
     await this.table.delete(`id = '${id}'`);
     await this.table.add([this.toStoredRow(updated)]);
-    debugLog(`Updated memory: ${id}`);
+    memoryLogger.debug(`Updated memory: ${id}`);
   }
 
   async delete(id: string): Promise<void> {
@@ -387,7 +384,7 @@ export class MemoryStore {
     }
 
     await this.table.delete(`id = '${id}'`);
-    debugLog(`Deleted memory: ${id}`);
+    memoryLogger.debug(`Deleted memory: ${id}`);
   }
 
   async count(): Promise<number> {

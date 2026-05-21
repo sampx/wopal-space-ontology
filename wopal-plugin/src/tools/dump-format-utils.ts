@@ -1,8 +1,6 @@
-import { createDebugLog } from "../debug.js";
+import { contextLogger } from "../logger.js";
 
-const debugLog = createDebugLog("[context]", "context");
-
-export { debugLog };
+export { contextLogger as debugLog };
 
 const TRUNCATE_THRESHOLD_LINES = 10;
 const TRUNCATE_KEEP_LINES = 5;

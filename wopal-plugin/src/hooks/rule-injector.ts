@@ -7,13 +7,13 @@ import {
   type DiscoveredRule,
   type MatchedRuleInfo,
 } from "../rules/index.js";
-import type { DebugLog } from "../debug.js";
-import { formatSessionID } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
+import { formatSessionID } from "../logger.js";
 
 export interface RuleInjectorContext {
   directory: string;
   ruleFiles: DiscoveredRule[];
-  rulesDebugLog: DebugLog;
+  rulesLogger: LoggerInstance;
 }
 
 
@@ -53,7 +53,7 @@ export async function injectRules(
 
   if (result.content) {
     const matchedRuleNames = formatMatchedRulesForLog(result.matchedRules);
-    ctx.rulesDebugLog(
+    ctx.rulesLogger.debug(
       `${formatSessionID(sessionID, !!isTask)} agent=${agentName ?? "?"}: injected ${matchedRuleNames.length} rules → ${matchedRuleNames.join(", ")}`,
     );
     return result.content;

@@ -1,11 +1,9 @@
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { WopalTask, OpenCodeClient } from "../types.js"
-import { createDebugLog } from "../debug.js"
+import { taskLogger } from "../logger.js"
 import { trackActivity } from "../tasks/progress.js"
 import { isResumableTask } from "../tasks/task-phase.js"
-
-const debugLog = createDebugLog("[task]", "task")
 
 function resetTaskForResume(task: WopalTask): void {
   task.status = "running"
@@ -34,7 +32,7 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientA
     if (resultObj?.error) {
       throw new Error(`question.reply returned error: ${JSON.stringify(resultObj.error)}`)
     }
-    debugLog(`task ${taskId} resolved question via v2 client: requestID=${requestID} result=${JSON.stringify(result)}`)
+    taskLogger.debug(`task ${taskId} resolved question via v2 client: requestID=${requestID} result=${JSON.stringify(result)}`)
     return
   }
 
@@ -72,7 +70,7 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientA
     throw new Error(`question.reply fallback failed: ${response.status} ${response.statusText} — ${body}`)
   }
 
-  debugLog(`task ${taskId} resolved question via HTTP fallback: requestID=${requestID}`)
+  taskLogger.debug(`task ${taskId} resolved question via HTTP fallback: requestID=${requestID}`)
 }
 
 export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition {
@@ -85,7 +83,7 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
     },
     execute: async (args: { task_id: string; message: string; interrupt?: boolean }, context: ToolContext) => {
       const { task_id, message, interrupt = false } = args
-      debugLog(`wopal_reply called: task_id=${task_id} interrupt=${interrupt}`)
+      taskLogger.debug(`wopal_reply called: task_id=${task_id} interrupt=${interrupt}`)
 
       if (!context.sessionID) {
         return "Error: Current session ID is unavailable; cannot reply to task."
@@ -119,9 +117,9 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
         if (typeof client?.session?.abort === "function") {
           try {
             await client.session.abort({ path: { id: task.sessionID } })
-            debugLog(`task ${task_id} aborted before interrupt reply`)
+            taskLogger.debug(`task ${task_id} aborted before interrupt reply`)
           } catch (abortErr) {
-            debugLog(`abort failed (task may already be idle): ${abortErr}`)
+            taskLogger.debug(`abort failed (task may already be idle): ${abortErr}`)
           }
         }
 
@@ -150,13 +148,13 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
           // Now safe to clear idleNotified, waitingReason, waitingConcurrencyKey
           resetTaskForResume(task)
 
-          debugLog(`task ${task_id} interrupted and resumed with new direction`)
+          taskLogger.debug(`task ${task_id} interrupted and resumed with new direction`)
 
           return `Interrupt sent to task ${task_id}. Previous execution aborted, new message injected. Task will continue with new direction.`
         } catch (err) {
           // Rollback: release the slot we acquired before the failed message
           manager.releaseConcurrencySlot(task)
-          debugLog(`wopal_reply interrupt error: ${err}`)
+          taskLogger.debug(`wopal_reply interrupt error: ${err}`)
           return `Failed to send interrupt: ${err instanceof Error ? err.message : String(err)}`
         }
       }
@@ -168,16 +166,16 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
       try {
         if (task.pendingQuestionID) {
           const questionID = task.pendingQuestionID
-          debugLog(`resolving question deferred: requestID=${questionID}`)
+          taskLogger.debug(`resolving question deferred: requestID=${questionID}`)
 
           await replyQuestion(task_id, manager, client, questionID, message)
 
-          debugLog(`question resolved: requestID=${questionID}`)
+          taskLogger.debug(`question resolved: requestID=${questionID}`)
           delete task.pendingQuestionID
 
           // Reset state after successful question reply
           resetTaskForResume(task)
-          debugLog(`task ${task_id} resumed via question.reply`)
+          taskLogger.debug(`task ${task_id} resumed via question.reply`)
 
           return `Reply sent to task ${task_id}. The background task will continue execution.`
         }
@@ -198,13 +196,13 @@ export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition
 
         // Reset state after successful promptAsync
         resetTaskForResume(task)
-        debugLog(`task ${task_id} resumed`)
+        taskLogger.debug(`task ${task_id} resumed`)
 
         return `Reply sent to task ${task_id}. The background task will continue execution.`
       } catch (err) {
         // Rollback: release the slot we acquired before the failed operation
         manager.releaseConcurrencySlot(task)
-        debugLog(`wopal_reply error: ${err}`)
+        taskLogger.debug(`wopal_reply error: ${err}`)
         return `Failed to send reply: ${err instanceof Error ? err.message : String(err)}`
       }
     },

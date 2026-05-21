@@ -7,9 +7,9 @@
 
 import type { OpenCodeClient } from "../../types.js"
 import type { SessionStore } from "../../session-store.js"
-import type { DebugLog } from "../../debug.js"
+import type { LoggerInstance } from "../../logger.js"
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
-import { createDebugLog, formatSessionID } from "../../debug.js"
+import { contextLogger, formatSessionID } from "../../logger.js"
 import { trackActivity } from "../../tasks/progress.js"
 import { getSessionModelInfo } from "../../tools/output-helpers.js"
 
@@ -27,7 +27,7 @@ export interface MessageTokenHandlerContext {
   client: OpenCodeClient
   sessionStore: SessionStore
   taskManager: SimpleTaskManager | undefined
-  contextLog: DebugLog
+  contextLog: LoggerInstance
 }
 
 /**
@@ -70,8 +70,6 @@ export async function handleMessagePartUpdated(
   sessionID: string | undefined,
   part: EventPart | undefined,
 ): Promise<void> {
-  const contextLog = createDebugLog("[context] [tokens]", "context")
-
   // Token usage logging for step-finish events
   if (sessionID && part?.type === "step-finish" && part?.tokens) {
     const t = part.tokens
@@ -107,7 +105,7 @@ export async function handleMessagePartUpdated(
       // ignore — percentage is informational only
     }
 
-    contextLog(`${formatSessionID(sessionID, isTask)} agent=${agent} model=${model} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${pctText}`)
+    contextLogger.debug(`${formatSessionID(sessionID, isTask)} agent=${agent} model=${model} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${pctText}`)
 
     // Store token data + context limit in sessionStore
     if (t.input || cache.read) {

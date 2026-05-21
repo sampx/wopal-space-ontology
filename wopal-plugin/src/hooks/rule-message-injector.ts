@@ -1,5 +1,5 @@
 import type { SessionStore } from "../session-store.js";
-import type { DebugLog } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
 import type { MessageWithInfo } from "./message-context.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
 import type { OpenCodeClient } from "../types.js";
@@ -13,7 +13,7 @@ export interface RuleMessageInjectorContext {
   client: OpenCodeClient;
   taskManager?: { findBySession: (sessionID: string) => unknown } | undefined;
   childSessionCache: Map<string, boolean> | undefined;
-  rulesDebugLog: DebugLog;
+  rulesLogger: LoggerInstance;
   rulesInjectionEnabled: boolean;
 }
 

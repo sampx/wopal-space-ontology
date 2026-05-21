@@ -6,9 +6,7 @@ import { stat, readFile, readdir } from "fs/promises";
 import path from "path";
 import os from "os";
 import { parse as parseYaml } from "yaml";
-import { createWarnLog, type DebugLog } from "../debug.js";
-
-const warnLog = createWarnLog();
+import { rulesLogger, type LoggerInstance } from "../logger.js";
 
 /**
  * Metadata extracted from rule file frontmatter
@@ -87,8 +85,7 @@ export async function getCachedRule(
   } catch (error) {
     // Remove stale cache entry if file no longer exists
     ruleCache.delete(filePath);
-    const message = error instanceof Error ? error.message : String(error);
-    warnLog(`Failed to read rule file ${filePath}: ${message}`);
+    rulesLogger.warn({ err: error, file: filePath }, "Failed to read rule file");
     return undefined;
   }
 }
@@ -139,8 +136,7 @@ export function parseRuleMetadata(content: string): RuleMetadata | undefined {
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   } catch (error) {
     // Log warning for YAML parsing errors
-    const message = error instanceof Error ? error.message : String(error);
-    warnLog(`Failed to parse YAML frontmatter: ${message}`);
+    rulesLogger.warn({ err: error }, "Failed to parse YAML frontmatter");
     return undefined;
   }
 }
@@ -227,8 +223,7 @@ async function scanDirectoryRecursively(
     }
   } catch (error) {
     // Log directory read errors instead of silently ignoring
-    const message = error instanceof Error ? error.message : String(error);
-    warnLog(`Failed to read directory ${dir}: ${message}`);
+    rulesLogger.warn({ err: error, dir }, "Failed to read directory");
   }
 
   return results;
@@ -273,7 +268,7 @@ function inferAgentScope(relativePath: string): string | undefined {
  */
 export async function discoverRuleFiles(
   projectDir?: string,
-  rulesDebugLog?: DebugLog,
+  rulesDebugLog?: LoggerInstance,
 ): Promise<DiscoveredRule[]> {
   const files: DiscoveredRule[] = [];
 
@@ -322,7 +317,7 @@ export async function discoverRuleFiles(
 
   // Single-line summary log
   if (rulesDebugLog && files.length > 0) {
-    rulesDebugLog(
+    rulesDebugLog.debug(
       `Discovered ${files.length} rule file(s): ${files.map((r) => r.relativePath).join(", ")}`,
     );
   }

@@ -6,10 +6,7 @@
  */
 
 import OpenAI from "openai";
-import { createDebugLog, createWarnLog } from "../debug.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
+import { memoryLogger } from "../logger.js";
 
 /**
  * Embedding client using OpenAI-compatible API
@@ -47,7 +44,7 @@ export class EmbeddingClient {
       timeout: 60_000,
     });
 
-    debugLog(`EmbeddingClient ready: ${this.model} @ ${baseURL}`);
+    memoryLogger.debug(`EmbeddingClient ready: ${this.model} @ ${baseURL}`);
   }
 
   /**
@@ -72,7 +69,7 @@ export class EmbeddingClient {
       return embeddings;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      warnLog(`Embedding failed: ${message}`);
+      memoryLogger.warn(`Embedding failed: ${message}`);
       throw new Error(`Embedding failed: ${message}`);
     }
   }

@@ -8,10 +8,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import type { MemoryCategory } from "./types.js";
-import { createDebugLog, createWarnLog } from "../debug.js";
-
-const debugLog = createDebugLog("[memory]", "memory");
-const warnLog = createWarnLog("[memory]");
+import { memoryLogger } from "../logger.js";
 
 /**
  * Resolve prompt file path from environment variable
@@ -63,10 +60,10 @@ export function loadPromptTemplate(): string {
   if (DISTILL_PROMPT_FILE && existsSync(DISTILL_PROMPT_FILE)) {
     try {
       const content = readFileSync(DISTILL_PROMPT_FILE, "utf-8");
-      debugLog(`Loaded distill prompt from: ${DISTILL_PROMPT_FILE}`);
+      memoryLogger.debug(`Loaded distill prompt from: ${DISTILL_PROMPT_FILE}`);
       return content;
     } catch (error) {
-      warnLog(`Failed to load distill prompt from ${DISTILL_PROMPT_FILE}: ${error}`);
+      memoryLogger.warn(`Failed to load distill prompt from ${DISTILL_PROMPT_FILE}: ${error}`);
     }
   }
 
@@ -75,15 +72,15 @@ export function loadPromptTemplate(): string {
   if (existsSync(defaultPath)) {
     try {
       const content = readFileSync(defaultPath, "utf-8");
-      debugLog(`Loaded distill prompt from default path: ${defaultPath}`);
+      memoryLogger.debug(`Loaded distill prompt from default path: ${defaultPath}`);
       return content;
     } catch (error) {
-      warnLog(`Failed to load distill prompt from default path: ${error}`);
+      memoryLogger.warn(`Failed to load distill prompt from default path: ${error}`);
     }
   }
 
   // Return embedded default prompt (simplified version for fallback)
-  debugLog("Using embedded default distill prompt");
+  memoryLogger.debug("Using embedded default distill prompt");
   return `# 记忆提取 Prompt（默认版本）
 
 分析以下会话内容，提取值得长期保存的记忆。
@@ -143,10 +140,10 @@ export function buildBatchDedupPrompt(
   if (DEDUP_PROMPT_FILE && existsSync(DEDUP_PROMPT_FILE)) {
     try {
       const template = readFileSync(DEDUP_PROMPT_FILE, "utf-8");
-      debugLog(`Loaded dedup prompt from: ${DEDUP_PROMPT_FILE}`);
+      memoryLogger.debug(`Loaded dedup prompt from: ${DEDUP_PROMPT_FILE}`);
       return template.replace("{{input}}", JSON.stringify(input, null, 2));
     } catch (error) {
-      warnLog(`Failed to load dedup prompt from ${DEDUP_PROMPT_FILE}: ${error}`);
+      memoryLogger.warn(`Failed to load dedup prompt from ${DEDUP_PROMPT_FILE}: ${error}`);
     }
   }
 

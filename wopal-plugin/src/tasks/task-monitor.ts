@@ -6,7 +6,7 @@
  */
 
 import type { WopalTask } from "../types.js"
-import type { DebugLog } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
 
 // Re-export from specialized modules for backward compatibility
 export {
@@ -81,7 +81,7 @@ export function clearStuckState(tasks: Iterable<WopalTask>): void {
 
 export interface TaskMonitorDeps {
   tasks: Map<string, WopalTask>
-  debugLog: DebugLog
+  debugLog: LoggerInstance
   notifyParentStuckFn: (task: WopalTask, durationText: string) => Promise<void>
 }
 
@@ -105,7 +105,7 @@ export async function checkStuckTasksAndNotify(
     task.stuckNotified = true
     task.stuckNotifiedAt = new Date()
 
-    debugLog(`[stuck] detected: taskId=${task.id} duration=${durationText}`)
+    debugLog.debug(`[stuck] detected: taskId=${task.id} duration=${durationText}`)
     await notifyParentStuckFn(task, durationText)
   }
 }
@@ -113,7 +113,7 @@ export async function checkStuckTasksAndNotify(
 export function logTickStatus(
   tasks: Map<string, WopalTask>,
   progressInfos: ProgressTaskInfo[],
-  debugLog: DebugLog,
+  debugLog: LoggerInstance,
 ): void {
   const runningTasks = Array.from(tasks.values())
     .filter(t => t.status === 'running' && !t.idleNotified)
@@ -143,5 +143,5 @@ export function logTickStatus(
     return `  [${i + 1}] wopal-task-${shortId} "${task.description}": ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
   })
 
-  debugLog(`[tick] ${runningTasks.length} tasks:\n${lines.join('\n')}`)
+  debugLog.debug(`[tick] ${runningTasks.length} tasks:\n${lines.join('\n')}`)
 }

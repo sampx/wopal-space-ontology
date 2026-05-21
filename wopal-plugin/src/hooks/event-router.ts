@@ -7,9 +7,9 @@
 
 import type { SessionStore } from "../session-store.js"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
-import type { DebugLog } from "../debug.js"
+import type { LoggerInstance } from "../logger.js"
 import type { OpenCodeClient } from "../types.js"
-import { createDebugLog, formatSessionID } from "../debug.js"
+import { contextLogger, formatSessionID } from "../logger.js"
 
 // Import specialized handlers
 import { handleMessageUpdated, handleMessagePartDelta, handleMessagePartUpdated } from "./events/message-token-handler.js"
@@ -19,15 +19,13 @@ import { handleSessionError, stringifyEventError } from "./events/error-handler.
 export interface EventRouterHookContext {
   client: OpenCodeClient
   sessionStore: SessionStore
-  contextDebugLog: DebugLog
-  taskDebugLog: DebugLog
+  contextLogger: LoggerInstance
+  taskLogger: LoggerInstance
   taskManager: SimpleTaskManager | undefined
 }
 
 export function createEventRouter(ctx: EventRouterHookContext) {
   let recovered = false
-
-  const contextLog = createDebugLog("[context] [tokens]", "context")
 
   async function onEvent(
     input: { event: { type: string; properties?: Record<string, unknown> } },
@@ -47,7 +45,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           const result = await client.session.get({ path: { id: sessionID } })
           const session = (result as { data?: { parentID?: string } } | undefined)?.data
           if (session && !session.parentID) {
-            ctx.taskDebugLog(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
+            ctx.taskLogger.debug(`[recover] main session detected: ${formatSessionID(sessionID, false)}, triggering recovery`)
             void ctx.taskManager.recoverFromSession(sessionID)
           }
         } catch {
@@ -63,20 +61,20 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       if (sessionID) {
         const info = props?.info as { agent?: string } | undefined
         handleMessageUpdated(
-          { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog },
+          { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
           sessionID,
           info,
         )
       }
     } else if (eventType === "message.part.delta") {
       handleMessagePartDelta(
-        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog },
+        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
         sessionID,
       )
     } else if (eventType === "message.part.updated") {
       const part = props?.part as { type?: string; tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } } } | undefined
       await handleMessagePartUpdated(
-        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog },
+        { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: contextLogger },
         sessionID,
         part,
       )
@@ -88,8 +86,8 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           client: ctx.client,
           sessionStore: ctx.sessionStore,
           taskManager: ctx.taskManager,
-          contextDebugLog: ctx.contextDebugLog,
-          taskDebugLog: ctx.taskDebugLog,
+          contextLogger: ctx.contextLogger,
+          taskLogger: ctx.taskLogger,
         },
         sessionID ?? "",
       )
@@ -101,8 +99,8 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           client: ctx.client,
           sessionStore: ctx.sessionStore,
           taskManager: ctx.taskManager,
-          contextDebugLog: ctx.contextDebugLog,
-          taskDebugLog: ctx.taskDebugLog,
+          contextLogger: ctx.contextLogger,
+          taskLogger: ctx.taskLogger,
         },
         sessionID ?? "",
       )
@@ -110,7 +108,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
 
     if (eventType === "session.error") {
       handleSessionError(
-        { taskManager: ctx.taskManager, taskDebugLog: ctx.taskDebugLog },
+        { taskManager: ctx.taskManager, taskLogger: ctx.taskLogger },
         sessionID,
         props?.error,
       )
@@ -121,7 +119,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       const requestID = props?.id as string | undefined
       const permission = props?.permission as string | undefined
 
-      ctx.taskDebugLog(`[permission.asked] ${formatSessionID(sessionID ?? "?", !!sessionID && !!ctx.taskManager?.isTaskSession(sessionID))} id=${requestID} permission=${permission}`)
+      ctx.taskLogger.debug(`[permission.asked] ${formatSessionID(sessionID ?? "?", !!sessionID && !!ctx.taskManager?.isTaskSession(sessionID))} id=${requestID} permission=${permission}`)
 
       if (sessionID && requestID && permission) {
         const { handlePermissionAsked } = await import("../tasks/permission-proxy.js")
@@ -130,7 +128,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           { sessionID, requestID, permission, ...(patterns ? { patterns } : {}) },
           ctx.taskManager!,
           ctx.client,
-          ctx.taskDebugLog,
+          ctx.taskLogger,
         )
       }
     }
@@ -146,7 +144,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           await handleQuestionAsked(
             { sessionID, requestID, question: firstQuestion },
             ctx.taskManager!,
-            ctx.taskDebugLog,
+            ctx.taskLogger,
           )
         }
       }

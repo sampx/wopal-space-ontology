@@ -3,7 +3,19 @@ import { launchTask, sessionIDToTaskID } from "./task-launcher.js"
 import type { TaskLauncherDeps, LaunchInput } from "./task-launcher.js"
 import { toErrorMessage, isPromiseLike } from "./utils.js"
 import type { WopalTask } from "../types.js"
+import type { LoggerInstance } from "../logger.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
+
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  }
+}
 
 describe("task-launcher", () => {
   describe("sessionIDToTaskID", () => {
@@ -62,7 +74,7 @@ describe("task-launcher", () => {
     let tasks: Map<string, WopalTask>
     let failTaskSpy: ReturnType<typeof vi.fn>
     let abortSessionSpy: ReturnType<typeof vi.fn>
-    let debugLogSpy: ReturnType<typeof vi.fn>
+    let debugLogSpy: LoggerInstance
     let concurrency: ConcurrencyManager
     let deps: TaskLauncherDeps
 
@@ -70,7 +82,7 @@ describe("task-launcher", () => {
       tasks = new Map()
       failTaskSpy = vi.fn().mockReturnValue(true)
       abortSessionSpy = vi.fn().mockResolvedValue(undefined)
-      debugLogSpy = vi.fn()
+      debugLogSpy = createMockLogger()
       concurrency = new ConcurrencyManager()
 
       deps = {

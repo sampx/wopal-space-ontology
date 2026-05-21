@@ -7,17 +7,17 @@
 
 import type { OpenCodeClient, WopalTask } from "../../types.js"
 import type { SessionStore } from "../../session-store.js"
-import type { DebugLog } from "../../debug.js"
+import type { LoggerInstance } from "../../logger.js"
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
-import { formatSessionID } from "../../debug.js"
+import { formatSessionID } from "../../logger.js"
 import { isTaskActive } from "../../tasks/task-phase.js"
 
 export interface IdleCompactHandlerContext {
   client: OpenCodeClient
   sessionStore: SessionStore
   taskManager: SimpleTaskManager | undefined
-  contextDebugLog: DebugLog
-  taskDebugLog: DebugLog
+  contextLogger: LoggerInstance
+  taskLogger: LoggerInstance
 }
 
 /**
@@ -40,12 +40,12 @@ export async function handleSessionIdle(
     const providerID = state.providerID ?? ""
     const modelID = state.modelID ?? ""
     if (typeof ctx.client.session?.summarize !== "function") {
-      ctx.contextDebugLog(`${formatSessionID(sessionID, false)} summarize unavailable for deferred compact`)
+      ctx.contextLogger.debug(`${formatSessionID(sessionID, false)} summarize unavailable for deferred compact`)
       return
     }
 
     ctx.sessionStore.markCompacting(sessionID, Date.now(), "plugin")
-    ctx.contextDebugLog(`${formatSessionID(sessionID, false)} idle -> starting deferred main-session compact`)
+    ctx.contextLogger.debug(`${formatSessionID(sessionID, false)} idle -> starting deferred main-session compact`)
 
     try {
       await ctx.client.session.summarize({
@@ -58,7 +58,7 @@ export async function handleSessionIdle(
         delete s.compactingSince
         delete s.compactingTrigger
       })
-      ctx.contextDebugLog(`${formatSessionID(sessionID, false)} deferred compact failed: ${err instanceof Error ? err.message : String(err)}`)
+      ctx.contextLogger.debug(`${formatSessionID(sessionID, false)} deferred compact failed: ${err instanceof Error ? err.message : String(err)}`)
     }
     return
   }
@@ -76,10 +76,10 @@ export async function handleSessionIdle(
       task.waitingConcurrencyKey = task.concurrencyKey
       task.concurrencyKey = undefined
     }
-    ctx.taskDebugLog(`task ${task.id} idle`)
+    ctx.taskLogger.debug(`task ${task.id} idle`)
     if (ctx.taskManager) {
       ctx.taskManager.notifyParent(task.id).catch((err) => {
-        ctx.taskDebugLog(`[notifyParent] error for ${task.id}: ${err instanceof Error ? err.message : String(err)}`)
+        ctx.taskLogger.debug(`[notifyParent] error for ${task.id}: ${err instanceof Error ? err.message : String(err)}`)
       })
     }
   }
@@ -97,7 +97,7 @@ export async function handleSessionCompacted(
   ctx.sessionStore.markCompacted(sessionID)
   const compactedState = ctx.sessionStore.get(sessionID)
   const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
-  ctx.contextDebugLog(`${formatSessionID(sessionID, isTask)} compact completed (event-driven)`)
+  ctx.contextLogger.debug(`${formatSessionID(sessionID, isTask)} compact completed (event-driven)`)
 
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
   const state = compactedState
@@ -127,7 +127,7 @@ export async function handleSessionCompacted(
       delete s.needsAutoContinue
       s.needsRecoveryInjection = true // Fallback: messages.transform will inject
     })
-    ctx.contextDebugLog(`${formatSessionID(sessionID, !!task)} promptAsync failed, fallback to messages.transform injection`)
+    ctx.contextLogger.debug(`${formatSessionID(sessionID, !!task)} promptAsync failed, fallback to messages.transform injection`)
     return // Do not continue - needsRecoveryInjection will trigger recovery
   }
 
@@ -167,7 +167,7 @@ The session context has been compacted. Execute recovery protocol immediately an
 </system-reminder>`
 
   if (typeof ctx.client.session?.promptAsync !== "function") {
-    ctx.taskDebugLog(`[autoContinue] promptAsync unavailable for main session: ${formatSessionID(sessionID, false)}`)
+    ctx.taskLogger.debug(`[autoContinue] promptAsync unavailable for main session: ${formatSessionID(sessionID, false)}`)
     return false
   }
 
@@ -179,10 +179,10 @@ The session context has been compacted. Execute recovery protocol immediately an
         parts: [{ type: "text", text: recoveryText }],
       },
     })
-    ctx.taskDebugLog(`[autoContinue] sent recovery to main session: ${formatSessionID(sessionID, false)}`)
+    ctx.taskLogger.debug(`[autoContinue] sent recovery to main session: ${formatSessionID(sessionID, false)}`)
     return true
   } catch (err) {
-    ctx.taskDebugLog(`[autoContinue] error: ${err instanceof Error ? err.message : String(err)}`)
+    ctx.taskLogger.debug(`[autoContinue] error: ${err instanceof Error ? err.message : String(err)}`)
     return false
   }
 }
@@ -210,7 +210,7 @@ Use wopal_task_reply to send recovery instructions if the task should continue.
 </system-reminder>`
 
   if (typeof ctx.client.session?.promptAsync !== "function") {
-    ctx.taskDebugLog(`[compactedNotify] promptAsync unavailable for task: ${task.id}`)
+    ctx.taskLogger.debug(`[compactedNotify] promptAsync unavailable for task: ${task.id}`)
     return false
   }
 
@@ -222,10 +222,10 @@ Use wopal_task_reply to send recovery instructions if the task should continue.
         parts: [{ type: "text", text: notification }],
       },
     })
-    ctx.taskDebugLog(`[compactedNotify] sent to parent: taskId=${task.id}`)
+    ctx.taskLogger.debug(`[compactedNotify] sent to parent: taskId=${task.id}`)
     return true
   } catch (err) {
-    ctx.taskDebugLog(`[compactedNotify] error: ${err instanceof Error ? err.message : String(err)}`)
+    ctx.taskLogger.debug(`[compactedNotify] error: ${err instanceof Error ? err.message : String(err)}`)
     return false
   }
 }

@@ -1,6 +1,6 @@
 import { extractSessionID, extractLatestUserPrompt, extractAgentName, type MessageWithInfo } from "./message-context.js";
 import type { SessionStore } from "../session-store.js";
-import type { DebugLog } from "../debug.js";
+import type { LoggerInstance } from "../logger.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import { injectSkillReload, type SkillReloadInjectorContext } from "./skill-reload-injector.js";
 import { injectRulesToMessage, type RuleMessageInjectorContext } from "./rule-message-injector.js";
@@ -15,7 +15,7 @@ interface MessagesTransformOutput {
 
 export interface MessageHookContext {
   sessionStore: SessionStore;
-  contextDebugLog: DebugLog;
+  contextLogger: LoggerInstance;
   projectDirectory: string;
   transformedMessagesMap: Map<string, MessageWithInfo[]>;
   skillReloadCtx: SkillReloadInjectorContext;

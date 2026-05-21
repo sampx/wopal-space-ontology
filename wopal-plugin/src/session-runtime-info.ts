@@ -7,10 +7,8 @@
 
 import type { OpenCodeClient, OpenCodeConfig, SessionMessage } from "./types.js"
 import type { SessionStore } from "./session-store.js"
-import type { DebugLog } from "./debug.js"
-import { formatSessionID, createTraceLog } from "./debug.js"
-
-const traceLog = createTraceLog("[task]", "task")
+import type { LoggerInstance } from "./logger.js"
+import { formatSessionID, taskLogger } from "./logger.js"
 
 export interface SessionModelInfo {
   providerID: string
@@ -41,21 +39,21 @@ export interface TaskSessionInspector {
 export async function fetchProvidersConfig(
   config: OpenCodeConfig | undefined,
   directory: string,
-  _debugLog?: DebugLog,
+  _debugLog?: LoggerInstance,
 ): Promise<ProviderModelConfig | null> {
-  void _debugLog // retained for callers, unused after traceLog migration
+  void _debugLog // retained for callers, unused after taskLogger migration
   if (typeof config?.providers !== "function") {
-    traceLog(`[providersConfig] no config.providers API`)
+    taskLogger.trace("[providersConfig] no config.providers API")
     return null
   }
 
   try {
     const result = await config.providers({ query: { directory } })
     const providers = result?.data?.providers ?? []
-    traceLog(`[providersConfig] fetched ${providers.length} providers`)
+    taskLogger.trace({ provider_count: providers.length }, "[providersConfig] fetched providers")
     return { providers }
   } catch (err) {
-    traceLog(`[providersConfig] error: ${err instanceof Error ? err.message : String(err)}`)
+    taskLogger.trace({ err }, "[providersConfig] error")
     return null
   }
 }
@@ -66,14 +64,14 @@ export async function fetchProvidersConfig(
  */
 export function extractModelFromMessages(
   messages: SessionMessage[],
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): SessionModelInfo | null {
   const lastAssistant = [...messages].reverse().find((m) =>
     m?.info?.role === "assistant"
   )
 
   if (!lastAssistant?.info) {
-    debugLog?.(`[modelFromMsgs] no assistant message found`)
+    debugLog?.debug(`[modelFromMsgs] no assistant message found`)
     return null
   }
 
@@ -81,7 +79,7 @@ export function extractModelFromMessages(
   const modelID = lastAssistant.info.modelID ?? lastAssistant.info.model?.modelID
 
   if (!providerID || !modelID) {
-    debugLog?.(`[modelFromMsgs] missing provider/model IDs`)
+    debugLog?.debug(`[modelFromMsgs] missing provider/model IDs`)
     return null
   }
 
@@ -95,10 +93,10 @@ export function extractModelFromMessages(
 export async function fetchSessionModelInfo(
   client: OpenCodeClient,
   sessionID: string,
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): Promise<SessionModelInfo | null> {
   if (typeof client.session?.messages !== "function") {
-    debugLog?.(`[modelInfo] no session.messages API`)
+    debugLog?.debug("[modelInfo] no session.messages API")
     return null
   }
 
@@ -111,7 +109,7 @@ export async function fetchSessionModelInfo(
 
     return extractModelFromMessages(messages, debugLog)
   } catch (err) {
-    debugLog?.(`[modelInfo] error: ${err instanceof Error ? err.message : String(err)}`)
+    debugLog?.debug(`[modelInfo] error: ${err instanceof Error ? err.message : String(err)}`)
     return null
   }
 }
@@ -123,14 +121,14 @@ export async function fetchSessionModelInfo(
 export function extractContextUsage(
   messages: SessionMessage[],
   providers: ProviderModelConfig["providers"],
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
 ): ContextUsageInfo | null {
   const lastAssistant = [...messages].reverse().find((m) =>
     m?.info?.role === "assistant" && m?.info?.tokens
   )
 
   if (!lastAssistant?.info?.tokens) {
-    debugLog?.(`[extractCtx] no assistant with tokens found`)
+    debugLog?.debug("[extractCtx] no assistant with tokens found")
     return null
   }
 
@@ -138,7 +136,7 @@ export function extractContextUsage(
   const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
 
   if (used === 0) {
-    debugLog?.(`[extractCtx] used=0 (step still streaming)`)
+    debugLog?.debug(`[extractCtx] used=0 (step still streaming)`)
     return null
   }
 
@@ -146,7 +144,7 @@ export function extractContextUsage(
   const modelID = lastAssistant.info.modelID ?? lastAssistant.info.model?.modelID
 
   if (!providerID || !modelID) {
-    debugLog?.(`[extractCtx] missing IDs: providerID=${providerID ?? 'undefined'} modelID=${modelID ?? 'undefined'}`)
+    debugLog?.debug(`[extractCtx] missing IDs: providerID=${providerID ?? 'undefined'} modelID=${modelID ?? 'undefined'}`)
     return null
   }
 
@@ -154,12 +152,12 @@ export function extractContextUsage(
   const contextLimit = provider?.models?.[modelID]?.limit?.context
 
   if (!contextLimit) {
-    debugLog?.(`[extractCtx] no context limit for ${providerID}/${modelID}`)
+    debugLog?.debug(`[extractCtx] no context limit for ${providerID}/${modelID}`)
     return null
   }
 
   const pct = Math.round((used / contextLimit) * 100)
-  debugLog?.(`[extractCtx] ${used}/${contextLimit} = ${pct}%`)
+  debugLog?.debug(`[extractCtx] ${used}/${contextLimit} = ${pct}%`)
   return { pct, used, contextLimit }
 }
 
@@ -171,7 +169,7 @@ export function extractContextFromStore(
   sessionStore: SessionStore,
   sessionID: string,
   providers: ProviderModelConfig["providers"],
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
   taskManager?: TaskSessionInspector,
 ): ContextUsageInfo | null {
   const state = sessionStore.get(sessionID)
@@ -179,14 +177,14 @@ export function extractContextFromStore(
   const isTask = taskManager?.isTaskSession(sessionID) ?? false
 
   if (!tokens) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} no lastTokens in store`)
+    debugLog?.debug(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} no lastTokens in store`)
     return null
   }
 
   // Stale check: tokens older than 60s may be outdated
   const ageMs = Date.now() - tokens.updatedAt
   if (ageMs > 60_000) {
-    traceLog(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
+    taskLogger.trace(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} tokens stale (${Math.floor(ageMs / 1000)}s ago)`)
     return null
   }
 
@@ -194,14 +192,14 @@ export function extractContextFromStore(
   const modelID = state.modelID
 
   if (!providerID || !modelID) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} missing provider/model info`)
+    debugLog?.debug(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} missing provider/model info`)
     return null
   }
 
   const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
 
   if (used === 0) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} used=0`)
+    debugLog?.debug(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} used=0`)
     return null
   }
 
@@ -209,12 +207,12 @@ export function extractContextFromStore(
   const contextLimit = provider?.models?.[modelID]?.limit?.context
 
   if (!contextLimit) {
-    debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} no contextLimit for ${providerID}/${modelID}`)
+    debugLog?.debug(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} no contextLimit for ${providerID}/${modelID}`)
     return null
   }
 
   const pct = Math.round((used / contextLimit) * 100)
-  debugLog?.(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} ${used}/${contextLimit} = ${pct}%`)
+  debugLog?.debug(`[ctxFromStore] ${formatSessionID(sessionID, isTask)} ${used}/${contextLimit} = ${pct}%`)
   return { pct, used, contextLimit }
 }
 
@@ -228,11 +226,11 @@ export async function fetchContextPercent(
   sessionStore: SessionStore,
   directory: string,
   sessionID: string,
-  debugLog?: DebugLog,
+  debugLog?: LoggerInstance,
   taskManager?: TaskSessionInspector,
 ): Promise<ContextUsageInfo | null> {
   const isTask = taskManager?.isTaskSession(sessionID) ?? false
-  const ctxLog = (msg: string) => debugLog?.(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
+  const ctxLog = (msg: string) => debugLog?.debug(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
 
   try {
     // Get providers config (needed for contextLimit lookup)
@@ -259,7 +257,7 @@ export async function fetchContextPercent(
       path: { id: sessionID },
     })
     const messages = (messagesResult as { data?: SessionMessage[] } | undefined)?.data ?? []
-    traceLog(`[ctxUsage] ${formatSessionID(sessionID, isTask)} fetched ${messages.length} messages (fallback)`)
+    taskLogger.trace(`[ctxUsage] ${formatSessionID(sessionID, isTask)} fetched ${messages.length} messages (fallback)`)
 
     const result = extractContextUsage(messages, configResult.providers, debugLog)
     if (result) {

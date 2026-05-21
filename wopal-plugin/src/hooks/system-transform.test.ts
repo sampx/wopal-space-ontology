@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SystemPromptMetadata } from '../types.js';
 import type { MessageWithInfo } from './message-context.js';
+import type { LoggerInstance } from '../logger.js';
 import { SessionStore } from '../session-store.js';
 import { createSystemTransformHooks } from './system-transform.js';
 import { writeContextDump } from '../tools/dump-formatter.js';
@@ -16,12 +17,23 @@ vi.mock('../tools/dump-formatter.js', () => ({
   }),
 }));
 
+function createMockLogger(): LoggerInstance {
+  return {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  };
+}
+
 function createHooks(messages: MessageWithInfo[] = []) {
   const transformedMessagesMap = new Map<string, MessageWithInfo[]>();
   const systemSnapshots = new Map<string, string[]>();
   const systemMetadataMap = new Map<string, SystemPromptMetadata>();
   const systemInjectionsMap = new Map<string, string[]>();
-  const contextDebugLog = vi.fn();
+  const contextLogger = createMockLogger();
 
   transformedMessagesMap.set('ses_1', messages);
 
@@ -30,8 +42,8 @@ function createHooks(messages: MessageWithInfo[] = []) {
     directory: '/tmp',
     projectDirectory: '/tmp',
     sessionStore: new SessionStore({ max: 10 }),
-    memoryDebugLog: vi.fn(),
-    contextDebugLog,
+    memoryLogger: createMockLogger(),
+    contextLogger,
     now: () => Date.now(),
     memoryInjector: undefined,
     childSessionCache: new Map<string, boolean>(),
@@ -46,7 +58,7 @@ function createHooks(messages: MessageWithInfo[] = []) {
   return {
     hooks,
     transformedMessagesMap,
-    contextDebugLog,
+    contextLogger,
   };
 }
 
@@ -56,17 +68,17 @@ function flushAutoDump(): Promise<void> {
 
 describe('system-transform auto dump deduplication', () => {
   beforeEach(() => {
-    process.env.WOPAL_PLUGIN_DEBUG = 'context';
+    process.env.WOPAL_PLUGIN_LOG_LEVEL = 'trace';
     vi.mocked(writeContextDump).mockClear();
   });
 
   afterEach(() => {
-    delete process.env.WOPAL_PLUGIN_DEBUG;
+    delete process.env.WOPAL_PLUGIN_LOG_LEVEL;
     vi.resetAllMocks();
   });
 
   it('skips duplicate auto dump when context fingerprint is unchanged', async () => {
-    const { hooks, contextDebugLog } = createHooks([
+    const { hooks, contextLogger } = createHooks([
       {
         info: { role: 'user', sessionID: 'ses_1', id: 'msg_1' },
         parts: [{ type: 'text', text: 'hello' }],
