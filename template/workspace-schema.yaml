@@ -1,7 +1,7 @@
 version: 1
 
 instance:
-  path: .wopal_space
+  path: .wopal-space
   entries:
     - path: .workspace.md
     - path: AGENTS.md

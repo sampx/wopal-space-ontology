@@ -4,13 +4,13 @@ description: 召唤 Wopal，唤醒记忆与上下文
 
 # 召唤
 
-项目模式: `$ARGUMENTS`（如 `ontology`、`web/wopal`）
+项目模式: `$ARGUMENTS`（如 `wopal-cli`）
 
 ## 流程
 
-1. **核心记忆**：加载 `USER.md`、`MEMORY.md`（已加载则跳过）
-2. **短期记忆**：读取 `memory/` 下最近 3 天的日记
-3. **空间地图**：读取 `.workspace.md`
+1. **核心记忆**：加载 `.wopal-space/USER.md`、`.wopal-space/MEMORY.md`（已加载则跳过）
+2. **短期记忆**：读取 `.wopal-space/memory/diary/` 下最近 3 天的日记
+3. **空间地图**：读取 `.wopal-space/.workspace.md`
 4. **项目规范**（有参数时）：读取 `projects/<项目>/AGENTS.md`
 5. **状态校准**：`git status && git log -5 --oneline`（根据参数确定仓库）
 

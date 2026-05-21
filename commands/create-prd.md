@@ -24,7 +24,7 @@ description: 为新产品创建产品级 PRD（Product Requirement Document）
 ### 2. 收集上下文
 
 **必读：**
-- `.workspace.md` — 工作空间结构
+- `.wopal-space/.workspace.md` — 工作空间结构
 - `docs/products/wopal-space/PRD-wopalspace.md` — 空间产品愿景与演进阶段
 - `docs/products/wopal-space/DESIGN-wopalspace.md` — 空间目标态设计（用于对齐定位）
 
