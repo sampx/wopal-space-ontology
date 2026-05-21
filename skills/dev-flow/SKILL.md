@@ -23,6 +23,7 @@ compatibility:
 2. `approve --confirm` 和 `verify --confirm` 都是人类授权门。
 3. `complete` 表示"实施完成，代码已提交，进入用户验证阶段"，不代表"用户已验证通过"。
 4. `archive` 只做 push + 归档收尾，不承担验证职责。
+5. **Plan 必须先通过 `flow.sh plan ...` 生成或定位 stub**；禁止手写创建 Plan 文件，禁止自行猜测 Plan 路径。
 
 ## 最容易遗漏的两步
 
@@ -59,6 +60,12 @@ compatibility:
 ### A. 进入 planning
 
 Issue 驱动：`flow.sh plan <issue>`。无 Issue：`flow.sh plan --title "..." --project <name> --type <type>`。
+
+#### Plan stub 与目录规则
+
+- 先执行 `flow.sh plan ...` 生成或定位 stub，再编辑内容。
+- Plan 目录由 `--project` 决定；不要用组件名猜目录。
+- 本空间约定：跨项目综合 Plan 使用 `--project wopal-space`，目录是 `docs/products/wopal-space/plans/`。
 
 ### B. Plan 写完后，方案评审
 

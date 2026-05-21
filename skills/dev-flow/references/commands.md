@@ -75,6 +75,10 @@ flow.sh issue update <issue> [options]
 flow.sh plan --title "feat(scope): desc" --project <name> --type <type>
 ```
 
+先运行这条命令生成或定位 Plan stub，再编辑内容；禁止手写创建新的 Plan 文件。
+
+目录由 `--project` 决定。本空间约定：跨项目综合 Plan 使用 `--project wopal-space`，目录为 `docs/products/wopal-space/plans/`。
+
 ### plan --check
 
 ```bash

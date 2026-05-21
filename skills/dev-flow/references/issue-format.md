@@ -63,3 +63,9 @@ fix-dev-flow-handle-expired-tokens
 - `slug` 来自标题 description 部分
 - 用 kebab-case
 - 无 Issue 模式下，后续命令统一传 `plan-name`
+
+## Plan 目录规则
+
+- 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件。
+- Plan 目录由 dev-flow 项目名决定，不由组件名决定。
+- 本空间约定：跨项目综合 Plan 使用 `--project wopal-space`，目录为 `docs/products/wopal-space/plans/`。
