@@ -30,24 +30,85 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 
 **HookContext 传递开关**：`rulesInjectionEnabled` 和 `memoryInjectionEnabled` 从 index.ts → createHookContext → 各 hook，hook 不直接读环境变量。
 
-### 日志归属规范
+### 日志规范
 
-| 日志内容 | 归属模块 | Prefix | Module |
-|---------|---------|--------|--------|
-| Plugin loaded/initialized | Global | `[plugin]` | `plugin` |
-| 规则发现/匹配/注入 | Rules | `[rules]` | `rules` |
-| LanceDB/Embedding/LLM 初始化, 记忆检索/注入 | Memory | `[memory]` | `memory` |
-| 任务委派/监控/通信 | Task | `[task]` | `task` |
-| 会话状态/snapshot/compaction/context 管理/上下文压缩 | Context | `[context]` | `context` |
+日志模块位于 `src/logger.ts`，基于 GESP backend logger 设计（零依赖、阈值过滤、结构化字段）。
 
-**日志格式规则**：
+#### 日志级别（严格按语义使用）
 
-1. **SessionID 统一格式**：所有日志中的 sessionID 必须使用 `formatSessionID(sessionID, isTask)`，格式为 `ses_<16chars>(main)` 或 `ses_<16chars>(task)`
-2. **日志紧凑**：单条日志无空行分隔，多行内容用 `\n` 拼接后缩进展示
-3. **有价值信息**：日志内容必须包含实际值（如 enrichedQuery 内容、token 具体数值），避免"found"、"completed"等空洞描述
-4. **模块归属正确**：日志 prefix 和 module 参数必须与功能归属对应，禁止跨模块混用
+| 级别 | 数值 | 用途 | 示例 |
+|------|------|------|------|
+| `trace` | 10 | 极细粒度跟踪，仅深度调试时启用 | 进入函数、中间状态快照、streaming 事件 |
+| `debug` | 20 | 调试信息，开发/排查时启用 | SSE 事件类型、SQL 查询详情、注入内容 |
+| `info` | 30 | 关键业务事件（主要生产级别） | 任务启动/完成、记忆注入、规则匹配结果 |
+| `warn` | 40 | 可恢复异常，需关注但不中断 | 降级处理、频率接近阈值、API 超时重试 |
+| `error` | 50 | 操作失败，需人工介入 | LanceDB 连接失败、Embedding API 错误 |
+| `fatal` | 60 | 系统不可用 | 插件初始化崩溃 |
 
-禁用状态在 Global 层（`[plugin]`）报告**一次**，禁用时模块代码**完全不执行**。
+默认阈值 `warn`：生产环境只输出 error + warn。
+
+#### 模块 Logger
+
+| Logger 导出 | 覆盖范围 | 典型场景 |
+|-------------|---------|---------|
+| `coreLogger` | 全局引导、生命周期、Hook/Tool 注册、模块启停 | 插件加载完成、环境变量读取、禁用状态报告 |
+| `rulesLogger` | 规则发现/匹配/注入 | 规则文件扫描、条件匹配、注入完成 |
+| `taskLogger` | 任务委派/监控/通信/并发 | 任务启动、状态轮询、SSE 事件、子会话通信 |
+| `memoryLogger` | LanceDB/Embedding/检索/注入/蒸馏 | 记忆检索、注入内容、蒸馏 preview/confirm |
+| `contextLogger` | 会话状态/snapshot/压缩/恢复 | 上下文 dump、compaction、恢复指令 |
+
+#### 调用 API
+
+```typescript
+import { taskLogger } from "../logger";
+
+// 纯文本消息
+taskLogger.info("Task started");
+
+// 结构化字段 + 消息（推荐）
+taskLogger.info({ task_id: taskId, session_id: sid }, "Task started");
+
+// 错误日志必须携带 Error 对象
+taskLogger.error({ err: error, task_id: taskId }, "Task failed");
+
+// 多字段自动格式化为 key=val
+memoryLogger.debug({ enriched_query: query, token_count: 42 }, "Memory retrieval completed");
+```
+
+**签名**：`logger.info(data?, message)` 或 `logger.info(message)`
+- `data` 是 `Record<string, unknown>`，自动格式化为 `key=val` 对
+- `message` 是人类可读的简明描述，过去时态动词开头
+- Error 对象写 `err` 字段：`{ err: error }`，自动提取 message
+
+#### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `WOPAL_PLUGIN_LOG_LEVEL` | `warn` | 日志阈值：trace/debug/info/warn/error/fatal |
+| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | 日志文件路径 |
+| `WOPAL_PLUGIN_LOG_MODULES` | (空) | 模块过滤（逗号分隔），空=全部。可选：core/rules/task/memory/context |
+
+#### 日志编写规则
+
+1. **模块归属正确**：使用对应模块的 logger，禁止跨模块混用（如 task 模块代码用 `memoryLogger`）
+2. **结构化字段**：上下文通过 `data` 对象传递，禁止拼接到 message 里
+3. **字段命名 snake_case**：`task_id`、`session_id`、`duration_ms`、`token_count`
+4. **sessionID 统一格式**：必须使用 `formatSessionID(sessionID, isTask)`，输出 `ses_<16chars>(main/task)`
+5. **敏感信息脱敏**：`token`、`password`、`api_key`、`secret`、`credential`、`authorization` 等字段自动替换为 `[REDACTED]`
+6. **禁止日志截断**：不使用 `.slice(0, N)`，排错时看不到完整内容等于白打
+7. **禁止空洞描述**：避免 "found"、"completed" 等无实际值的 message，必须携带关键数据
+8. **批量操作记录摘要**：不逐条记录，记录 `batch_size`、`succeeded`、`failed` 等汇总信息
+9. **错误日志必须携带 Error 对象**：`logger.error({ err: error }, "描述")`，禁止 `logger.error(error.message)`
+
+#### 输出格式
+
+```
+2026-05-21 14:30:00 [INFO] [task] task_id=wopal-task-abc123 session_id=ses_1da5cd41(main) Task started
+2026-05-21 14:30:01 [WARN] [memory] err=Connection refused Memory retrieval failed, skipping injection
+2026-05-21 14:30:02 [DEBUG] [context] enriched_query="how to debug" token_count=15 Memory retrieval completed
+```
+
+禁用状态在 `coreLogger` 报告**一次**，禁用时模块代码**完全不执行**。
 
 ---
 
@@ -115,7 +176,7 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 | 测试文件 | 与源文件同目录，`*.test.ts` | `task-launcher.test.ts` |
 | 工具定义 | `wopal-task.ts` / `wopal-task-output.ts` | 任务工具统一 `wopal-task-` 前缀 |
 | Hook 函数 | `create*` 工厂模式 | `createAllHooks()`, `createHookContext()` |
-| DebugLog | 模块级实例，不跨模块传递日志函数 | `createDebugLog("[task]", "task")` |
+| Logger | 模块级单例，从 `logger.ts` 导入对应模块 logger | `taskLogger`、`memoryLogger`、`coreLogger` |
 | 环境变量 | `WOPAL_` 前缀 + `UPPER_SNAKE_CASE` | `WOPAL_MEMORY_ENABLED` |
 | CSS/DOM 类名 | `wopal-` 前缀（如有 UI） | `wopal-task-card` |
 
@@ -125,9 +186,9 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 
 ### 禁止
 
-- `console.log` — 用 `createDebugLog(prefix, module)` 或 `createWarnLog(prefix)`
+- `console.log` — 用模块级 logger（`taskLogger.info(...)` 等）
 - 日志截断 — 禁止 `.slice(0, N)`，排错时看不到完整内容等于白打
-- 混用日志模块 — `module` 参数决定环境变量过滤，必须对应功能模块
+- 混用日志模块 — 必须使用对应功能模块的 logger，禁止跨模块混用
 - npm / pnpm — 只允许 Bun
 - `^` 前缀引用 LanceDB — `@lancedb/lancedb` 和 `@lancedb/lancedb-darwin-x64` 必须精确版本一致（当前 `0.22.3`），ABI 不兼容会导致记忆系统崩溃
 - 修改后不测试 — 核心逻辑修改后必须 `bun run test:run`
@@ -156,7 +217,7 @@ Memory 双开关：`WOPAL_MEMORY_ENABLED=false` 时 `WOPAL_MEMORY_INJECTION_ENAB
 ### 异步操作
 
 所有异步操作（网络、文件 I/O、LanceDB 操作）**必须 try/catch**。catch 块中：
-- 用模块对应级别的日志记录错误（禁止吞异常）
+- 用模块 logger 的 `error` 级别记录错误（必须携带 `{ err: error }`，禁止吞异常）
 - 返回安全的降级值或 `null`/`undefined`，不要让未捕获的 Promise rejection 上泡到 EllaMaka 运行时
 - 错误分类走 `tasks/error-classifier.ts`，不要在调用方临时 `String(e)`
 
@@ -220,19 +281,24 @@ bun run format:check      # Prettier 检查
 ### 调试开关
 
 ```bash
-WOPAL_PLUGIN_DEBUG=1                          # 启用所有模块（1 / * / all）
-WOPAL_PLUGIN_DEBUG=plugin                     # 仅 Global
-WOPAL_PLUGIN_DEBUG=task                       # 仅 Task
-WOPAL_PLUGIN_DEBUG=memory                     # 仅 Memory
-WOPAL_PLUGIN_DEBUG=rules                      # 仅 Rules
-WOPAL_PLUGIN_DEBUG=context                    # 仅 Context
-WOPAL_PLUGIN_DEBUG=task,context               # 多模块（逗号分隔）
-WOPAL_RULES_INJECTION_ENABLED=false           # 禁用 Rules 模块
-WOPAL_MEMORY_ENABLED=false                    # 禁用 Memory 模块
-WOPAL_MEMORY_INJECTION_ENABLED=false          # 仅禁用 Memory 注入
-```
+# 日志级别（默认 warn，仅输出 error + warn）
+WOPAL_PLUGIN_LOG_LEVEL=debug                    # debug + info + warn + error
+WOPAL_PLUGIN_LOG_LEVEL=trace                    # 全部级别
+WOPAL_PLUGIN_LOG_LEVEL=info                     # info + warn + error
 
-日志位置：`<cwd>/.wopal-space/logs/wopal-plugin.log`（可通过 `WOPAL_PLUGIN_LOG_FILE` 覆盖）
+# 模块过滤（可选，空=全部模块）
+WOPAL_PLUGIN_LOG_MODULES=task                   # 仅 Task 模块
+WOPAL_PLUGIN_LOG_MODULES=task,memory            # Task + Memory
+WOPAL_PLUGIN_LOG_MODULES=core,rules,context     # 多模块
+
+# 日志文件路径（默认 <cwd>/.wopal-space/logs/wopal-plugin.log）
+WOPAL_PLUGIN_LOG_FILE=/tmp/wopal-plugin.log
+
+# 功能模块开关
+WOPAL_RULES_INJECTION_ENABLED=false             # 禁用 Rules 模块
+WOPAL_MEMORY_ENABLED=false                      # 禁用 Memory 模块
+WOPAL_MEMORY_INJECTION_ENABLED=false            # 仅禁用 Memory 注入
+```
 
 ### 代码风格
 
