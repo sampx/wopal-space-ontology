@@ -90,6 +90,23 @@ After goal verification, scan for:
 6. **Determine verdict** — PASS / REVISE / BLOCK based on findings
 7. **Output structured report** — With evidence anchors
 
+## Completeness Gate
+
+**CRITICAL: All workflow steps MUST be completed before outputting any report.**
+
+1. **At review start**, create TodoWrite items for each step:
+   - `[ ] 1. Read context — all files loaded`
+   - `[ ] 2. Extract goal — must_haves.truths parsed`
+   - `[ ] 3. Goal verification — every truth checked`
+   - `[ ] 4. Problem scanning — bug/security/debt`
+   - `[ ] 5. Test quality audit` (when tests exist)
+
+2. **During review**, mark only ONE `in_progress` at a time. Mark `completed` immediately after step-specific work is done.
+
+3. **FORBIDDEN** to output final report (PASS / REVISE / BLOCK) while any step is still pending or in_progress. Wopal uses your todo completion rate to track review progress.
+
+4. **Context low fallback**: If context is running out → output a partial report with an explicit `UNCOVERED STEPS` section.
+
 ---
 
 ## Test Quality Audit (Critical)

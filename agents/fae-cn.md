@@ -3,6 +3,8 @@ description: Wopal's execution agent for implementation tasks—coding, refactor
 mode: all
 temperature: 0.3
 permission:
+  wopal_*: deny
+  task: deny
   skill:
     "*": deny
     project-worktrees: allow

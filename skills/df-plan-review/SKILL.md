@@ -117,6 +117,24 @@ A task "create auth endpoint" can exist in the plan while password hashing is mi
 
 **Severity**: BLOCKER for Out of Scope violations or extreme complexity.
 
+## Completeness Gate
+
+**CRITICAL: All six dimensions MUST be checked before outputting any report.**
+
+1. **At review start**, create TodoWrite items for each dimension:
+   - `[ ] 1. Goal Coverage`
+   - `[ ] 2. Task Completeness`
+   - `[ ] 3. Dependency & Wave Correctness`
+   - `[ ] 4. Key Links Planned`
+   - `[ ] 5. Verification Falsifiability`
+   - `[ ] 6. Scope & Context Match`
+
+2. **During review**, mark only ONE `in_progress` at a time. Mark `completed` immediately after dimension-specific checks are done.
+
+3. **FORBIDDEN** to output final report (VERIFICATION PASSED / ISSUES FOUND) while any dimension is still pending or in_progress. Wopal uses your todo completion rate to track review progress.
+
+4. **Context low fallback**: If context is running out and some dimensions remain unchecked → output a partial report with an explicit `UNCOVERED DIMENSIONS` section listing which dimensions were NOT checked and why.
+
 ## Scope Reduction Detection
 
 **Most insidious failure**: Plan claims to implement a decision but delivers a shadow version.
