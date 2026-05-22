@@ -25,6 +25,8 @@ const TRIGGER_LABELS: Record<ProgressNotifyTrigger, string> = {
   context_milestone: 'context usage milestone',
 }
 
+const IDLE_OUTPUT_MAX_CHARS = 4000
+
 export async function sendProgressNotification(
   deps: TaskNotifierDeps,
   task: WopalTask,
@@ -138,8 +140,8 @@ export async function notifyParent(
   // Error notifications remain concise (no enrichment)
   const errorLine = task.error ? `\n**Error:** ${task.error}` : ''
 
-  // For IDLE notifications, add result summaries (fetch messages only if needed)
-  let resultLine = ''
+  // For IDLE notifications, return full assistant output to avoid re-query
+  let resultBlock = ''
   if (task.idleNotified && !task.error) {
     let messages: SessionMessage[] = []
     try {
@@ -156,11 +158,6 @@ export async function notifyParent(
       ? `\n**Tools:** ${formatToolCallSummary(toolSummary)}`
       : ''
 
-    const lastOutput = extractLastOutput(messages, 150)
-    const outputLine = lastOutput
-      ? `\n**Last output:** ${lastOutput}`
-      : ''
-
     const todoSummary = extractTodoSummary(messages)
     const todoSummaryStr = formatTodoSummary(todoSummary)
     const todoPercentageStr = formatTodoPercentage(todoSummary)
@@ -168,16 +165,24 @@ export async function notifyParent(
       ? `\n**Todos:** ${todoSummaryStr} (${todoPercentageStr})`
       : ''
 
-    resultLine = `${toolLine}${todoLine}${outputLine}`
+    const lastOutput = extractLastOutput(messages, IDLE_OUTPUT_MAX_CHARS)
+    const truncated = lastOutput?.endsWith(" [...]")
+    const outputLine = lastOutput
+      ? `\n\n**Result:**\n${lastOutput}${truncated ? `\n\n[Output truncated to ${IDLE_OUTPUT_MAX_CHARS} chars. Call \`wopal_task_output(task_id="${task.id}")\` for full content.]` : ''}`
+      : ''
+
+    resultBlock = `${toolLine}${todoLine}${outputLine}`
   }
+
+  const footerLine = task.idleNotified && !task.error && !resultBlock.includes("wopal_task_output")
+    ? ''
+    : `\n\nUse \`wopal_task_output(task_id="${task.id}")\` to retrieve the result.`
 
   const notification = `<system-reminder>
 [WOPAL TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Agent:** ${task.agent}
-**Description:** ${task.description}${errorLine}${resultLine}
-
-Use \`wopal_task_output(task_id="${task.id}")\` to retrieve the result.
+**Description:** ${task.description}${errorLine}${resultBlock}${footerLine}
 </system-reminder>`
 
   const success = await sendNotification(deps, task.parentSessionID, notification)
