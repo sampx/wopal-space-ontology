@@ -66,9 +66,11 @@ export function createMainSessionMonitorStrategy(
 
           if (!ctxInfo) continue
 
-          const shortId = formatSessionID(sessionID, false)
+          const shortId = sessionID.slice(-10)
           const warnMark = ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT ? ' ⚠️' : ''
-          lines.push(`  [main] ${shortId}: ctx:${ctxInfo.pct}%${warnMark}`)
+          const prompt = state.lastUserPrompt?.slice(0, 40) ?? ''
+          const titleText = prompt ? `"${prompt}" ` : ''
+          lines.push(`[${lines.length}] ${shortId}(main) ${titleText}ctx:${ctxInfo.pct}%${warnMark}`)
 
           if (ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT) {
             const queued = args.sessionStore.queueContextWarning(sessionID, ctxInfo.pct, nowMs)

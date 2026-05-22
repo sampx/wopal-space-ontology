@@ -121,7 +121,7 @@ export function formatTickStatusLines(
 
   const now = Date.now()
   const lines = runningTasks.map((task, i) => {
-    const shortId = task.id.replace('wopal-task-', '').slice(0, 8)
+    const sessionId = (task.sessionID ?? task.id).slice(-10)
     const wasChecked = progressInfos.find(p => p.taskId === task.id)
 
     const msgsText = wasChecked ? `${wasChecked.messageCount} msgs` : '—'
@@ -139,7 +139,7 @@ export function formatTickStatusLines(
 
     const notifiedMark = wasChecked?.wasNotified ? ' ✓notified' : ''
 
-    return `  [${i + 1}] wopal-task-${shortId} "${task.description}": ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
+    return `[${i}] ${sessionId}(task) "${task.description}" ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
   })
 
   return { count: runningTasks.length, lines }

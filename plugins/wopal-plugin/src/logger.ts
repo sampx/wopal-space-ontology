@@ -229,14 +229,14 @@ export const contextLogger: LoggerInstance = createLogger("context")
 // ---------------------------------------------------------------------------
 
 /**
- * Format session ID for logging: prefix 16 chars + (main/task) role.
- * e.g. "ses_1da5cd417ffe(main)", "ses_1d63bf80effe(task)"
+ * Format session ID for logging: last 10 chars + (main/task) role.
+ * e.g. "ffeEpC3rH1(main)", "fffeUoPDLV7(task)"
  */
 export function formatSessionID(
   sessionID: string | undefined,
   isTask: boolean,
 ): string {
   if (!sessionID) return "unknown"
-  const prefix = sessionID.length > 16 ? sessionID.slice(0, 16) : sessionID
-  return `${prefix}(${isTask ? "task" : "main"})`
+  const suffix = sessionID.length > 10 ? sessionID.slice(-10) : sessionID
+  return `${suffix}(${isTask ? "task" : "main"})`
 }

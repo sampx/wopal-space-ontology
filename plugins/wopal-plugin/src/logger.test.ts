@@ -355,21 +355,21 @@ describe("formatSessionID", () => {
   })
 
   it("adds (main) suffix for isTask=false", () => {
-    expect(formatSessionID("ses_1da5cd417ffe", false)).toBe("ses_1da5cd417ffe(main)")
+    expect(formatSessionID("ses_1da5cd417ffe", false)).toBe("a5cd417ffe(main)")
   })
 
   it("adds (task) suffix for isTask=true", () => {
-    expect(formatSessionID("ses_1d63bf80effe", true)).toBe("ses_1d63bf80effe(task)")
+    expect(formatSessionID("ses_1d63bf80effe", true)).toBe("63bf80effe(task)")
   })
 
-  it("truncates to 16 chars if sessionID is longer", () => {
+  it("takes last 10 chars if sessionID is longer", () => {
     const longID = "ses_abcdefghij123456789xyz"
     const result = formatSessionID(longID, false)
-    expect(result).toBe("ses_abcdefghij12(main)")
-    expect(result.length).toBe(22) // 16 chars + "(main)"
+    expect(result).toBe("3456789xyz(main)")
+    expect(result.length).toBe(16) // 10 chars + "(main)"
   })
 
-  it("does not truncate if sessionID <= 16 chars", () => {
+  it("does not truncate if sessionID <= 10 chars", () => {
     const shortID = "ses_short"
     expect(formatSessionID(shortID, true)).toBe("ses_short(task)")
   })

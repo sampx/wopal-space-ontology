@@ -634,7 +634,7 @@ describe("logTickStatus", () => {
 
     expect(debugLog.debug).toHaveBeenCalledTimes(1)
     expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("[tick] 1 tasks:"))
-    expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("wopal-task-abc123"))
+    expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("(task)"))
   })
 
   it("should skip logging when no running tasks", () => {
