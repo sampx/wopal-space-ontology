@@ -165,8 +165,18 @@ export async function handleMessagePartUpdated(
 
     ctx.contextLog.debug(`${formatSessionID(sessionID, isTask)} agent=${agent} model=${model} tokens: input=${t.input ?? 0} output=${t.output ?? 0} cache_read=${cache.read ?? 0} cache_write=${cache.write ?? 0}${pctText}`)
 
-    // Store token data + context limit in sessionStore
+    // Store token data + context limit + title in sessionStore
     if (t.input || cache.read) {
+      let sessionTitle: string | undefined
+      try {
+        if (typeof ctx.client?.session?.get === "function") {
+          const result = await ctx.client.session.get({ path: { id: sessionID } }) as { data?: { title?: string } } | undefined
+          sessionTitle = result?.data?.title
+        }
+      } catch {
+        // graceful degradation
+      }
+
       ctx.sessionStore.upsert(sessionID, (state) => {
         if (modelInfo) {
           state.providerID = modelInfo.providerID
@@ -174,6 +184,9 @@ export async function handleMessagePartUpdated(
         }
         if (contextLimit) {
           state.contextLimit = contextLimit
+        }
+        if (sessionTitle) {
+          state.title = sessionTitle
         }
         const cacheData = t.cache ? { ...t.cache } : undefined
         state.lastTokens = {

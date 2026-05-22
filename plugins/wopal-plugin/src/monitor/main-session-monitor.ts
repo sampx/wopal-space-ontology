@@ -68,8 +68,8 @@ export function createMainSessionMonitorStrategy(
 
           const shortId = sessionID.slice(-10)
           const warnMark = ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT ? ' ⚠️' : ''
-          const prompt = state.lastUserPrompt?.slice(0, 40) ?? ''
-          const titleText = prompt ? `"${prompt}" ` : ''
+          const title = state.title?.slice(0, 40) ?? ''
+          const titleText = title ? `"${title}" ` : ''
           lines.push(`[${lines.length}] ${shortId}(main) ${titleText}ctx:${ctxInfo.pct}%${warnMark}`)
 
           if (ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT) {
