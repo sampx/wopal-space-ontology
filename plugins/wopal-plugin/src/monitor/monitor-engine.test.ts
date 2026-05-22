@@ -72,15 +72,19 @@ describe("MonitorEngine", () => {
   })
 
   describe("start / stop idempotency", () => {
-    it("does not create a second interval on repeated start()", () => {
-      const engine = new MonitorEngine({ strategies: [], logger, intervalMs: 10_000 })
+    it("does not create a second interval on repeated start()", async () => {
+      let tickCount = 0
+      const s1 = createStrategy("s1", async () => { tickCount++ })
+      const engine = new MonitorEngine({ strategies: [s1], logger, intervalMs: 10_000 })
       engine.start()
-      engine.start()
+      engine.start() // second call must be no-op
 
-      // Advance by two intervals; with one interval, tick fires twice
-      vi.advanceTimersByTime(20_000)
+      // Advance by two intervals, flushing async ticks
+      await vi.advanceTimersByTimeAsync(20_000)
       engine.stop()
-      // No assertion needed beyond: no double-fire causes issues
+
+      // If a second interval were created, tickCount would be 4 (2 intervals × 2 ticks)
+      expect(tickCount).toBe(2)
     })
 
     it("stop() is idempotent", () => {

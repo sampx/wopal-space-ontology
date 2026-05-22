@@ -307,6 +307,47 @@ describe("MonitorEngine registration", () => {
     }
   });
 
+  it("single MonitorEngine instance receives both strategies by name", async () => {
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+
+    try {
+      const { MonitorEngine } = await import("./monitor/monitor-engine.js");
+
+      // Capture constructor calls by spying on the prototype's start method
+      // and extracting the strategies from the instance
+      const capturedInstances: InstanceType<typeof MonitorEngine>[] = [];
+      const startSpy = vi.spyOn(MonitorEngine.prototype, "start").mockImplementation(function (this: InstanceType<typeof MonitorEngine>) {
+        capturedInstances.push(this);
+      });
+
+      const indexModule = await import("./index.js?test=" + Date.now());
+      const pluginDef = indexModule.default;
+      const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+
+      await plugin({
+        client: {} as any,
+        project: {} as any,
+        directory: testDir,
+        worktree: testDir,
+        $: {} as any,
+        serverUrl: new URL("http://localhost"),
+      });
+
+      // Exactly one MonitorEngine instance created
+      expect(capturedInstances).toHaveLength(1);
+
+      // Both strategies registered on the single instance
+      const engine = capturedInstances[0] as unknown as { strategies: Array<{ name: string }> };
+      const strategyNames = engine.strategies.map(s => s.name);
+      expect(strategyNames).toEqual(["task-monitor", "main-session-monitor"]);
+
+      startSpy.mockRestore();
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
   it("engine strategies are exactly task-monitor and main-session-monitor", async () => {
     // Verify strategy names independently — this proves index.ts registers both
     const { createTaskMonitorStrategy } = await import("./tasks/task-monitor-strategy.js");

@@ -12,27 +12,37 @@ import { PROGRESS_NOTIFY_TIME_THRESHOLD_MS, CONTEXT_WARN_THRESHOLD, DEFAULT_STUC
 const callOrder: string[] = []
 let logTickReceivedInfos: ProgressTaskInfo[] | undefined
 
+// Module-level references to mock functions for per-test override (var for hoisting compatibility)
+var checkProgressNotificationsMock: ReturnType<typeof vi.fn>
+var clearStuckStateMock: ReturnType<typeof vi.fn>
+var checkStuckTasksAndNotifyMock: ReturnType<typeof vi.fn>
+var logTickStatusMock: ReturnType<typeof vi.fn>
+
 vi.mock("./task-monitor.js", async (importOriginal) => {
   const actual = await importOriginal() as any
+  checkProgressNotificationsMock = vi.fn(async (deps: any) => {
+    callOrder.push("checkProgressNotifications")
+    return actual.checkProgressNotifications(deps)
+  })
+  clearStuckStateMock = vi.fn((...args: any[]) => {
+    callOrder.push("clearStuckState")
+    return actual.clearStuckState(...args)
+  })
+  checkStuckTasksAndNotifyMock = vi.fn(async (...args: any[]) => {
+    callOrder.push("checkStuckTasksAndNotify")
+    return actual.checkStuckTasksAndNotify(...args)
+  })
+  logTickStatusMock = vi.fn((tasks: any, infos: any, log: any) => {
+    callOrder.push("logTickStatus")
+    logTickReceivedInfos = infos
+    return actual.logTickStatus(tasks, infos, log)
+  })
   return {
     ...actual,
-    checkProgressNotifications: vi.fn(async (deps: any) => {
-      callOrder.push("checkProgressNotifications")
-      return actual.checkProgressNotifications(deps)
-    }),
-    clearStuckState: vi.fn((...args: any[]) => {
-      callOrder.push("clearStuckState")
-      return actual.clearStuckState(...args)
-    }),
-    checkStuckTasksAndNotify: vi.fn(async (...args: any[]) => {
-      callOrder.push("checkStuckTasksAndNotify")
-      return actual.checkStuckTasksAndNotify(...args)
-    }),
-    logTickStatus: vi.fn((tasks: any, infos: any, log: any) => {
-      callOrder.push("logTickStatus")
-      logTickReceivedInfos = infos
-      return actual.logTickStatus(tasks, infos, log)
-    }),
+    checkProgressNotifications: checkProgressNotificationsMock,
+    clearStuckState: clearStuckStateMock,
+    checkStuckTasksAndNotify: checkStuckTasksAndNotifyMock,
+    logTickStatus: logTickStatusMock,
   }
 })
 
@@ -109,23 +119,17 @@ describe("task-monitor-strategy", () => {
     })
 
     it("passes progressInfos from checkProgressNotifications to logTickStatus verbatim", async () => {
-      const task = createRunningTask()
-      const tasks = new Map<string, WopalTask>()
-      tasks.set(task.id, task)
+      // W-02 fix: Override mock to return sentinel array with unique marker
+      const sentinelInfos: ProgressTaskInfo[] = [{ taskId: "SENTINEL-W02-UNIQUE", messageCount: 0, contextUsage: null }]
 
-      const deps = createMockDeps({ tasks })
-      ;(deps.client.session.messages as ReturnType<typeof vi.fn>).mockResolvedValue({
-        data: [{ id: "msg-1" }, { id: "msg-2" }],
-      })
+      // Override checkProgressNotifications for this test only
+      checkProgressNotificationsMock.mockImplementationOnce(async () => sentinelInfos)
 
+      const deps = createMockDeps()
       await runTaskMonitorTick(deps)
 
-      // logTickStatus must receive the exact array returned by checkProgressNotifications
-      expect(logTickReceivedInfos).toBeDefined()
-      expect(Array.isArray(logTickReceivedInfos)).toBe(true)
-      // The infos should reference the task we set up
-      const infoForTask = logTickReceivedInfos!.find((p) => p.taskId === task.id)
-      expect(infoForTask).toBeDefined()
+      // Verbatim pass-through: exact same reference
+      expect(logTickReceivedInfos).toBe(sentinelInfos)
     })
   })
 
