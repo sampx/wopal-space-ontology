@@ -1,9 +1,14 @@
 import type { LoggerInstance } from "../logger.js"
 import { coreLogger } from "../logger.js"
 
+export interface TickResult {
+  tasks?: { count: number; lines: string[] }
+  mainSessions?: { count: number; lines: string[] }
+}
+
 export interface MonitorStrategy {
   name: string
-  tick(): Promise<void>
+  tick(): Promise<TickResult | void>
 }
 
 export class MonitorEngine {
@@ -50,14 +55,16 @@ export class MonitorEngine {
     this.stop()
   }
 
-  async runOnceForTesting(): Promise<void> {
-    await this.runTick()
+  async runOnceForTesting(): Promise<TickResult[]> {
+    return this.runTick()
   }
 
-  private async runTick(): Promise<void> {
+  private async runTick(): Promise<TickResult[]> {
+    const results: TickResult[] = []
     for (const strategy of this.strategies) {
       try {
-        await strategy.tick()
+        const result = await strategy.tick()
+        if (result) results.push(result)
       } catch (error) {
         this.logger.error(
           { err: error instanceof Error ? error : new Error(String(error)), strategy: strategy.name },
@@ -65,5 +72,18 @@ export class MonitorEngine {
         )
       }
     }
+
+    const taskCount = results.reduce((sum, r) => sum + (r.tasks?.count ?? 0), 0)
+    const mainCount = results.reduce((sum, r) => sum + (r.mainSessions?.count ?? 0), 0)
+
+    if (taskCount > 0 || mainCount > 0) {
+      const lines: string[] = []
+      for (const r of results) {
+        if (r.tasks?.lines) lines.push(...r.tasks.lines)
+        if (r.mainSessions?.lines) lines.push(...r.mainSessions.lines)
+      }
+      this.logger.debug(`[tick] ${taskCount} tasks, ${mainCount} main sessions:\n${lines.join('\n')}`)
+    }
+    return results
   }
 }

@@ -6,6 +6,7 @@ description: |-
   Examples:
   - user: "Add Anthropic as a provider" → edit global or wopal-space config
   - user: "Restrict agent permissions" → edit agent frontmatter permission or settings.jsonc
+  - user: "Disable custom plugin tools for subagents" → use ellamaka permission rules on custom tool names (supports wildcards like `wopal_*`)
   - user: "Config not loading" → check wopal-space mode config priority
   - user: "Disable gofmt formatter" → edit formatters section, set languages.gofmt.enabled = false
 ---
@@ -32,6 +33,8 @@ Help users configure ellamaka (WopalSpace OpenCode fork) through guided setup of
 4. `.wopal/agents/{name}.md`
 
 > ⚠️ Wopal-space mode bypasses standard config returns directly, **skipping** project `opencode.jsonc`, `~/.config/opencode/`, `OPENCODE_CONFIG`.
+
+> ⚠️ Validate ellamaka behavior against **ellamaka itself** (or `projects/ellamaka/` source), not upstream `opencode`. Wopal-space mode and plugin tools are ellamaka-specific.
 
 > **Precedence:** Project > Global. Configs are merged, not replaced.
 
@@ -83,6 +86,39 @@ Control what requires approval using the `permission` field.
   }
 }
 ```
+
+### ellamaka custom tool permissions
+
+ellamaka supports permission rules for **custom/plugin tool names**, not only built-in tools.
+
+- `ConfigPermission` accepts arbitrary keys
+- `Permission.fromConfig()` preserves those keys as rules
+- runtime matching uses wildcard matching against the actual tool name
+
+That means both exact names and wildcard rules work:
+
+```jsonc
+{
+  "permission": {
+    "wopal_task": "deny",
+    "wopal_*": "deny"
+  }
+}
+```
+
+For subagent boundaries, prefer agent-local frontmatter because it has the highest precedence in wopal-space mode:
+
+```yaml
+---
+permission:
+  wopal_*: deny
+  skill:
+    "*": deny
+    df-implement-review: allow
+---
+```
+
+Use this pattern when you want to block custom delegation or plugin tools for a specific subagent.
 
 ### Legacy Configuration
 
@@ -142,13 +178,21 @@ OpenCode supports JSONC (JSON with comments). SHOULD comment out unused configs 
 
 ## Validate After Major Changes
 
-After editing opencode.jsonc, you MUST run this validation (not just suggest it):
+After editing ellamaka config, you MUST run validation (not just suggest it):
 
 ```bash
-opencode run "test"
+ellamaka run "test"
 ```
 
 **Execute it yourself** using the Bash tool before telling the user the change is complete.
+
+After editing agent permissions, also inspect the resolved rules:
+
+```bash
+ellamaka agent list
+```
+
+Do not use upstream `opencode` to verify ellamaka-specific permission behavior.
 
 If broken, you'll see a clear error with line number:
 ```
@@ -225,6 +269,7 @@ Common JSONC mistakes:
 | Skill not found | Verify `SKILL.md` (uppercase), check frontmatter |
 | Permission denied unexpectedly | Check global vs project config precedence |
 | Permission change not taking effect (wopal-space mode) | Wopal-space skips project `opencode.jsonc`. Check agent frontmatter > `settings.jsonc` > global config > defaults |
+| Custom tool permission seems ignored | Verify with `ellamaka agent list`, not `opencode`. Custom tool names and wildcard rules like `wopal_*` are resolved by ellamaka permission matching |
 
 </troubleshooting>
 

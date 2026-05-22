@@ -5,7 +5,7 @@
  * Does NOT send prompts — only records pending state for later consumption.
  */
 
-import type { MonitorStrategy } from "./monitor-engine.js"
+import type { MonitorStrategy, TickResult } from "./monitor-engine.js"
 import type { SessionStore } from "../session-store.js"
 import type { OpenCodeClient } from "../types.js"
 import type { TaskSessionInspector } from "../session-runtime-info.js"
@@ -38,9 +38,10 @@ export function createMainSessionMonitorStrategy(
 ): MonitorStrategy {
   return {
     name: "main-session-monitor",
-    tick: async () => {
+    tick: async (): Promise<TickResult> => {
       const sessionIDs = args.sessionStore.ids()
       const nowMs = Date.now()
+      const lines: string[] = []
 
       for (const sessionID of sessionIDs) {
         try {
@@ -65,11 +66,15 @@ export function createMainSessionMonitorStrategy(
 
           if (!ctxInfo) continue
 
+          const shortId = formatSessionID(sessionID, false)
+          const warnMark = ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT ? ' ⚠️' : ''
+          lines.push(`  [main] ${shortId}: ctx:${ctxInfo.pct}%${warnMark}`)
+
           if (ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT) {
             const queued = args.sessionStore.queueContextWarning(sessionID, ctxInfo.pct, nowMs)
             if (queued) {
-              args.logger.debug(
-                `[mainSessionMonitor] ${formatSessionID(sessionID, false)} context warning queued at ${ctxInfo.pct}%`,
+              args.logger.trace(
+                `[mainSessionMonitor] ${shortId} context warning queued at ${ctxInfo.pct}%`,
               )
             }
           }
@@ -80,6 +85,8 @@ export function createMainSessionMonitorStrategy(
           continue
         }
       }
+
+      return { mainSessions: { count: lines.length, lines } }
     },
   }
 }

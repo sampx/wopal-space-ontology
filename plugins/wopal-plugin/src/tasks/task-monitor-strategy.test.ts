@@ -10,13 +10,13 @@ import { PROGRESS_NOTIFY_TIME_THRESHOLD_MS, CONTEXT_WARN_THRESHOLD, DEFAULT_STUC
 
 // --- Call-order tracking via vi.mock (hoisted) ---
 const callOrder: string[] = []
-let logTickReceivedInfos: ProgressTaskInfo[] | undefined
+let formatTickReceivedInfos: ProgressTaskInfo[] | undefined
 
 // Module-level references to mock functions for per-test override (var for hoisting compatibility)
 var checkProgressNotificationsMock: ReturnType<typeof vi.fn>
 var clearStuckStateMock: ReturnType<typeof vi.fn>
 var checkStuckTasksAndNotifyMock: ReturnType<typeof vi.fn>
-var logTickStatusMock: ReturnType<typeof vi.fn>
+var formatTickStatusLinesMock: ReturnType<typeof vi.fn>
 
 vi.mock("./task-monitor.js", async (importOriginal) => {
   const actual = await importOriginal() as any
@@ -32,17 +32,17 @@ vi.mock("./task-monitor.js", async (importOriginal) => {
     callOrder.push("checkStuckTasksAndNotify")
     return actual.checkStuckTasksAndNotify(...args)
   })
-  logTickStatusMock = vi.fn((tasks: any, infos: any, log: any) => {
-    callOrder.push("logTickStatus")
-    logTickReceivedInfos = infos
-    return actual.logTickStatus(tasks, infos, log)
+  formatTickStatusLinesMock = vi.fn((tasks: any, infos: any) => {
+    callOrder.push("formatTickStatusLines")
+    formatTickReceivedInfos = infos
+    return actual.formatTickStatusLines(tasks, infos)
   })
   return {
     ...actual,
     checkProgressNotifications: checkProgressNotificationsMock,
     clearStuckState: clearStuckStateMock,
     checkStuckTasksAndNotify: checkStuckTasksAndNotifyMock,
-    logTickStatus: logTickStatusMock,
+    formatTickStatusLines: formatTickStatusLinesMock,
   }
 })
 
@@ -98,11 +98,11 @@ function createRunningTask(overrides: Partial<WopalTask> = {}): WopalTask {
 describe("task-monitor-strategy", () => {
   beforeEach(() => {
     callOrder.length = 0
-    logTickReceivedInfos = undefined
+    formatTickReceivedInfos = undefined
   })
 
   describe("runTaskMonitorTick", () => {
-    it("executes in strict order: checkProgressNotifications → clearStuckState → checkStuckTasksAndNotify → logTickStatus", async () => {
+    it("executes in strict order: checkProgressNotifications → clearStuckState → checkStuckTasksAndNotify → formatTickStatusLines", async () => {
       const task = createRunningTask()
       const tasks = new Map<string, WopalTask>()
       tasks.set(task.id, task)
@@ -114,11 +114,11 @@ describe("task-monitor-strategy", () => {
         "checkProgressNotifications",
         "clearStuckState",
         "checkStuckTasksAndNotify",
-        "logTickStatus",
+        "formatTickStatusLines",
       ])
     })
 
-    it("passes progressInfos from checkProgressNotifications to logTickStatus verbatim", async () => {
+    it("passes progressInfos from checkProgressNotifications to formatTickStatusLines verbatim", async () => {
       // W-02 fix: Override mock to return sentinel array with unique marker
       const sentinelInfos: ProgressTaskInfo[] = [{ taskId: "SENTINEL-W02-UNIQUE", messageCount: 0, contextUsage: null }]
 
@@ -129,7 +129,7 @@ describe("task-monitor-strategy", () => {
       await runTaskMonitorTick(deps)
 
       // Verbatim pass-through: exact same reference
-      expect(logTickReceivedInfos).toBe(sentinelInfos)
+      expect(formatTickReceivedInfos).toBe(sentinelInfos)
     })
   })
 

@@ -128,7 +128,7 @@ export function extractContextUsage(
   )
 
   if (!lastAssistant?.info?.tokens) {
-    debugLog?.debug("[extractCtx] no assistant with tokens found")
+    debugLog?.trace("[extractCtx] no assistant with tokens found")
     return null
   }
 
@@ -136,7 +136,7 @@ export function extractContextUsage(
   const used = (tokens.input ?? 0) + (tokens.cache?.read ?? 0)
 
   if (used === 0) {
-    debugLog?.debug(`[extractCtx] used=0 (step still streaming)`)
+    debugLog?.trace(`[extractCtx] used=0 (step still streaming)`)
     return null
   }
 
@@ -144,7 +144,7 @@ export function extractContextUsage(
   const modelID = lastAssistant.info.modelID ?? lastAssistant.info.model?.modelID
 
   if (!providerID || !modelID) {
-    debugLog?.debug(`[extractCtx] missing IDs: providerID=${providerID ?? 'undefined'} modelID=${modelID ?? 'undefined'}`)
+    debugLog?.trace(`[extractCtx] missing IDs: providerID=${providerID ?? 'undefined'} modelID=${modelID ?? 'undefined'}`)
     return null
   }
 
@@ -152,12 +152,12 @@ export function extractContextUsage(
   const contextLimit = provider?.models?.[modelID]?.limit?.context
 
   if (!contextLimit) {
-    debugLog?.debug(`[extractCtx] no context limit for ${providerID}/${modelID}`)
+    debugLog?.trace(`[extractCtx] no context limit for ${providerID}/${modelID}`)
     return null
   }
 
   const pct = Math.round((used / contextLimit) * 100)
-  debugLog?.debug(`[extractCtx] ${used}/${contextLimit} = ${pct}%`)
+  debugLog?.trace(`[extractCtx] ${used}/${contextLimit} = ${pct}%`)
   return { pct, used, contextLimit }
 }
 
@@ -230,7 +230,7 @@ export async function fetchContextPercent(
   taskManager?: TaskSessionInspector,
 ): Promise<ContextUsageInfo | null> {
   const isTask = taskManager?.isTaskSession(sessionID) ?? false
-  const ctxLog = (msg: string) => debugLog?.debug(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
+  const ctxLog = (msg: string) => debugLog?.trace(`[ctxUsage] ${formatSessionID(sessionID, isTask)} ${msg}`)
 
   try {
     // Get providers config (needed for contextLimit lookup)

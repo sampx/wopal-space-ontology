@@ -5,7 +5,7 @@
  * Execution order preserved: checkProgressNotifications → clearStuckState → checkStuckTasksAndNotify → logTickStatus
  */
 
-import type { MonitorStrategy } from "../monitor/monitor-engine.js"
+import type { MonitorStrategy, TickResult } from "../monitor/monitor-engine.js"
 import type { WopalTask, OpenCodeClient } from "../types.js"
 import type { SessionStore } from "../session-store.js"
 import type { LoggerInstance } from "../logger.js"
@@ -15,7 +15,7 @@ import {
   checkProgressNotifications,
   clearStuckState,
   checkStuckTasksAndNotify,
-  logTickStatus,
+  formatTickStatusLines,
 } from "./task-monitor.js"
 
 export interface TaskMonitorRuntimeDeps {
@@ -32,8 +32,9 @@ export interface TaskMonitorRuntimeDeps {
 /**
  * Run one tick of the task monitor.
  * Preserves the original tick body order from SimpleTaskManager.
+ * Returns TickResult for MonitorEngine to log.
  */
-export async function runTaskMonitorTick(deps: TaskMonitorRuntimeDeps): Promise<void> {
+export async function runTaskMonitorTick(deps: TaskMonitorRuntimeDeps): Promise<TickResult> {
   // Step 1: Check progress notifications (returns ProgressTaskInfo[])
   const taskInfos: ProgressTaskInfo[] = await checkProgressNotifications(deps)
 
@@ -47,8 +48,9 @@ export async function runTaskMonitorTick(deps: TaskMonitorRuntimeDeps): Promise<
     notifyParentStuckFn: deps.notifyParentStuckFn,
   })
 
-  // Step 4: Log tick status with progress infos
-  logTickStatus(deps.tasks, taskInfos, deps.debugLog)
+  // Step 4: Format tick status lines (return to engine)
+  const tasks = formatTickStatusLines(deps.tasks, taskInfos)
+  return { tasks }
 }
 
 /**
@@ -62,7 +64,7 @@ export function createTaskMonitorStrategy(args: {
     name: "task-monitor",
     tick: async () => {
       const deps = args.getDeps()
-      await runTaskMonitorTick(deps)
+      return runTaskMonitorTick(deps)
     },
   }
 }

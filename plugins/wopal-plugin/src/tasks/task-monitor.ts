@@ -110,15 +110,14 @@ export async function checkStuckTasksAndNotify(
   }
 }
 
-export function logTickStatus(
+export function formatTickStatusLines(
   tasks: Map<string, WopalTask>,
   progressInfos: ProgressTaskInfo[],
-  debugLog: LoggerInstance,
-): void {
+): { count: number; lines: string[] } {
   const runningTasks = Array.from(tasks.values())
     .filter(t => t.status === 'running' && !t.idleNotified)
 
-  if (runningTasks.length === 0) return
+  if (runningTasks.length === 0) return { count: 0, lines: [] }
 
   const now = Date.now()
   const lines = runningTasks.map((task, i) => {
@@ -143,5 +142,16 @@ export function logTickStatus(
     return `  [${i + 1}] wopal-task-${shortId} "${task.description}": ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
   })
 
-  debugLog.debug(`[tick] ${runningTasks.length} tasks:\n${lines.join('\n')}`)
+  return { count: runningTasks.length, lines }
+}
+
+export function logTickStatus(
+  tasks: Map<string, WopalTask>,
+  progressInfos: ProgressTaskInfo[],
+  debugLog: LoggerInstance,
+): void {
+  const { count, lines } = formatTickStatusLines(tasks, progressInfos)
+  if (count > 0) {
+    debugLog.debug(`[tick] ${count} tasks:\n${lines.join('\n')}`)
+  }
 }
