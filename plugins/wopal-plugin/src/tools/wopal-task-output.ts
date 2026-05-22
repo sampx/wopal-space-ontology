@@ -13,11 +13,18 @@ import { getDisplayStatus, isIdleTask } from "../tasks/task-phase.js"
 
 export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
-    description: "Get status and output for a background task. Use `section` param: 'tools' (tool calls), 'reasoning' (thinking), 'text' (output). Omit for summary.",
+    description: `Get status and output for a background task. Use \`section\` param: 'tools' (tool calls), 'reasoning' (thinking), 'text' (output). Omit for summary.
+
+⚠️ Do NOT poll. Only call when:
+- You received a system notification [WOPAL TASK IDLE/STUCK/PROGRESS/ERROR]
+- You need to diagnose a stuck/error task
+- The task's result is needed for your next step
+
+Default returns only the last message — sufficient for most cases. Use \`last_n\` only when you genuinely need more history. "Just checking progress" is never a valid reason to call this.`,
     args: {
       task_id: tool.schema.string().describe("Task ID to query. Sources: (1) System notification [WOPAL TASK IDLE/STUCK/ERROR], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID for all active tasks"),
       section: tool.schema.enum(["tools", "reasoning", "text"]).optional().describe("Content section to retrieve: 'tools' (tool calls & results), 'reasoning' (thinking process), 'text' (text output). Omit for summary only."),
-      last_n: tool.schema.number().optional().describe("Only output the last N messages. Default: all messages."),
+      last_n: tool.schema.number().optional().describe("Number of recent messages to retrieve. Default: 1 (last message only). Increase only when you need more history for diagnosis."),
     },
     execute: async (args: { task_id: string; section?: OutputSection; last_n?: number }, context: ToolContext) => {
       if (!context.sessionID) {

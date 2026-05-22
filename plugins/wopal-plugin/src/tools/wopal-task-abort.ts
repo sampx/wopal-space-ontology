@@ -5,7 +5,10 @@ import { toErrorMessage } from "../tasks/utils.js"
 
 export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
-    description: "Abort active running task. Stops execution immediately — no message sent, no wake-up. Task enters idle phase awaiting finish/TTL cleanup. Use this when you only want to stop a running task without redirecting. For redirect, use wopal_task_reply(interrupt=true).",
+    description: `Stop a running task immediately. No message sent, no wake-up — pure termination without redirect.
+
+- Task running, just stop → abort
+- Task running, needs correction → wopal_task_reply(interrupt=true)`,
     args: {
       task_id: tool.schema.string().describe("Task ID to abort. Sources: (1) System notification [WOPAL TASK IDLE/STUCK], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID"),
     },

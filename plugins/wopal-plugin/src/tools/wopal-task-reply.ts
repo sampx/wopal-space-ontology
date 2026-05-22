@@ -75,7 +75,13 @@ async function replyQuestion(taskId: string, manager: SimpleTaskManager, clientA
 
 export function createWopalReplyTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
-    description: "Task communication channel. Resumes/redirects idle/waiting/error tasks via message injection. interrupt=true aborts active execution + sends redirect message. Re-acquires concurrency slot on wake-up. Use wopal_task_abort for pure stop (no message, no wake-up).",
+    description: `Resume or redirect a non-running task (idle/waiting/error) by injecting a message into its session. With interrupt=true, aborts active execution first, then injects the message — use for course correction on running tasks. Re-acquires concurrency slot on wake-up.
+
+Decision guide:
+- Task idle/waiting/error → reply (resume or redirect)
+- Task running, needs correction → reply with interrupt=true (abort + redirect)
+- Task running, just stop it → wopal_task_abort (stop without message)
+- Task done, clean up → wopal_task_finish (terminate + delete)`,
     args: {
       task_id: tool.schema.string().describe("Task ID to communicate. Sources: (1) System notification [WOPAL TASK IDLE/STUCK/WAITING], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID"),
       message: tool.schema.string().describe("The message to send to the background task"),
