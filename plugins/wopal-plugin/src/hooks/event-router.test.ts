@@ -555,12 +555,10 @@ describe("OpenCodeRulesRuntime event handling", () => {
     it("relays permission request for child session", async () => {
       const mockTask = { id: "task-1", sessionID: "child-1", parentSessionID: "parent-1" }
       const mockPermissionReply = vi.fn().mockResolvedValue(undefined)
-      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
 
       const ctx = {
         client: {
           permission: { reply: mockPermissionReply },
-          session: { promptAsync: mockPromptAsync },
         },
         sessionStore: new SessionStore({ max: 10 }),
         taskLogger: createMockLogger(),
@@ -570,9 +568,7 @@ describe("OpenCodeRulesRuntime event handling", () => {
           isTaskSession: vi.fn().mockReturnValue(true),
           getClient: vi.fn().mockReturnValue({
             permission: { reply: mockPermissionReply },
-            session: { promptAsync: mockPromptAsync },
           }),
-          getTask: vi.fn().mockReturnValue(mockTask),
         } as never,
       }
 
@@ -590,22 +586,9 @@ describe("OpenCodeRulesRuntime event handling", () => {
         },
       })
 
-      // Should auto-reply 'once' for child session
       expect(mockPermissionReply).toHaveBeenCalledWith({
         requestID: "perm-123",
         reply: "once",
-      })
-
-      // Should notify parent session (without synthetic flag - visible in TUI)
-      expect(mockPromptAsync).toHaveBeenCalledWith({
-        path: { id: "parent-1" },
-        body: {
-          noReply: true,
-          parts: [{
-            type: "text",
-            text: expect.stringContaining("[WOPAL TASK PERMISSION]"),
-          }],
-        },
       })
     })
 

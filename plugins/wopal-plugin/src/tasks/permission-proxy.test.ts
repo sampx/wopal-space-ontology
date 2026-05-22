@@ -6,9 +6,6 @@ import type { WopalTask } from "../types.js"
 function createV1MockClient() {
   return {
     postSessionIdPermissionsPermissionId: vi.fn().mockResolvedValue(true),
-    session: {
-      promptAsync: vi.fn().mockResolvedValue(undefined),
-    },
   }
 }
 
@@ -17,9 +14,6 @@ function createV2MockClient() {
     permission: {
       reply: vi.fn().mockResolvedValue(true),
     },
-    session: {
-      promptAsync: vi.fn().mockResolvedValue(undefined),
-    },
   }
 }
 
@@ -27,7 +21,6 @@ function createMockTaskManager(task?: WopalTask, client?: ReturnType<typeof crea
   const mockClient = client ?? createV1MockClient()
   return {
     findBySession: vi.fn((sessionID: string) => (task?.sessionID === sessionID ? task : undefined)),
-    getTask: vi.fn((id: string) => (task?.id === id ? task : undefined)),
     getClient: vi.fn(() => mockClient),
   } as unknown as SimpleTaskManager
 }
@@ -59,7 +52,6 @@ describe("handlePermissionAsked", () => {
       path: { id: "child-session-456", permissionID: "per-abc123" },
       body: { response: "once" },
     })
-    expect(mockClient.session.promptAsync).toHaveBeenCalled()
   })
 
   it("v2 SDK: 子会话权限请求调用 permission.reply", async () => {
@@ -127,26 +119,5 @@ describe("handlePermissionAsked", () => {
     const result = await handlePermissionAsked(event, mockManager, mockClient)
 
     expect(result).toBe(false)
-  })
-
-  it("通知包含权限信息：通知中包含 permission 类型和 patterns", async () => {
-    const mockClient = createV1MockClient()
-    const mockManager = createMockTaskManager(mockTask, mockClient)
-    const event: PermissionAskedEvent = {
-      sessionID: "child-session-456",
-      requestID: "per-with-patterns",
-      permission: "write",
-      patterns: ["file1.ts", "file2.ts"],
-    }
-
-    await handlePermissionAsked(event, mockManager, mockClient)
-
-    const promptCall = mockClient.session.promptAsync.mock.calls[0][0]
-    const notification = promptCall.body.parts[0].text
-
-    expect(notification).toContain("write")
-    expect(notification).toContain("file1.ts")
-    expect(notification).toContain("file2.ts")
-    expect(notification).toContain("[WOPAL TASK PERMISSION]")
   })
 })

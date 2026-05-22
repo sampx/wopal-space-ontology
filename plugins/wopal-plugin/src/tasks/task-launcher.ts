@@ -147,7 +147,7 @@ export async function launchTask(
 
   debugLog.info(
     {
-      task_id: taskId,
+      task_id: formatSessionID(task.sessionID, true),
       description: input.description,
       agent: input.agent,
       parent_id: formatSessionID(input.parentSessionID, false),
