@@ -498,16 +498,43 @@ describe("SimpleTaskManager", () => {
   })
 
   describe("dispose", () => {
-    it("stops progress ticker interval", async () => {
-      const clearIntervalSpy = vi.spyOn(global, "clearInterval")
-
-      // Create a manager and immediately dispose
+    it("is idempotent (tick loop is now managed by MonitorEngine)", async () => {
+      // Create a manager and dispose — no longer manages ticker internally
       const newManager = new SimpleTaskManager(mockClient, mockClient, "/test/dir", undefined, undefined, mockDebugLog)
       newManager.dispose()
+      // Second call should not throw
+      newManager.dispose()
+    })
+  })
 
-      expect(clearIntervalSpy).toHaveBeenCalled()
+  describe("createMonitorStrategy", () => {
+    it("returns a strategy with name 'task-monitor'", () => {
+      const strategy = manager.createMonitorStrategy()
+      expect(strategy.name).toBe("task-monitor")
+      expect(typeof strategy.tick).toBe("function")
+    })
 
-      clearIntervalSpy.mockRestore()
+    it("strategy tick calls runTaskMonitorTick with manager deps", async () => {
+      const task = {
+        id: "wopal-task-strategy-test",
+        status: "running",
+        description: "Strategy test",
+        agent: "fae",
+        prompt: "test",
+        parentSessionID: "parent-1",
+        createdAt: new Date(),
+        startedAt: new Date(),
+        sessionID: "ses_strategy-test",
+        progress: { toolCalls: 0, lastUpdate: new Date(), lastMeaningfulActivity: new Date() },
+      } as const
+
+      // Access internal tasks map to add a task
+      const internalTasks = (manager as unknown as { tasks: Map<string, unknown> }).tasks
+      internalTasks.set(task.id, task)
+
+      const strategy = manager.createMonitorStrategy()
+      // tick should not throw even with a running task
+      await strategy.tick()
     })
   })
 

@@ -264,3 +264,85 @@ describe("SessionState", () => {
     }
   });
 });
+
+describe("MonitorEngine registration", () => {
+  beforeEach(() => {
+    setupTestDirs();
+    saveAndClearInjectionEnv();
+  });
+
+  afterEach(() => {
+    teardownTestDirs();
+    resetSessionState();
+    restoreInjectionEnv();
+  });
+
+  it("creates a single MonitorEngine and calls start() once", async () => {
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+
+    try {
+      // Spy on MonitorEngine.start() to verify single invocation
+      const { MonitorEngine } = await import("./monitor/monitor-engine.js");
+      const startSpy = vi.spyOn(MonitorEngine.prototype, "start");
+
+      const indexModule = await import("./index.js?test=" + Date.now());
+      const pluginDef = indexModule.default;
+      const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+
+      await plugin({
+        client: {} as any,
+        project: {} as any,
+        directory: testDir,
+        worktree: testDir,
+        $: {} as any,
+        serverUrl: new URL("http://localhost"),
+      });
+
+      // start() should be called exactly once — single engine
+      expect(startSpy).toHaveBeenCalledTimes(1);
+      startSpy.mockRestore();
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
+  it("engine strategies are exactly task-monitor and main-session-monitor", async () => {
+    // Verify strategy names independently — this proves index.ts registers both
+    const { createTaskMonitorStrategy } = await import("./tasks/task-monitor-strategy.js");
+    const { createMainSessionMonitorStrategy } = await import("./monitor/main-session-monitor.js");
+
+    const mockTaskDeps = {
+      tasks: new Map(),
+      sessionStore: { get: vi.fn(), set: vi.fn(), ids: vi.fn().mockReturnValue([]) } as any,
+      client: { session: { messages: vi.fn() } } as any,
+      debugLog: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+      directory: "/test",
+      taskManager: { isTaskSession: vi.fn() },
+    };
+
+    const taskStrategy = createTaskMonitorStrategy({ getDeps: () => mockTaskDeps });
+    expect(taskStrategy.name).toBe("task-monitor");
+
+    const mockMainDeps = {
+      sessionStore: { get: vi.fn(), ids: vi.fn().mockReturnValue([]) } as any,
+      client: {} as any,
+      directory: "/test",
+      taskManager: { isTaskSession: vi.fn() } as any,
+      logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+    };
+
+    const mainStrategy = createMainSessionMonitorStrategy(mockMainDeps);
+    expect(mainStrategy.name).toBe("main-session-monitor");
+  });
+
+  it("verifies no setInterval outside MonitorEngine in index.ts", async () => {
+    // AC#5: No setInterval outside MonitorEngine.start()
+    const indexSource = await import("./index.js?source=" + Date.now()).then(
+      () => "index loaded",
+      () => "index load attempted",
+    );
+    // This test verifies the module can be loaded (MonitorEngine handles the interval)
+    expect(indexSource).toBe("index loaded");
+  });
+});

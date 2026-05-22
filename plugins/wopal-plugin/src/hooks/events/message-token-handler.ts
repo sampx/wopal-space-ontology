@@ -3,6 +3,7 @@
  *
  * Handles message.updated, message.part.delta, and message.part.updated events.
  * Captures agent info and token usage from step-finish events.
+ * Consumes pending context warnings on step-finish and injects [CONTEXT HEALTH] reminder.
  */
 
 import type { OpenCodeClient } from "../../types.js"
@@ -63,14 +64,71 @@ export function handleMessagePartDelta(
 }
 
 /**
- * Handle message.part.updated event - token tracking and activity
+ * Consume pending context warning on step-finish.
+ * Sends [CONTEXT HEALTH] reminder if a pending warning exists.
+ * Returns true if a warning was sent, false otherwise.
+ */
+export async function consumeContextWarning(
+  ctx: MessageTokenHandlerContext,
+  sessionID: string,
+): Promise<boolean> {
+  // Skip task sessions
+  if (ctx.taskManager?.isTaskSession(sessionID)) return false
+
+  // Atomically enter sending state and get pct
+  const pct = ctx.sessionStore.beginContextWarningSend(sessionID)
+  if (pct === null) return false
+
+  const warningText = `<system-reminder>
+[CONTEXT HEALTH]
+Context usage: ${pct}%. Consider compacting with context_manage(action="compact") to maintain session health.
+</system-reminder>`
+
+  try {
+    if (typeof ctx.client.session?.promptAsync !== "function") {
+      ctx.sessionStore.rollbackContextWarningSend(sessionID, pct)
+      ctx.contextLog.debug(
+        `[contextHealth] ${formatSessionID(sessionID, false)} promptAsync unavailable, rolling back warning`,
+      )
+      return false
+    }
+
+    await ctx.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        noReply: false,
+        parts: [{ type: "text", text: warningText }],
+      },
+    })
+
+    ctx.sessionStore.commitContextWarningSend(sessionID, Date.now())
+    ctx.contextLog.debug(
+      `[contextHealth] ${formatSessionID(sessionID, false)} context warning sent at ${pct}%`,
+    )
+    return true
+  } catch (err) {
+    ctx.sessionStore.rollbackContextWarningSend(sessionID, pct)
+    ctx.contextLog.debug(
+      `[contextHealth] ${formatSessionID(sessionID, false)} warning send failed, rolled back: ${err instanceof Error ? err.message : String(err)}`,
+    )
+    return false
+  }
+}
+
+/**
+ * Handle message.part.updated event - token tracking, context warning, and activity
  */
 export async function handleMessagePartUpdated(
   ctx: MessageTokenHandlerContext,
   sessionID: string | undefined,
   part: EventPart | undefined,
 ): Promise<void> {
-  // Token usage logging for step-finish events
+  // Outer layer: step-finish — consume context warning for main sessions
+  if (sessionID && part?.type === "step-finish") {
+    await consumeContextWarning(ctx, sessionID)
+  }
+
+  // Inner layer: token usage logging and storage (only when tokens present)
   if (sessionID && part?.type === "step-finish" && part?.tokens) {
     const t = part.tokens
     const cache = t.cache ?? {}

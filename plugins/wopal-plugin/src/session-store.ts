@@ -44,6 +44,14 @@ export interface SessionState {
     cache?: { read?: number; write?: number };
     updatedAt: number; // timestamp for freshness check
   };
+  /** Context warning pending — set by MainSessionMonitorStrategy when pct >= threshold */
+  pendingContextWarningPct?: number;
+  /** Context warning in-flight — set before promptAsync, cleared on commit/rollback */
+  contextWarningSending?: boolean;
+  /** Timestamp of last successfully sent context warning */
+  lastContextWarningAt?: number;
+  /** Number of context warnings sent in current session (reset on compact) */
+  contextWarningsSent?: number;
 }
 
 export interface SessionStoreOptions {
@@ -119,6 +127,11 @@ export class SessionStore {
       if (trigger === "plugin") {
         state.compactingTrigger = "plugin";
       }
+      // Clear context warning state on compact — context is being reset
+      delete state.pendingContextWarningPct;
+      delete state.contextWarningSending;
+      delete state.lastContextWarningAt;
+      delete state.contextWarningsSent;
     });
   }
 
@@ -168,6 +181,111 @@ export class SessionStore {
       delete s.needsRecoveryInjection;
     });
     return true;
+  }
+
+  // Context warning state machine helpers
+
+  /** Cooldown period in ms between context warnings (5 minutes) */
+  static readonly CONTEXT_WARNING_COOLDOWN_MS = 300_000;
+
+  /** Max number of context warnings per session before stopping */
+  static readonly MAX_CONTEXT_WARNINGS = 3;
+
+  /**
+   * Queue a context warning for the session.
+   * Checks: pending, sending, cooldown, max count.
+   * Returns true if warning was queued, false if skipped.
+   */
+  queueContextWarning(sessionID: string, pct: number, nowMs: number): boolean {
+    const state = this.stateMap.get(sessionID);
+    if (!state) return false;
+
+    // Skip if already pending
+    if (state.pendingContextWarningPct !== undefined) return false;
+
+    // Skip if sending in progress
+    if (state.contextWarningSending) return false;
+
+    // Skip if compacting
+    if (state.isCompacting) return false;
+
+    // Skip if cooldown not passed
+    if (state.lastContextWarningAt !== undefined) {
+      const elapsed = nowMs - state.lastContextWarningAt;
+      if (elapsed < SessionStore.CONTEXT_WARNING_COOLDOWN_MS) return false;
+    }
+
+    // Skip if max warnings reached
+    const sentCount = state.contextWarningsSent ?? 0;
+    if (sentCount >= SessionStore.MAX_CONTEXT_WARNINGS) return false;
+
+    this.upsert(sessionID, (s) => {
+      s.pendingContextWarningPct = pct;
+    });
+    return true;
+  }
+
+  /**
+   * Begin sending context warning — atomically enter sending state and clear pending.
+   * Returns the pct value to send, or null if no pending warning.
+   */
+  beginContextWarningSend(sessionID: string): number | null {
+    const state = this.stateMap.get(sessionID);
+    if (!state || state.pendingContextWarningPct === undefined) return null;
+    if (state.isCompacting) {
+      this.upsert(sessionID, (s) => { delete s.pendingContextWarningPct; });
+      return null;
+    }
+
+    const pct = state.pendingContextWarningPct;
+    this.upsert(sessionID, (s) => {
+      delete s.pendingContextWarningPct;
+      s.contextWarningSending = true;
+    });
+    return pct;
+  }
+
+  /**
+   * Commit context warning send — clear sending, update timestamp, increment count.
+   */
+  commitContextWarningSend(sessionID: string, nowMs: number): void {
+    this.upsert(sessionID, (s) => {
+      if (s.isCompacting) {
+        delete s.contextWarningSending;
+        return;
+      }
+      delete s.contextWarningSending;
+      s.lastContextWarningAt = nowMs;
+      s.contextWarningsSent = (s.contextWarningsSent ?? 0) + 1;
+    });
+  }
+
+  /**
+   * Rollback context warning send — clear sending, restore pending.
+   */
+  rollbackContextWarningSend(sessionID: string, pct: number): void {
+    this.upsert(sessionID, (s) => {
+      delete s.contextWarningSending;
+      if (s.isCompacting) {
+        return;
+      }
+      s.pendingContextWarningPct = pct;
+    });
+  }
+
+  /**
+   * Clear context warning state (used after compact or explicit cleanup).
+   * If resetCount is true, also reset the warning count.
+   */
+  clearContextWarningState(sessionID: string, options?: { resetCount?: boolean }): void {
+    this.upsert(sessionID, (s) => {
+      delete s.pendingContextWarningPct;
+      delete s.contextWarningSending;
+      if (options?.resetCount) {
+        delete s.contextWarningsSent;
+        delete s.lastContextWarningAt;
+      }
+    });
   }
 
   private createDefaultState(): SessionState {

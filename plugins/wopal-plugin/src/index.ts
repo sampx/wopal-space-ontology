@@ -12,8 +12,11 @@ import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
-import { coreLogger, memoryLogger, rulesLogger } from "./logger.js";
+import { coreLogger, memoryLogger, rulesLogger, contextLogger } from "./logger.js";
 import { SimpleTaskManager } from "./tasks/simple-task-manager.js";
+import { MonitorEngine } from "./monitor/monitor-engine.js";
+import { createMainSessionMonitorStrategy } from "./monitor/main-session-monitor.js";
+import { registerManagerForCleanup } from "./lifecycle/process-cleanup.js";
 import { createWopalTools } from "./tools/index.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
@@ -130,6 +133,25 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     pluginInput.serverUrl,
     sessionStore,
   );
+
+  // Create MonitorEngine and register strategies
+  const monitorEngine = new MonitorEngine({
+    strategies: [
+      taskManager.createMonitorStrategy(),
+      createMainSessionMonitorStrategy({
+        sessionStore,
+        client: pluginInput.client as unknown as OpenCodeClient,
+        directory: pluginInput.directory,
+        taskManager,
+        logger: contextLogger,
+      }),
+    ],
+    logger: coreLogger,
+  });
+  monitorEngine.start();
+
+  // Register monitor engine for process cleanup
+  registerManagerForCleanup(monitorEngine);
 
   const systemSnapshots = new Map<string, string[]>();
   const systemMetadataMap = new Map<string, SystemPromptMetadata>();

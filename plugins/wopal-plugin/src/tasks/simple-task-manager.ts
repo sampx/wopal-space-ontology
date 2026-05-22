@@ -7,9 +7,10 @@ import type {
 } from "../types.js"
 import type { LoggerInstance } from "../logger.js"
 import type { SessionStore } from "../session-store.js"
+import type { MonitorStrategy } from "../monitor/monitor-engine.js"
+import type { TaskMonitorRuntimeDeps } from "./task-monitor-strategy.js"
 import { taskLogger } from "../logger.js"
 import { sessionStore as globalSessionStore } from "../session-store-instance.js"
-import { clearStuckState } from "./task-monitor.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup.js"
 import {
@@ -17,12 +18,8 @@ import {
   DEFAULT_CONCURRENCY_LIMIT,
 } from "./task-launcher.js"
 import { notifyParent, notifyParentStuck, sendProgressNotification } from "./task-notifier.js"
-import {
-  checkProgressNotifications,
-  checkStuckTasksAndNotify,
-  logTickStatus,
-  type ProgressNotifyTrigger,
-} from "./task-monitor.js"
+import { createTaskMonitorStrategy } from "./task-monitor-strategy.js"
+import type { ProgressNotifyTrigger } from "./task-monitor.js"
 import {
   failTask,
   abortSession,
@@ -43,11 +40,9 @@ export class SimpleTaskManager {
   private directory: string
   private debugLog: LoggerInstance
   private sessionStore: SessionStore
-  private tickerInterval: ReturnType<typeof setInterval> | undefined = undefined
   private concurrency = new ConcurrencyManager()
   private readonly CONCURRENCY_KEY = 'default'
   private isShuttingDown = false
-  private tickRunning = false
   private unregistered = false
   private recoveredSessions = new Set<string>()
   private recoveringSessions = new Set<string>()
@@ -68,23 +63,6 @@ export class SimpleTaskManager {
     }
     this.sessionStore = sessionStore ?? globalSessionStore
     this.debugLog = debugLog ?? taskLogger
-
-    // Setup stuck detection and progress notifications (every 30 seconds)
-    this.tickerInterval = setInterval(() => {
-      if (this.tickRunning) return
-      this.tickRunning = true
-      void (async () => {
-        try {
-          const taskInfos = await checkProgressNotifications(this.getMonitorDeps())
-          clearStuckState(this.tasks.values())
-          await checkStuckTasksAndNotify(this.getMonitorDeps())
-          logTickStatus(this.tasks, taskInfos, this.debugLog)
-        } finally {
-          this.tickRunning = false
-        }
-      })()
-    }, 30_000)
-    this.tickerInterval.unref()
 
     registerManagerForCleanup(this)
   }
@@ -116,10 +94,8 @@ export class SimpleTaskManager {
   }
 
   dispose(): void {
-    if (this.tickerInterval) {
-      clearInterval(this.tickerInterval)
-    }
-    this.tickerInterval = undefined
+    // Tick loop is now managed by MonitorEngine, nothing to clean up here.
+    // Method retained for backward compatibility.
   }
 
   async shutdown(): Promise<void> {
@@ -247,6 +223,16 @@ export class SimpleTaskManager {
     await notifyParent({ client: this.client, debugLog: this.debugLog }, task)
   }
 
+  /**
+   * Create a MonitorStrategy that wraps the task monitor tick body.
+   * Register the returned strategy with MonitorEngine.
+   */
+  createMonitorStrategy(): MonitorStrategy {
+    return createTaskMonitorStrategy({
+      getDeps: (): TaskMonitorRuntimeDeps => this.getMonitorDeps(),
+    })
+  }
+
   releaseConcurrencySlot(task: WopalTask): void {
     if (task.concurrencyKey) {
       this.concurrency.release(task.concurrencyKey)
@@ -368,7 +354,7 @@ export class SimpleTaskManager {
     }
   }
 
-  private getMonitorDeps() {
+  private getMonitorDeps(): TaskMonitorRuntimeDeps {
     return {
       tasks: this.tasks,
       sessionStore: this.sessionStore,

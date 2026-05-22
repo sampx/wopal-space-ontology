@@ -1,0 +1,68 @@
+/**
+ * Task Monitor Strategy
+ *
+ * Wraps existing task monitor tick body into a MonitorStrategy.
+ * Execution order preserved: checkProgressNotifications → clearStuckState → checkStuckTasksAndNotify → logTickStatus
+ */
+
+import type { MonitorStrategy } from "../monitor/monitor-engine.js"
+import type { WopalTask, OpenCodeClient } from "../types.js"
+import type { SessionStore } from "../session-store.js"
+import type { LoggerInstance } from "../logger.js"
+import type { TaskSessionInspector } from "../session-runtime-info.js"
+import type { ProgressNotifyTrigger, ProgressTaskInfo } from "./progress-notify.js"
+import {
+  checkProgressNotifications,
+  clearStuckState,
+  checkStuckTasksAndNotify,
+  logTickStatus,
+} from "./task-monitor.js"
+
+export interface TaskMonitorRuntimeDeps {
+  tasks: Map<string, WopalTask>
+  sessionStore: SessionStore
+  client: OpenCodeClient
+  debugLog: LoggerInstance
+  directory: string
+  taskManager?: TaskSessionInspector
+  notifyParentStuckFn: (task: WopalTask, durationText: string) => Promise<void>
+  sendProgressNotificationFn: (task: WopalTask, messageCount: number, contextUsage: number | null, trigger?: ProgressNotifyTrigger) => Promise<void>
+}
+
+/**
+ * Run one tick of the task monitor.
+ * Preserves the original tick body order from SimpleTaskManager.
+ */
+export async function runTaskMonitorTick(deps: TaskMonitorRuntimeDeps): Promise<void> {
+  // Step 1: Check progress notifications (returns ProgressTaskInfo[])
+  const taskInfos: ProgressTaskInfo[] = await checkProgressNotifications(deps)
+
+  // Step 2: Clear stuck state for tasks that have resumed activity
+  clearStuckState(deps.tasks.values())
+
+  // Step 3: Check stuck tasks and notify parent
+  await checkStuckTasksAndNotify({
+    tasks: deps.tasks,
+    debugLog: deps.debugLog,
+    notifyParentStuckFn: deps.notifyParentStuckFn,
+  })
+
+  // Step 4: Log tick status with progress infos
+  logTickStatus(deps.tasks, taskInfos, deps.debugLog)
+}
+
+/**
+ * Create a TaskMonitorStrategy for registration with MonitorEngine.
+ * The `getDeps` function is called on each tick to get fresh deps (closure over manager state).
+ */
+export function createTaskMonitorStrategy(args: {
+  getDeps: () => TaskMonitorRuntimeDeps
+}): MonitorStrategy {
+  return {
+    name: "task-monitor",
+    tick: async () => {
+      const deps = args.getDeps()
+      await runTaskMonitorTick(deps)
+    },
+  }
+}

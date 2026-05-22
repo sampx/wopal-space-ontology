@@ -14,6 +14,7 @@
 | **Rules** | `WOPAL_RULES_INJECTION_ENABLED` | 禁用时跳过 `discoverRuleFiles()`，`ruleFiles = []` | `rules/index.ts` |
 | **Memory** | `WOPAL_MEMORY_ENABLED` | 禁用时跳过 `ensureMemorySystem()`，`memory = null` | `memory/index.ts` |
 | **Task** | 无（始终启用） | `SimpleTaskManager` 初始化 + cleanup handlers | `tasks/simple-task-manager.ts` |
+| **Monitor** | 无（始终启用） | `MonitorEngine` 启动，调度已注册的 strategy | `monitor/monitor-engine.ts` |
 | **Context** | 无（始终启用） | 无启动逻辑 | `hooks/conversation-context.ts` |
 
 **依赖方向**：`tools → tasks / memory`，`hooks → rules / memory`。禁止反向依赖。
@@ -136,6 +137,21 @@ memoryLogger.debug({ enriched_query: query, token_count: 42 }, "Memory retrieval
 - 监控：`task-monitor.ts` + `progress.ts`
 - 诊断：`idle-diagnostic.ts` + `loop-detector.ts` + `error-classifier.ts`
 - 并发：`concurrency-manager.ts`
+
+`SimpleTaskManager` **禁止拥有 tick loop**（`setInterval` / 递归 `setTimeout`）。所有周期性监控必须通过注册 `MonitorStrategy` 到 `MonitorEngine` 实现。
+
+### monitor
+
+`MonitorEngine`（`monitor/monitor-engine.ts`）是唯一的周期性调度引擎：
+- 统一管理 `setInterval`、防重入（`tickRunning`）、strategy 编排和生命周期清理
+- 每个 strategy 独立 try/catch，单个 strategy 失败不阻塞其他 strategy
+- 新增监控策略只需实现 `MonitorStrategy` 接口并注册到 engine，**禁止在其他模块新建独立调度链**
+
+### lifecycle
+
+通用进程清理 registry（`lifecycle/process-cleanup.ts`）：
+- 管理 cleanup handler 注册/注销，不依赖任何功能模块
+- `tasks/process-cleanup.ts` 保留 re-export 兼容旧导入，新代码直接引用 `lifecycle/process-cleanup.js`
 
 ### memory
 
