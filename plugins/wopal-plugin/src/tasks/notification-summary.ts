@@ -9,6 +9,77 @@ import type { SessionMessage } from "../types.js"
 import { getLastAssistantMessage, extractAssistantText, extractToolCallSequence } from "./session-messages.js"
 
 /**
+ * Todo item with content and status.
+ */
+export interface TodoItem {
+  content: string
+  status: "completed" | "in_progress" | "pending" | "cancelled"
+  priority?: string
+}
+
+/**
+ * Extract full todo list from session messages.
+ * Searches for todowrite tool calls and reads state.input for todo items.
+ * Only uses the LAST todowrite call (todowrite submits full list each time).
+ */
+export function extractTodoList(messages: SessionMessage[]): TodoItem[] | null {
+  // Iterate backwards to find the LAST todowrite snapshot
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.info?.role !== "assistant") continue
+    if (!message.parts) continue
+
+    for (let j = message.parts.length - 1; j >= 0; j--) {
+      const part = message.parts[j]
+      if (part.type === "tool" && part.tool === "todowrite") {
+        if (part.state?.input && typeof part.state.input === "object") {
+          const input = part.state.input as { todos?: Array<{ content?: string; status?: string; priority?: string }> }
+          if (Array.isArray(input.todos) && input.todos.length > 0) {
+            // Found the last todowrite snapshot - extract todos and return immediately
+            return input.todos
+              .filter(todo => todo.content && todo.status)
+              .map(todo => {
+                const item: TodoItem = {
+                  content: todo.content!,
+                  status: todo.status! as TodoItem["status"],
+                }
+                if (todo.priority) item.priority = todo.priority
+                return item
+              })
+          }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * Format todo detail for display.
+ * Returns compact format: "✓3 ⏳1 ⏸2 (3/6, 50%)" header + todo list.
+ */
+export function formatTodoDetail(summary: TodoSummary | null, todos: TodoItem[] | null): string | null {
+  if (!todos || todos.length === 0) return null
+
+  const header = formatTodoSummary(summary) ?? "(no todos)"
+  const percentage = formatTodoPercentage(summary) ?? ""
+  const headerLine = percentage ? `${header} (${percentage})` : header
+
+  const lines: string[] = [headerLine]
+
+  for (const todo of todos) {
+    const icon = todo.status === "completed" ? "✓"
+      : todo.status === "in_progress" ? "⏳"
+      : todo.status === "pending" ? "⏸"
+      : "✗"
+    lines.push(`  ${icon} ${todo.status.padEnd(12)} ${todo.content}`)
+  }
+
+  return lines.join("\n")
+}
+
+/**
  * Todo summary with status counts.
  */
 export interface TodoSummary {

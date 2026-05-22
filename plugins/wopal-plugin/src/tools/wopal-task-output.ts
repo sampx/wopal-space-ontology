@@ -10,10 +10,17 @@ import {
   formatProgressOutput,
 } from "./output-helpers.js"
 import { getDisplayStatus, isIdleTask } from "../tasks/task-phase.js"
+import {
+  extractTodoSummary,
+  extractTodoList,
+  formatTodoDetail,
+  formatTodoSummary,
+  formatTodoPercentage,
+} from "../tasks/notification-summary.js"
 
 export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinition {
   return tool({
-    description: `Get status and output for a background task. Use \`section\` param: 'tools' (tool calls), 'reasoning' (thinking), 'text' (output). Omit for summary.
+    description: `Get status and output for a background task. Use \`section\` param: 'tools' (tool calls), 'reasoning' (thinking), 'text' (output), 'todos' (todo list progress). Omit for summary.
 
 ⚠️ Do NOT poll. Only call when:
 - You received a system notification [WOPAL TASK IDLE/STUCK/PROGRESS/ERROR]
@@ -23,15 +30,16 @@ export function createWopalOutputTool(manager: SimpleTaskManager): ToolDefinitio
 Default returns only the last message — sufficient for most cases. Use \`last_n\` only when you genuinely need more history. "Just checking progress" is never a valid reason to call this.`,
     args: {
       task_id: tool.schema.string().describe("Task ID to query. Sources: (1) System notification [WOPAL TASK IDLE/STUCK/ERROR], (2) wopal_task return value, (3) context_manage(status) → tasks[].taskID for all active tasks"),
-      section: tool.schema.enum(["tools", "reasoning", "text"]).optional().describe("Content section to retrieve: 'tools' (tool calls & results), 'reasoning' (thinking process), 'text' (text output). Omit for summary only."),
+      section: tool.schema.enum(["tools", "reasoning", "text", "todos"]).optional().describe("Content section to retrieve: 'tools' (tool calls & results), 'reasoning' (thinking process), 'text' (text output), 'todos' (todo list progress). Omit for summary only."),
+      detail: tool.schema.boolean().optional().describe("Return detailed output. For 'todos': full list with content instead of summary counts. Default: false."),
       last_n: tool.schema.number().optional().describe("Number of recent messages to retrieve. Default: 1 (last message only). Increase only when you need more history for diagnosis."),
     },
-    execute: async (args: { task_id: string; section?: OutputSection; last_n?: number }, context: ToolContext) => {
+    execute: async (args: { task_id: string; section?: OutputSection; detail?: boolean; last_n?: number }, context: ToolContext) => {
       if (!context.sessionID) {
         return "Current session ID is unavailable; cannot read task status."
       }
 
-      const { task_id, section, last_n } = args
+      const { task_id, section, detail, last_n } = args
 
       const task = manager.getTaskForParent(task_id, context.sessionID)
 
@@ -150,26 +158,30 @@ Default returns only the last message — sufficient for most cases. Use \`last_
           result += `\n**Waiting reason:** ${task.waitingReason}`
         }
 
-        // waiting 状态：如果指定了 section 则按分类获取，否则用 section="text" 获取文本内容
-        const fetchSection = section ?? "text"
-        const client = manager.getClient()
-        if (typeof client.session?.messages === "function") {
-          try {
-            const messagesResult = await client.session.messages({
-              path: { id: task.sessionID },
-            })
+        // waiting 状态：todos 由下方专用块处理，其余 section 按分类获取，默认 text
+        if (section === "todos") {
+          // skip — handled by unified todos block below
+        } else {
+          const fetchSection = section ?? "text"
+          const client = manager.getClient()
+          if (typeof client.session?.messages === "function") {
+            try {
+              const messagesResult = await client.session.messages({
+                path: { id: task.sessionID },
+              })
 
-            const error = getErrorMessage(messagesResult)
-            if (error) {
-              result += `\n\n---\n**Section [${fetchSection}]:**\n(Failed to fetch: ${error})`
-            } else {
-              const messages = extractMessages(messagesResult)
-              const sectionContent = extractBySection(messages, fetchSection, last_n ? { lastN: last_n } : undefined)
-              result += `\n\n---\n**Section [${fetchSection}]:**\n${sectionContent || "(No content)"}`
+              const error = getErrorMessage(messagesResult)
+              if (error) {
+                result += `\n\n---\n**Section [${fetchSection}]:**\n(Failed to fetch: ${error})`
+              } else {
+                const messages = extractMessages(messagesResult)
+                const sectionContent = extractBySection(messages, fetchSection, last_n ? { lastN: last_n } : undefined)
+                result += `\n\n---\n**Section [${fetchSection}]:**\n${sectionContent || "(No content)"}`
+              }
+            } catch (err) {
+              const errorMsg = err instanceof Error ? err.message : String(err)
+              result += `\n\n---\n**Section [${fetchSection}]:**\n(Failed to fetch: ${errorMsg})`
             }
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : String(err)
-            result += `\n\n---\n**Section [${fetchSection}]:**\n(Failed to fetch: ${errorMsg})`
           }
         }
       } else if (task.status === 'waiting') {
@@ -179,8 +191,42 @@ Default returns only the last message — sufficient for most cases. Use \`last_
         }
       }
 
-      // section 模式：按分类获取内容
-      const shouldShowSection = section && task.status !== 'waiting' && task.sessionID
+      // todos section: extract todo list from sub-session (all statuses)
+      if (section === "todos" && task.sessionID) {
+        const client = manager.getClient()
+        if (typeof client.session?.messages === "function") {
+          try {
+            const messagesResult = await client.session.messages({
+              path: { id: task.sessionID },
+            })
+
+            const error = getErrorMessage(messagesResult)
+            if (error) {
+              result += `\n\n---\n**Todos:**\n(Failed to fetch: ${error})`
+            } else {
+              const messages = extractMessages(messagesResult)
+
+              if (detail) {
+                const summary = extractTodoSummary(messages)
+                const todos = extractTodoList(messages)
+                const formatted = formatTodoDetail(summary, todos)
+                result += `\n\n---\n**Todos:**\n${formatted ?? "(No todos found)"}`
+              } else {
+                const summary = extractTodoSummary(messages)
+                const summaryStr = formatTodoSummary(summary)
+                const pctStr = formatTodoPercentage(summary)
+                result += `\n\n---\n**Todos:**\n${summaryStr ? (pctStr ? `${summaryStr} (${pctStr})` : summaryStr) : "(No todos found)"}`
+              }
+            }
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err)
+            result += `\n\n---\n**Todos:**\n(Failed to fetch: ${errorMsg})`
+          }
+        }
+      }
+
+      // section 模式：按分类获取内容（tools/reasoning/text）
+      const shouldShowSection = section && section !== "todos" && task.status !== 'waiting' && task.sessionID
       if (shouldShowSection && task.sessionID) {
         const client = manager.getClient()
         if (typeof client.session?.messages === "function") {

@@ -157,7 +157,7 @@ export function extractAssistantText(message: SessionMessage): string {
   return texts.join(" ").trim()
 }
 
-export type OutputSection = "tools" | "reasoning" | "text"
+export type OutputSection = "tools" | "reasoning" | "text" | "todos"
 
 /**
  * MCP status fallback: detect error from content when state.status is missing or unreliable.
