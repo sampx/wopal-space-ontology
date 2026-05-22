@@ -70,7 +70,7 @@ export function createMainSessionMonitorStrategy(
           const warnMark = ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT ? ' ⚠️' : ''
           const title = state.title?.slice(0, 40) ?? ''
           const titleText = title ? `"${title}" ` : ''
-          lines.push(`[${lines.length}] ${shortId}(main) ${titleText}ctx:${ctxInfo.pct}%${warnMark}`)
+          lines.push(`${shortId}(main) ${titleText}ctx:${ctxInfo.pct}%${warnMark}`)
 
           if (ctxInfo.pct >= MAIN_SESSION_CONTEXT_WARNING_THRESHOLD_PCT) {
             const queued = args.sessionStore.queueContextWarning(sessionID, ctxInfo.pct, nowMs)

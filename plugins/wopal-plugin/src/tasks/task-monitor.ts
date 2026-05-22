@@ -120,7 +120,7 @@ export function formatTickStatusLines(
   if (runningTasks.length === 0) return { count: 0, lines: [] }
 
   const now = Date.now()
-  const lines = runningTasks.map((task, i) => {
+  const lines = runningTasks.map((task) => {
     const sessionId = (task.sessionID ?? task.id).slice(-10)
     const wasChecked = progressInfos.find(p => p.taskId === task.id)
 
@@ -139,7 +139,7 @@ export function formatTickStatusLines(
 
     const notifiedMark = wasChecked?.wasNotified ? ' ✓notified' : ''
 
-    return `[${i}] ${sessionId}(task) "${task.description}" ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
+    return `${sessionId}(task) "${task.description}" ${msgsText}, ${timeText}${ctxText}${notifiedMark}`
   })
 
   return { count: runningTasks.length, lines }

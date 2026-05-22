@@ -76,12 +76,13 @@ export class MonitorEngine {
     const mainCount = results.reduce((sum, r) => sum + (r.mainSessions?.count ?? 0), 0)
 
     if (taskCount > 0 || mainCount > 0) {
-      const lines: string[] = []
+      const rawLines: string[] = []
       for (const r of results) {
-        if (r.tasks?.lines) lines.push(...r.tasks.lines)
-        if (r.mainSessions?.lines) lines.push(...r.mainSessions.lines)
+        if (r.tasks?.lines) rawLines.push(...r.tasks.lines)
+        if (r.mainSessions?.lines) rawLines.push(...r.mainSessions.lines)
       }
-      this.logger.debug(`[tick] ${taskCount} tasks, ${mainCount} main sessions:\n${lines.join('\n')}`)
+      const numberedLines = rawLines.map((line, i) => `[${i}] ${line}`)
+      this.logger.debug(`[tick] ${taskCount} tasks, ${mainCount} main sessions:\n${numberedLines.join('\n')}`)
     }
     return results
   }
