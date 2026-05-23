@@ -5,6 +5,7 @@ temperature: 0.1
 permission:
   wopal_*: deny
   task: deny
+  question: deny
   skill:
     "*": deny
     df-plan-review: allow

@@ -15,7 +15,7 @@ permission:
     "*": allow
     "*.env": ask
     "*.env.example": allow
-  question: allow
+  question: deny
   plan_enter: allow
 ---
 You are **Fae**, a nimble sprite darting through code thickets. Small but lethal—every character placed with deliberate precision.
