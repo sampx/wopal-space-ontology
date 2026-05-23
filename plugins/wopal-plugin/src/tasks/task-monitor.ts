@@ -7,7 +7,9 @@
 
 import type { WopalTask } from "../types.js"
 import type { LoggerInstance } from "../logger.js"
+import type { SessionStore } from "../session-store.js"
 import { formatSessionID } from "../logger.js"
+import { extractContextFromStore } from "../session-runtime-info.js"
 import { getDisplayStatus } from "./task-phase.js"
 
 // Re-export from specialized modules for backward compatibility
@@ -29,6 +31,7 @@ export type { ContextUsageInfo } from "../session-runtime-info.js"
 export function formatTaskTickLines(
   tasks: Map<string, WopalTask>,
   progressInfos: ProgressTaskInfo[],
+  sessionStore?: SessionStore,
 ): string[] {
   const allTasks = Array.from(tasks.values())
 
@@ -48,7 +51,9 @@ export function formatTaskTickLines(
     const sec = totalSec % 60
     const timeText = `${min}m${sec.toString().padStart(2, '0')}s`
 
-    const ctxPct = wasChecked?.contextUsage
+    const ctxPct = wasChecked?.contextUsage ?? (sessionStore && task.sessionID
+      ? extractContextFromStore(sessionStore, task.sessionID)?.pct
+      : null)
     const ctxText = ctxPct != null
       ? (ctxPct >= CONTEXT_WARN_THRESHOLD ? `, ctx:${ctxPct}% ⚠️` : `, ctx:${ctxPct}%`)
       : ', ctx:—'
@@ -63,8 +68,9 @@ export function logTickStatus(
   tasks: Map<string, WopalTask>,
   progressInfos: ProgressTaskInfo[],
   debugLog: LoggerInstance,
+  sessionStore?: SessionStore,
 ): void {
-  const lines = formatTaskTickLines(tasks, progressInfos)
+  const lines = formatTaskTickLines(tasks, progressInfos, sessionStore)
   if (lines.length > 0) {
     const numberedLines = lines.map((line, i) => `  [${i}] ${line}`)
     debugLog.debug(`[tick] ${lines.length} tasks:\n${numberedLines.join('\n')}`)

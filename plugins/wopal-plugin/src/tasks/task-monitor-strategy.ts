@@ -36,7 +36,7 @@ export async function runTaskMonitorTick(deps: TaskMonitorRuntimeDeps): Promise<
   const taskInfos: ProgressTaskInfo[] = await checkProgressNotifications(deps)
 
   // Step 2: Format task tick lines and wrap as task sessions
-  const lines = formatTaskTickLines(deps.tasks, taskInfos)
+  const lines = formatTaskTickLines(deps.tasks, taskInfos, deps.sessionStore)
   return {
     sessions: lines.map((text) => ({ kind: "task" as const, text })),
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import {
   checkProgressNotifications,
+  formatTaskTickLines,
   logTickStatus,
   PROGRESS_NOTIFY_TIME_THRESHOLD_MS,
   CONTEXT_WARN_THRESHOLD,
@@ -448,6 +449,27 @@ describe("logTickStatus", () => {
     expect(debugLog.debug).toHaveBeenCalledTimes(1)
     expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("[tick] 1 tasks:"))
     expect(debugLog.debug).toHaveBeenCalledWith(expect.stringContaining("[idle]"))
+  })
+
+  it("should show cached context usage for idle tasks", () => {
+    const task = createTask({ status: "idle", sessionID: "session-idle" })
+    const tasks = new Map([["task-1", task]])
+    const sessionStore = new SessionStore({ max: 10 })
+
+    sessionStore.upsert("session-idle", (state) => {
+      state.contextLimit = 100_000
+      state.lastTokens = {
+        input: 33_000,
+        output: 100,
+        cache: { read: 10_000 },
+        updatedAt: Date.now(),
+      }
+    })
+
+    const lines = formatTaskTickLines(tasks, [], sessionStore)
+
+    expect(lines[0]).toContain("[idle]")
+    expect(lines[0]).toContain("ctx:43%")
   })
 
   it("should not log when tasks map is empty", () => {
