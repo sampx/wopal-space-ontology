@@ -8,15 +8,18 @@
         "agent": {
             "plan": { "disable": true },
             "build": { "disable": true },
-            "wopal": {
-                "model": "wopal-ai/glm-5.1"
-            },
             "general": {
                 "model": "wopal-ai/glm-5.1"
+            },
+            "explore": {
+                "model": "wopal-ai/deepseek-v4-flash"
             },
             "compaction": {                
                 "model": "github-copilot/gpt-5-mini"
             },
+            "wopal": {
+                "model": "wopal-ai/glm-5.1"
+            },            
             "fae": {
               "model": "wopal-ai/glm-5.1"
             },
