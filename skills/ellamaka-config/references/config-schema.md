@@ -212,7 +212,43 @@ Custom slash commands:
 }
 ```
 
-Use `$ARGUMENTS` for user input after command.
+### Command Template Placeholders
+
+Templates support dynamic input via placeholders:
+
+```jsonc
+{
+  "command": {
+    "review": {
+      "template": "Review commit $1. Focus on: $2",
+      "description": "Review a specific commit",
+    },
+  },
+}
+```
+
+| Placeholder | Behavior |
+|-------------|----------|
+| `$ARGUMENTS` | Raw string after command name, no splitting, quotes preserved |
+| `$1`, `$2`...`$N` | Positional token (space-split, quoted strings treated as one token, quotes stripped) |
+| `$N` (highest) | "Rest" semantics — all remaining tokens from position N onward, joined by space |
+| No placeholder used | Arguments auto-appended to template end with two newlines |
+
+Example with `/review abc123 security performance`:
+
+- `$ARGUMENTS` → `abc123 security performance` (raw)
+- `$1` → `abc123`
+- `$2` → `security performance` (rest semantics: highest placeholder gets everything after)
+
+Example with quoted input `/test "hello world" --verbose`:
+
+- `$ARGUMENTS` → `"hello world" --verbose` (raw, quotes preserved)
+- `$1` → `hello world` (quotes stripped)
+- `$2` → `--verbose`
+
+Replacement order: positional (`$1`..`$N`) first, then `$ARGUMENTS`, then auto-append fallback.
+
+Note: `$@` is NOT supported.
 
 </commands>
 
