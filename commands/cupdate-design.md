@@ -128,8 +128,8 @@ Rules:
 
 ## Templates
 
-- Product DESIGN: `templates/design-product.md`
-- Project DESIGN: `templates/design-project.md`
+- Product DESIGN: `.wopal/templates/design-product.md`
+- Project DESIGN: `.wopal/templates/design-project.md`
 
 ---
 

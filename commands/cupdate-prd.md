@@ -116,8 +116,8 @@ Rules:
 
 ## Templates
 
-- Product PRD: `templates/prd-product.md`
-- Project PRD: `templates/prd-project.md`
+- Product PRD: `.wopal/templates/prd-product.md`
+- Project PRD: `.wopal/templates/prd-project.md`
 
 ---
 
