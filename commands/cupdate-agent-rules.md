@@ -1,5 +1,5 @@
 ---
-description: Create or update AGENTS.md technical implementation rules for a project or directory
+description: Create or update project AGENTS.md
 ---
 
 # Create or Update Agent Rules

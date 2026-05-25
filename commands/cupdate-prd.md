@@ -1,5 +1,5 @@
 ---
-description: Create or update PRD documents for products and subsystems
+description: Create or update product PRD documents
 ---
 
 # Create or Update PRD

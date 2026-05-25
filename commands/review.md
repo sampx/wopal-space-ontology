@@ -1,5 +1,5 @@
 ---
-description: review changes [commit|branch|pr], defaults to uncommitted
+description: review code changes
 subtask: true
 ---
 

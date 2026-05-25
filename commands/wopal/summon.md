@@ -1,29 +1,29 @@
 ---
-description: 召唤 Wopal，唤醒记忆与上下文
+description: Summon Wopal and restore memory
 ---
 
-# 召唤
+# Summon
 
-项目模式: `$ARGUMENTS`（如 `wopal-cli`）
+Project mode: `$ARGUMENTS` (e.g. `wopal-cli`)
 
-## 流程
+## Workflow
 
-1. **核心记忆**：加载 `.wopal-space/memory/USER.md`、`.wopal-space/memory/MEMORY.md`（已加载则跳过）
-2. **短期记忆**：读取 `.wopal-space/memory/diary/` 下最近 3 天的日记
-3. **空间地图**：读取 `.wopal-space/.workspace.md`
-4. **项目规范**（有参数时）：读取 `projects/<项目>/AGENTS.md`
-5. **状态校准**：`git status && git log -5 --oneline`（根据参数确定仓库）
+1. **Core memory**: load `.wopal-space/memory/USER.md`, `.wopal-space/memory/MEMORY.md` (skip if already loaded)
+2. **Short-term memory**: read the last 3 days of diaries under `.wopal-space/memory/diary/`
+3. **Space map**: read `.wopal-space/.workspace.md`
+4. **Project rules** (when argument provided): read `projects/<project>/AGENTS.md`
+5. **State calibration**: `git status && git log -5 --oneline` (determine repo from argument)
 
-## 唤醒报告
+## Summon Report
 
-🧙 **记忆要点**
-- MEMORY.md 关键条目
-- 近期日记摘要（决策/进度/TODO）
+🧙 **Memory Highlights**
+- Key MEMORY.md entries
+- Recent diary summary (decisions / progress / TODOs)
 
-📁 **当前状态**
-- 分支 / 最近提交 / 未提交变更
+📁 **Current State**
+- Branch / recent commits / uncommitted changes
 
-🏗️ **项目**（如有）
-- 技术栈 / 特殊规范
+🏗️ **Project** (if applicable)
+- Tech stack / special conventions
 
-报告精炼，项目符号为主。
+Keep the report concise; prefer bullet points.

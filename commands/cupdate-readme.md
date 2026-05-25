@@ -1,5 +1,5 @@
 ---
-description: Create or update a project-level README.md for human readers
+description: Create or update project README.md
 ---
 
 # Create or Update README

@@ -1,43 +1,43 @@
 ---
-description: 评估技能的功能、质量和价值，生成标准化评估报告
+description: Evaluate skill and generate report
 ---
 
-# 技能评估 (Evaluate Skill)
+# Evaluate Skill
 
-对指定技能进行全面评估，生成标准化报告。
+Perform a comprehensive evaluation of a specified skill and generate a standardized report.
 
-## 待评估技能
+## Target Skill
 
-目标路径: `$ARGUMENTS`
+Target path: `$ARGUMENTS`
 
-> **注意**: 如果没有提供参数，询问用户。
+> **Note**: if no argument provided, ask the user.
 
 ---
 
-## 执行方式
+## Execution Method
 
-本命令使用 `skill-master` 技能的评估能力。
+This command uses the `skill-master` skill's evaluation capabilities.
 
-**详细评估规范**：`references/evaluate-skill.md`
+**Detailed evaluation spec**: `references/evaluate-skill.md`
 
-## 快速评估步骤
+## Quick Evaluation Steps
 
-1. **信息收集**: 目录结构、文件数量、SKILL.md 行数
-2. **功能分析**: 名称、描述、核心功能、触发场景
-3. **规范性评估**: 目录/命名/元数据合规检查
-4. **质量评估**: 5 维度评分
-5. **关系分析**: 与现有技能的重叠/互补
+1. **Information gathering**: directory structure, file count, SKILL.md line count
+2. **Functionality analysis**: name, description, core features, trigger scenarios
+3. **Standards compliance**: directory / naming / metadata compliance check
+4. **Quality assessment**: 5-dimension scoring
+5. **Relationship analysis**: overlap / complement with existing skills
 
-## 评估输出
+## Evaluation Output
 
-根据技能状态选择报告格式：
-- **已安装技能**: 深度解析（机制、场景、原理）
-- **INBOX 技能**: 入库评估（价值量化、去留决策）
+Select report format based on skill status:
+- **Installed skill**: deep analysis (mechanism, scenario, principles)
+- **INBOX skill**: intake assessment (value quantification, keep/discard decision)
 
-## 下一步操作
+## Next Steps
 
-评估完成后询问用户：
-1. 安装推荐技能
-2. 修复规范性问题后安装
-3. 删除低价值技能
-4. 导出评估报告
+After evaluation, ask the user:
+1. Install recommended skills
+2. Fix compliance issues then install
+3. Remove low-value skills
+4. Export evaluation report

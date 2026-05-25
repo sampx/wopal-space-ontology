@@ -1,40 +1,40 @@
 ---
-description: 快速记录到短期记忆
+description: Quickly record to short-term memory
 ---
 
-# 快速记录 (Memo)
+# Quick Record (Memo)
 
-## 内容: `$ARGUMENTS`
+## Content: `$ARGUMENTS`
 
-- **有参数**：直接使用参数内容
-- **无参数**：扫描当前会话上下文，提取值得沉淀的信息
+- **With argument**: use the argument content directly
+- **No argument**: scan current session context, extract information worth preserving
 
-## 捕获规则
+## Capture Rules
 
-参见 `AGENTS.md` 记忆与进化章节的"捕获三问"、"捕获类型"、"不记录"清单。
+See the "Capture Three Questions", "Capture Types", and "Do Not Record" checklist in the Memory & Evolution section of `AGENTS.md`.
 
-**核心原则**：只沉淀与空间优化、项目建设**高度相关**且具有**长期复用价值**的信息。
+**Core principle**: only preserve information that is **highly relevant** to space optimization and project construction, and has **long-term reuse value**.
 
-## 操作步骤
+## Steps
 
-1. **提取候选**（无参数时扫描会话上下文，列出所有候选信息）
-2. **筛选展示**（用三问检验每条候选，展示通过/舍弃及原因）
-3. **写入日记**（仅写入通过筛选的内容）：
+1. **Extract candidates** (scan session context when no argument, list all candidates)
+2. **Filter and display** (test each candidate against the three questions, show pass/discard with reason)
+3. **Write to diary** (only write passed items):
    ```bash
    cat >> memory/diary/YYYY-MM-DD.md <<'EOF'
 
-   ### HH:MM 主题
-   - [类型] 内容
+   ### HH:MM Topic
+   - [Type] Content
    EOF
    ```
-4. **确认**：`已记录到日记`
+4. **Confirm**: `Recorded to diary`
 
-## 筛选示例
+## Filter Example
 
 ```
-候选：会话恢复操作流程
-检验：三问全否 → 舍弃（通用操作，非高价值）
+Candidate: session recovery workflow
+Test: all three questions → no → discard (generic workflow, not high-value)
 
-候选：灵魂不应引用空间守则
-检验：能避免重复研究 → 通过（架构设计决策）
+Candidate: soul should not reference space regulations
+Test: avoids repeated research → pass (architecture design decision)
 ```

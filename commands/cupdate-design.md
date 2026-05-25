@@ -1,5 +1,5 @@
 ---
-description: Create or update DESIGN documents for products and subsystems based on PRDs and implementation facts
+description: Create or update product DESIGN documents
 ---
 
 # Create or Update DESIGN

@@ -1,13 +1,13 @@
 ---
-description: 从项目代码/文档中提炼业务规则，生成 BUSINESS_RULES.md
+description: Extract business rules to BUSINESS_RULES.md
 ---
 
 # /wopal:extract-br
 
-输入: `$ARGUMENTS`（产品名，如 `gesp`、`wopal-cli`）
+Input: `$ARGUMENTS` (product name, e.g. `gesp`, `wopal-cli`)
 
-## 执行
+## Execution
 
-1. **确认参数**：`$ARGUMENTS` 为空或多个候选时，列出可选产品名，让用户确认。禁止推断。
-2. **加载规范**：强制读取并遵循: @.wopal/rules/business-rules.md
-3. **按规范提取规则**，输出到 `docs/products/{product}/BUSINESS_RULES.md`
+1. **Confirm argument**: if `$ARGUMENTS` is empty or ambiguous, list candidate product names and ask user to confirm. Do not infer.
+2. **Load spec**: must read and follow: @.wopal/rules/business-rules.md
+3. **Extract rules per spec**, output to `docs/products/{product}/BUSINESS_RULES.md`
