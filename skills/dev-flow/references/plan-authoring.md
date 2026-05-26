@@ -4,6 +4,27 @@ Plan 质量门、AC 分类、TDD 规则、委派 prompt 格式。
 
 ---
 
+## Plan Metadata 填写规则
+
+Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`）必须从空间的 `STRUCTURE.md` 查询。
+
+**填写步骤**：
+1. 根据 Plan 涉及的代码路径判断属于哪个域（ontology / projects / contents / ...）
+2. 在 `STRUCTURE.md` frontmatter 或表格中匹配对应的 path/type/repo
+3. 填写映射：
+
+| STRUCTURE.md type | Project Type | Project Path 示例 |
+|---|---|---|
+| `ontology-worktree` | ontology-worktree | `.wopal/` |
+| `projects` | projects | `projects/<name>/` |
+| `contents` | contents | `contents/<name>/` |
+
+**常见错误**：
+- 把子目录（如 `.wopal/plugins/wopal-plugin/`）当作项目根路径 — 错误，应取 worktree 根 `.wopal/`
+- 把 ontology worktree 归为普通项目 — 错误，它是独立 repo 的 worktree
+
+---
+
 ## Plan 质量门
 
 进入 `approve` 前 Plan 必须达到可执行质量。校验覆盖 Task 字段（Verification Intent / Behavior / Design / TDD / Verify / Done）。`approve` 被 check-doc 阻断时先修 Plan 再重试。
