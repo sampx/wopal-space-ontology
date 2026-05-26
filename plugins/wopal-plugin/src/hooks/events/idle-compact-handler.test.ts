@@ -305,3 +305,51 @@ describe("handleSessionCompacted — API failure degradation", () => {
     expect(promptAsync).toHaveBeenCalled()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Negative timing: compacted arrives before ended
+// ---------------------------------------------------------------------------
+
+describe("handleSessionCompacted — negative timing (ended arrives after compacted)", () => {
+  const testSessionID = "test-negative-timing-session-id"
+
+  beforeEach(() => {
+    clearSessionContext(testSessionID)
+  })
+
+  afterEach(() => {
+    clearSessionContext(testSessionID)
+  })
+
+  it("skips summary/title when no cache, then late write leaves cache for next consumption", async () => {
+    const compactionText = "## Goal\nLate arriving summary"
+    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
+
+    // Step 1: handleSessionCompacted WITHOUT prior setCompactionSummary
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    // Assert: no summary written to SessionContext
+    const savedCtx = loadSessionContext(testSessionID)
+    expect(savedCtx).toBeNull()
+
+    // Assert: title update API not called (no title extracted)
+    expect(updateSessionTitle).not.toHaveBeenCalled()
+
+    // Assert: recovery message sent but without compaction summary section
+    expect(promptAsync).toHaveBeenCalled()
+    const callArgs = promptAsync.mock.calls[0][0]
+    expect(callArgs.body.parts[0].text).not.toContain("## Compaction Summary")
+
+    // Step 2: Late-arriving ended event writes compaction summary to cache
+    sessionStore.setCompactionSummary(testSessionID, compactionText)
+
+    // Assert: cache still exists, pending next consumption
+    const state = sessionStore.get(testSessionID)
+    expect(state?.compactionSummaryText).toBe(compactionText)
+  })
+})

@@ -674,6 +674,79 @@ describe("OpenCodeRulesRuntime event handling", () => {
     })
   })
 
+  // Compaction summary event routing chain
+  describe("session.next.compaction.ended → session.compacted chain", () => {
+    it("caches summary on compaction.ended then consumes on session.compacted with full wiring", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        taskLogger: createMockLogger(),
+        coreLogger: createMockLogger(),
+        contextLogger: createMockLogger(),
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+          isTaskSession: vi.fn().mockReturnValue(false),
+          getClient: vi.fn().mockReturnValue({
+            session: {
+              messages: vi.fn().mockResolvedValue({ data: [] }),
+            },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskIdleBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+
+      const hooks = createEventRouter(ctx as never)
+
+      // Pre-condition: Plugin-initiated compact
+      sessionStore.markCompacting("chain-session", Date.now(), "plugin")
+      sessionStore.upsert("chain-session", (s) => {
+        s.loadedSkills = new Set(["test-skill"])
+      })
+
+      // Step 1: Fire session.next.compaction.ended → router caches summary
+      await hooks.event({
+        event: {
+          type: "session.next.compaction.ended",
+          properties: {
+            sessionID: "chain-session",
+            text: "## Goal\nTest chain routing\n## Instructions\nDetails",
+          },
+        },
+      })
+
+      // Assert: compaction summary cached in sessionStore
+      const stateAfterEnded = sessionStore.get("chain-session")
+      expect(stateAfterEnded?.compactionSummaryText).toBe("## Goal\nTest chain routing\n## Instructions\nDetails")
+
+      // Step 2: Fire session.compacted → handler consumes summary + sends recovery
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "chain-session" } },
+      })
+
+      // Assert: summary consumed (cache cleared)
+      const stateAfterCompacted = sessionStore.get("chain-session")
+      expect(stateAfterCompacted?.compactionSummaryText).toBeUndefined()
+
+      // Assert: recovery message sent with compaction summary injected
+      expect(mockPromptAsync).toHaveBeenCalled()
+      const callArgs = mockPromptAsync.mock.calls[0][0]
+      expect(callArgs.body.parts[0].text).toContain("## Compaction Summary")
+      expect(callArgs.body.parts[0].text).toContain("Test chain routing")
+    })
+  })
+
   // Task 4: message/token tracking tests
   describe("message.token tracking", () => {
     it("stores agent info on message.updated event", async () => {
