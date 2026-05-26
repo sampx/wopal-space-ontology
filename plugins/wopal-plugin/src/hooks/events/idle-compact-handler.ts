@@ -9,9 +9,52 @@ import type { OpenCodeClient, WopalTask } from "../../types.js"
 import type { SessionStore } from "../../session-store.js"
 import type { LoggerInstance } from "../../logger.js"
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
+import {
+  loadSessionContext,
+  saveSessionContext,
+  type SessionContext,
+} from "../../memory/session-context.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
+
+/** Max title length extracted from compaction summary */
+const MAX_TITLE_LENGTH = 80
+
+/** Max compaction text injected into recovery messages */
+const MAX_COMPACTION_INJECT_LENGTH = 1500
+
+/**
+ * Extract a title from compaction summary text.
+ *
+ * Strategy:
+ * 1. Match `## Goal` section, take first non-empty line after it
+ * 2. Fallback: first non-empty, non-`#`-heading, non-`---` line
+ * 3. Final fallback: first 50 characters of text
+ * 4. Truncate result to MAX_TITLE_LENGTH (80 chars)
+ */
+export function extractTitleFromCompaction(text: string): string {
+  if (!text || !text.trim()) return ""
+
+  // Strategy 1: Match ## Goal section
+  const goalMatch = text.match(/^## Goal\s*\n\s*(.+)$/m)
+  if (goalMatch && goalMatch[1].trim()) {
+    return goalMatch[1].trim().slice(0, MAX_TITLE_LENGTH)
+  }
+
+  // Strategy 2: First valid non-heading, non-separator line
+  const lines = text.split("\n")
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (trimmed.startsWith("#")) continue
+    if (trimmed === "---") continue
+    return trimmed.slice(0, MAX_TITLE_LENGTH)
+  }
+
+  // Strategy 3: First 50 characters
+  return text.trim().slice(0, 50)
+}
 
 export interface IdleCompactHandlerContext {
   client: OpenCodeClient
@@ -110,10 +153,49 @@ export async function handleSessionCompacted(
 ): Promise<void> {
   if (!sessionID) return
 
+  // Consume compaction summary BEFORE markCompacted (summary is cached by event-router)
+  const compactionText = ctx.sessionStore.consumeCompactionSummary(sessionID)
+
   ctx.sessionStore.markCompacted(sessionID)
   const compactedState = ctx.sessionStore.get(sessionID)
   const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
   ctx.contextLogger.info({ session_id: formatSessionID(sessionID, isTask) }, "Compact completed")
+
+  // Extract title and save SessionContext if compaction summary is available
+  if (compactionText) {
+    const title = extractTitleFromCompaction(compactionText)
+    if (title) {
+      const existingCtx = loadSessionContext(sessionID)
+      const newCtx: SessionContext = {
+        sessionID,
+        title: existingCtx?.title ?? null,
+        ...existingCtx,
+        summary: {
+          text: title,
+          messageCount: 0,
+          generatedAt: new Date().toISOString(),
+        },
+      }
+      saveSessionContext(newCtx)
+
+      // Update session title via API (non-blocking; failure only logs debug)
+      try {
+        if (typeof ctx.client?.session?.update === "function") {
+          await ctx.client.session.update({
+            path: { id: sessionID },
+            body: { title },
+          })
+          newCtx.title = title
+          saveSessionContext(newCtx)
+        }
+      } catch (err) {
+        ctx.contextLogger.debug(
+          { session_id: formatSessionID(sessionID, isTask), err },
+          "Failed to update session title from compaction summary",
+        )
+      }
+    }
+  }
 
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
   const state = compactedState
@@ -129,10 +211,10 @@ export async function handleSessionCompacted(
   let sendSuccess = false
   if (task) {
     // Child session: notify parent Agent via promptAsync
-    sendSuccess = await sendCompactedNotification(ctx, task, state)
+    sendSuccess = await sendCompactedNotification(ctx, task, state, compactionText)
   } else {
     // Main session: send auto-continue recovery message
-    sendSuccess = await sendAutoContinueForMain(ctx, sessionID, state)
+    sendSuccess = await sendAutoContinueForMain(ctx, sessionID, state, compactionText)
   }
 
   // If send failed, rollback recoverySent and enable fallback injection
@@ -166,13 +248,19 @@ async function sendAutoContinueForMain(
   ctx: IdleCompactHandlerContext,
   sessionID: string,
   state: { loadedSkills?: Set<string> },
+  compactionText?: string | null,
 ): Promise<boolean> {
   const skills = state.loadedSkills?.size ? Array.from(state.loadedSkills).join(", ") : null
   const skillLine = skills ? `\n- Reload previously loaded skills: ${skills}` : ""
 
+  // Build compaction summary injection
+  const compactionSection = compactionText
+    ? `\n## Compaction Summary\n${compactionText.slice(0, MAX_COMPACTION_INJECT_LENGTH)}\n`
+    : ""
+
   const recoveryText = `<system-reminder>
 The session context has been compacted. Execute recovery protocol immediately and continue working:
-<CRITICAL_RULE>
+${compactionSection}<CRITICAL_RULE>
 - Read key files from the compaction summary (plans, specs, etc. — max 3)
 - Search and load task-relevant memories (max 3)${skillLine}
 - Check current session state (active tasks, pending work)
@@ -211,17 +299,23 @@ async function sendCompactedNotification(
   ctx: IdleCompactHandlerContext,
   task: WopalTask,
   state: { loadedSkills?: Set<string> },
+  compactionText?: string | null,
 ): Promise<boolean> {
   if (!task.sessionID || !task.parentSessionID) return false
 
   const skills = state.loadedSkills ? Array.from(state.loadedSkills).join(", ") : "none"
+
+  // Build compaction summary injection
+  const compactionSection = compactionText
+    ? `\nCompaction Summary:\n${compactionText.slice(0, MAX_COMPACTION_INJECT_LENGTH)}\n`
+    : ""
 
   const notification = `<system-reminder>
 [WOPAL TASK COMPACTED]
 Task ID: ${task.id}
 Description: ${task.description}
 Skills: ${skills}
-The child session has been compacted and is now IDLE.
+${compactionSection}The child session has been compacted and is now IDLE.
 Use wopal_task_reply to send recovery instructions if the task should continue.
 </system-reminder>`
 

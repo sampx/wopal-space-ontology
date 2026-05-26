@@ -98,6 +98,14 @@ export function createEventRouter(ctx: EventRouterHookContext) {
       )
     }
 
+    if (eventType === "session.next.compaction.ended") {
+      const text = props?.text as string | undefined
+      if (sessionID && text) {
+        ctx.sessionStore.setCompactionSummary(sessionID, text)
+        ctx.contextLogger.debug(`[compaction.ended] cached compaction summary for ${formatSessionID(sessionID, !!ctx.taskManager?.isTaskSession(sessionID))} (${text.length} chars)`)
+      }
+    }
+
     if (eventType === "session.compacted") {
       await handleSessionCompacted(
         {
