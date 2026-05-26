@@ -31,7 +31,7 @@ Write the generated or updated document in the user's preferred language unless 
 
 **Product DESIGN**: preserve the existing path when updating. Default for new files: `docs/products/<product-name>/DESIGN-<product-name>.md`. Acceptable existing variants: `DESIGN.md`, `DESIGN-*.md`.
 
-**Project DESIGN**: preserve the existing path when updating. Default for new files: `docs/products/<project-name>/DESIGN.md`.
+**Project DESIGN**: preserve the existing path when updating. Default for new files: `docs/projects/<project-name>/DESIGN.md`.
 
 ### Preconditions
 
@@ -51,8 +51,7 @@ If no PRD exists and the user is not explicitly asking for a design-first draft,
 
 - `.wopal-space/STRUCTURE.md`
 - `.wopal-space/REGULATIONS.md`
-- `docs/products/wopal-space/PRD-wopalspace.md`
-- `docs/products/wopal-space/DESIGN-wopalspace.md`
+
 
 ### Core Rules
 

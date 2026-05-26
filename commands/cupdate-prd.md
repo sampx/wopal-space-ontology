@@ -31,7 +31,7 @@ Write the generated or updated document in the user's preferred language unless 
 
 **Product PRD**: use the established naming convention when one exists. Default: `docs/products/<product-name>/PRD-<product-name>.md`. Acceptable variants: `PRD.md`, `PRD-*.md`. When updating, preserve the existing file path.
 
-**Project PRD**: default `docs/products/<project-name>/PRD.md`. When updating, preserve the existing file path.
+**Project PRD**: default `docs/projects/<project-name>/PRD.md`. When updating, preserve the existing file path.
 
 ### Context Collection
 
@@ -50,8 +50,7 @@ Read enough context to avoid inventing requirements.
 
 - `.wopal-space/STRUCTURE.md`
 - `.wopal-space/REGULATIONS.md`
-- `docs/products/wopal-space/PRD-wopalspace.md`
-- `docs/products/wopal-space/DESIGN-wopalspace.md`
+
 
 ### Writing Rules
 

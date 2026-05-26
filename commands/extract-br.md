@@ -10,4 +10,4 @@ Input: `$ARGUMENTS` (product name, e.g. `gesp`, `wopal-cli`)
 
 1. **Confirm argument**: if `$ARGUMENTS` is empty or ambiguous, list candidate product names and ask user to confirm. Do not infer.
 2. **Load spec**: must read and follow: @.wopal/rules/business-rules.md
-3. **Extract rules per spec**, output to `docs/products/{product}/BUSINESS_RULES.md`
+3. **Extract rules per spec**, output to `docs/projects/{project-name}/BUSINESS_RULES.md`

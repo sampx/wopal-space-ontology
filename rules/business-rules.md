@@ -30,7 +30,7 @@ keywords:
 ### 位置
 
 ```
-docs/products/{product-name}/BUSINESS_RULES.md
+docs/projects/{project-name}/BUSINESS_RULES.md
 ```
 
 每个产品一份，与 REQUIREMENT.md 同级。
