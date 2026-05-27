@@ -105,6 +105,31 @@ def _extract_project_metadata_from_body(issue_info: dict) -> tuple[str | None, s
     return project_type, project_path
 
 
+def _extract_product_phase_from_body(issue_info: dict) -> tuple[str | None, str | None]:
+    """Extract Product and Phase from Issue body metadata section.
+
+    Args:
+        issue_info: Issue info dict from GitHub
+
+    Returns:
+        Tuple of (product, phase) - both may be None if not present
+    """
+    body = issue_info.get("body", "")
+
+    if not body:
+        return None, None
+
+    # Look for metadata fields in Issue body
+    # Pattern: "- **Product**: <value>" or "- **Phase**: <value>"
+    product_match = re.search(r'^-\s*\*\*Product\*\*:\s*(.+)$', body, re.MULTILINE)
+    phase_match = re.search(r'^-\s*\*\*Phase\*\*:\s*(.+)$', body, re.MULTILINE)
+
+    product = product_match.group(1).strip() if product_match else None
+    phase = phase_match.group(1).strip() if phase_match else None
+
+    return product, phase
+
+
 def _title_to_slug(title: str) -> str:
     """Convert Issue title to slug (lowercase, hyphen-separated)."""
     # Extract description part: type(scope): description
@@ -175,6 +200,8 @@ def create_plan_from_template(
     deep_mode: bool = False,
     project_path: str | None = None,
     project_type: str | None = None,
+    product: str | None = None,
+    phase: str | None = None,
 ) -> Path:
     """Create Plan file from template.
     
@@ -189,6 +216,8 @@ def create_plan_from_template(
         deep_mode: Whether to enable deep mode for plan structure
         project_path: Optional project path (for ontology-worktree type)
         project_type: Optional project type (e.g., "ontology-worktree")
+        product: Optional product name
+        phase: Optional phase name
         
     Returns:
         Path to created plan file
@@ -235,7 +264,18 @@ def create_plan_from_template(
         project_type_line = f"- **Project Type**: {project_type}"
     else:
         project_type_line = ""
-    
+
+    # Product and phase lines
+    if product:
+        product_line = f"- **Product**: {product}"
+    else:
+        product_line = ""
+
+    if phase:
+        phase_line = f"- **Phase**: {phase}"
+    else:
+        phase_line = ""
+
     created_date = date.today().strftime("%Y-%m-%d")
     
     # Replace placeholders
@@ -245,6 +285,8 @@ def create_plan_from_template(
     content = content.replace("{project_line}", project_line)
     content = content.replace("{project_path_line}", project_path_line)
     content = content.replace("{project_type_line}", project_type_line)
+    content = content.replace("{product_line}", product_line)
+    content = content.replace("{phase_line}", phase_line)
     content = content.replace("{date}", created_date)
     
     # Handle --deep and --prd placeholders if present in template
@@ -498,6 +540,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
         
         # Extract Project Type and Project Path from Issue body
         issue_project_type, issue_project_path = _extract_project_metadata_from_body(issue_info)
+        # Extract Product and Phase from Issue body
+        issue_product, issue_phase = _extract_product_phase_from_body(issue_info)
     else:
         # No-issue mode: use provided title, project, type, scope
         if not scope:
@@ -531,6 +575,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
             deep_mode=deep_mode,
             project_path=issue_project_path,
             project_type=issue_project_type,
+            product=issue_product,
+            phase=issue_phase,
         )
         log_success(f"Plan created: {plan_file}")
     except (FileExistsError, FileNotFoundError) as e:

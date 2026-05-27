@@ -158,9 +158,8 @@ else:
         """Create initial issue body using Python build_structured_issue_body"""
         # Build structured body directly (no bash dependency)
         body = build_structured_issue_body(
-            type='feature',
             goal='Old goal',
-            background='Old background',
+            context='Old context notes',
             scope='one,two',
             reference='docs/original.md'
         )
@@ -202,8 +201,8 @@ else:
 
         self.assertIn('New goal', updated_body,
                       'body edit should contain new goal')
-        self.assertIn('Old background', updated_body,
-                      'body edit should preserve old background')
+        self.assertIn('Old context notes', updated_body,
+                      'body edit should preserve old context')
         self.assertIn('docs/original.md', updated_body,
                       'body edit should preserve reference')
 

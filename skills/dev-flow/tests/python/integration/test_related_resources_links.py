@@ -74,15 +74,16 @@ class TestRelatedResourcesLinks(unittest.TestCase):
         self.assertIsNotNone(edit_call, "gh issue edit should be called")
         args = edit_call[0][0]
         
-        # Body should contain the plan link
+        # Body should contain the plan link (now returns just the row)
         body_idx = args.index("--body") + 1
         body = args[body_idx]
         
         expected_link = "[120-test-plan](https://github.com/sampx/wopal-space/blob/main/docs/projects/ontology/plans/120-test-plan.md)"
         self.assertIn(expected_link, body,
-                      "Body should contain Plan link in Related Resources table")
-        self.assertIn("## Related Resources", body,
-                      "Body should contain Related Resources section")
+                      "Body should contain Plan link")
+        # build_issue_body_from_plan now returns just the row, not the full section
+        self.assertIn("| Plan |", body,
+                      "Body should contain Plan table row")
 
     @patch("dev_flow.domain.issue.sync.subprocess.run")
     def test_planning_plan_keeps_placeholder_link(self, mock_subprocess):

@@ -173,11 +173,8 @@ def _render_related_resources_table(reference: str, plan_link: str) -> str:
     return "## Related Resources\n\n" + "\n".join(rows) + "\n"
 
 
-def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, workspace_root: str = None) -> str:
-    """
-    Build normalized Issue body from approved Plan content.
-    
-    Preserves checkbox states from Agent Verification.
+def build_plan_link_for_issue(plan_file: str, plan_name: str, repo: str, workspace_root: str = None) -> str:
+    """Build Plan link row for Issue's Related Resources table.
     
     Args:
         plan_file: Path to Plan file
@@ -186,109 +183,27 @@ def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, worksp
         workspace_root: Optional workspace root (for Project-based Plan path resolution)
     
     Returns:
-        Formatted Issue body string
+        Markdown table row: | Plan | [{plan_name}]({github_url}) |
+        Or: | Plan | _待关联_ | if Plan is in planning/draft status
     """
-    has_audit_sections = _plan_has_audit_subsections(plan_file)
-    has_new_template = _plan_has_new_template_subsections(plan_file)
-    
-    # Extract Goal
-    goal = _extract_plan_section(plan_file, "Goal", 5)
-    
-    # Extract Background based on Plan structure
-    if has_new_template:
-        # New template: extract 4 subsections and combine as background
-        arch_context = _extract_subsection(plan_file, "Architecture Context")
-        research_findings = _extract_subsection(plan_file, "Research Findings")
-        key_decisions = _extract_subsection(plan_file, "Key Decisions")
-        key_interfaces = _extract_subsection(plan_file, "Key Interfaces")
-        
-        bg_parts = []
-        if arch_context:
-            bg_parts.append(f"### Architecture Context\n\n{arch_context}")
-        if research_findings:
-            bg_parts.append(f"### Research Findings\n\n{research_findings}")
-        if key_decisions:
-            bg_parts.append(f"### Key Decisions\n\n{key_decisions}")
-        if key_interfaces:
-            bg_parts.append(f"### Key Interfaces\n\n{key_interfaces}")
-        background = "\n\n".join(bg_parts) if bg_parts else ""
-        confirmed_bugs = ""
-        content_model_defects = ""
-        cleanup_scope = ""
-        key_findings = ""
-    elif has_audit_sections:
-        background = _extract_technical_context_top(plan_file)
-        confirmed_bugs = _extract_subsection(plan_file, "Confirmed Bugs")
-        content_model_defects = _extract_subsection(plan_file, "Content Model Defects")
-        cleanup_scope = _extract_subsection(plan_file, "Cleanup Scope")
-        key_findings = _extract_subsection(plan_file, "Key Findings")
-    else:
-        background = _extract_plan_section(plan_file, "Technical Context", 20)
-        confirmed_bugs = ""
-        content_model_defects = ""
-        cleanup_scope = ""
-        key_findings = ""
-    
-    # Extract scope sections
-    in_scope = _extract_plan_section(plan_file, "In Scope", 50)
-    out_of_scope = _extract_plan_section(plan_file, "Out of Scope", 20)
-    
-    # Extract Acceptance Criteria
-    acceptance_criteria = _extract_acceptance_criteria(plan_file)
-    
-    # Get project and status
-    project = get_plan_field(plan_file, "Target Project")
     plan_status = get_plan_field(plan_file, "Status")
-    
-    # Build Plan link
     if plan_status in ('planning', 'draft'):
-        plan_link = "_待关联_"
+        return "| Plan | _待关联_ |"
+    
+    project = get_plan_field(plan_file, "Target Project")
+    if workspace_root:
+        plan_path = Path(plan_file).resolve().relative_to(Path(workspace_root).resolve()).as_posix()
+    elif project:
+        plan_path = f"docs/projects/{project}/plans/{plan_name}.md"
     else:
-        if workspace_root:
-            plan_path = Path(plan_file).resolve().relative_to(Path(workspace_root).resolve()).as_posix()
-        elif project:
-            plan_path = f"docs/projects/{project}/plans/{plan_name}.md"
-        else:
-            plan_path = f"docs/projects/plans/{plan_name}.md"
-        github_url = build_repo_blob_url(repo, plan_path)
-        plan_link = f"[{plan_name}]({github_url})"
+        plan_path = f"docs/projects/plans/{plan_name}.md"
+    github_url = build_repo_blob_url(repo, plan_path)
+    return f"| Plan | [{plan_name}]({github_url}) |"
+
+
+def build_issue_body_from_plan(plan_file: str, plan_name: str, repo: str, workspace_root: str = None) -> str:
+    """Deprecated: Use build_plan_link_for_issue instead.
     
-    # Build sections
-    sections = ""
-    
-    sections += _render_issue_section("Goal", goal, "<目标描述>")
-    sections += "\n"
-    
-    sections += _render_issue_section("Background", background, "<背景描述>")
-    sections += "\n"
-    
-    # Audit sections (only for Plans with old audit subsections)
-    if has_audit_sections and not has_new_template:
-        if confirmed_bugs:
-            sections += _render_issue_section("Confirmed Bugs", confirmed_bugs, "")
-            sections += "\n"
-        
-        if content_model_defects:
-            sections += _render_issue_section("Content Model Defects", content_model_defects, "")
-            sections += "\n"
-        
-        if cleanup_scope:
-            sections += _render_issue_section("Cleanup Scope", cleanup_scope, "")
-            sections += "\n"
-        
-        if key_findings:
-            sections += _render_issue_section("Key Findings", key_findings, "")
-            sections += "\n"
-    
-    sections += _render_issue_section("In Scope", in_scope, "- 范围项 1")
-    sections += "\n"
-    
-    sections += _render_issue_section("Out of Scope", out_of_scope, "- 不做的项（原因）")
-    sections += "\n"
-    
-    sections += _render_issue_section("Acceptance Criteria", acceptance_criteria, "- 验收条件 1")
-    sections += "\n"
-    
-    sections += _render_related_resources_table("", plan_link)
-    
-    return sections
+    Returns only the Plan link row (same as build_plan_link_for_issue).
+    """
+    return build_plan_link_for_issue(plan_file, plan_name, repo, workspace_root)

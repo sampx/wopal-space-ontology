@@ -19,6 +19,7 @@ from dev_flow.commands.complete import register_complete_parser, cmd_complete
 from dev_flow.commands.verify import register_verify_parser, cmd_verify
 from dev_flow.commands.plan import register_plan_parser, cmd_plan
 from dev_flow.commands.decompose import register_decompose_parser, cmd_decompose
+from dev_flow.commands.roadmap import register_roadmap_parser, cmd_roadmap
 from dev_flow.commands.reset import register_reset_parser, cmd_reset
 from dev_flow.commands.verify_switch import run_verify_switch
 
@@ -61,6 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Register decompose-prd subcommand (top-level alias)
     register_decompose_parser(subparsers)
+
+    # Register roadmap subcommand
+    register_roadmap_parser(subparsers)
 
     # Register reset subcommand
     register_reset_parser(subparsers)
@@ -107,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         print("")
         print("Utility commands:")
         print("  decompose-prd   Create Issues from PRD phases")
+        print("  roadmap         Product phase roadmap (Analyze/Discuss/Produce/Decompose)")
         print("  reset           Reset Plan to planning status")
         print("  query           Low-level data queries")
         print("")
@@ -144,6 +149,10 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch decompose-prd subcommand
     if args.command == "decompose-prd":
         return cmd_decompose(args)
+
+    # Dispatch roadmap subcommand
+    if args.command == "roadmap":
+        return cmd_roadmap(args)
 
     # Dispatch reset subcommand
     if args.command == "reset":

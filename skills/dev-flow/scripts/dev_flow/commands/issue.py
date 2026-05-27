@@ -14,6 +14,7 @@ import subprocess
 import sys
 import re
 import os
+from pathlib import Path
 
 from dev_flow.domain.issue.title import (
     validate_issue_title,
@@ -34,7 +35,7 @@ from dev_flow.domain.plan.project import (
     resolve_project_info,
     ProjectType,
 )
-from dev_flow.core.logging import log_info, log_success, log_error
+from dev_flow.core.logging import log_info, log_warn, log_success, log_error
 from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
 
@@ -266,52 +267,17 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
     
     # Determine body content
     if getattr(args, 'body_file', None):
-        # --body-file: read body from file
         body_file = args.body_file
         if not os.path.isfile(body_file):
             log_error(f"body-file not found: {body_file}")
             return 1
         with open(body_file, 'r') as f:
             body = f.read()
-        
-        # Warn if structured params also provided (they will be ignored)
-        structured_params = [
-            args.goal, args.background, args.scope, args.out_of_scope,
-            args.reference, args.confirmed_bugs, args.content_model_defects,
-            args.cleanup_scope, args.key_findings, args.baseline, args.target,
-            args.affected_components, args.refactor_strategy, args.target_documents,
-            args.audience, args.test_scope, args.test_strategy,
-        ]
-        if any(structured_params):
-            log_info("Warning: --body-file provided, ignoring structured params (--goal, --background, etc.)")
+    elif getattr(args, 'body', None):
+        body = args.body
     else:
-        # Build structured body from params
-        body_kwargs = {
-            "type": plan_type,
-            "goal": args.goal or "",
-            "background": args.background or "",
-            "scope": args.scope or "",
-            "out_of_scope": args.out_of_scope or "",
-            "reference": args.reference or "",
-            "confirmed_bugs": args.confirmed_bugs or "",
-            "content_model_defects": args.content_model_defects or "",
-            "cleanup_scope": args.cleanup_scope or "",
-            "key_findings": args.key_findings or "",
-            "baseline": args.baseline or "",
-            "target": args.target or "",
-            "affected_components": args.affected_components or "",
-            "refactor_strategy": args.refactor_strategy or "",
-            "target_documents": args.target_documents or "",
-            "audience": args.audience or "",
-            "test_scope": args.test_scope or "",
-            "test_strategy": args.test_strategy or "",
-        }
-        
-        # Use provided body or build structured body
-        if args.body and not any(v for k, v in body_kwargs.items() if k != "type" and v):
-            body = args.body
-        else:
-            body = build_structured_issue_body(**body_kwargs)
+        # Generate empty five-section skeleton
+        body = build_structured_issue_body()
     
     # Inject project type metadata for ontology-worktree projects
     workspace_root = find_workspace_root()
@@ -366,6 +332,7 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
 
 def cmd_issue_update(args: argparse.Namespace) -> int:
     """Update structured GitHub Issue fields."""
+    print("[DEPRECATED] use issue write --body-file or --append instead", file=sys.stderr)
     issue_number = args.issue_number
     
     if not issue_number:
@@ -476,6 +443,71 @@ def cmd_issue_update(args: argparse.Namespace) -> int:
 
 
 # ============================================
+# issue write command
+# ============================================
+
+def cmd_issue_write(args: argparse.Namespace) -> int:
+    """Write to issue body (full replace or append)."""
+    issue_number = args.issue_number
+    if not issue_number:
+        log_error("Missing issue number")
+        return 1
+    
+    body_file = getattr(args, 'body_file', None) or getattr(args, 'append', None)
+    if not body_file:
+        log_error("Must specify --body-file or --append")
+        return 1
+    
+    if not os.path.isfile(body_file):
+        log_error(f"File not found: {body_file}")
+        return 1
+    
+    file_content = Path(body_file).read_text()
+    
+    # Check for empty file
+    if not file_content.strip():
+        log_error("Source file is empty")
+        return 1
+    
+    # Warning if file doesn't start with markdown-ish content
+    first_line = file_content.strip().split('\n')[0] if file_content.strip() else ''
+    if first_line and not first_line.startswith('#') and not first_line.startswith('-'):
+        log_warn("File does not start with heading or list item")
+    
+    repo = detect_space_repo(find_workspace_root())
+    
+    if getattr(args, 'append', None):
+        # Append mode: read current body + append new content
+        issue_info = get_issue_info(issue_number, repo)
+        current_body = issue_info.get("body", "")
+        trimmed = current_body.rstrip('\n')
+        if trimmed:
+            new_body = trimmed + "\n\n" + file_content
+        else:
+            new_body = file_content
+        if not new_body.endswith('\n'):
+            new_body += '\n'
+    else:
+        # Replace mode
+        new_body = file_content
+        if not new_body.endswith('\n'):
+            new_body += '\n'
+    
+    result = subprocess.run(
+        ["gh", "issue", "edit", issue_number, "--repo", repo, "--body", new_body],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        log_error(f"Failed to write to issue #{issue_number}")
+        log_error(result.stderr)
+        return 1
+    
+    mode = "append" if getattr(args, 'append', None) else "replace"
+    log_success(f"Issue #{issue_number} body updated ({mode})")
+    return 0
+
+
+# ============================================
 # argparse registration
 # ============================================
 
@@ -486,40 +518,13 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     
     # issue create
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
-    create_parser.add_argument("--title", required=False, help="Issue title (format: type(scope): description)")
-    create_parser.add_argument("--project", required=False, help="Project name (lowercase alphanumeric with hyphens)")
-    create_parser.add_argument("--type", help="Issue type (feat/fix/perf/refactor/docs/test/chore/enhance)")
-    create_parser.add_argument("--body", help="Raw issue body (fallback)")
-    create_parser.add_argument("--body-file", help="Read issue body from file (overrides structured params)")
-    create_parser.add_argument("--goal", help="One-line goal description")
-    create_parser.add_argument("--background", help="Background context")
-    create_parser.add_argument("--scope", help="In-scope items (comma-separated)")
-    create_parser.add_argument("--out-of-scope", help="Out-of-scope items (comma-separated)")
-    create_parser.add_argument("--reference", help="Research document path or URL")
+    create_parser.add_argument("--title", required=False, help="Issue title")
+    create_parser.add_argument("--project", required=False, help="Project name")
+    create_parser.add_argument("--type", help="Issue type (feat/fix/perf/etc.)")
+    create_parser.add_argument("--body", help="Raw issue body")
+    create_parser.add_argument("--body-file", help="Read issue body from file")
     
-    # Fix-specific options
-    create_parser.add_argument("--confirmed-bugs", help="Confirmed bugs section (fix type)")
-    create_parser.add_argument("--content-model-defects", help="Content model defects section (fix type)")
-    create_parser.add_argument("--cleanup-scope", help="Cleanup scope section (fix type)")
-    create_parser.add_argument("--key-findings", help="Key findings section (fix type)")
-    
-    # Perf-specific options
-    create_parser.add_argument("--baseline", help="Performance baseline (perf type)")
-    create_parser.add_argument("--target", help="Performance target (perf type)")
-    
-    # Refactor-specific options
-    create_parser.add_argument("--affected-components", help="Affected components (comma-separated, refactor type)")
-    create_parser.add_argument("--refactor-strategy", help="Refactor strategy")
-    
-    # Docs-specific options
-    create_parser.add_argument("--target-documents", help="Target documents (comma-separated, docs type)")
-    create_parser.add_argument("--audience", help="Target audience (docs type)")
-    
-    # Test-specific options
-    create_parser.add_argument("--test-scope", help="Test scope (test type)")
-    create_parser.add_argument("--test-strategy", help="Test strategy (test type)")
-    
-    # issue update
+    # issue update (deprecated - use issue write instead)
     update_parser = issue_subparsers.add_parser("update", help="Update existing issue")
     update_parser.add_argument("issue_number", nargs="?", help="Issue number to update")
     update_parser.add_argument("--title", help="New issue title")
@@ -543,6 +548,12 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     update_parser.add_argument("--out-of-scope", help="Update out-of-scope section")
     update_parser.add_argument("--reference", help="Update reference in Related Resources")
     update_parser.add_argument("--acceptance-criteria", help="Update acceptance criteria section")
+    
+    # issue write
+    write_parser = issue_subparsers.add_parser("write", help="Write to issue body")
+    write_parser.add_argument("issue_number", nargs="?", help="Issue number")
+    write_parser.add_argument("--body-file", help="Replace issue body with file content")
+    write_parser.add_argument("--append", help="Append file content to issue body")
 
 
 def cmd_issue(args: argparse.Namespace) -> int:
@@ -551,6 +562,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
         return cmd_issue_create(args)
     elif args.issue_cmd == "update":
         return cmd_issue_update(args)
+    elif args.issue_cmd == "write":
+        return cmd_issue_write(args)
     else:
         log_error(f"Unknown issue subcommand: {args.issue_cmd}")
         return 1
