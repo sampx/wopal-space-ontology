@@ -36,19 +36,21 @@ Localization review directory: `docs/projects/wopal-space-ontology/LANG/<locale>
 
 ### i18n / Multilingual
 
-Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, `prompts/`.
+Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, `prompts/`, `skills/`.
 
 - The formal English version is the runtime source, located under `.wopal/` in the corresponding directory.
-- Generate the user's preferred language review version first, then sync to the formal English version.
-- Review path: `docs/projects/wopal-space-ontology/LANG/<locale>/<type>/`.
-- `<type>` aligns with the runtime directory: `agents/`, `rules/`, `commands/`, `templates/`, `prompts/`.
-- `<locale>` uses IETF BCP 47 / RFC 5646 language tags, e.g. `zh-CN`, `en-US`. Never hardcode.
-- Review version titles and body use the target language; mixing Chinese and English titles is forbidden.
-- After review approval, update the English runtime source under `.wopal/`. Both versions must have aligned semantics.
+- If the user's preferred language is not English, first generate or update the user's preferred-language review version, then sync to the formal English version after approval.
+- `<locale>` uses IETF BCP 47 / RFC 5646 language tags, e.g. `zh-CN`, `en-US`. Never hardcode a specific locale.
+- Review-version titles and body use the target language; mixing Chinese and English titles is forbidden.
+- After review approval, update the English runtime source under `.wopal/`. Both versions must stay semantically aligned.
+- For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `docs/projects/wopal-space-ontology/LANG/<locale>/<type>/`.
+- For `skills/`, keep the preferred-language review version in the same skill directory as `SKILL.<locale>.md` (for example `SKILL.zh-CN.md`), then sync the approved content to `SKILL.md`.
+- If the user's preferred language is English, update the formal English file directly and do not create English locale variants such as `SKILL.en-US.md`.
 
 ### 3.1 Skill
 
 - To create or modify a skill: load the `skill-creator` skill first.
+- If the user's preferred language is not English, draft or update `SKILL.<locale>.md` in the same skill directory first, then translate and sync the approved content to `SKILL.md`.
 - frontmatter must have `name` and `description`.
 - `description` drives triggering: state what it does and when to trigger; triggering conditions go in frontmatter, not the body.
 - The body only covers workflow, output, and notes; long content offloads to `references/`.
