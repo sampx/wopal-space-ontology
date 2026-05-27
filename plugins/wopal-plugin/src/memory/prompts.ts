@@ -36,6 +36,26 @@ export function resolvePromptFilePath(envVar: string): string | null {
   return join(process.cwd(), envPath);
 }
 
+/** Title generation prompt for session title after compaction */
+export const TITLE_GENERATION_PROMPT = `You are a title generator. Output ONLY a session title, nothing else.
+
+Generate a brief title (≤50 characters) from the conversation summary below.
+
+<rules>
+- Use the same language as the summary
+- Focus on the main goal or topic from the Goal section
+- Include specific project names, technical terms, or file names
+- Never include tool names or generic filler words
+- Do NOT start with "Summarizing" or "Generating"
+- Output a single line, no quotes, no formatting
+</rules>
+
+<summary>
+{{summary}}
+</summary>
+
+Title:`
+
 // Prompt file path from environment
 const DISTILL_PROMPT_FILE = resolvePromptFilePath("WOPAL_DISTILL_PROMPT_FILE");
 const DEDUP_PROMPT_FILE = resolvePromptFilePath("WOPAL_DEDUP_PROMPT_FILE");

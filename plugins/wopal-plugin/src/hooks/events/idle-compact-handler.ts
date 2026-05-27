@@ -14,47 +14,11 @@ import {
   saveSessionContext,
   type SessionContext,
 } from "../../memory/session-context.js"
+import { DistillLLMClient } from "../../memory/llm-client.js"
+import { TITLE_GENERATION_PROMPT } from "../../memory/prompts.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
-
-/** Max title length extracted from compaction summary */
-const MAX_TITLE_LENGTH = 80
-
-/** Max compaction text injected into recovery messages */
-const MAX_COMPACTION_INJECT_LENGTH = 1500
-
-/**
- * Extract a title from compaction summary text.
- *
- * Strategy:
- * 1. Match `## Goal` section, take first non-empty line after it
- * 2. Fallback: first non-empty, non-`#`-heading, non-`---` line
- * 3. Final fallback: first 50 characters of text
- * 4. Truncate result to MAX_TITLE_LENGTH (80 chars)
- */
-export function extractTitleFromCompaction(text: string): string {
-  if (!text || !text.trim()) return ""
-
-  // Strategy 1: Match ## Goal section
-  const goalMatch = text.match(/^## Goal\s*\n\s*(.+)$/m)
-  if (goalMatch && goalMatch[1].trim()) {
-    return goalMatch[1].trim().slice(0, MAX_TITLE_LENGTH)
-  }
-
-  // Strategy 2: First valid non-heading, non-separator line
-  const lines = text.split("\n")
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    if (trimmed.startsWith("#")) continue
-    if (trimmed === "---") continue
-    return trimmed.slice(0, MAX_TITLE_LENGTH)
-  }
-
-  // Strategy 3: First 50 characters
-  return text.trim().slice(0, 50)
-}
 
 export interface IdleCompactHandlerContext {
   client: OpenCodeClient
@@ -161,40 +125,10 @@ export async function handleSessionCompacted(
   const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
   ctx.contextLogger.info({ session_id: formatSessionID(sessionID, isTask) }, "Compact completed")
 
-  // Extract title and save SessionContext if compaction summary is available
+  // Fire background title generation from compaction summary (non-blocking)
   if (compactionText) {
-    const title = extractTitleFromCompaction(compactionText)
-    if (title) {
-      const existingCtx = loadSessionContext(sessionID)
-      const newCtx: SessionContext = {
-        sessionID,
-        title: existingCtx?.title ?? null,
-        ...existingCtx,
-        summary: {
-          text: title,
-          messageCount: 0,
-          generatedAt: new Date().toISOString(),
-        },
-      }
-      saveSessionContext(newCtx)
-
-      // Update session title via API (non-blocking; failure only logs debug)
-      try {
-        if (typeof ctx.client?.session?.update === "function") {
-          await ctx.client.session.update({
-            path: { id: sessionID },
-            body: { title },
-          })
-          newCtx.title = title
-          saveSessionContext(newCtx)
-        }
-      } catch (err) {
-        ctx.contextLogger.debug(
-          { session_id: formatSessionID(sessionID, isTask), err },
-          "Failed to update session title from compaction summary",
-        )
-      }
-    }
+    generateTitleInBackground(ctx.client, sessionID, compactionText, ctx.contextLogger, isTask)
+      .catch(() => {})
   }
 
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
@@ -211,10 +145,10 @@ export async function handleSessionCompacted(
   let sendSuccess = false
   if (task) {
     // Child session: notify parent Agent via promptAsync
-    sendSuccess = await sendCompactedNotification(ctx, task, state, compactionText)
+    sendSuccess = await sendCompactedNotification(ctx, task, state)
   } else {
     // Main session: send auto-continue recovery message
-    sendSuccess = await sendAutoContinueForMain(ctx, sessionID, state, compactionText)
+    sendSuccess = await sendAutoContinueForMain(ctx, sessionID, state)
   }
 
   // If send failed, rollback recoverySent and enable fallback injection
@@ -241,6 +175,60 @@ export async function handleSessionCompacted(
 }
 
 /**
+ * Generate and update session title from compaction summary in background.
+ * Fire-and-forget: does not block recovery message delivery.
+ */
+async function generateTitleInBackground(
+  client: OpenCodeClient,
+  sessionID: string,
+  compactionText: string,
+  logger: LoggerInstance,
+  isTask: boolean,
+): Promise<void> {
+  try {
+    const llm = new DistillLLMClient()
+    const prompt = TITLE_GENERATION_PROMPT.replace("{{summary}}", compactionText)
+    const raw = await llm.complete(prompt)
+    const title = raw
+      .replace(/<\/think>[\s\S]*?<\/think>\s*/g, "")
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0)
+      ?.slice(0, 50)
+
+    if (!title) return
+
+    // Save SessionContext.summary
+    const existingCtx = loadSessionContext(sessionID)
+    const newCtx: SessionContext = {
+      sessionID,
+      title: existingCtx?.title ?? null,
+      ...existingCtx,
+      summary: {
+        text: title,
+        messageCount: 0,
+        generatedAt: new Date().toISOString(),
+      },
+    }
+    saveSessionContext(newCtx)
+
+    // Update session title via API
+    if (typeof client?.session?.update === "function") {
+      await client.session.update({
+        path: { id: sessionID },
+        body: { title },
+      })
+      newCtx.title = title
+      saveSessionContext(newCtx)
+    }
+
+    logger.debug({ session_id: formatSessionID(sessionID, isTask), title }, "Background title updated")
+  } catch {
+    // Best-effort: silently skip on any failure
+  }
+}
+
+/**
  * Send auto-continue recovery message to main session after compact.
  * Main session IDLE after compact, no one can notify it, so Plugin must send recovery instruction.
  */
@@ -248,19 +236,14 @@ async function sendAutoContinueForMain(
   ctx: IdleCompactHandlerContext,
   sessionID: string,
   state: { loadedSkills?: Set<string> },
-  compactionText?: string | null,
 ): Promise<boolean> {
   const skills = state.loadedSkills?.size ? Array.from(state.loadedSkills).join(", ") : null
   const skillLine = skills ? `\n- Reload previously loaded skills: ${skills}` : ""
 
-  // Build compaction summary injection
-  const compactionSection = compactionText
-    ? `\n## Compaction Summary\n${compactionText.slice(0, MAX_COMPACTION_INJECT_LENGTH)}\n`
-    : ""
-
   const recoveryText = `<system-reminder>
 The session context has been compacted. Execute recovery protocol immediately and continue working:
-${compactionSection}<CRITICAL_RULE>
+
+<CRITICAL_RULE>
 - Read key files from the compaction summary (plans, specs, etc. — max 3)
 - Search and load task-relevant memories (max 3)${skillLine}
 - Check current session state (active tasks, pending work)
@@ -299,23 +282,18 @@ async function sendCompactedNotification(
   ctx: IdleCompactHandlerContext,
   task: WopalTask,
   state: { loadedSkills?: Set<string> },
-  compactionText?: string | null,
 ): Promise<boolean> {
   if (!task.sessionID || !task.parentSessionID) return false
 
   const skills = state.loadedSkills ? Array.from(state.loadedSkills).join(", ") : "none"
-
-  // Build compaction summary injection
-  const compactionSection = compactionText
-    ? `\nCompaction Summary:\n${compactionText.slice(0, MAX_COMPACTION_INJECT_LENGTH)}\n`
-    : ""
 
   const notification = `<system-reminder>
 [WOPAL TASK COMPACTED]
 Task ID: ${task.id}
 Description: ${task.description}
 Skills: ${skills}
-${compactionSection}The child session has been compacted and is now IDLE.
+
+The child session has been compacted and is now IDLE.
 Use wopal_task_reply to send recovery instructions if the task should continue.
 </system-reminder>`
 

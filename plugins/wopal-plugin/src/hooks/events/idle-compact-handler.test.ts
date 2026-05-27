@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import {
-  extractTitleFromCompaction,
   handleSessionCompacted,
   type IdleCompactHandlerContext,
 } from "./idle-compact-handler.js"
@@ -15,6 +14,20 @@ import {
 import { join } from "path"
 import { existsSync, mkdirSync, rmSync } from "fs"
 import { homedir } from "os"
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const mockComplete = vi.fn().mockResolvedValue("Generated Session Title")
+
+vi.mock("../../memory/llm-client.js", () => ({
+  DistillLLMClient: vi.fn().mockImplementation(() => ({
+    complete: mockComplete,
+  })),
+}))
+
+import { DistillLLMClient } from "../../memory/llm-client.js"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,112 +76,38 @@ function createMockContext(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// extractTitleFromCompaction — 6 boundary unit tests
+// Recovery message tests
 // ---------------------------------------------------------------------------
 
-describe("extractTitleFromCompaction", () => {
-  it("extracts title from normal ## Goal section", () => {
-    const text = "## Goal\nImplement auto-session title feature\n## Instructions\nSome details"
-    expect(extractTitleFromCompaction(text)).toBe("Implement auto-session title feature")
-  })
+describe("handleSessionCompacted — recovery message", () => {
+  const testSessionID = "test-recovery-session-id"
 
-  it("extracts title when ## Goal is followed by blank line then content", () => {
-    const text = "## Goal\n\nThis is the core intent\n\n## Instructions\nDetails"
-    expect(extractTitleFromCompaction(text)).toBe("This is the core intent")
-  })
-
-  it("falls back to first valid line when no ## Goal section", () => {
-    const text = "## Instructions\nDo something useful\n## Accomplished\nNothing yet"
-    expect(extractTitleFromCompaction(text)).toBe("Do something useful")
-  })
-
-  it("skips heading lines and --- separators, picks first valid line", () => {
-    const text = "## Instructions\n---\n### Sub-heading\nActual content here"
-    expect(extractTitleFromCompaction(text)).toBe("Actual content here")
-  })
-
-  it("falls back to first 50 characters when all lines are invalid", () => {
-    const text = "# Heading Only\n## Another Heading\n---"
-    // All lines are headings or separators; fallback to first 50 chars
-    expect(extractTitleFromCompaction(text)).toBe("# Heading Only\n## Another Heading\n---".slice(0, 50))
-  })
-
-  it("truncates long title to 80 characters", () => {
-    const longTitle = "A".repeat(120)
-    const text = `## Goal\n${longTitle}`
-    const result = extractTitleFromCompaction(text)
-    expect(result).toBe(longTitle.slice(0, 80))
-    expect(result.length).toBe(80)
-  })
-
-  it("returns empty string for empty input", () => {
-    expect(extractTitleFromCompaction("")).toBe("")
-    expect(extractTitleFromCompaction("   ")).toBe("")
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Consumption chain integration tests
-// ---------------------------------------------------------------------------
-
-describe("handleSessionCompacted — consumption chain", () => {
-  const testSessionID = "test-compaction-chain-session-id"
-  const stateDir = join(homedir(), ".wopal", "memory", "state")
-
-  beforeEach(() => {
-    // Clean up any test session context file
-    clearSessionContext(testSessionID)
-  })
-
-  afterEach(() => {
-    clearSessionContext(testSessionID)
-  })
-
-  it("consumes compaction summary, extracts title, saves SessionContext, and injects into recovery message", async () => {
-    const compactionText = "## Goal\nRefactor compaction handler for auto title\n## Instructions\nSome details"
+  it("sends recovery message without compaction summary injection", async () => {
+    const compactionText = "## Goal\nRefactor compaction handler\n## Instructions\nSome details"
     const { ctx, sessionStore, promptAsync } = createMockContext()
 
-    // Simulate session.next.compaction.ended → setCompactionSummary
     sessionStore.setCompactionSummary(testSessionID, compactionText)
-
-    // Set up Plugin-initiated compact state
     sessionStore.upsert(testSessionID, (s) => {
       s.compactingTrigger = "plugin"
       s.needsAutoContinue = true
     })
 
-    // Simulate session.compacted → handleSessionCompacted
     await handleSessionCompacted(ctx, testSessionID)
 
-    // Verify: compaction summary was consumed
-    expect(sessionStore.consumeCompactionSummary(testSessionID)).toBeNull()
-
-    // Verify: SessionContext.summary saved
-    const savedCtx = loadSessionContext(testSessionID)
-    expect(savedCtx).not.toBeNull()
-    expect(savedCtx!.summary?.text).toBe("Refactor compaction handler for auto title")
-
-    // Verify: session title update API was called
-    expect(ctx.client.session!.update).toHaveBeenCalledWith({
-      path: { id: testSessionID },
-      body: { title: "Refactor compaction handler for auto title" },
-    })
-
-    // Verify: recovery message was sent and contains compaction summary
+    // Recovery message sent
     expect(promptAsync).toHaveBeenCalled()
     const callArgs = promptAsync.mock.calls[0][0]
-    expect(callArgs.body.parts[0].text).toContain("## Compaction Summary")
-    expect(callArgs.body.parts[0].text).toContain("Refactor compaction handler for auto title")
+    // Must NOT contain compaction summary
+    expect(callArgs.body.parts[0].text).not.toContain("## Compaction Summary")
+    expect(callArgs.body.parts[0].text).not.toContain("Refactor compaction handler")
+    // Must contain recovery protocol
+    expect(callArgs.body.parts[0].text).toContain("CRITICAL_RULE")
   })
 
-  it("correctly handles event timing: ended before compacted", async () => {
-    const compactionText = "## Goal\nTest timing order"
+  it("sends recovery message without compaction summary when no cache", async () => {
     const { ctx, sessionStore, promptAsync } = createMockContext()
 
-    // Step 1: session.next.compaction.ended → cache summary
-    sessionStore.setCompactionSummary(testSessionID, compactionText)
-
-    // Step 2: session.compacted arrives → consume + handle
+    // No setCompactionSummary — simulates missing ended event
     sessionStore.upsert(testSessionID, (s) => {
       s.compactingTrigger = "plugin"
       s.needsAutoContinue = true
@@ -176,30 +115,12 @@ describe("handleSessionCompacted — consumption chain", () => {
 
     await handleSessionCompacted(ctx, testSessionID)
 
-    // Summary consumed and used
-    expect(sessionStore.consumeCompactionSummary(testSessionID)).toBeNull()
-    const savedCtx = loadSessionContext(testSessionID)
-    expect(savedCtx?.summary?.text).toBe("Test timing order")
-  })
-
-  it("handles compacted event when no compaction summary was cached (no ended event)", async () => {
-    const { ctx, sessionStore, promptAsync } = createMockContext()
-
-    // No setCompactionSummary call — simulates missing ended event
-    sessionStore.upsert(testSessionID, (s) => {
-      s.compactingTrigger = "plugin"
-      s.needsAutoContinue = true
-    })
-
-    await handleSessionCompacted(ctx, testSessionID)
-
-    // Recovery message still sent (without compaction summary section)
     expect(promptAsync).toHaveBeenCalled()
     const callArgs = promptAsync.mock.calls[0][0]
     expect(callArgs.body.parts[0].text).not.toContain("## Compaction Summary")
   })
 
-  it("passes compactionText to child session notification", async () => {
+  it("child session notification without compaction summary injection", async () => {
     const compactionText = "## Goal\nChild task work"
     const task: WopalTask = {
       id: "task-1",
@@ -229,30 +150,32 @@ describe("handleSessionCompacted — consumption chain", () => {
     expect(promptAsync).toHaveBeenCalled()
     const callArgs = promptAsync.mock.calls[0][0]
     expect(callArgs.path.id).toBe("parent-session-id")
-    expect(callArgs.body.parts[0].text).toContain("Compaction Summary:")
-    expect(callArgs.body.parts[0].text).toContain("Child task work")
+    expect(callArgs.body.parts[0].text).toContain("[WOPAL TASK COMPACTED]")
+    // Must NOT contain compaction summary text
+    expect(callArgs.body.parts[0].text).not.toContain("Compaction Summary:")
+    expect(callArgs.body.parts[0].text).not.toContain("Child task work")
   })
 })
 
 // ---------------------------------------------------------------------------
-// API failure degradation test
+// Background title generation tests
 // ---------------------------------------------------------------------------
 
-describe("handleSessionCompacted — API failure degradation", () => {
-  const testSessionID = "test-api-failure-session-id"
+describe("handleSessionCompacted — background title generation", () => {
+  const testSessionID = "test-bg-title-session-id"
 
   beforeEach(() => {
-    clearSessionContext(testSessionID)
+    vi.clearAllMocks()
+    mockComplete.mockResolvedValue("Generated Session Title")
   })
 
   afterEach(() => {
     clearSessionContext(testSessionID)
   })
 
-  it("continues saving SessionContext and sending recovery when updateSessionTitle rejects", async () => {
-    const compactionText = "## Goal\nTest API failure handling"
-    const updateSessionTitle = vi.fn().mockRejectedValue(new Error("API timeout"))
-    const { ctx, sessionStore, promptAsync } = createMockContext({ updateSessionTitle })
+  it("fires background title generation after compaction", async () => {
+    const compactionText = "## Goal\nRefactor compaction handler\n## Instructions\nSome details"
+    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
 
     sessionStore.setCompactionSummary(testSessionID, compactionText)
     sessionStore.upsert(testSessionID, (s) => {
@@ -262,32 +185,36 @@ describe("handleSessionCompacted — API failure degradation", () => {
 
     await handleSessionCompacted(ctx, testSessionID)
 
-    // API was attempted
-    expect(updateSessionTitle).toHaveBeenCalled()
-
-    // SessionContext.summary is still saved
-    const savedCtx = loadSessionContext(testSessionID)
-    expect(savedCtx).not.toBeNull()
-    expect(savedCtx!.summary?.text).toBe("Test API failure handling")
-
-    // Recovery message was still sent
+    // Recovery message sent immediately
     expect(promptAsync).toHaveBeenCalled()
 
-    // Debug log was recorded for the API failure
-    expect(ctx.contextLogger.debug).toHaveBeenCalledWith(
-      expect.objectContaining({
-        err: expect.any(Error),
-      }),
-      "Failed to update session title from compaction summary",
+    // Wait for background title generation to complete
+    await vi.waitFor(() => {
+      expect(DistillLLMClient).toHaveBeenCalled()
+    })
+
+    // Verify LLM was called with compaction summary in prompt
+    expect(mockComplete).toHaveBeenCalledWith(
+      expect.stringContaining(compactionText),
     )
+
+    // Verify session title was updated
+    await vi.waitFor(() => {
+      expect(updateSessionTitle).toHaveBeenCalledWith({
+        path: { id: testSessionID },
+        body: { title: "Generated Session Title" },
+      })
+    })
   })
 
-  it("handles missing session.update API gracefully", async () => {
-    const compactionText = "## Goal\nNo update API"
-    const { ctx, sessionStore, promptAsync } = createMockContext()
+  it("gracefully handles DistillLLMClient constructor failure", async () => {
+    const compactionText = "## Goal\nFallback test"
+    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
 
-    // Remove update method
-    delete (ctx.client.session as Record<string, unknown>).update
+    // Simulate LLM constructor throwing
+    vi.mocked(DistillLLMClient).mockImplementationOnce(() => {
+      throw new Error("LLM unavailable")
+    })
 
     sessionStore.setCompactionSummary(testSessionID, compactionText)
     sessionStore.upsert(testSessionID, (s) => {
@@ -297,20 +224,47 @@ describe("handleSessionCompacted — API failure degradation", () => {
 
     await handleSessionCompacted(ctx, testSessionID)
 
-    // SessionContext.summary is still saved
-    const savedCtx = loadSessionContext(testSessionID)
-    expect(savedCtx?.summary?.text).toBe("No update API")
-
-    // Recovery message was still sent
+    // Recovery message still sent
     expect(promptAsync).toHaveBeenCalled()
+
+    // Session title NOT updated (LLM failed)
+    // No assertion needed — verify no crash
+  })
+
+  it("recovery message NOT blocked by slow title generation", async () => {
+    const compactionText = "## Goal\nSlow LLM test"
+    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
+
+    // Make LLM slow (but still resolve)
+    let resolveComplete: (value: string) => void
+    mockComplete.mockReturnValueOnce(new Promise((r) => { resolveComplete = r }))
+
+    sessionStore.setCompactionSummary(testSessionID, compactionText)
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    // Recovery message was sent BEFORE title generation completed
+    expect(promptAsync).toHaveBeenCalled()
+    // Session title update NOT called yet (LLM still pending)
+    expect(updateSessionTitle).not.toHaveBeenCalled()
+
+    // Now resolve the LLM call
+    resolveComplete!("Slow Title")
+    await vi.waitFor(() => {
+      expect(updateSessionTitle).toHaveBeenCalled()
+    })
   })
 })
 
 // ---------------------------------------------------------------------------
-// Negative timing: compacted arrives before ended
+// Negative timing tests
 // ---------------------------------------------------------------------------
 
-describe("handleSessionCompacted — negative timing (ended arrives after compacted)", () => {
+describe("handleSessionCompacted — negative timing", () => {
   const testSessionID = "test-negative-timing-session-id"
 
   beforeEach(() => {
@@ -321,9 +275,9 @@ describe("handleSessionCompacted — negative timing (ended arrives after compac
     clearSessionContext(testSessionID)
   })
 
-  it("skips summary/title when no cache, then late write leaves cache for next consumption", async () => {
+  it("handles compacted before ended: skips title, recovery sent without summary", async () => {
     const compactionText = "## Goal\nLate arriving summary"
-    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
+    const { ctx, sessionStore, promptAsync } = createMockContext()
 
     // Step 1: handleSessionCompacted WITHOUT prior setCompactionSummary
     sessionStore.upsert(testSessionID, (s) => {
@@ -333,22 +287,15 @@ describe("handleSessionCompacted — negative timing (ended arrives after compac
 
     await handleSessionCompacted(ctx, testSessionID)
 
-    // Assert: no summary written to SessionContext
-    const savedCtx = loadSessionContext(testSessionID)
-    expect(savedCtx).toBeNull()
-
-    // Assert: title update API not called (no title extracted)
-    expect(updateSessionTitle).not.toHaveBeenCalled()
-
-    // Assert: recovery message sent but without compaction summary section
+    // Recovery message sent without compaction summary
     expect(promptAsync).toHaveBeenCalled()
     const callArgs = promptAsync.mock.calls[0][0]
     expect(callArgs.body.parts[0].text).not.toContain("## Compaction Summary")
 
-    // Step 2: Late-arriving ended event writes compaction summary to cache
+    // Step 2: Late-arriving ended event writes to cache
     sessionStore.setCompactionSummary(testSessionID, compactionText)
 
-    // Assert: cache still exists, pending next consumption
+    // Cache exists, pending next consumption
     const state = sessionStore.get(testSessionID)
     expect(state?.compactionSummaryText).toBe(compactionText)
   })

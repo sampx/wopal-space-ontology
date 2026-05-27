@@ -739,11 +739,11 @@ describe("OpenCodeRulesRuntime event handling", () => {
       const stateAfterCompacted = sessionStore.get("chain-session")
       expect(stateAfterCompacted?.compactionSummaryText).toBeUndefined()
 
-      // Assert: recovery message sent with compaction summary injected
+      // Assert: recovery message sent (without compaction summary injection)
       expect(mockPromptAsync).toHaveBeenCalled()
       const callArgs = mockPromptAsync.mock.calls[0][0]
-      expect(callArgs.body.parts[0].text).toContain("## Compaction Summary")
-      expect(callArgs.body.parts[0].text).toContain("Test chain routing")
+      expect(callArgs.body.parts[0].text).not.toContain("## Compaction Summary")
+      expect(callArgs.body.parts[0].text).toContain("CRITICAL_RULE")
     })
   })
 
