@@ -78,7 +78,7 @@ function loadPromptFile(envVar: string, filename: string): string | null {
 /** Title generation prompt for session title after compaction */
 export function loadTitlePrompt(): string {
   return loadPromptFile("WOPAL_TITLE_PROMPT_FILE", "title.md")
-    ?? "You are a title generator. You output ONLY a thread title. Nothing else.\n\nGenerate a brief title (≤50 characters) from the conversation summary below. Use the same language as the summary.\n\n---\nConversation summary:\n{{summary}}";
+    ?? "You are a title generator. Output ONLY valid JSON: {\"title\":\"Brief natural thread title\"}. The title must be a single line, ≤50 characters, and use the same language as the summary. Never output labels like Thread Title or Title as the title value.\n\n---\nConversation summary:\n{{summary}}";
 }
 
 /** Extracted memory from LLM (single-layer body) */

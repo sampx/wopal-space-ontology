@@ -61,7 +61,7 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
   try {
     const { MemoryStore } = await import("./memory/store");
     const { EmbeddingClient } = await import("./memory/embedder");
-    const { LLMClient } = await import("./llm-client");
+    const { getLLMClient } = await import("./llm-client");
     const { DistillEngine } = await import("./memory/distill");
     const { MemoryRetriever } = await import("./memory/retriever");
     const { MemoryInjector } = await import("./memory/injector");
@@ -70,7 +70,7 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
     await store.init();
 
     const embedder = new EmbeddingClient();
-    const llm = new LLMClient();
+    const llm = getLLMClient();
     const distillEngine = new DistillEngine(store, embedder, llm);
     const retriever = new MemoryRetriever(store, embedder);
     const injector = new MemoryInjector(retriever);

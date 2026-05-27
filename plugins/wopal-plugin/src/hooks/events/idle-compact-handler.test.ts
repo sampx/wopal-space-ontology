@@ -19,15 +19,17 @@ import { homedir } from "os"
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockComplete = vi.fn().mockResolvedValue("Generated Session Title")
-
-  vi.mock("../../llm-client.js", () => ({
-  LLMClient: vi.fn().mockImplementation(() => ({
-    complete: mockComplete,
-  })),
+const { mockCompleteJson } = vi.hoisted(() => ({
+  mockCompleteJson: vi.fn().mockResolvedValue({ title: "Generated Session Title" }),
 }))
 
-  import { LLMClient } from "../../llm-client.js"
+vi.mock("../../llm-client.js", () => ({
+  getLLMClient: vi.fn().mockReturnValue({
+    completeJson: mockCompleteJson,
+  }),
+}))
+
+import { getLLMClient } from "../../llm-client.js"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,7 +168,7 @@ describe("handleSessionCompacted — background title generation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockComplete.mockResolvedValue("Generated Session Title")
+    mockCompleteJson.mockResolvedValue({ title: "Generated Session Title" })
   })
 
   afterEach(() => {
@@ -190,11 +192,11 @@ describe("handleSessionCompacted — background title generation", () => {
 
     // Wait for background title generation to complete
     await vi.waitFor(() => {
-      expect(LLMClient).toHaveBeenCalled()
+      expect(getLLMClient).toHaveBeenCalled()
     })
 
     // Verify LLM was called with compaction summary in prompt
-    expect(mockComplete).toHaveBeenCalledWith(
+    expect(mockCompleteJson).toHaveBeenCalledWith(
       expect.stringContaining(compactionText),
     )
 
@@ -207,14 +209,11 @@ describe("handleSessionCompacted — background title generation", () => {
     })
   })
 
-  it("gracefully handles LLMClient constructor failure", async () => {
+  it("warns and degrades when title generation fails", async () => {
     const compactionText = "## Goal\nFallback test"
     const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
 
-    // Simulate LLM constructor throwing
-    vi.mocked(LLMClient).mockImplementationOnce(() => {
-      throw new Error("LLM unavailable")
-    })
+    mockCompleteJson.mockRejectedValueOnce(new Error("network unavailable"))
 
     sessionStore.setCompactionSummary(testSessionID, compactionText)
     sessionStore.upsert(testSessionID, (s) => {
@@ -228,7 +227,13 @@ describe("handleSessionCompacted — background title generation", () => {
     expect(promptAsync).toHaveBeenCalled()
 
     // Session title NOT updated (LLM failed)
-    // No assertion needed — verify no crash
+    expect(updateSessionTitle).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(ctx.contextLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: expect.any(String), err: expect.any(Error) }),
+        "Session title generation failed",
+      )
+    })
   })
 
   it("recovery message NOT blocked by slow title generation", async () => {
@@ -236,8 +241,8 @@ describe("handleSessionCompacted — background title generation", () => {
     const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
 
     // Make LLM slow (but still resolve)
-    let resolveComplete: (value: string) => void
-    mockComplete.mockReturnValueOnce(new Promise((r) => { resolveComplete = r }))
+    let resolveComplete: (value: { title: string }) => void
+    mockCompleteJson.mockReturnValueOnce(new Promise((r) => { resolveComplete = r }))
 
     sessionStore.setCompactionSummary(testSessionID, compactionText)
     sessionStore.upsert(testSessionID, (s) => {
@@ -253,10 +258,55 @@ describe("handleSessionCompacted — background title generation", () => {
     expect(updateSessionTitle).not.toHaveBeenCalled()
 
     // Now resolve the LLM call
-    resolveComplete!("Slow Title")
+    resolveComplete!({ title: "Slow Title" })
     await vi.waitFor(() => {
       expect(updateSessionTitle).toHaveBeenCalled()
     })
+  })
+
+  it("skips placeholder title results without updating session state", async () => {
+    const compactionText = "## Goal\nTitle placeholder test"
+    const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
+    mockCompleteJson.mockResolvedValueOnce({ title: "**Thread Title:**" })
+
+    sessionStore.setCompactionSummary(testSessionID, compactionText)
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    expect(promptAsync).toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(ctx.contextLogger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "placeholder_title" }),
+        "Session title generation skipped",
+      )
+    })
+    expect(updateSessionTitle).not.toHaveBeenCalled()
+  })
+
+  it("skips log line title results without updating session state", async () => {
+    const compactionText = "## Goal\nLog line title test"
+    const { ctx, sessionStore, updateSessionTitle } = createMockContext()
+    mockCompleteJson.mockResolvedValueOnce({ title: "2026-05-27 13:45:06 [INFO] [core] LLM client ready" })
+
+    sessionStore.setCompactionSummary(testSessionID, compactionText)
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    await vi.waitFor(() => {
+      expect(ctx.contextLogger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "log_line" }),
+        "Session title generation skipped",
+      )
+    })
+    expect(updateSessionTitle).not.toHaveBeenCalled()
   })
 })
 

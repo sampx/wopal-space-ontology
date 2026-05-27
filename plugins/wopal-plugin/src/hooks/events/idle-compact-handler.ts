@@ -14,7 +14,7 @@ import {
   saveSessionContext,
   type SessionContext,
 } from "../../memory/session-context.js"
-import { LLMClient } from "../../llm-client.js"
+import { getLLMClient } from "../../llm-client.js"
 import { loadTitlePrompt } from "../../memory/prompts.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
@@ -27,6 +27,26 @@ export interface IdleCompactHandlerContext {
   taskManager: SimpleTaskManager | undefined
   contextLogger: LoggerInstance
   taskLogger: LoggerInstance
+}
+
+interface TitleGenerationResult {
+  title?: unknown
+}
+
+function validateGeneratedTitle(result: TitleGenerationResult): { title: string } | { reason: string } {
+  if (typeof result.title !== "string") return { reason: "missing_title" }
+
+  const title = result.title.trim()
+  if (!title) return { reason: "empty_title" }
+  if (title.length > 80) return { reason: "too_long" }
+  if (/\r|\n/.test(title)) return { reason: "multi_line" }
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+\[/.test(title)) return { reason: "log_line" }
+
+  const semantic = title.replace(/[*_`#>"']/g, "").trim().toLowerCase()
+  if (/^(thread\s+title|session\s+title|title)\s*:?$/.test(semantic)) return { reason: "placeholder_title" }
+  if (!/[\p{L}\p{N}]/u.test(semantic)) return { reason: "no_content" }
+
+  return { title }
 }
 
 /**
@@ -186,17 +206,16 @@ async function generateTitleInBackground(
   logger: LoggerInstance,
 ): Promise<void> {
   try {
-    const llm = new LLMClient()
+    const llm = getLLMClient()
     const prompt = loadTitlePrompt().replace("{{summary}}", compactionText)
-    const raw = await llm.complete(prompt)
-    const title = raw
-      .replace(/<\/think>[\s\S]*?<\/think>\s*/g, "")
-      .split("\n")
-      .map((l) => l.trim())
-      .find((l) => l.length > 0)
-      ?.slice(0, 50)
+    const result = await llm.completeJson<TitleGenerationResult>(prompt)
+    const validation = validateGeneratedTitle(result)
+    if ("reason" in validation) {
+      logger.debug({ session_id: formatSessionID(sessionID, false), reason: validation.reason }, "Session title generation skipped")
+      return
+    }
 
-    if (!title) return
+    const { title } = validation
 
     const existingCtx = loadSessionContext(sessionID)
     const newCtx: SessionContext = {
@@ -220,9 +239,9 @@ async function generateTitleInBackground(
     }
 
     saveSessionContext(newCtx)
-    logger.info(`Title generated: "${title}"`)
-  } catch {
-    // Best-effort: silently skip on any failure
+    logger.info({ session_id: formatSessionID(sessionID, false), title }, "Session title updated from compaction summary")
+  } catch (err) {
+    logger.warn({ session_id: formatSessionID(sessionID, false), err: err instanceof Error ? err : new Error(String(err)) }, "Session title generation failed")
   }
 }
 
