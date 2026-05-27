@@ -9,9 +9,17 @@ import type { OpenCodeClient, WopalTask } from "../../types.js"
 import type { SessionStore } from "../../session-store.js"
 import type { LoggerInstance } from "../../logger.js"
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
+import {
+  loadSessionContext,
+  saveSessionContext,
+  type SessionContext,
+} from "../../memory/session-context.js"
+import { getLLMClient } from "../../llm-client.js"
+import { loadTitlePrompt } from "../../memory/prompts.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
+import { getSessionModelOverride } from "../../session-model.js"
 
 export interface IdleCompactHandlerContext {
   client: OpenCodeClient
@@ -19,6 +27,26 @@ export interface IdleCompactHandlerContext {
   taskManager: SimpleTaskManager | undefined
   contextLogger: LoggerInstance
   taskLogger: LoggerInstance
+}
+
+interface TitleGenerationResult {
+  title?: unknown
+}
+
+function validateGeneratedTitle(result: TitleGenerationResult): { title: string } | { reason: string } {
+  if (typeof result.title !== "string") return { reason: "missing_title" }
+
+  const title = result.title.trim()
+  if (!title) return { reason: "empty_title" }
+  if (title.length > 80) return { reason: "too_long" }
+  if (/\r|\n/.test(title)) return { reason: "multi_line" }
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+\[/.test(title)) return { reason: "log_line" }
+
+  const semantic = title.replace(/[*_`#>"']/g, "").trim().toLowerCase()
+  if (/^(thread\s+title|session\s+title|title)\s*:?$/.test(semantic)) return { reason: "placeholder_title" }
+  if (!/[\p{L}\p{N}]/u.test(semantic)) return { reason: "no_content" }
+
+  return { title }
 }
 
 /**
@@ -110,10 +138,19 @@ export async function handleSessionCompacted(
 ): Promise<void> {
   if (!sessionID) return
 
+  // Consume compaction summary BEFORE markCompacted (summary is cached by event-router)
+  const compactionText = ctx.sessionStore.consumeCompactionSummary(sessionID)
+
   ctx.sessionStore.markCompacted(sessionID)
   const compactedState = ctx.sessionStore.get(sessionID)
   const isTask = !!ctx.taskManager?.isTaskSession(sessionID)
   ctx.contextLogger.info({ session_id: formatSessionID(sessionID, isTask) }, "Compact completed")
+
+  // Fire background title generation from compaction summary (non-blocking)
+  if (compactionText) {
+    generateTitleInBackground(ctx.client, sessionID, compactionText, ctx.contextLogger)
+      .catch(() => {})
+  }
 
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
   const state = compactedState
@@ -159,6 +196,56 @@ export async function handleSessionCompacted(
 }
 
 /**
+ * Generate and update session title from compaction summary in background.
+ * Fire-and-forget: does not block recovery message delivery.
+ */
+async function generateTitleInBackground(
+  client: OpenCodeClient,
+  sessionID: string,
+  compactionText: string,
+  logger: LoggerInstance,
+): Promise<void> {
+  try {
+    const llm = getLLMClient()
+    const prompt = loadTitlePrompt().replace("{{summary}}", compactionText)
+    const result = await llm.completeJson<TitleGenerationResult>(prompt)
+    const validation = validateGeneratedTitle(result)
+    if ("reason" in validation) {
+      logger.debug({ session_id: formatSessionID(sessionID, false), reason: validation.reason }, "Session title generation skipped")
+      return
+    }
+
+    const { title } = validation
+
+    const existingCtx = loadSessionContext(sessionID)
+    const newCtx: SessionContext = {
+      sessionID,
+      title: existingCtx?.title ?? null,
+      ...existingCtx,
+      summary: {
+        text: title,
+        messageCount: 0,
+        generatedAt: new Date().toISOString(),
+      },
+    }
+
+    // Update session title via API
+    if (typeof client?.session?.update === "function") {
+      await client.session.update({
+        path: { id: sessionID },
+        body: { title },
+      })
+      newCtx.title = title
+    }
+
+    saveSessionContext(newCtx)
+    logger.info({ session_id: formatSessionID(sessionID, false), title }, "Session title updated from compaction summary")
+  } catch (err) {
+    logger.warn({ session_id: formatSessionID(sessionID, false), err: err instanceof Error ? err : new Error(String(err)) }, "Session title generation failed")
+  }
+}
+
+/**
  * Send auto-continue recovery message to main session after compact.
  * Main session IDLE after compact, no one can notify it, so Plugin must send recovery instruction.
  */
@@ -172,6 +259,7 @@ async function sendAutoContinueForMain(
 
   const recoveryText = `<system-reminder>
 The session context has been compacted. Execute recovery protocol immediately and continue working:
+
 <CRITICAL_RULE>
 - Read key files from the compaction summary (plans, specs, etc. — max 3)
 - Search and load task-relevant memories (max 3)${skillLine}
@@ -188,9 +276,11 @@ The session context has been compacted. Execute recovery protocol immediately an
   }
 
   try {
+    const modelOverride = getSessionModelOverride(ctx.sessionStore.get(sessionID))
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: false,
         parts: [{ type: "text", text: recoveryText }],
       },
@@ -221,6 +311,7 @@ async function sendCompactedNotification(
 Task ID: ${task.id}
 Description: ${task.description}
 Skills: ${skills}
+
 The child session has been compacted and is now IDLE.
 Use wopal_task_reply to send recovery instructions if the task should continue.
 </system-reminder>`
@@ -231,9 +322,11 @@ Use wopal_task_reply to send recovery instructions if the task should continue.
   }
 
   try {
+    const modelOverride = getSessionModelOverride(ctx.sessionStore.get(task.parentSessionID))
     await ctx.client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: false,
         parts: [{ type: "text", text: notification }],
       },

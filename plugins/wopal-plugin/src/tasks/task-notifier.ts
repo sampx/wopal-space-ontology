@@ -1,6 +1,8 @@
 import type { WopalTask, OpenCodeClient, SessionMessage } from "../types.js"
 import type { LoggerInstance } from "../logger.js"
+import type { SessionStore } from "../session-store.js"
 import { formatSessionID } from "../logger.js"
+import { getSessionModelOverride } from "../session-model.js"
 import type { ProgressNotifyTrigger } from "./task-monitor.js"
 import { toErrorMessage } from "./utils.js"
 import { CONTEXT_WARN_THRESHOLD } from "./task-monitor.js"
@@ -18,6 +20,7 @@ import {
 export interface TaskNotifierDeps {
   client: OpenCodeClient
   debugLog: LoggerInstance
+  sessionStore?: SessionStore
 }
 
 const TRIGGER_LABELS: Record<ProgressNotifyTrigger, string> = {
@@ -113,9 +116,11 @@ export async function sendNotification(
   }
 
   try {
+    const modelOverride = getSessionModelOverride(deps.sessionStore?.get(parentSessionID))
     await client.session.promptAsync({
       path: { id: parentSessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: noReply ?? false,
         parts: [{ type: "text", text }],
       },

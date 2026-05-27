@@ -219,7 +219,7 @@ export class SimpleTaskManager {
   async notifyParent(taskId: string): Promise<void> {
     const task = this.tasks.get(taskId)
     if (!task) return
-    await notifyParent({ client: this.client, debugLog: this.debugLog }, task)
+    await notifyParent({ client: this.client, debugLog: this.debugLog, sessionStore: this.sessionStore }, task)
   }
 
   /**
@@ -367,7 +367,7 @@ export class SimpleTaskManager {
       directory: this.directory,
       taskManager: this,
       sendProgressNotificationFn: async (task: WopalTask, msgCount: number, ctx: number | null, trigger?: string) =>
-        await sendProgressNotification({ client: this.client, debugLog: this.debugLog }, task, msgCount, ctx, trigger as ProgressNotifyTrigger | undefined),
+        await sendProgressNotification({ client: this.client, debugLog: this.debugLog, sessionStore: this.sessionStore }, task, msgCount, ctx, trigger as ProgressNotifyTrigger | undefined),
     }
   }
 }

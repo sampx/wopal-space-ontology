@@ -54,6 +54,8 @@ export interface SessionState {
   lastContextWarningAt?: number;
   /** Number of context warnings sent in current session (reset on compact) */
   contextWarningsSent?: number;
+  /** Cached compaction agent summary text, consumed atomly by handleSessionCompacted */
+  compactionSummaryText?: string;
 }
 
 export interface SessionStoreOptions {
@@ -183,6 +185,22 @@ export class SessionStore {
       delete s.needsRecoveryInjection;
     });
     return true;
+  }
+
+  setCompactionSummary(sessionID: string, text: string): void {
+    this.upsert(sessionID, (s) => {
+      s.compactionSummaryText = text;
+    });
+  }
+
+  consumeCompactionSummary(sessionID: string): string | null {
+    const state = this.stateMap.get(sessionID);
+    if (!state?.compactionSummaryText) return null;
+    const text = state.compactionSummaryText;
+    this.upsert(sessionID, (s) => {
+      delete s.compactionSummaryText;
+    });
+    return text;
   }
 
   // Context warning state machine helpers

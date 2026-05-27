@@ -1,24 +1,24 @@
 /**
- * Distill LLM Client for Memory System
+ * LLM Client
  *
- * Uses OpenAI-compatible API for memory extraction and deduplication.
- * Required environment variables: LLM_BASE_URL, LLM_API_KEY
+ * Uses OpenAI-compatible API for memory distillation, deduplication, and session title generation.
+ * Required environment variables: WOPAL_LLM_BASE_URL, WOPAL_LLM_API_KEY
  */
 
 import OpenAI from "openai";
-import { memoryLogger } from "../logger.js";
+import { coreLogger } from "./logger.js";
 
 const LLM_TIMEOUT_MS = 120000;
 
 /**
- * Distill LLM client using OpenAI-compatible API
+ * LLM client using OpenAI-compatible API
  *
  * Required environment variables:
  * - WOPAL_LLM_BASE_URL: LLM API endpoint
  * - WOPAL_LLM_API_KEY: API key for LLM service
  * - WOPAL_LLM_MODEL: Model name (optional, defaults to gpt-4o-mini)
  */
-export class DistillLLMClient {
+export class LLMClient {
   private client: OpenAI;
   private model: string;
 
@@ -28,7 +28,7 @@ export class DistillLLMClient {
 
     if (!baseURL || !apiKey) {
       throw new Error(
-        "DistillLLMClient requires WOPAL_LLM_BASE_URL and WOPAL_LLM_API_KEY environment variables"
+        "LLMClient requires WOPAL_LLM_BASE_URL and WOPAL_LLM_API_KEY environment variables"
       );
     }
 
@@ -39,7 +39,7 @@ export class DistillLLMClient {
       apiKey,
     });
 
-    memoryLogger.info(`DistillLLMClient ready: ${this.model}`);
+    coreLogger.info({ model: this.model, base_url: baseURL }, "LLM client ready");
   }
 
   /**
@@ -64,9 +64,9 @@ export class DistillLLMClient {
 
       return content;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      memoryLogger.warn(`[LLM.complete] Failed: ${message}`);
-      throw new Error(`LLM complete failed: ${message}`);
+      const err = error instanceof Error ? error : new Error(String(error));
+      coreLogger.warn({ err }, "LLM completion failed");
+      throw new Error(`LLM complete failed: ${err.message}`);
     }
   }
 
@@ -86,8 +86,7 @@ export class DistillLLMClient {
     const jsonStr = this.extractJson(rawResponse);
 
     if (!jsonStr) {
-      memoryLogger.warn(`[LLM.completeJson] No JSON found in response`);
-      memoryLogger.warn(`[LLM.completeJson] Response:\n  ${rawResponse.replace(/\n/g, "\n  ")}`);
+      coreLogger.warn("LLM JSON response missing JSON payload");
       throw new Error("No JSON found in LLM response");
     }
 
@@ -105,8 +104,7 @@ export class DistillLLMClient {
       return JSON.parse(repaired) as T;
     } catch (parseError) {
       const message = parseError instanceof Error ? parseError.message : String(parseError);
-      memoryLogger.warn(`[LLM.completeJson] Parse failed: ${message}`);
-      memoryLogger.warn(`[LLM.completeJson] Failed JSON:\n  ${repaired.replace(/\n/g, "\n  ")}`);
+      coreLogger.warn({ err: parseError instanceof Error ? parseError : new Error(String(parseError)) }, "LLM JSON parse failed");
       throw new Error(`Failed to parse JSON after repair: ${message}`);
     }
   }
@@ -140,6 +138,14 @@ export class DistillLLMClient {
     const decisionStart = text.indexOf('{"decision"');
     if (decisionStart !== -1) {
       const jsonStr = this.extractBalancedJson(text, decisionStart);
+      if (jsonStr) return jsonStr;
+    }
+
+    // Strategy 4: Generic JSON object/array for small structured tasks
+    const genericStart = text.search(/[\[{]/);
+    if (genericStart !== -1) {
+      if (text[genericStart] === "{") return this.extractBalancedJson(text, genericStart);
+      const jsonStr = this.extractBalancedArray(text, genericStart);
       if (jsonStr) return jsonStr;
     }
 
@@ -179,6 +185,41 @@ export class DistillLLMClient {
           if (depth === 0) {
             return text.substring(start, i + 1);
           }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private extractBalancedArray(text: string, start: number): string | null {
+    let depth = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = start; i < text.length; i++) {
+      const char = text[i];
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === "[") depth++;
+        else if (char === "]") {
+          depth--;
+          if (depth === 0) return text.substring(start, i + 1);
         }
       }
     }
@@ -267,4 +308,11 @@ export class DistillLLMClient {
   getModel(): string {
     return this.model;
   }
+}
+
+let singleton: LLMClient | null = null;
+
+export function getLLMClient(): LLMClient {
+  singleton ??= new LLMClient();
+  return singleton;
 }

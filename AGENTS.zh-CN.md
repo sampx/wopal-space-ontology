@@ -6,7 +6,7 @@ WopalSpace 的空间灵魂、规约与能力基因工具包；`agents/`、`rules
 
 本项目以声明式本体文件为主，只有插件与部分 skill / scripts 属于代码面；根规范采用项目特化结构，不强制套用通用 AGENTS 模板。
 
-Canonical references:
+规范文档引用：
 
 - PRD: `docs/projects/wopal-space-ontology/PRD.md`
 - DESIGN: `docs/projects/wopal-space-ontology/DESIGN.md`
@@ -34,21 +34,23 @@ Canonical references:
 
 ## 3. 开发规范
 
-### **多语言规范**
+### 多语言规范
 
-适用范围：`agents/`、`rules/`、`commands/`、`templates/`、`prompts/` 的语义内容。
+适用范围：`agents/`、`rules/`、`commands/`、`templates/`、`prompts/`、`skills/` 的语义内容。
 
 - 英文正式版是运行时加载源，路径为 `.wopal/` 对应目录。
-- 先生成用户偏好语言审核版，再同步正式英文版。
-- 审核版路径：`docs/projects/wopal-space-ontology/LANG/<locale>/<type>/`。
-- `<type>` 与运行时目录对齐：`agents/`、`rules/`、`commands/`、`templates/`、`prompts/`。
-- `<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死。
+- 若用户偏好语言不是英文，必须先生成或更新用户偏好语言审核版，审核通过后再同步正式英文版。
+- `<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死某个具体 locale。
 - 审核版标题和正文使用目标语言，禁止中英文标题混杂。
-- 审核版确认后再更新 `.wopal/` 下对应英文运行源；两个版本的语义必须对齐。
+- 审核版确认后再更新 `.wopal/` 下对应英文运行源；两个版本的语义必须保持一致。
+- 对于 `agents/`、`rules/`、`commands/`、`templates/`、`prompts/`，审核版放在 `docs/projects/wopal-space-ontology/LANG/<locale>/<type>/` 下。
+- 对于 `skills/`，用户偏好语言审核版放在 skill 同目录，命名为 `SKILL.<locale>.md`（例如 `SKILL.zh-CN.md`）；审核通过后再同步到 `SKILL.md`。
+- 若用户偏好语言为英文，则直接更新正式英文文件，不生成 `SKILL.en-US.md` 之类的英文 locale 变体。
 
-### 3.1 skill
+### 3.1 技能
 
 - 新建或修改 skill：先加载 `skill-creator` 技能。
+- 若用户偏好语言不是英文，必须先在同一 skill 目录生成或更新 `SKILL.<locale>.md`，审核通过后再翻译并同步到 `SKILL.md`。
 - frontmatter 必须有 `name`、`description`。
 - `description` 负责触发：写清做什么、何时触发；触发条件放 frontmatter，不放正文。
 - 正文只写流程、输出、注意事项；长内容下沉 `references/`。

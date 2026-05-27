@@ -12,7 +12,7 @@ import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
-import { coreLogger, memoryLogger, rulesLogger, contextLogger } from "./logger.js";
+import { coreLogger, memoryLogger, rulesLogger, contextLogger, getLogFile, getMinLevelName } from "./logger.js";
 import { SimpleTaskManager } from "./tasks/simple-task-manager.js";
 import { MonitorEngine } from "./monitor/monitor-engine.js";
 import { createMainSessionMonitorStrategy } from "./monitor/main-session-monitor.js";
@@ -20,6 +20,7 @@ import { registerManagerForCleanup } from "./lifecycle/process-cleanup.js";
 import { createWopalTools } from "./tools/index.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { setPluginDirectory } from "./memory/prompts.js";
 
 
 
@@ -51,7 +52,7 @@ let _memorySystem: {
   distillEngine: import("./memory/distill").DistillEngine;
   store: import("./memory/store").MemoryStore;
   embedder: import("./memory/embedder").EmbeddingClient;
-  llm: import("./memory/llm-client").DistillLLMClient;
+  llm: import("./llm-client").LLMClient;
 } | null = null;
 
 async function ensureMemorySystem(): Promise<typeof _memorySystem> {
@@ -60,7 +61,7 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
   try {
     const { MemoryStore } = await import("./memory/store");
     const { EmbeddingClient } = await import("./memory/embedder");
-    const { DistillLLMClient } = await import("./memory/llm-client");
+    const { getLLMClient } = await import("./llm-client");
     const { DistillEngine } = await import("./memory/distill");
     const { MemoryRetriever } = await import("./memory/retriever");
     const { MemoryInjector } = await import("./memory/injector");
@@ -69,13 +70,13 @@ async function ensureMemorySystem(): Promise<typeof _memorySystem> {
     await store.init();
 
     const embedder = new EmbeddingClient();
-    const llm = new DistillLLMClient();
+    const llm = getLLMClient();
     const distillEngine = new DistillEngine(store, embedder, llm);
     const retriever = new MemoryRetriever(store, embedder);
     const injector = new MemoryInjector(retriever);
 
     _memorySystem = { injector, distillEngine, store, embedder, llm };
-    memoryLogger.info("Memory system initialized (LanceDB + Embedding + LLM)");
+    memoryLogger.info(`Memory system ready (LanceDB, Embedding, LLM)`);
     return _memorySystem;
   } catch (error) {
     coreLogger.warn({ err: error instanceof Error ? error : new Error(String(error)) }, "Memory system initialization failed (non-fatal)");
@@ -88,6 +89,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
 
   coreLogger.debug(`Loading plugin: ${directory}`);
   loadWopalEnv(directory);
+  setPluginDirectory(directory);
 
   // Read switches after loadWopalEnv (ensure .env has taken effect)
   const rulesInjectionEnabled = process.env.WOPAL_RULES_INJECTION_ENABLED !== "false";
@@ -181,7 +183,6 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     const { createContextManageTool } = await import("./tools/context-manage");
 
     tools.context_manage = createContextManageTool(
-      memory.llm,
       pluginInput.client as unknown as OpenCodeClient,
       systemSnapshots,
       systemMetadataMap,
@@ -193,6 +194,7 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
     );
   }
 
+  coreLogger.debug({ log_file: getLogFile(), log_level: getMinLevelName() }, "Logger config");
   coreLogger.info({ tools: Object.keys(tools).join(", "), memory: !!memory }, "Plugin initialized");
 
   return {

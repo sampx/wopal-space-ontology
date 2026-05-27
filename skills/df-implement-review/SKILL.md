@@ -1,7 +1,7 @@
 ---
 name: df-implement-review
 description: |
-  Review implementation results for goal achievement and code quality. ⚠️ MUST use when:
+  Review implementation results for goal achievement and code quality. Supports both Plan-backed review and planless diff review. ⚠️ MUST use when:
   (1) Wopal delegates rook to review fae implementation output, (2) Prompt contains "review_type: implementation",
   (3) Prompt contains changed code file list or Plan path + implementation scope, (4) Any code review request from Wopal.
   🔴 Trigger even when user does not explicitly mention "review" if the task involves verifying implementation results.
@@ -10,27 +10,55 @@ description: |
 
 # df-implement-review — Implementation Review Skill
 
-Review fae's implementation results to verify goal achievement and scan for bugs/security/debt.
+Review implementation results to verify explicit goals when they exist and to scan for technical defects and debt.
 
-## Two-Layer Review Method
+## Review Modes
 
-### Layer 1: Goal Verification
+Determine the mode before reviewing:
 
-**Do NOT trust "completed" claims.** Verify the goal is actually achieved.
+| Mode | Trigger | Primary responsibility |
+|------|---------|------------------------|
+| **Plan-backed review** | Prompt includes Plan path, explicit truths, or must_haves | Verify implementation against explicit truths + scan technical defects |
+| **Planless diff review** | Prompt includes changed files, working tree diff, commit, or commit range but no Plan | Review the supplied changes for technical defects and debt only |
 
-1. Read Plan's `must_haves.truths` (or derive from goal)
-2. For each truth, check if code makes it true
-3. Use four-level verification model (see references/review-rubric.md)
+**Critical rule**: In planless diff review, do **NOT** infer product requirements from your own taste. Business logic belongs to the user and Wopal unless the prompt explicitly requests business-logic review.
 
-### Layer 2: Problem Scanning
+## Core Review Scope
 
-After goal verification, scan for:
+Your core scope in code review is:
 
-| Category | Examples |
-|----------|----------|
-| **bug** | Logic errors, null/undefined checks, type mismatches, unhandled edge cases, dead code |
-| **security** | Injection, XSS, hardcoded secrets, unsafe deserialization, missing validation |
-| **debt** | TODO/FIXME, placeholder text, empty handlers, fake dynamic (hardcoded), weak tests |
+| Category | What to look for |
+|----------|------------------|
+| **bug / regression** | Logic errors, missing edge-case handling, broken branches, type/runtime mismatches, silent regressions |
+| **security** | Injection, XSS, unsafe deserialization, missing validation, accidental secret exposure |
+| **tests** | Missing coverage for changed behavior, skipped/placeholder assertions, weak assertions, redundant tests that fail to protect behavior |
+| **duplication / extraction** | Repeated logic that should reasonably be extracted into shared helpers/modules because it creates maintenance drift or bug risk |
+| **conventions** | Violations of `AGENTS.md`, local project rules, established patterns, or required config/typing/logging conventions |
+| **general debt** | TODO/FIXME stubs, placeholders, dead code, fake dynamic behavior, brittle wiring |
+
+### Out of Scope by Default
+
+Do **not** treat these as defects unless the prompt explicitly asks for them:
+
+- Product preference disagreements
+- Business logic choices that may simply be intentional
+- "I would design this feature differently"
+- Pure style nits with no maintainability or correctness consequence
+- Premature abstraction when duplication is too small to justify extraction
+
+## Serious Logic Risks (Discuss, Don’t Default-Block)
+
+If you discover a **plausible severe logic risk** while reviewing code, report it in a separate section: `Serious Logic Risks (Discuss with User)`.
+
+Use this section only when all are true:
+
+1. You have concrete `file:line` evidence
+2. The scenario is severe enough to matter (e.g. irreversible destructive behavior, major data corruption, severe user harm)
+3. The issue may still be requirement-driven or intentional, so you cannot safely classify it as a technical defect by yourself
+
+**Default rule**: Serious logic risks do **not** affect PASS / REVISE / BLOCK unless:
+- the prompt explicitly requests business-logic validation, or
+- an explicit Plan truth is contradicted.
 
 ---
 
@@ -57,8 +85,17 @@ After goal verification, scan for:
 ## Info
 {Info 项，可省略 file:line}
 
+## Serious Logic Risks (Discuss with User)
+{Only for severe logic risks that need Wopal + user discussion. Do not use this section for ordinary preferences.}
+
+## Requirement Questions
+{Only for requirement ambiguity or product choices that cannot be judged from code alone.}
+
 ## Positive Findings
 - {已验证通过的亮点项}
+
+## UNCOVERED STEPS / NEEDS_HUMAN
+{Only when context/time constraints prevented full coverage}
 ```
 
 ---
@@ -68,7 +105,7 @@ After goal verification, scan for:
 **Blocker requirements**:
 1. Location: `file:line`
 2. Code snippet: ≥ 1 line
-3. Problem: Why it blocks goal (not "bad code", but "goal X cannot be achieved")
+3. Problem: Explain the concrete technical failure, regression, security issue, or severe debt
 4. Fix: Concrete action (not "optimize", but "change to Y command")
 
 **Warning requirements**:
@@ -78,34 +115,45 @@ After goal verification, scan for:
 
 **Info can omit**: Location and code, but must be specific suggestion
 
+**Serious Logic Risk requirements**:
+1. Location: `file:line`
+2. Code snippet: present
+3. Severe scenario: specific harm if the logic is indeed wrong
+4. Why discussion is needed: explain why this may still be requirement-defined rather than an objective bug
+
 ---
 
 ## Workflow
 
-1. **Read context** — Load all files from prompt's `files_to_read`
-2. **Extract goal** — Parse Plan's goal and must_haves.truths
-3. **Verify goal achievement** — Apply four-level model to each truth
-4. **Scan for problems** — bug / security / debt classification
-5. **Run test quality audit** — Check for skipped tests, weak assertions, circular proofs
-6. **Determine verdict** — PASS / REVISE / BLOCK based on findings
-7. **Output structured report** — With evidence anchors
+1. **Determine review mode** — Plan-backed or planless diff review
+2. **Build exact scope** — Use `files_to_read`, working tree diff, commit, or commit range from prompt
+3. **Read context** — Load changed files plus relevant `AGENTS.md` / local config when needed
+4. **If Plan-backed** — Extract explicit truths and verify them with the four-level model
+5. **Scan all supplied changes** — bug / regression / security / duplication / conventions / debt
+6. **Run test quality audit** — Check coverage, weak assertions, skipped tests, circular proofs, redundant tests
+7. **Consolidate findings** — Continue scanning after the first Blocker; do not stop early
+8. **Determine verdict** — Based on technical findings only
+9. **Output structured report** — With evidence anchors and separate discussion-only sections when needed
 
 ## Completeness Gate
 
 **CRITICAL: All workflow steps MUST be completed before outputting any report.**
 
 1. **At review start**, create TodoWrite items for each step:
-   - `[ ] 1. Read context — all files loaded`
-   - `[ ] 2. Extract goal — must_haves.truths parsed`
-   - `[ ] 3. Goal verification — every truth checked`
-   - `[ ] 4. Problem scanning — bug/security/debt`
-   - `[ ] 5. Test quality audit` (when tests exist)
+   - `[ ] 1. Determine mode + exact scope`
+   - `[ ] 2. Read all changed files / diffs`
+   - `[ ] 3. Plan truth verification` (only when Plan-backed)
+   - `[ ] 4. Technical scan — bug/security/duplication/conventions/debt`
+   - `[ ] 5. Test quality audit`
+   - `[ ] 6. Consolidated report — all findings gathered`
 
 2. **During review**, mark only ONE `in_progress` at a time. Mark `completed` immediately after step-specific work is done.
 
 3. **FORBIDDEN** to output final report (PASS / REVISE / BLOCK) while any step is still pending or in_progress. Wopal uses your todo completion rate to track review progress.
 
-4. **Context low fallback**: If context is running out → output a partial report with an explicit `UNCOVERED STEPS` section.
+4. **FORBIDDEN** to stop after the first serious issue. A Blocker means severity, not permission to skip the remaining files.
+
+5. **Context low fallback**: If context is running out → output a partial report with an explicit `UNCOVERED STEPS` section.
 
 ---
 
@@ -120,8 +168,29 @@ Tests often hide the biggest debt. Check:
 | Placeholder assertions | `expect(true).toBe(true)` — always passes | `grep` tool: `pattern: 'expect\(true\)|expect\(false\)|expect\(1\)|expect\("test"\)'` |
 | Weak assertions | Only check existence, not behavior | `grep` tool: `pattern: 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull'` |
 | Missing assertions | No assertions in test file | `grep` tool: `pattern: 'expect|assert'` — zero hits = empty test shell |
+| Redundant tests | Many tests repeat the same happy path without protecting changed branches | Read changed tests and look for repeated assertions that do not cover distinct behavior |
+
+In planless review, ask: does the changed behavior have enough tests to catch regression? In all modes, ask: are the tests proving behavior, or just creating noise?
 
 **Blocker if**: Test file exists for requirement but all tests are skipped/disabled or assertions are placeholders.
+
+**Warning if**: Coverage for the changed branch is missing, or tests are obviously duplicated while key branches remain untested.
+
+---
+
+## Duplication / Extraction Audit
+
+Flag duplication only when it creates real maintenance cost or drift risk.
+
+Good reasons to flag:
+- The same validation / parsing / retry / branching logic appears in multiple places in the reviewed scope
+- The duplicated logic is already diverging or likely to diverge
+- A shared helper/module would clearly reduce bug risk or future edit cost
+
+Do **not** flag:
+- Tiny repetition with no meaningful maintenance cost
+- Straight-line call sequences that would become less readable if abstracted
+- Pure taste-driven "could be cleaner" remarks without operational risk
 
 ---
 
@@ -197,7 +266,46 @@ export async function GET() {
 
 ---
 
-### Example 3: Test Quality Audit
+### Example 3: Planless duplication warning
+
+**Code found**:
+```typescript
+// src/a.ts
+const normalized = input.trim().toLowerCase()
+if (!normalized) throw new Error("empty")
+
+// src/b.ts
+const normalized = input.trim().toLowerCase()
+if (!normalized) throw new Error("empty")
+```
+
+**Finding**:
+- **W-03**: Input normalization duplicated across modules
+- 位置: `src/a.ts:1-2`, `src/b.ts:1-2`
+- 代码: `const normalized = input.trim().toLowerCase()`
+- 问题: Shared validation logic is duplicated in multiple paths → future rule changes can drift and create inconsistent behavior
+- 修复建议: Extract a shared helper such as `normalizeInput()` if both modules are meant to follow the same rule
+
+---
+
+### Example 4: Serious logic risk (discussion only)
+
+**Code found**:
+```typescript
+// src/jobs/purge.ts:18
+await deleteAllUserContent(userId)
+```
+
+**Finding**:
+- **Serious Logic Risk**: Purge job may irreversibly delete all user content
+- 位置: `src/jobs/purge.ts:18`
+- 代码: `await deleteAllUserContent(userId)`
+- 风险场景: If this job is triggered by a soft-expiry rule instead of an explicit destructive action, user data could be lost permanently
+- 讨论原因: Whether this behavior is correct depends on product policy, which is not explicit in the prompt
+
+---
+
+### Example 5: Test Quality Audit
 
 **Test file**: `tests/chat.test.ts`
 
@@ -224,14 +332,17 @@ describe('Chat', () => {
 
 **ALWAYS**:
 - Read actual code files, not just SUMMARY.md claims
-- Check four levels: exists → substantive → wired → functional
+- Check four levels when explicit truths exist: exists → substantive → wired → functional
 - Include `file:line` evidence for Blocker/Warning
 - Run test quality audit when tests exist
+- Finish the whole scan before issuing the final verdict
 
 **NEVER**:
 - Trust "completed" without code evidence
 - Flag style preferences as warnings
+- Critique business logic preferences unless explicitly asked or backed by a Plan
 - Skip test quality audit
+- Stop after the first blocker
 - Report findings without concrete location
 
 ---
@@ -256,7 +367,7 @@ This skill is loaded by rook agent. Workflow:
 |---------|-----------|
 | **PASS** | All truths verified, no Blocker, Warning ≤ 2 |
 | **REVISE** | Warning ≥ 3 or Info ≥ 5, no Blocker |
-| **BLOCK** | ≥ 1 Blocker found |
+| **BLOCK** | ≥ 1 Blocker found within technical scope |
 
 | Evidence Level | Required for |
 |----------------|--------------|
@@ -269,3 +380,5 @@ This skill is loaded by rook agent. Workflow:
 | Circular/placeholder assertions | Blocker |
 | Missing assertions | Warning |
 | Weak assertions (existence only) | Info |
+
+`Serious Logic Risks` and `Requirement Questions` do **not** change the verdict by default.

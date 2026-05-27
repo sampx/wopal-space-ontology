@@ -69,6 +69,11 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 | `contextLogger` | Session state/compaction/recovery |
 
 - Log levels: trace(10) / debug(20) / info(30) / warn(40) / error(50) / fatal(60); default `info`
+- **Log level usage rules**:
+  - `info`: Core event completion — one info log per key event (e.g., distill done, confirm done, cancel). Do not add more
+  - `debug`: Important data display — log key metrics/data points for operational visibility (e.g., message count, conversation length after extraction)
+  - `trace`: Detailed debugging flow — step-by-step traces for troubleshooting (e.g., "already extracted", "too short, skip", "no memories extracted")
+  - `warn`: Structured error output — must carry `{ err: error }`, never interpolate error.message
 - Structured fields via `data` object, field names in snake_case; do not interpolate into message
 - Error logs must carry `{ err: error }`; logging only `error.message` is forbidden
 - sessionID format: `formatSessionID(sessionID, isTask)` → `<last10chars>(main|task)`
@@ -78,6 +83,13 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - **tasks**: `SimpleTaskManager` periodic monitoring must register via `MonitorStrategy` into `MonitorEngine`
 - **monitor**: New monitoring strategies implement `MonitorStrategy` and register with engine; creating independent scheduling chains in other modules is forbidden
 - **memory**: `MemoryStore` is the sole persistence entry; records use `tags` field (not `concepts`); distillation follows `preview → confirm` two-step flow, skipping user review is forbidden
+
+### `promptAsync` Session Model Discipline
+
+- Any `promptAsync` call that sends a message to a session must explicitly use the **target session's current trusted model** as `body.model`; never rely on the default model
+- Sending to the main session → use the main session's current model; sending to a child session → use that child session's current model
+- If the target session's current model is unknown, first resolve it from session state or the runtime API; only degrade safely when it still cannot be resolved, and log the reason at debug/warn level
+- Never use the sender session, current executing agent, or default provider/model configuration as a substitute for the target session's model
 
 ### Adding New Features
 

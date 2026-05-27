@@ -5,6 +5,8 @@ temperature: 0.3
 permission:
   wopal_*: deny
   task: deny
+  memory_manage: deny
+  context_manage: deny
   skill:
     "*": deny
     project-worktrees: allow
