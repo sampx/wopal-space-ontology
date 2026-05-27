@@ -81,9 +81,7 @@ else:
         result = subprocess.run(
             [self.flow_bin, 'issue', 'create',
              '--title', 'perf(dev-flow): reduce label sync overhead',
-             '--project', 'ontology',
-             '--baseline', '200ms',
-             '--target', '120ms'],
+             '--project', 'ontology'],
             cwd=self.skill_dir,
             capture_output=True,
             text=True,
@@ -100,10 +98,6 @@ else:
 
         self.assertIn('type/perf', captured,
                       'gh args should contain type/perf label')
-        self.assertIn('## Baseline', captured,
-                      'gh args body should contain Baseline section')
-        self.assertIn('## Target', captured,
-                      'gh args body should contain Target section')
 
     def test_issue_create_type_mismatch_rejected(self):
         """issue create rejects title type and explicit type mismatch"""

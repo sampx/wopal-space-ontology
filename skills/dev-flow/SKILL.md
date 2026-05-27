@@ -155,6 +155,54 @@ flow.sh verify-switch <issue> --merge
 
 `flow.sh archive <issue>`。前置：Plan 状态 = `done`。
 
+## Roadmap
+
+产品阶段规划前置工作流。从 PRD/DESIGN 文档生成 phase 文档和 Issue。
+
+```bash
+flow.sh roadmap <prd-path> [--product <name>] [--project <name>] [--yes] [--dry-run]
+```
+
+**四阶段流程**：
+1. **Analyze**（全自动）：解析 PRD，提取 Phase 定义
+2. **Discuss**（交互式）：逐 Phase 与用户确认目标、范围、退出条件（`--yes` 跳过）
+3. **Produce**（全自动）：按模板写入 phase 定义文档到 `phases/` 目录
+4. **Decompose**（全自动）：为每个涉及项目创建 Issue，注入 Product/Phase 元信息
+
+**Issue 标题格式**：`feat({scope}): {phase-id} — {goal-summary}`（≤72 chars）
+
+## Issue 编写
+
+### 创建 Issue
+
+以 `--body-file` 为主路径——agent 直接写 markdown 文件，不需要通过 CLI 参数拼装 body：
+
+```bash
+flow.sh issue create --title "feat(scope): desc" --project <name> --body-file body.md
+```
+
+`--type` 可选覆盖（默认从标题自动推断），`--body-file` 指向包含完整五段结构的 markdown 文件。
+
+### 写入 Issue body
+
+```bash
+flow.sh issue write <issue> --body-file <path>    # 全量替换 body
+flow.sh issue write <issue> --append <path>       # 追加到 body 末尾
+```
+
+- `--body-file`：用文件内容替换整个 Issue body
+- `--append`：在现有 body 末尾追加文件内容，用 `\n\n` 分隔，保留已有内容
+
+### decompose --from ROADMAP.md
+
+从 ROADMAP.md 的 Slices 表生成 Slice Issues：
+
+```bash
+flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
+```
+
+Slices 表格式见 ROADMAP.md Slices 语法规范。
+
 ## 主流路径
 
 | 场景 | 命令路径 |
@@ -196,4 +244,4 @@ flow.sh approve <issue> --confirm --worktree
 | `templates/issue*.md` | 各类型 Issue 模板 |
 | `references/plan-validation.md` | Plan 校验规则 |
 | `references/tdd-guide.md` | TDD Task 编写指南 |
-| `references/issue-format.md` | Issue 标题与 Plan 命名规范 |
+| `references/issue-format.md` | Issue 标题、Plan 命名规范与 Issue body 五段结构 |

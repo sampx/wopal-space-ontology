@@ -32,7 +32,7 @@ from dev_flow.domain.labels import (
     plan_type_to_issue_label,
     ValidationError,
 )
-from dev_flow.domain.plan.body import build_issue_body_from_plan as _build_issue_body
+from dev_flow.domain.plan.body import build_plan_link_for_issue as _build_plan_link
 from dev_flow.core.logging import log_info, log_success, log_warn, log_error
 from dev_flow.core.workspace import find_workspace_root, detect_space_repo
 
@@ -132,10 +132,10 @@ def extract_primary_plan_issue(plan_file: str) -> str:
 
 def sync_plan_to_issue(issue_number: str, plan_file: str, repo: str) -> int:
     """
-    Sync approved plan to Issue body.
+    Sync Plan link to Issue's Related Resources section.
     
-    This replaces the entire Issue body with normalized content from Plan.
-    Preserves Agent Verification checkbox states.
+    Only updates the | Plan | ... | row in ## Related Resources.
+    Preserves all other Issue body content.
     """
     if not os.path.isfile(plan_file):
         log_warn(f"Plan file not found: {plan_file}")
@@ -145,10 +145,44 @@ def sync_plan_to_issue(issue_number: str, plan_file: str, repo: str) -> int:
         log_warn("gh CLI not available, skipping issue sync")
         return 0
     
-    log_info(f"Syncing plan to Issue #{issue_number}...")
+    log_info(f"Syncing plan link to Issue #{issue_number}...")
     
     plan_name = get_plan_name(plan_file)
-    new_body = _build_issue_body(plan_file, plan_name, repo)
+    workspace_root = str(find_workspace_root())
+    new_plan_row = _build_plan_link(plan_file, plan_name, repo, workspace_root)
+    
+    # Read current Issue body
+    issue_info = get_issue_info(issue_number, repo)
+    current_body = issue_info.get("body", "")
+    
+    # Replace Plan row in Related Resources table
+    plan_row_pattern = re.compile(r'\| Plan \| .+ \|')
+
+    # Find Related Resources section boundaries to scope the replacement
+    rr_match = re.search(r'^##\s+Related Resources\s*$', current_body, re.MULTILINE)
+    if rr_match:
+        rr_start = rr_match.start()
+        # Find next ## heading after Related Resources
+        next_section = re.search(r'^##\s+', current_body[rr_match.end():], re.MULTILINE)
+        rr_end = rr_match.end() + next_section.start() if next_section else len(current_body)
+        rr_section = current_body[rr_start:rr_end]
+
+        if plan_row_pattern.search(rr_section):
+            new_rr_section = plan_row_pattern.sub(new_plan_row, rr_section, count=1)
+            new_body = current_body[:rr_start] + new_rr_section + current_body[rr_end:]
+        else:
+            # Has Related Resources but no Plan row — append after table header
+            new_body = current_body[:rr_end] + new_plan_row + "\n" + current_body[rr_end:]
+    elif "## Related Resources" in current_body:
+        # Fallback (shouldn't reach here normally)
+        new_body = current_body.replace(
+            "## Related Resources",
+            f"## Related Resources\n\n{new_plan_row}",
+            1,
+        )
+    else:
+        # No Related Resources section — append to body
+        new_body = current_body.rstrip('\n') + f"\n\n## Related Resources\n\n{new_plan_row}\n"
     
     # Update Issue body
     result = subprocess.run(
@@ -161,7 +195,7 @@ def sync_plan_to_issue(issue_number: str, plan_file: str, repo: str) -> int:
         log_warn(f"Failed to update Issue #{issue_number}")
         return 1
     
-    log_success(f"Issue #{issue_number} updated with plan content")
+    log_success(f"Issue #{issue_number} Plan link updated")
     return 0
 
 

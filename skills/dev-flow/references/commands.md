@@ -17,14 +17,18 @@
 | `verify <issue> --confirm` | 用户验证通过 |
 | `archive <issue>` | 归档 Plan，push 代码 |
 | `verify-switch <issue> [--merge]` | worktree 验证切换 |
+| `roadmap <prd-path> [--product ...] [--project ...]` | 产品阶段规划（四阶段工作流） |
 
 ### Issue 管理
 
 | 命令 | 说明 |
 |------|------|
-| `issue create --title "..." --project <name> --goal "..."` | 创建 Issue |
-| `issue update <issue>` | 更新 Issue |
+| `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue（`--body-file` 为主路径） |
+| `issue write <issue> --body-file <path>` | 全量替换 Issue body |
+| `issue write <issue> --append <path>` | 追加到 Issue body 末尾 |
+| `issue update <issue>` | ⚠️ **已废弃**，使用 `issue write` 替代 |
 | `decompose-prd <prd-path> [--dry-run]` | 从 PRD 拆分 Issue |
+| `decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]` | 从 ROADMAP.md Slices 表生成 Slice Issues |
 
 ### 查询与诊断
 
@@ -48,26 +52,37 @@
 ### issue create 参数速记
 
 ```bash
-# 最小创建
-flow.sh issue create --title "feat(scope): desc" --project <name> --goal "一句话目标"
+# 最小创建（--body-file 为主路径）
+flow.sh issue create --title "feat(scope): desc" --project <name> --body-file body.md
 
-# 常用附加
---background "背景说明" --scope "范围" --out-of-scope "不包括"
+# --type 可选覆盖（默认从标题推断）
+--type feat
 ```
 
-类型专属参数：
-- `fix`: `--confirmed-bugs` / `--cleanup-scope` / `--key-findings`
-- `refactor`: `--affected-components` / `--refactor-strategy`
-- `perf`: `--baseline` / `--target`
-- `docs`: `--target-documents` / `--audience`
-- `test`: `--test-scope` / `--test-strategy`
+`--body-file` 指向包含五段结构的 markdown 文件。不再支持 type-specific 参数（`--confirmed-bugs`、`--baseline` 等）——agent 在 body 文件的 `## Context` 中自由写入。
 
-### issue update
+### issue write
+
+写入 Issue body（全量替换或追加）。
+
+```bash
+flow.sh issue write <issue> --body-file <path>    # 全量替换 body
+flow.sh issue write <issue> --append <path>       # 追加到 body 末尾
+```
+
+**行为**：
+- `--body-file`：用文件内容替换整个 Issue body
+- `--append`：在现有 body 末尾追加文件内容，用 `\n\n` 分隔
+- 空文件或文件不存在时报错退出（exit 1）
+- 文件不以 `#` 或 `-` 开头时输出 warning
+
+### issue update（已废弃）
 
 ```bash
 flow.sh issue update <issue> [options]
 ```
-参数与 `issue create` 相同，用于补充 Issue 字段。
+
+⚠️ 已废弃，使用 `issue write --body-file` 或 `--append` 替代。调用时输出 deprecated 警告。
 
 ### plan（无 Issue 模式）
 
@@ -120,9 +135,28 @@ flow.sh verify-switch <issue> --merge
 ### decompose-prd
 
 ```bash
+# 从 PRD 拆分 Issue（兼容旧模式）
 flow.sh decompose-prd docs/projects/<project>/PRD.md --dry-run   # 预览
 flow.sh decompose-prd docs/projects/<project>/PRD.md --project <name>  # 创建
+
+# 从 ROADMAP.md Slices 表生成 Slice Issues
+flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
 ```
+
+`--from ROADMAP.md` 模式解析 ROADMAP.md 中 `## Slices` 下的 markdown table，为每个 Slice 生成独立 Issue。Slices 表格式见 ROADMAP.md Slices 语法规范。`--product` 指定产品线名称，用于 Issue 标签和 body 元信息。
+
+### roadmap
+
+```bash
+flow.sh roadmap docs/projects/<project>/PRD.md --product <name> [--project <name>] [--yes] [--dry-run]
+```
+
+四阶段工作流：Analyze → Discuss → Produce → Decompose。
+
+- `--product`：产品线名称（默认从 PRD 文件名推断）
+- `--project`：指定项目（影响 Issue label）
+- `--yes`：跳过 Discuss 交互，直接使用 Analyze 结果（非 TTY 环境必须指定）
+- `--dry-run`：只输出阶段分析，不创建文件和 Issue
 
 ### reset（破坏性）
 

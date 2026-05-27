@@ -5,6 +5,8 @@
 {issue_line}
 {type_line}
 {project_line}
+{product_line}
+{phase_line}
 {project_path_line}
 {project_type_line}
 - **Created**: {date}
