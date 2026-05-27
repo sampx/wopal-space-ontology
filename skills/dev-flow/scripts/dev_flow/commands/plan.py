@@ -444,8 +444,14 @@ def cmd_plan(args: argparse.Namespace) -> int:
             print(str(e))
             return 1
     
+    # Initialize issue context variables (may remain None for no-issue mode)
+    issue_product = None
+    issue_phase = None
+    issue_project_type = None
+    issue_project_path = None
+
     # ========================================
-    # Issue mode: check existing plan
+    # Issue mode: locate or create plan from Issue
     # ========================================
     if issue_number:
         try:
