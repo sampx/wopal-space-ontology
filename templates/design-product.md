@@ -45,6 +45,18 @@ Record important technical and architectural decisions with rationale.
 | Decision | Choice | Rationale |
 |---|---|---|
 
-## 9. Related Documents
+## 9. Evolution Roadmap
+
+Describe product phases from current state to target state. Use structured headings so tooling can parse phase definitions:
+
+### Phase N: Title
+
+- **Target**: product capability target for this phase
+- **Landed**: what has been implemented
+- **Remaining**: what is still needed
+
+Mark each phase as completed, current, planned, or deprecated when known. Focus on product outcomes and capability maturity, not task lists. This section is the primary input for `/cupdate-roadmap`.
+
+## 10. Related Documents
 
 Link only durable product / design references: PRD, project documents, business rules, architecture references, research summaries, and project specs.

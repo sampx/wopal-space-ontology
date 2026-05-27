@@ -4,20 +4,17 @@ description: Create or update product PRD documents
 
 # Create or Update PRD
 
-Create or update a product or project PRD document.
+Create or update a product PRD document.
 
-**Input**:
-
-- `$1` (type keyword: `product` / `project`, optional)
-- `$2` (name, optional, rest semantics)
+**Input**: `$1` (type keyword, optional), `$2` (name, optional, rest semantics)
 
 | `$1` | Action |
 |------|--------|
 | (empty) | Infer from context; target missing → create, exists → update |
 | `product` | Product PRD, `$2` = product name |
-| `project` | Project PRD, `$2` = project name |
 
 - If ambiguous, ask the user
+- Deprecated: project-level PRDs no longer exist independently; project-level information is maintained in DESIGN documents
 
 ---
 
@@ -31,8 +28,6 @@ Write the generated or updated document in the user's preferred language unless 
 
 **Product PRD**: use the established naming convention when one exists. Default: `docs/products/<product-name>/PRD-<product-name>.md`. Acceptable variants: `PRD.md`, `PRD-*.md`. When updating, preserve the existing file path.
 
-**Project PRD**: default `docs/projects/<project-name>/PRD.md`. When updating, preserve the existing file path.
-
 ### Context Collection
 
 Read enough context to avoid inventing requirements.
@@ -40,7 +35,6 @@ Read enough context to avoid inventing requirements.
 **Required**:
 
 - Existing target PRD, if present
-- Parent product PRD, for project PRDs
 - Related DESIGN documents, if present
 - Current conversation context: user needs, decisions, research conclusions, and unresolved questions
 
@@ -51,18 +45,14 @@ Read enough context to avoid inventing requirements.
 - `.wopal-space/STRUCTURE.md`
 - `.wopal-space/REGULATIONS.md`
 
-
 ### Writing Rules
 
 - PRD answers: what to build, for whom, why it matters, and what product outcomes it serves.
 - PRD must not explain internal architecture, APIs, storage schemas, implementation steps, or coding conventions.
 - Product PRD owns vision, users, product shape, capability boundaries, governance, and evolution.
-- Project PRD owns role, boundaries, responsibilities, capability scope, and evolution within a parent product.
-- Project PRD must not duplicate the parent product's full vision or target-user analysis.
 - Capability Scope / Core Capability Boundaries sections must describe target-state capability boundaries only: owned target capabilities, excluded capabilities, and delegation boundaries.
-- Capability Scope / Core Capability Boundaries sections must not include phase timing, current/future grouping, implementation status, delivery progress, module state, checkboxes, or "done / partial / pending" labels.
-- Implementation status belongs only in Evolution Roadmap / Implementation Roadmap sections, where phases may be marked as completed, current, planned, or deprecated.
-- Do not include standalone success-standard or validation-signal sections in PRDs. If validation signals are needed, place them in Plans, UAT, verification documents, or roadmap phase acceptance notes, not in the PRD template.
+- Capability Scope / Core Capability Boundaries sections must not include phase timing, current/future grouping, implementation status, delivery progress, module state, checkboxes, or "done / partial / pending" labels. Implementation status and phase roadmap belong in the DESIGN document's Evolution Roadmap section.
+- Do not include standalone success-standard or validation-signal sections in PRDs. If validation signals are needed, place them in Plans, UAT, verification documents, or roadmap phase acceptance notes.
 - PRD body must use product language, not documentation-authoring language. Do not explain what a section is for, how the document is organized, or how the template should be used.
 - Avoid abstract classification or defensive phrasing that does not communicate product value, such as "this is not X but Y", "exposes an interface", "has grown into", or "this section describes".
 - Each paragraph and table row should communicate a product fact: user problem, product role, user benefit, owned capability, excluded boundary, product entry, or roadmap outcome.
@@ -83,17 +73,11 @@ Every PRD should start with a concise metadata block after the title:
 > **Related DESIGN**: `<path-if-known>`
 ```
 
-For project PRDs, include parent product context:
-
-```markdown
-> **Parent Product**: `<parent-product-prd-path>`
-```
-
 Use localized field labels if the document language is not English.
 
 ## Section 0: Change Log
 
-Every PRD should include a concise `Change Log` section immediately after the document metadata and before section 1.
+Every PRD should include a concise Change Log section immediately after the document metadata and before section 1.
 
 ```markdown
 ## 0. Change Log
@@ -115,8 +99,7 @@ Rules:
 
 ## Templates
 
-- Product PRD: `.wopal/templates/prd-product.md`
-- Project PRD: `.wopal/templates/prd-project.md`
+- Product PRD: `.wopal/templates/prd.md`
 
 ---
 
@@ -130,13 +113,11 @@ When updating an existing PRD:
    - user-confirmed requirements and conversation decisions
    - implemented code facts
    - related PRD/DESIGN documents
-   - known roadmap or plan artifacts
 4. Add missing required sections when the existing structure is incomplete.
 5. Remove or revise obsolete claims when evidence is clear.
 6. Append one Change Log row in section 0 for the update.
 7. Keep unresolved items explicit as "Needs confirmation" or equivalent in the document language.
-8. Move phase timing, current/future grouping, and implementation status out of Capability Scope / Core Capability Boundaries and into Evolution Roadmap / Implementation Roadmap.
-9. Remove standalone success-standard or validation-signal sections from PRDs; do not replace them with renamed validation sections.
+8. Remove standalone success-standard or validation-signal sections from PRDs; do not replace them with renamed validation sections.
 
 Do not add implementation internals merely because they exist in code. Convert implementation facts into product capabilities and boundaries.
 
@@ -163,14 +144,12 @@ When a sentence fails the bar, rewrite it into a concrete product statement befo
 
 ## Quality Checklist
 
-- [ ] Correct template selected: product or project
+- [ ] Correct template selected: product
 - [ ] Document language follows user preference
 - [ ] Header includes current Updated date
 - [ ] PRD stays product-level and avoids architecture/implementation details
-- [ ] Product PRD does not collapse into project details
-- [ ] Project PRD does not duplicate parent-product vision
-- [ ] Capability Scope / Core Capability Boundaries contains target-state boundaries only, not phase timing or implementation status
-- [ ] Implementation status appears only in Evolution Roadmap / Implementation Roadmap
+- [ ] Capability Scope / Core Capability Boundaries contains target-state boundaries only, no phase timing or implementation status
+- [ ] Implementation status and phase roadmap belong in DESIGN's Evolution Roadmap, not PRD
 - [ ] No standalone success-standard or validation-signal section appears in the PRD
 - [ ] Required PRD structure is preserved while section wording is improved
 - [ ] PRD body contains no template commentary, section instructions, or documentation-authoring language
@@ -188,4 +167,4 @@ After creating or updating the PRD, respond in the user's language with:
 1. File path
 2. Create/update summary
 3. Meaningful added, revised, removed/deprecated, and needs-confirmation items
-4. Suggested next step, usually `/cupdate-design`
+4. Suggested next step: PRD done → `/cupdate-design` to translate product vision into system architecture

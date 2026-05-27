@@ -38,10 +38,6 @@ Write 3-5 scenario-level narratives. Each scenario should explain the user's goa
 
 Document product-level rules that protect user trust, safety, maintainability, or long-term evolution.
 
-## 8. Evolution Roadmap
+## 8. Related Documents
 
-Describe product phases from current state to target state. Mark each phase as completed, current, planned, or deprecated when known. Focus on product outcomes and capability maturity, not task lists.
-
-## 9. Related Documents
-
-Link the DESIGN document, project PRDs/DESIGNs, business rules, plans, research, and project specs.
+Link the DESIGN document, project DESIGNs, business rules, plans, research, and project specs.
