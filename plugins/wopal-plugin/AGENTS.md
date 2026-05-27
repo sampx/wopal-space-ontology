@@ -84,6 +84,13 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - **monitor**: New monitoring strategies implement `MonitorStrategy` and register with engine; creating independent scheduling chains in other modules is forbidden
 - **memory**: `MemoryStore` is the sole persistence entry; records use `tags` field (not `concepts`); distillation follows `preview → confirm` two-step flow, skipping user review is forbidden
 
+### `promptAsync` Session Model Discipline
+
+- Any `promptAsync` call that sends a message to a session must explicitly use the **target session's current trusted model** as `body.model`; never rely on the default model
+- Sending to the main session → use the main session's current model; sending to a child session → use that child session's current model
+- If the target session's current model is unknown, first resolve it from session state or the runtime API; only degrade safely when it still cannot be resolved, and log the reason at debug/warn level
+- Never use the sender session, current executing agent, or default provider/model configuration as a substitute for the target session's model
+
 ### Adding New Features
 
 - **New hook**: Create file in `hooks/`, register in `hooks/index.ts` `createAllHooks()`

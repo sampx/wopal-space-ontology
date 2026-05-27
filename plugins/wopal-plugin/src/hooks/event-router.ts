@@ -64,7 +64,19 @@ export function createEventRouter(ctx: EventRouterHookContext) {
     // Route to specialized handlers
     if (eventType === "message.updated") {
       if (sessionID) {
-        const info = props?.info as { agent?: string } | undefined
+        const info = props?.info as { agent?: string; providerID?: string; modelID?: string; model?: { providerID?: string; modelID?: string } } | undefined
+        const providerID = info?.providerID ?? info?.model?.providerID
+        const modelID = info?.modelID ?? info?.model?.modelID
+        ctx.contextLogger.trace(
+          {
+            session_id: formatSessionID(sessionID, typeof ctx.taskManager?.isTaskSession === "function" && ctx.taskManager.isTaskSession(sessionID)),
+            message_id: props?.messageID ?? props?.messageId ?? props?.id ?? "?",
+            agent: info?.agent ?? "?",
+            model: providerID && modelID ? `${providerID}/${modelID}` : "?",
+            prop_keys: Object.keys(props ?? {}),
+          },
+          "Message updated",
+        )
         handleMessageUpdated(
           { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: ctx.contextLogger },
           sessionID,
@@ -77,7 +89,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
         sessionID,
       )
     } else if (eventType === "message.part.updated") {
-      const part = props?.part as { type?: string; tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } } } | undefined
+      const part = props?.part as { type?: string; snapshot?: unknown; tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } } } | undefined
       await handleMessagePartUpdated(
         { client: ctx.client, sessionStore: ctx.sessionStore, taskManager: ctx.taskManager, contextLog: ctx.contextLogger },
         sessionID,

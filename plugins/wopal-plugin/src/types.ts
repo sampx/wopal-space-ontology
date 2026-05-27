@@ -172,6 +172,7 @@ export interface OpenCodeSession {
     path: { id: string }
     body: {
       agent?: string
+      model?: { providerID: string; modelID: string }
       parts: unknown[]
       noReply?: boolean
       tools?: Record<string, boolean>

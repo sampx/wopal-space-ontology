@@ -13,15 +13,58 @@ import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
 import { formatSessionID } from "../../logger.js"
 import { trackActivity } from "../../tasks/progress.js"
 import { getSessionModelInfo } from "../../tools/output-helpers.js"
+import { getSessionModelOverride } from "../../session-model.js"
 
 interface EventPart {
   type?: string
+  snapshot?: unknown
   tokens?: {
     input?: number
     output?: number
     reasoning?: number
     cache?: { read?: number; write?: number }
   }
+}
+
+interface EventModelInfo {
+  providerID?: string
+  modelID?: string
+  model?: { providerID?: string; modelID?: string }
+}
+
+interface MessageUpdateInfo extends EventModelInfo {
+  agent?: string
+}
+
+function extractModelInfo(info: EventModelInfo | undefined): { providerID: string; modelID: string } | null {
+  const providerID = info?.providerID ?? info?.model?.providerID
+  const modelID = info?.modelID ?? info?.model?.modelID
+  if (!providerID || !modelID) return null
+  return { providerID, modelID }
+}
+
+function formatModel(info: { providerID: string; modelID: string } | null | undefined): string {
+  return info ? `${info.providerID}/${info.modelID}` : "?"
+}
+
+async function resolveContextLimit(
+  ctx: MessageTokenHandlerContext,
+  modelInfo: { providerID: string; modelID: string } | null,
+): Promise<number | undefined> {
+  if (!modelInfo || typeof ctx.client.config?.providers !== "function") return undefined
+  const providersResult = await ctx.client.config.providers({ query: { directory: "" } })
+  const providers = providersResult?.data?.providers ?? []
+  const provider = providers.find((p) => p.id === modelInfo.providerID)
+  return provider?.models?.[modelInfo.modelID]?.limit?.context
+}
+
+function getTrustedStoredModel(state: { providerID?: string; modelID?: string } | undefined): { providerID: string; modelID: string } | null {
+  if (!state?.providerID || !state?.modelID) return null
+  return { providerID: state.providerID, modelID: state.modelID }
+}
+
+function isCompactionAgent(agent: string | undefined): boolean {
+  return agent === "compaction"
 }
 
 export interface MessageTokenHandlerContext {
@@ -37,15 +80,34 @@ export interface MessageTokenHandlerContext {
 export function handleMessageUpdated(
   ctx: MessageTokenHandlerContext,
   sessionID: string | undefined,
-  info: { agent?: string } | undefined,
+  info: MessageUpdateInfo | undefined,
 ): void {
   if (!sessionID) return
 
-  if (info?.agent) {
-    ctx.sessionStore.upsert(sessionID, (s) => {
-      s.agent = info.agent
-    })
-  }
+  const modelInfo = extractModelInfo(info)
+  if (!info?.agent && !modelInfo) return
+
+  ctx.sessionStore.upsert(sessionID, (s) => {
+    if (s.isCompacting && isCompactionAgent(info?.agent)) {
+      ctx.contextLog.debug(
+        { session_id: formatSessionID(sessionID, !!ctx.taskManager?.isTaskSession(sessionID)), agent: info?.agent, model: formatModel(modelInfo) },
+        "Ignored compaction message model update",
+      )
+      return
+    }
+
+    if (info?.agent) s.agent = info.agent
+    if (modelInfo) {
+      const current = getTrustedStoredModel(s)
+      const sid = formatSessionID(sessionID, !!ctx.taskManager?.isTaskSession(sessionID))
+      if (!current || current.providerID !== modelInfo.providerID || current.modelID !== modelInfo.modelID) {
+        s.providerID = modelInfo.providerID
+        s.modelID = modelInfo.modelID
+        delete s.contextLimit
+        ctx.contextLog.debug({ session_id: sid, model: formatModel(modelInfo) }, current ? "Session model updated" : "Session model initialized")
+      }
+    }
+  })
 }
 
 /**
@@ -93,9 +155,12 @@ Context usage: ${pct}%. Consider compacting with context_manage(action="compact"
       return false
     }
 
+    const modelOverride = getSessionModelOverride(ctx.sessionStore.get(sessionID))
+
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: false,
         parts: [{ type: "text", text: warningText }],
       },
@@ -136,35 +201,49 @@ export async function handleMessagePartUpdated(
     const state = ctx.sessionStore.get(sessionID)
     const agent = state?.agent ?? "?"
     const used = (t.input ?? 0) + (cache.read ?? 0)
+    let modelInfo = getTrustedStoredModel(state)
 
-    // Get model info and context limit for percentage calculation
-    let model = "?"
-    let pctText = ""
-    let modelInfo: { providerID: string; modelID: string } | null = null
+    ctx.contextLog.trace(
+      {
+        session_id: formatSessionID(sessionID, isTask),
+        part_keys: Object.keys(part),
+        snapshot_keys: typeof part.snapshot === "object" && part.snapshot !== null ? Object.keys(part.snapshot) : [],
+      },
+      "Step finish payload",
+    )
+
+    if (state?.isCompacting) {
+      let compactingContextLimit: number | undefined = state.contextLimit
+      if (!compactingContextLimit) {
+        try {
+          compactingContextLimit = await resolveContextLimit(ctx, modelInfo)
+        } catch {
+          // ignore — percentage is informational only
+        }
+      }
+      const compactingPct = compactingContextLimit && compactingContextLimit > 0 ? Math.round((used / compactingContextLimit) * 100) : undefined
+      ctx.contextLog.info(
+        { session_id: formatSessionID(sessionID, isTask), agent, model: formatModel(modelInfo), input: t.input ?? 0, output: t.output ?? 0, cache_read: cache.read ?? 0, cache_write: cache.write ?? 0, ...(compactingPct !== undefined ? { pct: compactingPct } : {}) },
+        "Token usage",
+      )
+      return
+    }
+
     let contextLimit: number | undefined = undefined
 
     try {
-      modelInfo = await getSessionModelInfo(ctx.client, sessionID)
-      if (modelInfo) {
-        const info = modelInfo
-        model = `${info.providerID}/${info.modelID}`
-        const configClient = ctx.client
-        if (typeof configClient.config?.providers === "function") {
-          const providersResult = await configClient.config.providers({ query: { directory: "" } })
-          const providers = providersResult?.data?.providers ?? []
-          const provider = providers.find((p) => p.id === info.providerID)
-          contextLimit = provider?.models?.[info.modelID]?.limit?.context
-          if (contextLimit && contextLimit > 0) {
-            pctText = ` pct=${Math.round((used / contextLimit) * 100)}%`
-          }
-        }
+      if (!modelInfo) {
+        modelInfo = await getSessionModelInfo(ctx.client, sessionID)
       }
+      contextLimit = await resolveContextLimit(ctx, modelInfo)
     } catch {
       // ignore — percentage is informational only
     }
 
+    const pct = contextLimit && contextLimit > 0 ? Math.round((used / contextLimit) * 100) : undefined
+
     ctx.contextLog.info(
-      { session_id: formatSessionID(sessionID, isTask), agent, model, input: t.input ?? 0, output: t.output ?? 0, cache_read: cache.read ?? 0, cache_write: cache.write ?? 0, ...(pctText ? { pct: pctText.trim() } : {}) },
+      { session_id: formatSessionID(sessionID, isTask), agent, model: formatModel(modelInfo), input: t.input ?? 0, output: t.output ?? 0, cache_read: cache.read ?? 0, cache_write: cache.write ?? 0, ...(pct !== undefined ? { pct } : {}) },
       "Token usage",
     )
 
@@ -181,7 +260,7 @@ export async function handleMessagePartUpdated(
       }
 
       ctx.sessionStore.upsert(sessionID, (state) => {
-        if (modelInfo) {
+        if (modelInfo && !getTrustedStoredModel(state)) {
           state.providerID = modelInfo.providerID
           state.modelID = modelInfo.modelID
         }

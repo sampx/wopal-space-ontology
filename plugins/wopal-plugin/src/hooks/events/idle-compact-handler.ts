@@ -19,6 +19,7 @@ import { loadTitlePrompt } from "../../memory/prompts.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
+import { getSessionModelOverride } from "../../session-model.js"
 
 export interface IdleCompactHandlerContext {
   client: OpenCodeClient
@@ -256,9 +257,11 @@ The session context has been compacted. Execute recovery protocol immediately an
   }
 
   try {
+    const modelOverride = getSessionModelOverride(ctx.sessionStore.get(sessionID))
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: false,
         parts: [{ type: "text", text: recoveryText }],
       },
@@ -300,9 +303,11 @@ Use wopal_task_reply to send recovery instructions if the task should continue.
   }
 
   try {
+    const modelOverride = getSessionModelOverride(ctx.sessionStore.get(task.parentSessionID))
     await ctx.client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
+        ...(modelOverride ? { model: modelOverride } : {}),
         noReply: false,
         parts: [{ type: "text", text: notification }],
       },
