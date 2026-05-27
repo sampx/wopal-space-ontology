@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   _clearPendingConfirmation,
@@ -23,11 +23,9 @@ function makeAssistantMsg(parts: Array<{ type: string; text?: string }>) {
   return { info: { role: 'assistant' }, parts };
 }
 
-const mockComplete = vi.fn();
 const mockMessages = vi.fn();
 const mockUpdate = vi.fn();
 
-const distillLLM = { complete: mockComplete };
 const summaryClient = {
   session: { messages: mockMessages, update: mockUpdate },
 };
@@ -36,7 +34,7 @@ const summaryCtx = { sessionID: 'ses-summary-test' } as { sessionID: string };
 
 describe('context_manage: schema', () => {
   it('marks session_id as optional and detail as optional with default', () => {
-    const tool = createContextManageTool(distillLLM, summaryClient) as {
+    const tool = createContextManageTool(summaryClient) as {
       args: {
         session_id: { type: string }
         detail: { type: string; def?: { type: string; defaultValue?: unknown } }
@@ -54,7 +52,7 @@ describe('context_manage: schema', () => {
       state.agent = 'wopal';
     });
 
-    const tool = createContextManageTool(distillLLM, summaryClient);
+    const tool = createContextManageTool(summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status', session_id: '' },
@@ -72,7 +70,7 @@ describe('context_manage: schema', () => {
       state.agent = 'wopal';
     });
 
-    const tool = createContextManageTool(distillLLM, summaryClient);
+    const tool = createContextManageTool(summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status' },
@@ -84,104 +82,6 @@ describe('context_manage: schema', () => {
     expect(parsed.agent).toBe('wopal');
   })
 })
-
-describe('context_manage: handleSummary', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockComplete.mockResolvedValue('测试会话摘要');
-    mockUpdate.mockResolvedValue({});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('filters out synthetic parts from user messages', async () => {
-    const messages = [
-      makeUserMsg([
-        { type: 'text', text: '真实用户消息' },
-        { type: 'text', text: '[WOPAL TASK COMPLETED] 任务完成', synthetic: true },
-      ]),
-    ];
-    mockMessages.mockResolvedValue({ data: messages });
-
-    const tool = createContextManageTool(distillLLM, summaryClient);
-    const execute = getExecute(tool);
-    const result = await execute({ action: 'summary' }, summaryCtx);
-
-    expect(result).not.toContain('WOPAL TASK COMPLETED');
-    expect(mockComplete).toHaveBeenCalledOnce();
-    const promptArg = mockComplete.mock.calls[0][0] as string;
-    expect(promptArg).toContain('真实用户消息');
-    expect(promptArg).not.toContain('WOPAL TASK');
-  });
-
-  it('skips compaction messages entirely', async () => {
-    const messages = [
-      makeUserMsg([{ type: 'compaction' }, { type: 'text', text: '压缩消息内容' }]),
-      makeUserMsg([{ type: 'text', text: '最新用户消息' }]),
-    ];
-    mockMessages.mockResolvedValue({ data: messages });
-
-    const tool = createContextManageTool(distillLLM, summaryClient);
-    const execute = getExecute(tool);
-    await execute({ action: 'summary' }, summaryCtx);
-
-    const promptArg = mockComplete.mock.calls[0][0] as string;
-    expect(promptArg).not.toContain('压缩消息内容');
-    expect(promptArg).toContain('最新用户消息');
-  });
-
-  it('truncates from tail keeping latest messages', async () => {
-    // 3 messages with unique markers to verify truncation behavior
-    const oldText = 'X'.repeat(5000); // Will be truncated
-    const newText = 'Y'.repeat(1000); // Will be kept
-    const messages = [
-      makeUserMsg([{ type: 'text', text: oldText }]),
-      makeUserMsg([{ type: 'text', text: newText }]),
-    ];
-    mockMessages.mockResolvedValue({ data: messages });
-
-    const tool = createContextManageTool(distillLLM, summaryClient);
-    const execute = getExecute(tool);
-    await execute({ action: 'summary' }, summaryCtx);
-
-    const promptArg = mockComplete.mock.calls[0][0] as string;
-    // Combined: 5000 + 10 (sep) + 1000 = 6010; slice(-3000) → last 3000 chars
-    // That's ~1990 X's + separator + 1000 Y's. Y should definitely be present.
-    expect(promptArg).toContain('YYY');
-    // X content is present due to overlap (5000 > 3000 - 1000 - 10)
-    // Instead verify truncation happened at all: combined is 6010 but prompt user text < 3100
-    const userMsgSection = promptArg.split('用户消息：\n')[1]?.split('\n\n要求：')[0] ?? '';
-    expect(userMsgSection.length).toBeLessThanOrEqual(3000);
-  });
-
-  it('returns message for empty sessions', async () => {
-    mockMessages.mockResolvedValue({ data: [] });
-
-    const tool = createContextManageTool(distillLLM, summaryClient);
-    const execute = getExecute(tool);
-    const result = await execute({ action: 'summary' }, summaryCtx);
-
-    expect(result).toContain('No messages');
-    expect(mockComplete).not.toHaveBeenCalled();
-  });
-
-  it('returns message when no user messages exist', async () => {
-    const messages = [
-      makeAssistantMsg([{ type: 'text', text: '助手回复' }]),
-    ];
-    mockMessages.mockResolvedValue({ data: messages });
-
-    const tool = createContextManageTool(distillLLM, summaryClient);
-    const execute = getExecute(tool);
-    const result = await execute({ action: 'summary' }, summaryCtx);
-
-    expect(result).toContain('No user messages');
-    expect(mockComplete).not.toHaveBeenCalled();
-  });
-
-  });
 
 // --- Dump action tests ---
 
@@ -216,7 +116,7 @@ describe('context_manage: handleStatus', () => {
       state.loadedSkills.add('another-skill');
     });
 
-    const tool = createContextManageTool(distillLLM, summaryClient);
+    const tool = createContextManageTool(summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status' },
@@ -244,7 +144,7 @@ describe('context_manage: handleStatus', () => {
   it('S2: returns defaults when session state is missing', async () => {
     const statusSessionStore = new SessionStore();
 
-    const tool = createContextManageTool(distillLLM, summaryClient);
+    const tool = createContextManageTool(summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status' },
@@ -273,7 +173,7 @@ describe('context_manage: handleStatus', () => {
     const statusSessionStore = new SessionStore();
     statusSessionStore.markCompacting('ses_compacting_status', Date.now());
 
-    const tool = createContextManageTool(distillLLM, summaryClient);
+    const tool = createContextManageTool(summaryClient);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status', session_id: 'ses_compacting_status' },
@@ -309,7 +209,7 @@ describe('context_manage: handleStatus', () => {
       ]),
     };
 
-    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const tool = createContextManageTool(summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status' },
@@ -343,7 +243,7 @@ describe('context_manage: handleStatus', () => {
       listTasksForParent: vi.fn(),
     };
 
-    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const tool = createContextManageTool(summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status', session_id: 'wopal-task-child123' },
@@ -374,7 +274,7 @@ describe('context_manage: handleStatus', () => {
       },
     };
 
-    const tool = createContextManageTool(distillLLM, clientWithGet, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const tool = createContextManageTool(clientWithGet, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status', session_id: 'ses_child_raw' },
@@ -393,7 +293,7 @@ describe('context_manage: handleStatus', () => {
       state.agent = 'wopal';
     });
 
-    const tool = createContextManageTool(distillLLM, summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore);
+    const tool = createContextManageTool(summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore);
     const execute = getExecute(tool);
     const result = await execute(
       { action: 'status' },
@@ -427,7 +327,7 @@ describe('context_manage: handleDump', () => {
     ];
     dumpMockMessages.mockResolvedValue({ data: msgs });
 
-    const tool = createContextManageTool(distillLLM, dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
+    const tool = createContextManageTool(dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
     const execute = getExecute(tool);
     const result = await execute({ action: 'dump' }, dumpCtx);
 
@@ -453,7 +353,7 @@ describe('context_manage: handleDump', () => {
     const snapshots = new Map<string, string[]>();
     snapshots.set('ses_abc123', ['system content']);
 
-    const tool = createContextManageTool(distillLLM, dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
+    const tool = createContextManageTool(dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
     const execute = getExecute(tool);
     const result = await execute({ action: 'dump', session_id: 'wopal-task-abc123' }, dumpCtx);
 
@@ -469,7 +369,7 @@ describe('context_manage: handleDump', () => {
   it('U3: graceful degradation when no snapshot', async () => {
     const snapshots = new Map<string, string[]>();
 
-    const tool = createContextManageTool(distillLLM, dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
+    const tool = createContextManageTool(dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
     const execute = getExecute(tool);
     const result = await execute({ action: 'dump', session_id: 'ses_nonexist' }, dumpCtx);
 
@@ -486,7 +386,7 @@ describe('context_manage: handleDump', () => {
     dumpMockGet.mockRejectedValue(new Error('API error'));
     dumpMockMessages.mockResolvedValue({ data: null });
 
-    const tool = createContextManageTool(distillLLM, dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
+    const tool = createContextManageTool(dumpClient, snapshots, new Map(), new Map(), new Map(), testTmpDir);
     const execute = getExecute(tool);
     const result = await execute({ action: 'dump' }, dumpCtx);
 
@@ -563,7 +463,6 @@ describe('context_manage: handleCompact', () => {
     });
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -593,7 +492,6 @@ describe('context_manage: handleCompact', () => {
     });
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -616,7 +514,6 @@ describe('context_manage: handleCompact', () => {
 
   it('C3: returns error when session does not exist in sessionStore', async () => {
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -637,7 +534,6 @@ describe('context_manage: handleCompact', () => {
     compactSessionStore.markCompacting('ses_compact_test', Date.now());
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -668,7 +564,6 @@ describe('context_manage: handleCompact', () => {
     };
 
     const tool = createContextManageTool(
-      distillLLM,
       clientWithoutSummarize,
       new Map(),
       new Map(),
@@ -692,7 +587,6 @@ describe('context_manage: handleCompact', () => {
     });
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -715,7 +609,6 @@ describe('context_manage: handleCompact', () => {
     });
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -739,7 +632,6 @@ describe('context_manage: handleCompact', () => {
     });
 
     const tool = createContextManageTool(
-      distillLLM,
       compactClient,
       new Map(),
       new Map(),
@@ -773,7 +665,6 @@ describe('context_manage: handleCompact', () => {
     };
 
     const tool = createContextManageTool(
-      distillLLM,
       clientWithGet,
       new Map(),
       new Map(),

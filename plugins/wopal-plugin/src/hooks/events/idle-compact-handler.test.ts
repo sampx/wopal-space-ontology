@@ -21,13 +21,13 @@ import { homedir } from "os"
 
 const mockComplete = vi.fn().mockResolvedValue("Generated Session Title")
 
-vi.mock("../../memory/llm-client.js", () => ({
-  DistillLLMClient: vi.fn().mockImplementation(() => ({
+  vi.mock("../../llm-client.js", () => ({
+  LLMClient: vi.fn().mockImplementation(() => ({
     complete: mockComplete,
   })),
 }))
 
-import { DistillLLMClient } from "../../memory/llm-client.js"
+  import { LLMClient } from "../../llm-client.js"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -190,7 +190,7 @@ describe("handleSessionCompacted — background title generation", () => {
 
     // Wait for background title generation to complete
     await vi.waitFor(() => {
-      expect(DistillLLMClient).toHaveBeenCalled()
+      expect(LLMClient).toHaveBeenCalled()
     })
 
     // Verify LLM was called with compaction summary in prompt
@@ -207,12 +207,12 @@ describe("handleSessionCompacted — background title generation", () => {
     })
   })
 
-  it("gracefully handles DistillLLMClient constructor failure", async () => {
+  it("gracefully handles LLMClient constructor failure", async () => {
     const compactionText = "## Goal\nFallback test"
     const { ctx, sessionStore, promptAsync, updateSessionTitle } = createMockContext()
 
     // Simulate LLM constructor throwing
-    vi.mocked(DistillLLMClient).mockImplementationOnce(() => {
+    vi.mocked(LLMClient).mockImplementationOnce(() => {
       throw new Error("LLM unavailable")
     })
 

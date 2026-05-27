@@ -1,24 +1,24 @@
 /**
- * Distill LLM Client for Memory System
+ * LLM Client
  *
- * Uses OpenAI-compatible API for memory extraction and deduplication.
- * Required environment variables: LLM_BASE_URL, LLM_API_KEY
+ * Uses OpenAI-compatible API for memory distillation, deduplication, and session title generation.
+ * Required environment variables: WOPAL_LLM_BASE_URL, WOPAL_LLM_API_KEY
  */
 
 import OpenAI from "openai";
-import { memoryLogger } from "../logger.js";
+import { coreLogger } from "./logger.js";
 
 const LLM_TIMEOUT_MS = 120000;
 
 /**
- * Distill LLM client using OpenAI-compatible API
+ * LLM client using OpenAI-compatible API
  *
  * Required environment variables:
  * - WOPAL_LLM_BASE_URL: LLM API endpoint
  * - WOPAL_LLM_API_KEY: API key for LLM service
  * - WOPAL_LLM_MODEL: Model name (optional, defaults to gpt-4o-mini)
  */
-export class DistillLLMClient {
+export class LLMClient {
   private client: OpenAI;
   private model: string;
 
@@ -28,7 +28,7 @@ export class DistillLLMClient {
 
     if (!baseURL || !apiKey) {
       throw new Error(
-        "DistillLLMClient requires WOPAL_LLM_BASE_URL and WOPAL_LLM_API_KEY environment variables"
+        "LLMClient requires WOPAL_LLM_BASE_URL and WOPAL_LLM_API_KEY environment variables"
       );
     }
 
@@ -39,7 +39,7 @@ export class DistillLLMClient {
       apiKey,
     });
 
-    memoryLogger.info(`DistillLLMClient ready: ${this.model}`);
+    coreLogger.info(`LLMClient ready: ${this.model} @ ${baseURL}`);
   }
 
   /**
@@ -65,7 +65,7 @@ export class DistillLLMClient {
       return content;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      memoryLogger.warn(`[LLM.complete] Failed: ${message}`);
+      coreLogger.warn(`[LLM.complete] Failed: ${message}`);
       throw new Error(`LLM complete failed: ${message}`);
     }
   }
@@ -86,8 +86,8 @@ export class DistillLLMClient {
     const jsonStr = this.extractJson(rawResponse);
 
     if (!jsonStr) {
-      memoryLogger.warn(`[LLM.completeJson] No JSON found in response`);
-      memoryLogger.warn(`[LLM.completeJson] Response:\n  ${rawResponse.replace(/\n/g, "\n  ")}`);
+      coreLogger.warn(`[LLM.completeJson] No JSON found in response`);
+      coreLogger.warn(`[LLM.completeJson] Response:\n  ${rawResponse.replace(/\n/g, "\n  ")}`);
       throw new Error("No JSON found in LLM response");
     }
 
@@ -105,8 +105,8 @@ export class DistillLLMClient {
       return JSON.parse(repaired) as T;
     } catch (parseError) {
       const message = parseError instanceof Error ? parseError.message : String(parseError);
-      memoryLogger.warn(`[LLM.completeJson] Parse failed: ${message}`);
-      memoryLogger.warn(`[LLM.completeJson] Failed JSON:\n  ${repaired.replace(/\n/g, "\n  ")}`);
+      coreLogger.warn(`[LLM.completeJson] Parse failed: ${message}`);
+      coreLogger.warn(`[LLM.completeJson] Failed JSON:\n  ${repaired.replace(/\n/g, "\n  ")}`);
       throw new Error(`Failed to parse JSON after repair: ${message}`);
     }
   }

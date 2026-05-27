@@ -1,7 +1,9 @@
 /**
- * Prompt Building and Template Loading
+ * Prompt Loading
  *
- * Constructs prompts for memory extraction and deduplication.
+ * Loads prompt templates from plugin's prompts/ directory at runtime for hot-reload support.
+ * Env vars WOPAL_DISTILL_PROMPT_FILE / WOPAL_DEDUP_PROMPT_FILE / WOPAL_TITLE_PROMPT_FILE
+ * override file paths with higher priority.
  */
 
 import { homedir } from "os";
@@ -10,135 +12,102 @@ import { existsSync, readFileSync } from "fs";
 import type { MemoryCategory } from "./types.js";
 import { memoryLogger } from "../logger.js";
 
+/** Plugin root directory — set during initialization */
+let _pluginDir: string | null = null;
+
 /**
- * Resolve prompt file path from environment variable
+ * Set plugin root directory for prompt file resolution.
+ * Must be called before any prompt loading functions.
+ */
+export function setPluginDirectory(dir: string): void {
+  _pluginDir = dir;
+}
+
+/**
+ * Resolve prompt file path from environment variable.
  *
  * Supports:
  * - Absolute path: /path/to/file.md
  * - Home directory: ~/path/to/file.md
- * - Relative path: .wopal/path/to/file.md (relative to cwd)
+ * - Relative path: path/to/file.md (relative to cwd)
  */
-export function resolvePromptFilePath(envVar: string): string | null {
+function resolveEnvFilePath(envVar: string): string | null {
   const envPath = process.env[envVar];
   if (!envPath) return null;
 
-  // Absolute path: use directly
   if (envPath.startsWith("/")) {
     return envPath;
   }
 
-  // Home directory: resolve ~/
   if (envPath.startsWith("~/")) {
     return join(homedir(), envPath.slice(2));
   }
 
-  // Relative path: resolve from cwd (workspace root)
   return join(process.cwd(), envPath);
 }
 
-/** Title generation prompt for session title after compaction */
-export const TITLE_GENERATION_PROMPT = `You are a title generator. Output ONLY a session title, nothing else.
-
-Generate a brief title (≤50 characters) from the conversation summary below.
-
-<rules>
-- Use the same language as the summary
-- Focus on the main goal or topic from the Goal section
-- Include specific project names, technical terms, or file names
-- Never include tool names or generic filler words
-- Do NOT start with "Summarizing" or "Generating"
-- Output a single line, no quotes, no formatting
-</rules>
-
-<summary>
-{{summary}}
-</summary>
-
-Title:`
-
-// Prompt file path from environment
-const DISTILL_PROMPT_FILE = resolvePromptFilePath("WOPAL_DISTILL_PROMPT_FILE");
-const DEDUP_PROMPT_FILE = resolvePromptFilePath("WOPAL_DEDUP_PROMPT_FILE");
-
 /**
- * Extracted memory from LLM (single-layer body)
+ * Load a prompt file: env var override → plugin prompts/ dir.
+ * Returns null if neither source is available.
  */
+function loadPromptFile(envVar: string, filename: string): string | null {
+  const envPath = resolveEnvFilePath(envVar);
+  if (envPath && existsSync(envPath)) {
+    try {
+      memoryLogger.debug(`Loaded prompt from env: ${envPath}`);
+      return readFileSync(envPath, "utf-8");
+    } catch (error) {
+      memoryLogger.warn(`Failed to load prompt from ${envPath}: ${error}`);
+    }
+  }
+
+  if (_pluginDir) {
+    const pluginPath = join(_pluginDir, "prompts", filename);
+    if (existsSync(pluginPath)) {
+      try {
+        return readFileSync(pluginPath, "utf-8");
+      } catch (error) {
+        memoryLogger.warn(`Failed to load prompt from ${pluginPath}: ${error}`);
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Title generation prompt for session title after compaction */
+export function loadTitlePrompt(): string {
+  return loadPromptFile("WOPAL_TITLE_PROMPT_FILE", "title.md")
+    ?? "You are a title generator. You output ONLY a thread title. Nothing else.\n\nGenerate a brief title (≤50 characters) from the conversation summary below. Use the same language as the summary.\n\n---\nConversation summary:\n{{summary}}";
+}
+
+/** Extracted memory from LLM (single-layer body) */
 export interface ExtractResult {
   memories: Array<{
     category: MemoryCategory;
-    body: string; // self-contained structured Markdown
+    body: string;
     tags: string[];
   }>;
   title?: string;
 }
 
 /**
- * Load extraction prompt from file or return default
+ * Load extraction prompt template.
  */
-export function loadPromptTemplate(): string {
-  // Try file path from environment
-  if (DISTILL_PROMPT_FILE && existsSync(DISTILL_PROMPT_FILE)) {
-    try {
-      const content = readFileSync(DISTILL_PROMPT_FILE, "utf-8");
-      memoryLogger.debug(`Loaded distill prompt from: ${DISTILL_PROMPT_FILE}`);
-      return content;
-    } catch (error) {
-      memoryLogger.warn(`Failed to load distill prompt from ${DISTILL_PROMPT_FILE}: ${error}`);
-    }
-  }
-
-  // Fallback: try default path
-  const defaultPath = join(homedir(), ".wopal", "agents", "wopal", "prompts", "distill.md");
-  if (existsSync(defaultPath)) {
-    try {
-      const content = readFileSync(defaultPath, "utf-8");
-      memoryLogger.debug(`Loaded distill prompt from default path: ${defaultPath}`);
-      return content;
-    } catch (error) {
-      memoryLogger.warn(`Failed to load distill prompt from default path: ${error}`);
-    }
-  }
-
-  // Return embedded default prompt (simplified version for fallback)
-  memoryLogger.debug("Using embedded default distill prompt");
-  return `# 记忆提取 Prompt（默认版本）
-
-分析以下会话内容，提取值得长期保存的记忆。
-
-## 最近对话
-{{conversation}}
-
----
-
-# 分类体系（7 类）
-
-| 中文标签 | 英文 category | 定义 |
-|---------|--------------|------|
-| 用户画像 | profile | 用户身份、静态属性 |
-| 用户偏好 | preference | 用户习惯、倾向、风格（非强制） |
-| 技术知识 | knowledge | 本空间/项目特有的技术理解、内部机制 |
-| 项目事实 | fact | 本空间/项目特有的客观事实、路径约定 |
-| 避坑方法 | gotcha | 历史错误、预防措施（必须有踩坑经历） |
-| 实践经验 | experience | 可复用流程、方法论 |
-| 用户要求 | requirement | 用户明确要求必须遵守的规则/行为 |
-
-# 输出格式
-
-返回 JSON 对象。示例：
-{"memories": [{"category": "knowledge", "body": "## [技术知识]: 主题\\n**背景**: ...\\n**内容**: ...", "tags": ["tag"]}]}
-
-如果无记忆可提取，返回 {"memories": []}`;
+function loadPromptTemplate(): string {
+  return loadPromptFile("WOPAL_DISTILL_PROMPT_FILE", "distill.md")
+    ?? "# Memory Extraction\n\nAnalyze the conversation below and extract memories worth preserving for future sessions.\n\n## Recent Conversation\n{{conversation}}\n\n## Output Format\n\nReturn a JSON object:\n{\"memories\": [{\"category\": \"knowledge\", \"body\": \"Title\\n\\nCore content...\", \"tags\": [\"tag\"]}]}\n\nIf nothing to extract, return {\"memories\": []}";
 }
 
 /**
- * Build extraction prompt for LLM (always reads from file for hot-reload)
+ * Build extraction prompt for LLM (always reads from file for hot-reload).
  */
 export function buildExtractionPrompt(conversation: string): string {
   return loadPromptTemplate().replace("{{conversation}}", conversation);
 }
 
 /**
- * Build deduplication prompt — single LLM call for decision + merge content
+ * Build deduplication prompt — single LLM call for decision + merge content.
  */
 export function buildBatchDedupPrompt(
   candidates: Array<{ index: number; category: string; body: string }>,
@@ -156,33 +125,8 @@ export function buildBatchDedupPrompt(
     };
   });
 
-  // Try loading from file
-  if (DEDUP_PROMPT_FILE && existsSync(DEDUP_PROMPT_FILE)) {
-    try {
-      const template = readFileSync(DEDUP_PROMPT_FILE, "utf-8");
-      memoryLogger.debug(`Loaded dedup prompt from: ${DEDUP_PROMPT_FILE}`);
-      return template.replace("{{input}}", JSON.stringify(input, null, 2));
-    } catch (error) {
-      memoryLogger.warn(`Failed to load dedup prompt from ${DEDUP_PROMPT_FILE}: ${error}`);
-    }
-  }
+  const template = loadPromptFile("WOPAL_DEDUP_PROMPT_FILE", "dedup.md")
+    ?? "You are a memory deduplicator. For each candidate, compare with similar existing memories and decide: create (unrelated, coexist), skip (discard), merge (supplement), or replace (outdated).\n\nInput:\n{{input}}\n\nOutput JSON:\n{\"decisions\": [{\"index\": 1, \"action\": \"create\"}, {\"index\": 2, \"action\": \"skip\"}, {\"index\": 3, \"action\": \"merge\", \"merge_into\": 1, \"merged_body\": \"...\", \"tags\": [\"tag\"]}]}";
 
-  // Fallback: inline prompt
-  return `你是记忆去重器。对每条候选，与已有相似记忆对比后做出决策。
-
-输入：
-${JSON.stringify(input, null, 2)}
-
-操作：create（不相关，应新建）/ skip（重复）/ merge（补充新细节）/ replace（事实已变化）
-
-关键约束：
-- 同关键词 ≠ 重复：两条都提到"确认"不代表是同一条要求
-- requirement 类型：两条不同的用户要求应并存（create），不要合并
-- create：候选与已有记忆说的是不同的事情，应该同时存在
-- skip：候选的所有关键信息都已在已有记忆中
-- merge：候选补充了已有记忆没有的新细节，输出 merged_body 和 tags
-- replace：候选与已有记忆冲突（旧的对新的错），用候选替换
-
-输出 JSON：
-{"decisions": [{"index": 1, "action": "create"}, {"index": 2, "action": "skip"}, {"index": 3, "action": "merge", "merge_into": 1, "merged_body": "合并后完整内容", "tags": ["tag1"]}]}`;
+  return template.replace("{{input}}", JSON.stringify(input, null, 2));
 }

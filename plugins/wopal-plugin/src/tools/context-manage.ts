@@ -7,7 +7,6 @@
  */
 
 import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
-import type { DistillLLMClient } from "../memory/llm-client.js";
 import type { SystemPromptMetadata } from "../types.js";
 import type { MessageWithInfo } from "../hooks/message-context.js";
 import type { SessionStore } from "../session-store.js";
@@ -19,20 +18,17 @@ import { resolveSessionTarget } from "./context-target.js";
 import {
   handleStatus,
   handleDump,
-  handleSummary,
   handleCompact,
 } from "./context-manage-actions.js";
 
 /**
  * Create context_manage tool
  *
- * @param distillLLM - Distill LLM client for summary generation
  * @param client - OpenCode client for session.messages() and session.update()
  * @param systemSnapshots - Plugin injections (rules + memories)
  * @param transformedMessagesMap - Messages with synthetic parts from hooks
  */
 export function createContextManageTool(
-  distillLLM: DistillLLMClient,
   client: OpenCodeClient,
   systemSnapshots?: Map<string, string[]>,
   systemMetadataMap?: Map<string, SystemPromptMetadata>,
@@ -54,15 +50,14 @@ export function createContextManageTool(
 
 Actions:
 - 'status': Session stats (context %, model, tokens) + active tasks list (main sessions only). Use before compact decisions or when context usage is uncertain.
-- 'summary': Generate session title (main sessions only). Only when user requests — not for casual use.
 - 'dump': Export context to file. Default: compact mode (detail=false). Use detail=true only when user explicitly requests full content. Low-frequency diagnostic tool.
 - 'compact': Trigger context compaction.
 
 ⚠️ compact is ASYNC — it schedules compaction but does NOT start immediately. Actual compaction begins only after YOUR turn finishes. After calling compact, finish your turn as soon as possible. Every message you generate delays compaction and degrades quality under high context. You will receive a notification when compaction completes — resume work only after that.`,
     args: {
       action: tool.schema
-        .enum(["summary", "status", "dump", "compact"] as const)
-        .describe("'summary' to generate summary and update title, 'status' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
+        .enum(["status", "dump", "compact"] as const)
+        .describe("'status' to inspect session context usage, 'dump' to export session context, 'compact' to compact session"),
       session_id: tool.schema
         .string()
         .optional()
@@ -76,8 +71,7 @@ Actions:
     execute: async (args, context: ToolContext): Promise<string> => {
       const sessionID = context.sessionID;
 
-      // Log caller session for summary/status/dump; compact has dedicated target session log
-      // When querying a different session (args.session_id != caller), show both to prevent misleading duplicates
+      // Log caller session for status/dump; compact has dedicated target session log
       if (args.action !== "compact") {
         if (args.session_id && args.session_id !== sessionID) {
           const callerLabel = formatSessionID(sessionID ?? "?", false);
@@ -132,15 +126,6 @@ Actions:
         const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
         contextLogger.trace(`[context_manage] compact ${formatSessionID(target.sessionID, target.isTask)}`);
         return await handleCompact(target.sessionID, target.isTask, client, activeStore, baseDir, taskManager);
-      }
-
-      // === SUMMARY action (no session_id override) ===
-      if (!sessionID) {
-        return "Failed: current session ID is unavailable.";
-      }
-
-      if (args.action === "summary") {
-        return await handleSummary(sessionID, distillLLM, client);
       }
 
       return "Unknown action.";

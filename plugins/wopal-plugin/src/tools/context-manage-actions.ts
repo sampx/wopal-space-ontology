@@ -1,26 +1,19 @@
 /**
- * Context Manage Actions - Handlers for status/dump/summary/compact
+ * Context Manage Actions - Handlers for status/dump/compact
  *
  * Extracted from context-manage.ts to reduce orchestration layer size.
  * Each handler is pure or has minimal side effects.
  */
 
 import type { OpenCodeClient } from "../types.js"
-import type { DistillLLMClient } from "../memory/llm-client.js"
 import type { SessionState, SessionStore } from "../session-store.js"
 import type { SystemPromptMetadata } from "../types.js"
 import type { MessageWithInfo } from "../hooks/message-context.js"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
-import {
-  loadSessionContext,
-  saveSessionContext,
-  type SessionContext,
-} from "../memory/session-context.js"
-import type { SessionMessage } from "../types.js"
+import type { TaskSessionInspector } from "../session-runtime-info.js"
 import { contextLogger, formatSessionID } from "../logger.js"
 import { writeContextDump, findActualKey } from "./dump-formatter.js"
 import { fetchContextPercent } from "../session-runtime-info.js"
-import type { TaskSessionInspector } from "../session-runtime-info.js"
 
 export interface StatusPayload {
   sessionID: string
@@ -170,108 +163,6 @@ export async function handleDump(
       : "structured metadata"
     : `${result.blockCount} raw blocks`
   return `Context dumped to ${result.filepath}\n\n- **Session:** ${sessionID}\n- **System prompt:** ${sysPromptLabel} (${metaLabel})\n- **Messages:** ${result.messageCount}`
-}
-
-/**
- * Handle summary action - generate session summary via LLM.
- */
-export async function handleSummary(
-  sessionID: string,
-  distillLLM: DistillLLMClient,
-  client: OpenCodeClient,
-): Promise<string> {
-  if (typeof client?.session?.messages !== "function") {
-    return "Failed: session.messages API is unavailable."
-  }
-
-  try {
-    const result = await client.session.messages({ path: { id: sessionID } }) as { data?: SessionMessage[] } | undefined
-    const messages: SessionMessage[] = result?.data ?? []
-
-    if (messages.length === 0) {
-      return "No messages in current session to summarize."
-    }
-
-    const userTexts: string[] = []
-    for (const msg of messages) {
-      if (msg.info?.role !== "user") continue
-      if (!msg.parts) continue
-
-      // Skip compaction messages
-      if (msg.parts.some((p) => p.type === "compaction")) continue
-
-      for (const part of msg.parts) {
-        if (part.type === "text" && part.text) {
-          // Skip synthetic parts (system notifications injected as user text)
-          if (part.synthetic) continue
-          userTexts.push(part.text)
-        }
-      }
-    }
-
-    if (userTexts.length === 0) {
-      return "No user messages found to summarize."
-    }
-
-    const combinedText = userTexts.join("\n\n---\n\n")
-    const truncatedText = combinedText.length > 3000
-      ? combinedText.slice(-3000)
-      : combinedText
-    const prompt = `根据以下用户消息，用一句话概括本次会话的核心意图，不超过 50 字。
-
-用户消息：
-${truncatedText}
-
-要求：
-- 用简洁的一句话描述用户想要做什么
-- 不超过 50 个汉字
-- 只输出摘要内容，不要其他解释`
-
-    const summaryText = await distillLLM.complete(prompt)
-    const cleanedSummary = summaryText
-      .trim()
-      .replace(/^["「『]|["」』]$/g, "")
-      .slice(0, 80)
-
-    const existingCtx = loadSessionContext(sessionID)
-    const newCtx: SessionContext = {
-      sessionID,
-      title: existingCtx?.title ?? null,
-      ...existingCtx,
-      summary: {
-        text: cleanedSummary,
-        messageCount: messages.length,
-        generatedAt: new Date().toISOString(),
-      },
-    }
-
-    if (typeof client?.session?.update === "function") {
-      try {
-        await client.session.update({
-          path: { id: sessionID },
-          body: { title: cleanedSummary },
-        })
-        newCtx.title = cleanedSummary
-      } catch (error) {
-        contextLogger.debug(`[context_manage.summary] Failed to update session title: ${error}`)
-      }
-    }
-
-    saveSessionContext(newCtx)
-
-    return [
-      "## ✅ Session Summary Generated",
-      "",
-      `**Summary:** ${cleanedSummary}`,
-      `**Message Count:** ${messages.length}`,
-      `**Generated At:** ${new Date().toISOString()}`,
-      "",
-      "> Important: This output is only visible to the calling agent. You must display the full content to the user.",
-    ].join("\n")
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return `Failed to generate summary: ${message}`
-  }
 }
 
 /**

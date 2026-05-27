@@ -8,7 +8,7 @@
 import type { MemoryStore } from "./store.js";
 import type { MemoryCategory } from "./types.js";
 import type { EmbeddingClient } from "./embedder.js";
-import type { DistillLLMClient } from "./llm-client.js";
+import type { LLMClient } from "../llm-client.js";
 import type { SessionMessage } from "../types.js";
 import { memoryLogger, formatSessionID } from "../logger.js";
 import { loadSessionContext, saveSessionContext, clearSessionContext, type SessionContext } from "./session-context.js";
@@ -73,9 +73,9 @@ export function clearExtractionState(sessionID: string): void {
 export class DistillEngine {
   private store: MemoryStore;
   private embedder: EmbeddingClient;
-  private llm: DistillLLMClient;
+  private llm: LLMClient;
 
-  constructor(store: MemoryStore, embedder: EmbeddingClient, llm: DistillLLMClient) {
+  constructor(store: MemoryStore, embedder: EmbeddingClient, llm: LLMClient) {
     this.store = store;
     this.embedder = embedder;
     this.llm = llm;

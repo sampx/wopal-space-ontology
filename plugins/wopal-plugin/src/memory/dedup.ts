@@ -7,7 +7,7 @@
 import type { MemoryCategory } from "./types.js";
 import type { MemoryStore } from "./store.js";
 import type { EmbeddingClient } from "./embedder.js";
-import type { DistillLLMClient } from "./llm-client.js";
+import type { LLMClient } from "../llm-client.js";
 import { memoryLogger } from "../logger.js";
 import { validateCategory, getDefaultImportance } from "./categories.js";
 import { buildBatchDedupPrompt } from "./prompts.js";
@@ -58,7 +58,7 @@ export async function performDeduplication(
   candidates: DedupCandidate[],
   store: MemoryStore,
   embedder: EmbeddingClient,
-  llm: DistillLLMClient,
+  llm: LLMClient,
 ): Promise<DedupResult> {
   const result: DedupResult = {
     create: [],

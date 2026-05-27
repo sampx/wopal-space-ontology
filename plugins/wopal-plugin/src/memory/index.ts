@@ -7,7 +7,7 @@
 export { MemoryStore } from "./store.js";
 export type { Memory, MemoryInput, MemoryCategory, MemoryUpdate, QueryType } from "./types.js";
 export { EmbeddingClient } from "./embedder.js";
-export { DistillLLMClient } from "./llm-client.js";
+export { LLMClient } from "../llm-client.js";
 
 // Core engine exports
 export {

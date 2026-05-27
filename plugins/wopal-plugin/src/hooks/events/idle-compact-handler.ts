@@ -14,8 +14,8 @@ import {
   saveSessionContext,
   type SessionContext,
 } from "../../memory/session-context.js"
-import { DistillLLMClient } from "../../memory/llm-client.js"
-import { TITLE_GENERATION_PROMPT } from "../../memory/prompts.js"
+import { LLMClient } from "../../llm-client.js"
+import { loadTitlePrompt } from "../../memory/prompts.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
@@ -186,8 +186,8 @@ async function generateTitleInBackground(
   isTask: boolean,
 ): Promise<void> {
   try {
-    const llm = new DistillLLMClient()
-    const prompt = TITLE_GENERATION_PROMPT.replace("{{summary}}", compactionText)
+    const llm = new LLMClient()
+    const prompt = loadTitlePrompt().replace("{{summary}}", compactionText)
     const raw = await llm.complete(prompt)
     const title = raw
       .replace(/<\/think>[\s\S]*?<\/think>\s*/g, "")
