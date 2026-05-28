@@ -10,7 +10,8 @@
 <CRITICAL_RULE>
 On startup, agents must load the following files in order (skip if already loaded):
 1. `.wopal-space/STRUCTURE.md` — Space structure source of truth
-2. `.wopal-space/memory/USER.md` — User profile
+2. `.wopal-space/REGULATIONS.md` — Space regulations (strictly follow)
+3. `.wopal-space/memory/USER.md` — User profile
 </CRITICAL_RULE>
 
 ## User Rules

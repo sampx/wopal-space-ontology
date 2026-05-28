@@ -29,10 +29,10 @@ contents: []
 | path | type | level | description |
 |------|------|-------|-------------|
 | `.wopal` | ontology-worktree | worktree | ontology worktree — {space-name} 空间 |
-| `.wopal/skills/` | ontology-worktree | moduel | 技能定义 |
-| `.wopal/agents/` | ontology-worktree | moduel | Agent 灵魂 |
-| `.wopal/rules/` | ontology-worktree | moduel | 行为规则 |
-| `.wopal/commands/` | ontology-worktree | moduel | 自定义命令 |
+| `.wopal/skills/` | ontology-worktree | module | 技能定义 |
+| `.wopal/agents/` | ontology-worktree | module | Agent 灵魂 |
+| `.wopal/rules/` | ontology-worktree | module | 行为规则 |
+| `.wopal/commands/` | ontology-worktree | module | 自定义命令 |
 | `.wopal-space/.tmp/` | space-runtime | dir | 临时缓冲 |
 | `.wopal-space/INBOX/` | space-runtime | dir | 外部技能暂存 |
 | `.wopal-space/backup/` | space-runtime | dir | 空间内容备份 |

@@ -29,10 +29,10 @@ contents: []
 | path | type | level | description |
 |------|------|-------|-------------|
 | `.wopal` | ontology-worktree | worktree | ontology worktree — {space-name} space |
-| `.wopal/skills/` | ontology-worktree | moduel | skill definitions |
-| `.wopal/agents/` | ontology-worktree | moduel | Agent souls |
-| `.wopal/rules/` | ontology-worktree | moduel | behavior rules |
-| `.wopal/commands/` | ontology-worktree | moduel | custom commands |
+| `.wopal/skills/` | ontology-worktree | module | skill definitions |
+| `.wopal/agents/` | ontology-worktree | module | Agent souls |
+| `.wopal/rules/` | ontology-worktree | module | behavior rules |
+| `.wopal/commands/` | ontology-worktree | module | custom commands |
 | `.wopal-space/.tmp/` | space-runtime | dir | temporary buffer |
 | `.wopal-space/INBOX/` | space-runtime | dir | external skill staging |
 | `.wopal-space/backup/` | space-runtime | dir | space content backup |
