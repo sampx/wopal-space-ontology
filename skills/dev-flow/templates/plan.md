@@ -40,13 +40,28 @@
 
 <!--
   ⚠️ 前期研究结论摘要。
-  **必须附带参考资料列表**——研究来源的文件路径（如 projects/space-flow/agents/wsf-planner.md）或 URL 链接。
   确保后续审阅者可追溯到原始研究材料。
+
+  ⚠️ 参考资料只放上下文文档——Plan 实施时需要理解的外部约束和前置上下文。
+  不是实施目标文档，不是被修改的源文件，不是项目配置文件。
+
+  ✅ 应该放：
+  - 父级产品架构文档（如 docs/products/<product>/DESIGN-<product>.md）
+  - 产品阶段文档（如 docs/products/<product>/phases/<product>-p1-xxx.md）
+  - 上游依赖 Plan（如本 Plan 依赖的其他项目 Plan）
+  - 外部规范/标准文档
+
+  ❌ 不应该放：
+  - 本项目的 DESIGN.md（这是实施目标，已通过 Architecture Context 引用）
+  - 本 Plan 要修改的源文件（已在 Affected Files 表中列出）
+  - 项目配置文件（package.json 等）
+  - 运行时实例文件（.wopal-space/ 下的 STRUCTURE.md、REGULATIONS.md 等）
 -->
 <研究结论摘要>
 
 **参考资料**：
-- `<参考资料文件路径或 URL>`
+<!-- 只放上下文文档：父级架构、阶段文档、依赖 Plan、外部规范。不放本项目 DESIGN、源文件、配置文件、运行时实例。 -->
+- `<上下文文档路径>`
 
 ### Key Decisions
 
