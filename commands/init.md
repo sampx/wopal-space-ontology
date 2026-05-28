@@ -1,70 +1,52 @@
 ---
-description: guided AGENTS.md setup
+description: calibrate space runtime structure
 ---
 
-Create or update `AGENTS.md` for this repository.
-
-The goal is a compact instruction file that helps future OpenCode sessions avoid mistakes and ramp up quickly. Every line should answer: "Would an agent likely miss this without help?" If not, leave it out.
+Calibrate the current WopalSpace runtime structure: verify the `.wopal-space/` skeleton, detect structural drift, and report template diffs for user confirmation before writing.
 
 User-provided focus or constraints (honor these):
 $ARGUMENTS
 
-## How to investigate
+## Goal
 
-Read the highest-value sources first:
-- `README*`, root manifests, workspace config, lockfiles
-- build, test, lint, formatter, typecheck, and codegen config
-- CI workflows and pre-commit / task runner config
-- existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`, `.github/copilot-instructions.md`)
-- repo-local OpenCode config such as `opencode.json`
+Ensure the current space runtime matches its declared structure in `STRUCTURE.md` and that key runtime files (`REGULATIONS.md`, `memory/USER.md`, `memory/MEMORY.md`) are present and up to date. This is a maintenance command for existing spaces — not a replacement for `wopal space init`.
 
-If architecture is still unclear after reading config and docs, inspect a small number of representative code files to find the real entrypoints, package boundaries, and execution flow. Prefer reading the files that explain how the system is wired together over random leaf files.
+## Investigation scope
 
-Prefer executable sources of truth over prose. If docs conflict with config or scripts, trust the executable source and only keep what you can verify.
+Read these sources to build the current-state picture:
 
-## What to extract
+1. **Structure truth source**: `.wopal-space/STRUCTURE.md` — frontmatter and markdown table define what the space should contain.
+2. **Runtime directory**: `.wopal-space/` — scan actual directories and files against the declared structure.
+3. **Space root**: check `AGENTS.md` and `.gitignore` at the space root.
+4. **Ontology templates**: `.wopal/templates/` — reference templates for diff comparison (`STRUCTURE.md`, `REGULATIONS.md`, `root-AGENTS.md`, `gitignore`, `memory/USER.md`, `memory/MEMORY.md`).
+5. **Schema**: `.wopal/templates/wopalspace-schema.yaml` — defines the canonical runtime and space file/directory layout.
 
-Look for the highest-signal facts for an agent working in this repo:
-- exact developer commands, especially non-obvious ones
-- how to run a single test, a single package, or a focused verification step
-- required command order when it matters, such as `lint -> typecheck -> test`
-- monorepo or multi-package boundaries, ownership of major directories, and the real app/library entrypoints
-- framework or toolchain quirks: generated code, migrations, codegen, build artifacts, special env loading, dev servers, infra deploy flow
-- repo-specific style or workflow conventions that differ from defaults
-- testing quirks: fixtures, integration test prerequisites, snapshot workflows, required services, flaky or expensive suites
-- important constraints from existing instruction files worth preserving
+If `STRUCTURE.md` is missing, report that `wopal space init` should be run first and stop.
 
-Good `AGENTS.md` content is usually hard-earned context that took reading multiple files to infer.
+## Execution order
+
+1. **Read current state** — load `STRUCTURE.md`, scan `.wopal-space/` and space root for actual files and directories.
+2. **Calibrate structure** — compare actual layout against `STRUCTURE.md` frontmatter and schema. Identify missing directories, missing files, and undeclared entries.
+3. **Check runtime files** — verify presence of `REGULATIONS.md`, `memory/USER.md`, `memory/MEMORY.md`. Check if root `AGENTS.md` and `.gitignore` exist.
+4. **Report template diffs** — for each runtime file that has a corresponding template, show a concise diff or summary of differences between the template and the current instance. Highlight user-authored content that must be preserved.
+5. **Wait for user confirm** — present all findings as a structured report. Do not write any files until the user explicitly confirms.
+6. **Write** — after confirmation, apply only the approved changes: create missing directories/files, update `STRUCTURE.md` structure facts, and preserve all user-authored content.
+
+## Output constraints
+
+- Structure report must reference `STRUCTURE.md` and `REGULATIONS.md` explicitly.
+- Clearly label each finding as: **missing** (does not exist), **drift** (exists but differs from declared structure), or **template-diff** (instance differs from template).
+- Never overwrite user-authored content in `REGULATIONS.md`, `memory/USER.md`, or `memory/MEMORY.md` without showing the diff and getting explicit confirmation.
+- Preserve the interactive confirmation style: always report first, wait for user approval, then write.
+- Do not move deterministic init logic (directory creation, template rendering) into this command — that belongs to `wopal space init`.
 
 ## Questions
 
-Only ask the user questions if the repo cannot answer something important. Use the `question` tool for one short batch at most.
+Only ask the user questions if the runtime state cannot be resolved from the available sources. Use the `question` tool for one short batch at most.
 
 Good questions:
-- undocumented team conventions
-- branch / PR / release expectations
-- missing setup or test prerequisites that are known but not written down
+- ambiguous structural entries in `STRUCTURE.md`
+- conflicting information between `STRUCTURE.md` and actual layout
+- user intent for undeclared directories found during scan
 
-Do not ask about anything the repo already makes clear.
-
-## Writing rules
-
-Include only high-signal, repo-specific guidance such as:
-- exact commands and shortcuts the agent would otherwise guess wrong
-- architecture notes that are not obvious from filenames
-- conventions that differ from language or framework defaults
-- setup requirements, environment quirks, and operational gotchas
-- references to existing instruction sources that matter
-
-Exclude:
-- generic software advice
-- long tutorials or exhaustive file trees
-- obvious language conventions
-- speculative claims or anything you could not verify
-- content better stored in another file referenced via `opencode.json` `instructions`
-
-When in doubt, omit.
-
-Prefer short sections and bullets. If the repo is simple, keep the file simple. If the repo is large, summarize the few structural facts that actually change how an agent should work.
-
-If `AGENTS.md` already exists at `${path}`, improve it in place rather than rewriting blindly. Preserve verified useful guidance, delete fluff or stale claims, and reconcile it with the current codebase.
+Do not ask about anything the schema or `STRUCTURE.md` already makes clear.
