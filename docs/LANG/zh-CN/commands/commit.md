@@ -71,7 +71,6 @@ git diff --stat
 ```
 📦 工作空间:
   - MEMORY.md
-  - docs/projects/plans/xxx.md
 
 📦 projects/ontology:
   - agents/wopal/commands/summon.md
@@ -79,7 +78,6 @@ git diff --stat
 
 分组:
   [workspace] 组1 (docs): 更新知识沉淀 → MEMORY.md
-  [workspace] 组2 (chore): 归档计划 → plans/xxx.md
   [ontology] 组1 (feat): 优化命令提示词 → summon.md + commit.md
 ```
 

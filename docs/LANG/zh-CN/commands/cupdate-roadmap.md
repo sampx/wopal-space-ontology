@@ -8,7 +8,7 @@ description: 创建或更新产品阶段路线图文档
 
 **用户输入参数**：`$1` `$2`
 
-**参数说明**: `<名称> [类型: product|project]`。用户未输入时，去 `docs/products/` 和 `docs/projects/` 查目录和上下文匹配推断，有疑问向用户确认. 
+**参数说明**: `<名称> [类型: product|project]`。用户未输入时，去 `docs/products/` 和 `projects/*/docs/` 查目录和上下文匹配推断，有疑问向用户确认.
 
 
 **两种模式**：
@@ -43,7 +43,7 @@ description: 创建或更新产品阶段路线图文档
 # 产品 DESIGN：
 docs/products/wopal-space/phases/wopal-space-p0-core-foundation.md
 # 项目 DESIGN：
-docs/projects/wopal-cli/phases/wopal-cli-p1-one-click-distribution.md
+projects/wopal-cli/docs/phases/wopal-cli-p1-one-click-distribution.md
 ```
 
 存量文档保留现有路径不变。

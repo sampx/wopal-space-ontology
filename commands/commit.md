@@ -71,7 +71,6 @@ git diff --stat
 ```
 📦 Workspace:
   - MEMORY.md
-  - docs/projects/plans/xxx.md
 
 📦 projects/ontology:
   - agents/wopal/commands/summon.md
@@ -79,7 +78,6 @@ git diff --stat
 
 Groups:
   [workspace] group1 (docs): update knowledge → MEMORY.md
-  [workspace] group2 (chore): archive plan → plans/xxx.md
   [ontology] group1 (feat): optimize command prompts → summon.md + commit.md
 ```
 

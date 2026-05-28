@@ -52,8 +52,8 @@ Product PRD + Product DESIGN §9 (Evolution Roadmap)
                   ▼
         ┌──────────────────┐
         │  Issue → Plan    │  (项目级, 1:1)
-        │  docs/projects/  │    每 phase 1 Issue + 1 Plan
-        │  <project>/plans/│
+        │  projects/  │    每 phase 1 Issue + 1 Plan
+        │  <project>/docs/plans/│
         └──────────────────┘
 ```
 
@@ -129,7 +129,7 @@ flow.sh roadmap <project> --decompose P1        # 仅处理指定 phase
 flow.sh roadmap <project> --decompose --dry-run # 预览，不创建
 ```
 
-`<project>` 是 `docs/projects/` 下的项目名（如 `wopal-cli`）。
+`<project>` 是 `projects/` 下的项目名（如 `wopal-cli`）。
 
 ### road --decompose 创建逻辑
 
@@ -145,7 +145,7 @@ flow.sh roadmap <project> --decompose --dry-run # 预览，不创建
 **Plan 路径**（`--decompose --plan`）：
 1-2 同上
 3. 每条 phase → 1 个 Plan（复用 `create_plan_from_template()`）：
-   - Plan 目录: `docs/projects/{project}/plans/`
+   - Plan 目录: `projects/{project}/docs/plans/`
    - Plan 名: `{type}-{project}-p{N}-{slug}`
    - Body: 注入 product/phase/phase_doc/goal/exit_criteria 上下文
 4. 直接进入 `approve → execute → complete → verify → archive` 标准流程
@@ -185,7 +185,7 @@ flow.sh roadmap <project> --decompose --dry-run # 预览，不创建
 ### Key Decisions
 
 - D-01: 砍掉项目 phase 文档。产品 phase 是唯一 phase doc，项目目标直接写在 DESIGN §8。
-- D-02: roadmap 只接受 `<project>` 参数（无需 product/project 双模式分支）。模式由 `docs/projects/<name>/DESIGN.md` 路径自动确定。
+- D-02: roadmap 只接受 `<project>` 参数（无需 product/project 双模式分支）。模式由 `projects>/<name>/docs/DESIGN.md` 路径自动确定。
 - D-03: Phase doc 模板统一使用 `## Metadata` 格式（`- **Field**: value`），不再使用 blockquote 元数据格式。
 - D-04: 校验分两层——脚本负责格式（字段存在、枚举值、Regex），人/AI 负责内容质量（Goal 可验证性、Exit Criteria 可测试性）。
 - D-05: `--decompose --plan` 读产品 phase doc 做上下文注入（Goal/Exit Criteria/Decomposition Hints），确保 Plan 有足够 Agent 可消费的上下文。

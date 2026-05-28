@@ -8,7 +8,7 @@ WopalSpace 的空间灵魂、规约与能力基因工具包；`agents/`、`rules
 
 规范文档引用：
 
-- DESIGN: `docs/projects/wopal-space-ontology/DESIGN.md`
+- DESIGN: `.wopal/docs/DESIGN.md`
 - Business Rules: `.wopal/rules/business-rules.md`
 - Parent Rules: `.wopal-space/REGULATIONS.md`
 - Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
@@ -17,7 +17,7 @@ WopalSpace 的空间灵魂、规约与能力基因工具包；`agents/`、`rules
 
 执行链：修改 ontology 源 → 如涉及加载链路，由用户重启 ellamaka → 在 ellamaka 运行时验证。
 
-本地化审核目录使用 `docs/projects/wopal-space-ontology/LANG/<locale>/...`；`<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死 `zh-CN`。
+本地化审核目录使用 `.wopal/docs/LANG/<locale>/...`；`<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死 `zh-CN`。
 
 | 目录 | 职责 |
 |---|---|
@@ -42,7 +42,7 @@ WopalSpace 的空间灵魂、规约与能力基因工具包；`agents/`、`rules
 - `<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死某个具体 locale。
 - 审核版标题和正文使用目标语言，禁止中英文标题混杂。
 - 审核版确认后再更新 `.wopal/` 下对应英文运行源；两个版本的语义必须保持一致。
-- 对于 `agents/`、`rules/`、`commands/`、`templates/`、`prompts/`，审核版放在 `docs/projects/wopal-space-ontology/LANG/<locale>/<type>/` 下。
+- 对于 `agents/`、`rules/`、`commands/`、`templates/`、`prompts/`，审核版放在 `.wopal/docs/LANG/<locale>/<type>/` 下。
 - 对于 `skills/`，用户偏好语言审核版放在 skill 同目录，命名为 `SKILL.<locale>.md`（例如 `SKILL.zh-CN.md`）；审核通过后再同步到 `SKILL.md`。
 - 若用户偏好语言为英文，则直接更新正式英文文件，不生成 `SKILL.en-US.md` 之类的英文 locale 变体。
 

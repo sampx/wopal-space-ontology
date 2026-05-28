@@ -8,7 +8,7 @@ Discuss and generate compliant phase documents from a product DESIGN or project 
 
 **Input**: `$1` `$2`
 
-**Parameter Notes**: `<name> [type: product|project]`. When not provided, look up `docs/products/` and `docs/projects/` plus context to infer. Confirm if unclear.
+**Parameter Notes**: `<name> [type: product|project]`. When not provided, look up `docs/products/` and `projects/*/docs/` plus context to infer. Confirm if unclear.
 
 **Two modes**:
 
@@ -42,7 +42,7 @@ Examples:
 # Product DESIGN:
 docs/products/wopal-space/phases/wopal-space-p0-core-foundation.md
 # Project DESIGN:
-docs/projects/wopal-cli/phases/wopal-cli-p1-one-click-distribution.md
+projects/wopal-cli/docs/phases/wopal-cli-p1-one-click-distribution.md
 ```
 
 Preserve existing paths for legacy documents.

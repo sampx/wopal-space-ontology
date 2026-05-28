@@ -8,7 +8,7 @@ description: 创建或更新产品 DESIGN 文档
 
 **用户输入参数**：`$1` `$2`
 
-**参数说明**: `<名称> [product|project] `。用户未输入时，去 `docs/products/` 和 `docs/projects/` 查目录和上下文匹配推断，有疑问向用户确认. 
+**参数说明**: `<名称> [product|project] `。用户未输入时，去 `docs/products/` 和 `projects/*/docs/` 查目录和上下文匹配推断，有疑问向用户确认.
 
 ---
 
@@ -22,7 +22,7 @@ description: 创建或更新产品 DESIGN 文档
 
 **产品 DESIGN**：更新时保留既有路径。新建时默认：`docs/products/<product-name>/DESIGN-<product-name>.md`。可接受既有变体：`DESIGN.md`、`DESIGN-*.md`。
 
-**项目 DESIGN**：更新时保留既有路径。新建时默认：`docs/projects/<project-name>/DESIGN.md`。
+**项目 DESIGN**：更新时保留既有路径。新建时默认：`projects/<project-name>/docs/DESIGN.md`。
 
 ### 前置条件
 

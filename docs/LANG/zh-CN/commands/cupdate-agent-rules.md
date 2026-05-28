@@ -49,11 +49,11 @@ description: 创建或更新项目 AGENTS.md
 WopalSpace 常见文档位置：
 
 ```text
-docs/projects/<product>/PRD.md
-docs/projects/<product>/PRD-*.md
-docs/projects/<product>/DESIGN.md
-docs/projects/<product>/DESIGN-*.md
-docs/projects/<product>/BUSINESS_RULES.md
+projects/<product>/docs/PRD.md
+projects/<product>/docs/PRD-*.md
+projects/<product>/docs/DESIGN.md
+projects/<product>/docs/DESIGN-*.md
+projects/<product>/docs/BUSINESS_RULES.md
 <project>/AGENTS.md
 ```
 

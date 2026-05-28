@@ -15,7 +15,6 @@
 3. OpenCode 原生插件机制允许做什么，不允许做什么
 4. Wopal 当前已有插件能力是什么，未来的 `wopal-orchestrator-plugin` 应该怎样落地才兼容、可演进、可回退
 
-本报告聚焦“事实、结构、边界、迁移判断”，不直接承担实施设计；实施方案另见 `docs/projects/plans/wopal-orchestrator-evolution-plan.md`。
 
 ---
 

@@ -49,11 +49,11 @@ Before generating, prefer reading:
 Common WopalSpace document locations:
 
 ```text
-docs/projects/<project-name>/PRD.md
-docs/projects/<project-name>/PRD-*.md
-docs/projects/<project-name>/DESIGN.md
-docs/projects/<project-name>/DESIGN-*.md
-docs/projects/<project-name>/BUSINESS_RULES.md
+projects/<project-name>/docs/PRD.md
+projects/<project-name>/docs/PRD-*.md
+projects/<project-name>/docs/DESIGN.md
+projects/<project-name>/docs/DESIGN-*.md
+projects/<project-name>/docs/BUSINESS_RULES.md
 <project>/AGENTS.md
 ```
 

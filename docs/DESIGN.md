@@ -432,6 +432,6 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 |------|------|
 | `docs/products/wopal-space/PRD-wopalspace.md` | 父产品 PRD — 产品意图、定位与演进路线 |
 | `docs/products/wopal-space/DESIGN-wopalspace.md` | 父产品 DESIGN — 总体架构契约 |
-| `docs/projects/wopal-cli/DESIGN.md` | wopal-cli 子系统设计 — 统一操作入口 |
-| `docs/projects/wopal-space-ontology/BUSINESS_RULES.md` | 本体业务规则 |
+| `projects/wopal-cli/docs/DESIGN.md` | wopal-cli 子系统设计 — 统一操作入口 |
+| `.wopal/docs/BUSINESS_RULES.md` | 本体业务规则 |
 | `AGENTS.md` | 本体项目开发规范 |

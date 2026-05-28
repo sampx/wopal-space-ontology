@@ -8,7 +8,7 @@ Create or update a product or project DESIGN document. Product DESIGN is the ove
 
 **Input**: `$1` `$2`
 
-**Parameter Notes**: `<name> [product|project]`. When not provided, look up `docs/products/` and `docs/projects/` plus context to infer. Confirm if unclear.
+**Parameter Notes**: `<name> [product|project]`. When not provided, look up `docs/products/` and `projects/*/docs/` plus context to infer. Confirm if unclear.
 
 ---
 
@@ -22,7 +22,7 @@ Write the generated or updated document in the user's preferred language unless 
 
 **Product DESIGN**: preserve the existing path when updating. Default for new files: `docs/products/<product-name>/DESIGN-<product-name>.md`. Acceptable existing variants: `DESIGN.md`, `DESIGN-*.md`.
 
-**Project DESIGN**: preserve the existing path when updating. Default for new files: `docs/projects/<project-name>/DESIGN.md`.
+**Project DESIGN**: preserve the existing path when updating. Default for new files: `projects/<project-name>/docs/DESIGN.md`.
 
 ### Preconditions
 

@@ -8,7 +8,7 @@ This project is primarily declarative ontology files; only the plugin and some s
 
 Canonical references:
 
-- DESIGN: `docs/projects/wopal-space-ontology/DESIGN.md`
+- DESIGN: `.wopal/docs/DESIGN.md`
 - Business Rules: `.wopal/rules/business-rules.md`
 - Parent Rules: `.wopal-space/REGULATIONS.md`
 - Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
@@ -17,7 +17,7 @@ Canonical references:
 
 Execution chain: modify ontology source → if load-path-related, user restarts ellamaka → verify at ellamaka runtime.
 
-Localization review directory: `docs/projects/wopal-space-ontology/LANG/<locale>/...`. `<locale>` uses IETF BCP 47 / RFC 5646 tags, e.g. `zh-CN`, `en-US`. Never hardcode `zh-CN`.
+Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses IETF BCP 47 / RFC 5646 tags, e.g. `zh-CN`, `en-US`. Never hardcode `zh-CN`.
 
 | Directory | Responsibility |
 |---|---|
@@ -42,7 +42,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, 
 - `<locale>` uses IETF BCP 47 / RFC 5646 language tags, e.g. `zh-CN`, `en-US`. Never hardcode a specific locale.
 - Review-version titles and body use the target language; mixing Chinese and English titles is forbidden.
 - After review approval, update the English runtime source under `.wopal/`. Both versions must stay semantically aligned.
-- For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `docs/projects/wopal-space-ontology/LANG/<locale>/<type>/`.
+- For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `.wopal/docs/LANG/<locale>/<type>/`.
 - For `skills/`, keep the preferred-language review version in the same skill directory as `SKILL.<locale>.md` (for example `SKILL.zh-CN.md`), then sync the approved content to `SKILL.md`.
 - If the user's preferred language is English, update the formal English file directly and do not create English locale variants such as `SKILL.en-US.md`.
 
