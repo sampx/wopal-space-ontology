@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.sync import sync_plan_to_issue
+from commands.sync import sync_plan_to_issue
 
 
 class TestSyncPreservesContext(unittest.TestCase):
@@ -49,14 +49,14 @@ class TestSyncPreservesContext(unittest.TestCase):
                 "| Plan | old_link |"
             )
 
-            with patch('dev_flow.commands.sync.get_issue_info') as mock_get:
+            with patch('commands.sync.get_issue_info') as mock_get:
                 mock_get.return_value = {"body": original_body}
-                with patch('dev_flow.commands.sync._build_plan_link') as mock_build:
+                with patch('commands.sync._build_plan_link') as mock_build:
                     mock_build.return_value = "| Plan | [new-plan](http://new) |"
-                    with patch('dev_flow.commands.sync.subprocess.run') as mock_run:
+                    with patch('commands.sync.subprocess.run') as mock_run:
                         mock_run.return_value = MagicMock(returncode=0)
-                        with patch('dev_flow.commands.sync.shutil_which', return_value=True):
-                            with patch('dev_flow.commands.sync.find_workspace_root', return_value='/fake'):
+                        with patch('commands.sync.shutil_which', return_value=True):
+                            with patch('commands.sync.find_workspace_root', return_value='/fake'):
                                 rc = sync_plan_to_issue("42", plan_file, "test/repo")
                                 self.assertEqual(rc, 0)
 
@@ -82,14 +82,14 @@ class TestSyncPreservesContext(unittest.TestCase):
         try:
             original_body = "## Context\n\nAgent notes\n\nSome other content"
 
-            with patch('dev_flow.commands.sync.get_issue_info') as mock_get:
+            with patch('commands.sync.get_issue_info') as mock_get:
                 mock_get.return_value = {"body": original_body}
-                with patch('dev_flow.commands.sync._build_plan_link') as mock_build:
+                with patch('commands.sync._build_plan_link') as mock_build:
                     mock_build.return_value = "| Plan | [appended-plan](http://appended) |"
-                    with patch('dev_flow.commands.sync.subprocess.run') as mock_run:
+                    with patch('commands.sync.subprocess.run') as mock_run:
                         mock_run.return_value = MagicMock(returncode=0)
-                        with patch('dev_flow.commands.sync.shutil_which', return_value=True):
-                            with patch('dev_flow.commands.sync.find_workspace_root', return_value='/fake'):
+                        with patch('commands.sync.shutil_which', return_value=True):
+                            with patch('commands.sync.find_workspace_root', return_value='/fake'):
                                 rc = sync_plan_to_issue("42", plan_file, "test/repo")
                                 self.assertEqual(rc, 0)
 

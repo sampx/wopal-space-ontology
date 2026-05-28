@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.validation import check_user_validation, ValidationError
+from validation import check_user_validation, ValidationError
 
 
 class TestUserValidation(unittest.TestCase):

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.plan.link import update_issue_plan_link
+from plan import update_issue_plan_link
 
 
 class TestArchivePlanLink(unittest.TestCase):

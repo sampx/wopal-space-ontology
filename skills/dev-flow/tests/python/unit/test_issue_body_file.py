@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.issue import cmd_issue_create
+from commands.issue import cmd_issue_create
 
 
 class TestIssueBodyFile(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestIssueBodyFile(unittest.TestCase):
         
         try:
             # Mock gh CLI call
-            with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.subprocess.run') as mock_run:
                 mock_result = MagicMock()
                 mock_result.returncode = 0
                 mock_result.stdout = "https://github.com/test/repo/issues/42\n"
@@ -44,9 +44,9 @@ class TestIssueBodyFile(unittest.TestCase):
                 mock_run.return_value = mock_result
                 
                 # Mock workspace detection
-                with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-                    with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                        with patch('dev_flow.commands.issue.resolve_project_info', return_value=('standard', None)):
+                with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+                    with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                        with patch('commands.issue.resolve_project_info', return_value=('standard', None)):
                             # Create args with body-file
                             args = MagicMock()
                             args.title = "feat(cli): test body-file"
@@ -89,8 +89,8 @@ class TestIssueBodyFile(unittest.TestCase):
         args.body = None
         
         # Mock workspace detection
-        with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-            with patch('dev_flow.commands.issue.log_error') as mock_log_error:
+        with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+            with patch('commands.issue.log_error') as mock_log_error:
                 result = cmd_issue_create(args)
                 
                 # Should fail
@@ -110,7 +110,7 @@ class TestIssueBodyFile(unittest.TestCase):
         
         try:
             # Mock gh CLI call
-            with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.subprocess.run') as mock_run:
                 mock_result = MagicMock()
                 mock_result.returncode = 0
                 mock_result.stdout = "https://github.com/test/repo/issues/42\n"
@@ -118,9 +118,9 @@ class TestIssueBodyFile(unittest.TestCase):
                 mock_run.return_value = mock_result
                 
                 # Mock workspace detection
-                with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-                    with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                        with patch('dev_flow.commands.issue.resolve_project_info', return_value=('standard', None)):
+                with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+                    with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                        with patch('commands.issue.resolve_project_info', return_value=('standard', None)):
                             # Create args with BOTH body-file and --body
                             args = MagicMock()
                             args.title = "feat(cli): test body-file priority"

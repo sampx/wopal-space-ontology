@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.archive import archive_plan_file
+from commands.archive import archive_plan_file
 
 
 PLAN_TEMPLATE = """# 20260512-demo

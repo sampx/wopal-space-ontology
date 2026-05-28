@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.roadmap import _decompose, _truncate_title
+from commands.roadmap import _decompose, _truncate_title
 
 
 class TestRoadmapDecompose(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestRoadmapDecompose(unittest.TestCase):
 
     def _make_phase(self, **kwargs):
         """Helper to create a mock ConfirmedPhase."""
-        from dev_flow.commands.roadmap import ConfirmedPhase
+        from commands.roadmap import ConfirmedPhase
         defaults = dict(
             id="P1",
             title="Foundation",
@@ -49,7 +49,7 @@ class TestRoadmapDecompose(unittest.TestCase):
         args.project = None
         args.dry_run = True
 
-        with patch('dev_flow.commands.roadmap.detect_space_repo', return_value='test/repo'):
+        with patch('commands.roadmap.detect_space_repo', return_value='test/repo'):
             result = _decompose([phase], "myproduct", "/tmp/PRD.md", args)
 
         # In dry_run mode, we can verify via captured output
@@ -81,9 +81,9 @@ class TestRoadmapDecompose(unittest.TestCase):
             captured_bodies.append(cmd)
             return MagicMock(returncode=0, stdout="https://github.com/test/repo/issues/42\n", stderr="")
 
-        with patch('dev_flow.commands.roadmap.detect_space_repo', return_value='test/repo'):
-            with patch('dev_flow.commands.roadmap.ensure_label_exists'):
-                with patch('dev_flow.commands.roadmap.subprocess.run', side_effect=mock_run):
+        with patch('commands.roadmap.detect_space_repo', return_value='test/repo'):
+            with patch('commands.roadmap.ensure_label_exists'):
+                with patch('commands.roadmap.subprocess.run', side_effect=mock_run):
                     _decompose([phase], "myproduct", "/tmp/PRD.md", args)
 
         self.assertTrue(len(captured_bodies) > 0, "gh issue create should have been called")
@@ -110,9 +110,9 @@ class TestRoadmapDecompose(unittest.TestCase):
             captured_cmds.append(cmd)
             return MagicMock(returncode=0, stdout="https://github.com/test/repo/issues/42\n", stderr="")
 
-        with patch('dev_flow.commands.roadmap.detect_space_repo', return_value='test/repo'):
-            with patch('dev_flow.commands.roadmap.ensure_label_exists'):
-                with patch('dev_flow.commands.roadmap.subprocess.run', side_effect=mock_run):
+        with patch('commands.roadmap.detect_space_repo', return_value='test/repo'):
+            with patch('commands.roadmap.ensure_label_exists'):
+                with patch('commands.roadmap.subprocess.run', side_effect=mock_run):
                     _decompose([phase], "myproduct", "/tmp/PRD.md", args)
 
         # Find the gh issue create command (not label ensure commands)
@@ -131,8 +131,8 @@ class TestRoadmapDecompose(unittest.TestCase):
         args.project = None
         args.dry_run = True
 
-        with patch('dev_flow.commands.roadmap.detect_space_repo', return_value='test/repo'):
-            with patch('dev_flow.commands.roadmap.subprocess.run') as mock_run:
+        with patch('commands.roadmap.detect_space_repo', return_value='test/repo'):
+            with patch('commands.roadmap.subprocess.run') as mock_run:
                 result = _decompose([phase], "myproduct", "/tmp/PRD.md", args)
 
                 # subprocess.run should not be called for issue creation

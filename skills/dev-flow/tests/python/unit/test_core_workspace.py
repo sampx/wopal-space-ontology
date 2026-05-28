@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.core.workspace import find_workspace_root, detect_space_repo
+from lib.workspace import find_workspace_root, detect_space_repo
 
 
 class TestFindWorkspaceRoot(unittest.TestCase):
@@ -86,42 +86,42 @@ class TestDetectSpaceRepo(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp_dir)
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_https_url_with_git_suffix(self, mock_url):
         """detect_space_repo parses HTTPS URL with .git suffix."""
         mock_url.return_value = "https://github.com/sampx/wopal-space.git"
         result = detect_space_repo(self.workspace_root)
         self.assertEqual(result, "sampx/wopal-space")
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_https_url_without_git_suffix(self, mock_url):
         """detect_space_repo parses HTTPS URL without .git suffix."""
         mock_url.return_value = "https://github.com/sampx/wopal-space"
         result = detect_space_repo(self.workspace_root)
         self.assertEqual(result, "sampx/wopal-space")
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_ssh_url_with_git_suffix(self, mock_url):
         """detect_space_repo parses SSH URL with .git suffix."""
         mock_url.return_value = "git@github.com:sampx/wopal-space.git"
         result = detect_space_repo(self.workspace_root)
         self.assertEqual(result, "sampx/wopal-space")
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_ssh_url_without_git_suffix(self, mock_url):
         """detect_space_repo parses SSH URL without .git suffix."""
         mock_url.return_value = "git@github.com:sampx/wopal-space"
         result = detect_space_repo(self.workspace_root)
         self.assertEqual(result, "sampx/wopal-space")
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_raises_on_empty_url(self, mock_url):
         """detect_space_repo raises RuntimeError when no remote configured."""
         mock_url.return_value = ""
         with self.assertRaises(RuntimeError):
             detect_space_repo(self.workspace_root)
 
-    @patch("dev_flow.core.workspace.get_remote_url")
+    @patch("lib.workspace.get_remote_url")
     def test_raises_on_invalid_url(self, mock_url):
         """detect_space_repo raises RuntimeError on unparseable URL."""
         mock_url.return_value = "https://gitlab.com/some/repo"
@@ -130,7 +130,7 @@ class TestDetectSpaceRepo(unittest.TestCase):
 
     def test_real_space_repo_detection(self):
         """I2: detect_space_repo returns sampx/wopal-space from real workspace."""
-        from dev_flow.core.workspace import find_workspace_root
+        from lib.workspace import find_workspace_root
         ws_root = find_workspace_root()
         result = detect_space_repo(ws_root)
         self.assertEqual(result, "sampx/wopal-space")

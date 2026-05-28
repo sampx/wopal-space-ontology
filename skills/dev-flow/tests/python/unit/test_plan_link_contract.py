@@ -17,8 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.link import build_repo_blob_url
-from dev_flow.domain.plan.find import find_plan_by_issue
+from issue import build_repo_blob_url
+from plan import find_plan_by_issue
 
 
 class TestBuildRepoBlobUrl(unittest.TestCase):

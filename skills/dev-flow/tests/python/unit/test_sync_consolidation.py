@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.sync import (
+from issue import (
     sync_status_label_group,
     sync_type_label_group,
     sync_project_label_group,
@@ -35,8 +35,8 @@ from dev_flow.domain.issue.sync import (
 class TestSyncStatusLabelGroup(unittest.TestCase):
     """Test domain.issue.sync.sync_status_label_group wrapper."""
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_removes_old_status_and_adds_new(self, mock_subprocess, mock_get_labels):
         """sync_status_label_group: removes old status labels, adds new."""
         mock_get_labels.return_value = ["status/planning", "type/feature"]
@@ -49,8 +49,8 @@ class TestSyncStatusLabelGroup(unittest.TestCase):
         self.assertIn("--add-label", args)
         self.assertIn("status/in-progress", args)
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_accepts_int_issue_number(self, mock_subprocess, mock_get_labels):
         """sync_status_label_group: accepts int issue_number."""
         mock_get_labels.return_value = []
@@ -59,8 +59,8 @@ class TestSyncStatusLabelGroup(unittest.TestCase):
         args = run_call[0][0]
         self.assertIn("42", args)
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_accepts_str_issue_number(self, mock_subprocess, mock_get_labels):
         """sync_status_label_group: accepts str issue_number."""
         mock_get_labels.return_value = []
@@ -69,8 +69,8 @@ class TestSyncStatusLabelGroup(unittest.TestCase):
         args = run_call[0][0]
         self.assertIn("42", args)
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_noop_when_label_already_set(self, mock_subprocess, mock_get_labels):
         """sync_status_label_group: no-op when desired label already present."""
         mock_get_labels.return_value = ["status/in-progress"]
@@ -80,8 +80,8 @@ class TestSyncStatusLabelGroup(unittest.TestCase):
             if c[0] and "issue" in str(c[0][0]):
                 self.fail("Should not call gh when label already set")
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_removes_all_conflicting_status_labels(self, mock_subprocess, mock_get_labels):
         """sync_status_label_group: removes multiple conflicting status labels."""
         mock_get_labels.return_value = ["status/planning", "status/in-progress", "type/feature"]
@@ -101,7 +101,7 @@ class TestSyncStatusLabelGroup(unittest.TestCase):
 class TestEnsureLabelExists(unittest.TestCase):
     """Test domain.issue.sync.ensure_label_exists."""
 
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.subprocess")
     def test_creates_status_label_with_correct_color(self, mock_subprocess):
         """ensure_label_exists: status/planning gets color fbca04."""
         ensure_label_exists("status/planning", "owner/repo")
@@ -111,7 +111,7 @@ class TestEnsureLabelExists(unittest.TestCase):
         color_idx = args.index("--color")
         self.assertEqual(args[color_idx + 1], "fbca04")
 
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.subprocess")
     def test_creates_type_label_with_correct_color(self, mock_subprocess):
         """ensure_label_exists: type/feature gets color 1d76db."""
         ensure_label_exists("type/feature", "owner/repo")
@@ -121,7 +121,7 @@ class TestEnsureLabelExists(unittest.TestCase):
         color_idx = args.index("--color")
         self.assertEqual(args[color_idx + 1], "1d76db")
 
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.subprocess")
     def test_unknown_label_gets_default_color(self, mock_subprocess):
         """ensure_label_exists: unknown label gets color dddddd."""
         ensure_label_exists("custom/label", "owner/repo")
@@ -179,9 +179,9 @@ class TestPlanProjectToIssueLabel(unittest.TestCase):
 class TestSyncTypeLabelGroup(unittest.TestCase):
     """Test sync_type_label_group wrapper."""
 
-    @patch("dev_flow.domain.issue.sync.ensure_label_exists")
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.ensure_label_exists")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_removes_old_type_and_adds_new(self, mock_subprocess, mock_get_labels, mock_ensure):
         """sync_type_label_group: removes old type labels, adds new."""
         mock_get_labels.return_value = ["type/bug", "status/planning"]
@@ -193,9 +193,9 @@ class TestSyncTypeLabelGroup(unittest.TestCase):
         self.assertIn("--add-label", args)
         self.assertIn("type/feature", args)
 
-    @patch("dev_flow.domain.issue.sync.ensure_label_exists")
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.ensure_label_exists")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_ensures_label_exists_before_adding(self, mock_subprocess, mock_get_labels, mock_ensure):
         """sync_type_label_group: ensures target label exists."""
         mock_get_labels.return_value = []
@@ -211,8 +211,8 @@ class TestSyncTypeLabelGroup(unittest.TestCase):
 class TestSyncProjectLabelGroup(unittest.TestCase):
     """Test sync_project_label_group wrapper."""
 
-    @patch("dev_flow.domain.issue.sync._get_issue_labels")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.get_issue_labels")
+    @patch("issue.subprocess")
     def test_removes_old_project_labels(self, mock_subprocess, mock_get_labels):
         """sync_project_label_group: removes old project/* labels."""
         mock_get_labels.return_value = ["project/old-project", "status/planning"]
@@ -233,11 +233,11 @@ class TestSyncProjectLabelGroup(unittest.TestCase):
 class TestEnsureIssueLabels(unittest.TestCase):
     """Test ensure_issue_labels from domain layer."""
 
-    @patch("dev_flow.domain.issue.sync.sync_project_label_group")
-    @patch("dev_flow.domain.issue.sync.sync_type_label_group")
-    @patch("dev_flow.domain.issue.sync.get_plan_type")
-    @patch("dev_flow.domain.issue.sync.get_plan_project")
-    @patch("dev_flow.domain.issue.sync.subprocess")
+    @patch("issue.sync_project_label_group")
+    @patch("issue.sync_type_label_group")
+    @patch("plan.get_plan_type")
+    @patch("plan.get_plan_project")
+    @patch("issue.subprocess")
     def test_calls_sync_functions_with_plan_metadata(
         self, mock_subprocess, mock_get_project, mock_get_type,
         mock_sync_type, mock_sync_project
@@ -266,58 +266,58 @@ class TestCommandLayerImports(unittest.TestCase):
 
     def test_sync_command_imports_sync_status_label_group(self):
         """commands/sync: imports sync_status_label_group from domain."""
-        from dev_flow.commands import sync as sync_mod
+        from commands import sync as sync_mod
         self.assertTrue(
             hasattr(sync_mod, "sync_status_label_group") or
-            _imports_from_domain(sync_mod, "sync_status_label_group", "dev_flow.domain.issue.sync")
+            _imports_from_domain(sync_mod, "sync_status_label_group", "issue")
         )
 
     def test_sync_command_imports_ensure_label_exists(self):
         """commands/sync: imports ensure_label_exists from domain."""
-        from dev_flow.commands import sync as sync_mod
+        from commands import sync as sync_mod
         self.assertTrue(
             hasattr(sync_mod, "ensure_label_exists") or
-            _imports_from_domain(sync_mod, "ensure_label_exists", "dev_flow.domain.issue.sync")
+            _imports_from_domain(sync_mod, "ensure_label_exists", "issue")
         )
 
     def test_issue_command_imports_ensure_label_exists(self):
         """commands/issue: imports ensure_label_exists from domain."""
-        from dev_flow.commands import issue as issue_mod
+        from commands import issue as issue_mod
         self.assertTrue(
             hasattr(issue_mod, "ensure_label_exists") or
-            _imports_from_domain(issue_mod, "ensure_label_exists", "dev_flow.domain.issue.sync")
+            _imports_from_domain(issue_mod, "ensure_label_exists", "issue")
         )
 
     def test_issue_command_imports_sync_type_label_group(self):
         """commands/issue: imports sync_type_label_group from domain."""
-        from dev_flow.commands import issue as issue_mod
+        from commands import issue as issue_mod
         self.assertTrue(
             hasattr(issue_mod, "sync_type_label_group") or
-            _imports_from_domain(issue_mod, "sync_type_label_group", "dev_flow.domain.issue.sync")
+            _imports_from_domain(issue_mod, "sync_type_label_group", "issue")
         )
 
     def test_issue_command_imports_sync_project_label_group(self):
         """commands/issue: imports sync_project_label_group from domain."""
-        from dev_flow.commands import issue as issue_mod
+        from commands import issue as issue_mod
         self.assertTrue(
             hasattr(issue_mod, "sync_project_label_group") or
-            _imports_from_domain(issue_mod, "sync_project_label_group", "dev_flow.domain.issue.sync")
+            _imports_from_domain(issue_mod, "sync_project_label_group", "issue")
         )
 
     def test_reset_command_imports_sync_status_label_group(self):
         """commands/reset: imports sync_status_label_group from domain."""
-        from dev_flow.commands import reset as reset_mod
+        from commands import reset as reset_mod
         self.assertTrue(
             hasattr(reset_mod, "sync_status_label_group") or
-            _imports_from_domain(reset_mod, "sync_status_label_group", "dev_flow.domain.issue.sync")
+            _imports_from_domain(reset_mod, "sync_status_label_group", "issue")
         )
 
     def test_plan_command_imports_ensure_label_exists(self):
         """commands/plan: imports ensure_label_exists from domain."""
-        from dev_flow.commands import plan as plan_mod
+        from commands import plan as plan_mod
         self.assertTrue(
             hasattr(plan_mod, "ensure_label_exists") or
-            _imports_from_domain(plan_mod, "ensure_label_exists", "dev_flow.domain.issue.sync")
+            _imports_from_domain(plan_mod, "ensure_label_exists", "issue")
         )
 
 
