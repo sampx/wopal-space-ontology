@@ -392,7 +392,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
     if check_only:
         plan_file = None
         
-        if issue_number:
+        if input_ref and Path(input_ref).exists():
+            # input_ref is already a valid file path
+            plan_file = str(Path(input_ref).resolve())
+        elif issue_number:
             # Find by Issue
             try:
                 plan_file = find_plan_by_issue(issue_number, str(workspace_root))
@@ -468,6 +471,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
     # No-issue mode: check existing plan by plan-name
     # ========================================
     if input_ref and not issue_number:
+        # Check if input_ref is already a valid file path
+        if Path(input_ref).exists():
+            plan_file = str(Path(input_ref).resolve())
+            _print_existing_plan_info(plan_file, input_ref)
+            return 0
         # Plan-name lookup
         try:
             plan_file = find_plan_by_name(input_ref, str(workspace_root))
