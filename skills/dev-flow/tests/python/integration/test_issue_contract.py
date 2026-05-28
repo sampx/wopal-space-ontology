@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.body import build_structured_issue_body
+from issue import build_structured_issue_body
 
 
 def extract_sections(content):

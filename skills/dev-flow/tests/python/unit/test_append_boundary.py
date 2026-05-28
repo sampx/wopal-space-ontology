@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.issue import cmd_issue_write
+from commands.issue import cmd_issue_write
 
 
 class TestAppendBoundary(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestAppendBoundary(unittest.TestCase):
 
     def test_append_consecutive_produces_double_newline(self):
         """Two consecutive appends produce \\n\\n separation between bodies"""
-        from dev_flow.commands.issue import cmd_issue_write
+        from commands.issue import cmd_issue_write
 
         body_state = {"body": "Initial content"}
 
@@ -52,9 +52,9 @@ class TestAppendBoundary(unittest.TestCase):
         file_b.close()
 
         try:
-            with patch("dev_flow.commands.issue.get_issue_info", return_value=body_state), \
-                 patch("dev_flow.commands.issue.detect_space_repo", return_value="org/repo"), \
-                 patch("dev_flow.commands.issue.find_workspace_root", return_value="/tmp/ws"), \
+            with patch("commands.issue.get_issue_info", return_value=body_state), \
+                 patch("commands.issue.detect_space_repo", return_value="org/repo"), \
+                 patch("commands.issue.find_workspace_root", return_value="/tmp/ws"), \
                  patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(returncode=0)
 

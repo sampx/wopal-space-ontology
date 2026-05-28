@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.issue import cmd_issue_write
+from commands.issue import cmd_issue_write
 
 
 class TestIssueWrite(unittest.TestCase):
@@ -35,8 +35,8 @@ class TestIssueWrite(unittest.TestCase):
             temp_file = f.name
 
         try:
-            with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                with patch('commands.issue.subprocess.run') as mock_run:
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
 
                     args = MagicMock()
@@ -64,10 +64,10 @@ class TestIssueWrite(unittest.TestCase):
             temp_file = f.name
 
         try:
-            with patch('dev_flow.commands.issue.get_issue_info') as mock_get:
+            with patch('commands.issue.get_issue_info') as mock_get:
                 mock_get.return_value = {"body": "old content", "title": "test"}
-                with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                    with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+                with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                    with patch('commands.issue.subprocess.run') as mock_run:
                         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
                         args = MagicMock()
@@ -95,8 +95,8 @@ class TestIssueWrite(unittest.TestCase):
             temp_file = f.name
 
         try:
-            with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                with patch('dev_flow.commands.issue.get_issue_info') as mock_get:
+            with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                with patch('commands.issue.get_issue_info') as mock_get:
                     mock_get.return_value = {"body": "old", "title": "test"}
 
                     args = MagicMock()
@@ -120,7 +120,7 @@ class TestIssueWrite(unittest.TestCase):
         args.body_file = None
         args.append = missing_file
 
-        with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
+        with patch('commands.issue.detect_space_repo', return_value='test/repo'):
             result = cmd_issue_write(args)
             self.assertEqual(result, 1)
 
@@ -134,10 +134,10 @@ class TestIssueWrite(unittest.TestCase):
             # Simulate body that already has content from a first append
             existing_body = "original\n\nfirst append"
 
-            with patch('dev_flow.commands.issue.get_issue_info') as mock_get:
+            with patch('commands.issue.get_issue_info') as mock_get:
                 mock_get.return_value = {"body": existing_body, "title": "test"}
-                with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                    with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+                with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                    with patch('commands.issue.subprocess.run') as mock_run:
                         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
                         args = MagicMock()
@@ -164,8 +164,8 @@ class TestIssueWrite(unittest.TestCase):
             temp_file = f.name
 
         try:
-            with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                with patch('commands.issue.subprocess.run') as mock_run:
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
 
                     args = MagicMock()

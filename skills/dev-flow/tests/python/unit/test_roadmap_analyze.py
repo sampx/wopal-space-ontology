@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.roadmap import parse_prd_phases, _infer_product
+from commands.roadmap import parse_prd_phases, _infer_product
 
 
 PRD_FIXTURE = """# Product PRD

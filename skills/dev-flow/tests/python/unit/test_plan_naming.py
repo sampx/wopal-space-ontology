@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.plan.naming import validate_plan_name, make_plan_name, ValidationError
+from plan import validate_plan_name, make_plan_name, ValidationError
 
 
 class TestValidatePlanName(unittest.TestCase):

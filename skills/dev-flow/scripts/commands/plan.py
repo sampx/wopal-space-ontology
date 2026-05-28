@@ -41,7 +41,7 @@ from datetime import date
 
 from plan import find_plan, find_plan_by_issue, find_plan_by_name
 from plan import make_plan_name, validate_plan_name
-from plan import _NamingValidationError as NamingValidationError
+from plan import ValidationError as NamingValidationError
 from plan import get_plan_status
 from issue import extract_scope, extract_type
 from issue import ensure_label_exists, sync_status_label_group

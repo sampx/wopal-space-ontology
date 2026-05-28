@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.title import extract_scope, extract_type, validate_issue_title, ValidationError
+from issue import extract_scope, extract_type, validate_issue_title, ValidationError
 
 
 class TestExtractScope(unittest.TestCase):

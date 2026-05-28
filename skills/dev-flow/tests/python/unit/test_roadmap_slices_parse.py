@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.decompose import parse_roadmap_slices, Slice, create_slice_issue
+from commands.decompose import parse_roadmap_slices, Slice, create_slice_issue
 from unittest.mock import patch, MagicMock
 
 
@@ -121,8 +121,8 @@ class TestRoadmapSlicesParse(unittest.TestCase):
         """create_slice_issue renders depends with titles from slice_titles mapping"""
         s = Slice(id="S02", title="空间切换热加载", project="space-flow", risk="medium", depends=["S01"], demo="")
         titles = {"S01": "CLI 多空间管理"}
-        with patch("dev_flow.commands.decompose.find_workspace_root", return_value="/tmp/ws"), \
-             patch("dev_flow.domain.issue.link.build_repo_blob_url", return_value="https://example.com/ROADMAP.md"), \
+        with patch("commands.decompose.find_workspace_root", return_value="/tmp/ws"), \
+             patch("issue.build_repo_blob_url", return_value="https://example.com/ROADMAP.md"), \
              patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="https://github.com/org/repo/issues/42\n")
             result = create_slice_issue(s, "org/repo", "/tmp/ws/ROADMAP.md", "wopal", slice_titles=titles)
@@ -134,8 +134,8 @@ class TestRoadmapSlicesParse(unittest.TestCase):
     def test_create_slice_issue_depends_without_titles(self):
         """create_slice_issue falls back to _(see ROADMAP)_ when slice_titles missing"""
         s = Slice(id="S02", title="空间切换热加载", project="space-flow", risk="medium", depends=["S01"], demo="")
-        with patch("dev_flow.commands.decompose.find_workspace_root", return_value="/tmp/ws"), \
-             patch("dev_flow.domain.issue.link.build_repo_blob_url", return_value="https://example.com/ROADMAP.md"), \
+        with patch("commands.decompose.find_workspace_root", return_value="/tmp/ws"), \
+             patch("issue.build_repo_blob_url", return_value="https://example.com/ROADMAP.md"), \
              patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="https://github.com/org/repo/issues/42\n")
             result = create_slice_issue(s, "org/repo", "/tmp/ws/ROADMAP.md", "wopal", slice_titles=None)

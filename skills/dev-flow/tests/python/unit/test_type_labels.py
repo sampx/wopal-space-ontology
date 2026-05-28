@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.labels import (
+from labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
     issue_label_to_plan_type,

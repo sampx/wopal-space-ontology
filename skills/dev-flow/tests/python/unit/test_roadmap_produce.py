@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.roadmap import (
+from commands.roadmap import (
     ConfirmedPhase,
     _produce,
     _writeback_prd_reference,

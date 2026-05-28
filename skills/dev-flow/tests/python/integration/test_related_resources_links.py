@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.sync import sync_plan_to_issue_body
+from issue import sync_plan_to_issue_body
 
 
 class TestRelatedResourcesLinks(unittest.TestCase):
@@ -47,8 +47,8 @@ class TestRelatedResourcesLinks(unittest.TestCase):
             f.write("## In Scope\n\n- Item 1\n\n")
             f.write("## Acceptance Criteria\n\n- [ ] AC 1\n")
 
-    @patch("dev_flow.domain.issue.sync.subprocess.run")
-    @patch("dev_flow.domain.plan.body.build_repo_blob_url")
+    @patch("issue.subprocess.run")
+    @patch("plan.build_repo_blob_url")
     def test_approved_plan_updates_related_resources_link(self, mock_blob_url, mock_subprocess):
         """sync_plan_to_issue_body: approved plan -> Plan link is GitHub URL"""
         # Setup: approved plan
@@ -85,7 +85,7 @@ class TestRelatedResourcesLinks(unittest.TestCase):
         self.assertIn("| Plan |", body,
                       "Body should contain Plan table row")
 
-    @patch("dev_flow.domain.issue.sync.subprocess.run")
+    @patch("issue.subprocess.run")
     def test_planning_plan_keeps_placeholder_link(self, mock_subprocess):
         """sync_plan_to_issue_body: planning plan -> Plan link remains '_待关联_'"""
         # Setup: planning status

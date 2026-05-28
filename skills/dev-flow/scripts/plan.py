@@ -342,7 +342,7 @@ def _is_git_repo(project_path: Path) -> bool:
 # Naming (from naming.py)
 # ============================================
 
-class _NamingValidationError(Exception):
+class ValidationError(Exception):
     """Raised when plan naming validation fails"""
     pass
 
@@ -359,7 +359,7 @@ def validate_plan_name(name: str) -> None:
     pattern = r'^([0-9]+)?-?(feature|enhance|fix|refactor|docs|chore|test)-([a-z0-9]+)-([a-z0-9-]+)$'
     
     if not re.match(pattern, name):
-        raise _NamingValidationError(
+        raise ValidationError(
             f"Invalid plan name: {name}\n"
             "\n"
             "Plan naming convention (scope is mandatory):\n"
@@ -408,7 +408,7 @@ def _normalize_type(raw_type: str) -> str:
     elif raw == 'test':
         return 'test'
     else:
-        raise _NamingValidationError(f"Invalid plan type: {raw_type}")
+        raise ValidationError(f"Invalid plan type: {raw_type}")
 
 
 # ============================================
