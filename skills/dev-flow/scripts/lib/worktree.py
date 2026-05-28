@@ -58,7 +58,8 @@ def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path
         RuntimeError: If worktree creation fails
     """
     project_name = project_dir.name
-    worktree_path = worktree_base / f"{project_name}-{branch}"
+    branch_slug = branch.replace("/", "-")
+    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
 
     # Ensure worktree_base exists
     worktree_base.mkdir(parents=True, exist_ok=True)
@@ -146,9 +147,13 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
         project_dir: Path to the project's git root directory
         branch: Branch name of the worktree
         worktree_base: Base directory where worktrees are stored
+
+    Raises:
+        RuntimeError: If both normal and force remove fail
     """
     project_name = project_dir.name
-    worktree_path = worktree_base / f"{project_name}-{branch}"
+    branch_slug = branch.replace("/", "-")
+    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
 
     if worktree_path.exists():
         # Try normal remove
@@ -161,12 +166,16 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
 
         if result.returncode != 0:
             # Force remove on failure
-            subprocess.run(
+            result = subprocess.run(
                 ["git", "worktree", "remove", str(worktree_path), "--force"],
                 cwd=str(project_dir),
                 capture_output=True,
                 text=True,
             )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to remove worktree {worktree_path}: {result.stderr.strip()}"
+                )
 
     # Always prune (whether remove succeeded or path didn't exist)
     subprocess.run(
