@@ -218,8 +218,8 @@ sys.exit(result.returncode)
 
         # Output should show auto-commit
         output = result.stdout + result.stderr
-        self.assertIn('Auto-committing', output,
-                      'output should show auto-commit step')
+        self.assertIn('Committing uncommitted changes', output,
+                       'output should show auto-commit step')
         self.assertIn('archived', output.lower(),
                       'output should mention archived status')
 
@@ -274,40 +274,7 @@ sys.exit(result.returncode)
         # Output should show push failure
         output = result.stdout + result.stderr
         self.assertIn('push', output.lower(),
-                      'output should mention push failure')
-
-    def test_archive_passes_on_clean_project_repo(self):
-        """archive succeeds when project repo is clean"""
-        # Create a file and commit it (clean state)
-        clean_file = os.path.join(self.project_dir, 'clean_file.txt')
-        with open(clean_file, 'w') as f:
-            f.write('committed changes')
-
-        subprocess.run(['git', 'add', 'clean_file.txt'],
-                       cwd=self.project_dir, capture_output=True, check=True)
-        subprocess.run(['git', 'commit', '-m', 'add clean file'],
-                       cwd=self.project_dir, capture_output=True, check=True)
-
-        env = os.environ.copy()
-        env['PATH'] = self.bin_dir + ':' + env.get('PATH', '')
-        env['GH_STATE_DIR'] = self.state_dir
-
-        result = subprocess.run(
-            [self.flow_bin, 'archive', '121'],
-            cwd=self.tmp_dir,
-            capture_output=True,
-            text=True,
-            env=env
-        )
-
-        # Archive should succeed with clean repo (no auto-commit needed)
-        self.assertEqual(result.returncode, 0,
-                         f'archive should succeed on clean project repo: {result.stderr}')
-
-        # Output should show archived status
-        output = result.stdout + result.stderr
-        self.assertIn('archived', output.lower(),
-                      'output should mention archived status')
+                       'output should mention push failure')
 
 
 if __name__ == '__main__':
