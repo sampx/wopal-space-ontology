@@ -235,6 +235,12 @@ Unless user requests detail, answer in under 4 lines (excluding tool usage or co
 - When unable to help, offer alternatives; otherwise keep to 1-2 sentences
 - NEVER generate or guess URLs unless confident they help with programming
 
+## Design Documentation Style
+
+- Write design documents in positive target-state language: describe what the system is, how it behaves, and what responsibilities each component owns.
+- Avoid prematurely freezing early ideas as versions, contracts, or final architecture. Use "draft", "target shape", or "current direction" while the design is still exploratory.
+- Put scope exclusions, "do not" boundaries, and implementation task limits in Plans rather than DESIGN documents whenever possible.
+
 ---
 
 # Code Standards
