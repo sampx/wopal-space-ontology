@@ -6,13 +6,15 @@
 
 ## 0. Change Log
 
+Record design intent, architecture, boundary, and contract-level changes.
+
 | Date | Type | Summary |
 |---|---|---|
 | YYYY-MM-DD | Created / Updated | One-line summary |
 
 ## 1. Architecture Design
 
-Provide a high-level architecture diagram (ASCII preferred) and a layer table.
+Overall product architecture diagram (ASCII preferred) and layer table. The diagram covers all core subsystems and their interaction relationships.
 
 ```text
 <ASCII architecture diagram>
@@ -22,42 +24,44 @@ Provide a high-level architecture diagram (ASCII preferred) and a layer table.
 
 | Layer | Location | Owner | Responsibility |
 |---|---|---|---|
-| ... | ... | ... | ... |
 
 ## 2. Core Projects
 
-Define each core project's role, boundary, and interaction contract. One subsection per project, covering responsibility, design principles, and external contracts. Link to the corresponding project DESIGN document.
+Each core subsystem's role, boundary, and interaction contract.
+
+- One subsection per subsystem: responsibility, design principles, external contract
+- Link to the corresponding project DESIGN document
+- Inter-subsystem interaction relationships are traceable
 
 ## 3. Runtime Model
 
-Describe runtime structure, state locations, data ownership, configuration layers, lifecycle behavior, and persistence boundaries.
+Runtime structure, state locations, data ownership, configuration layers, lifecycle, persistence boundaries.
+
+- Clarify each subsystem's state ownership scope
+- Configuration layer relationships are clear (global → space → project)
 
 ## 4. End-to-End Flows
 
-Describe critical cross-project flows. Use numbered steps. Focus on system behavior.
+Key cross-project flows, from a system perspective.
+
+- Cover critical user paths (installation, daily use, failure recovery)
+- Use numbered steps, focus on system behavior
 
 ## 5. Evolution Roadmap
 
-Describe product phases from current to target state using design decisions as the unit of tracking. Each phase has one Goal and a set of D-NN decisions with checkbox completion status:
+Product evolution skeleton. Each phase includes title, Goal, and Phase document link. Phase delivery details and acceptance criteria are carried by Phase documents.
 
 ```markdown
 ### Phase N: Title
 
 > Phase doc: [phases/<product>-pN-<slug>.md]
 
-- **Goal**: Product capability target for this phase (one line, ≥20 chars, no placeholders)
-
-- [x] D-01: <design decision, done>
-- [ ] D-02: <design decision, pending>
+- **Goal**: Product capability target for this phase (one line, ≥20 characters, verifiable product capability statement)
 ```
 
-**Requirements**:
-- Every phase must have a **Goal** line and ≥1 D-NN decision
-- D-NN numbering restarts per phase. `[x]` = done, `[ ]` = pending
-- Completion is based on whether the design has been decided and implemented, not on code completeness
-- A phase with all `[x]` is considered complete
-- This section is the input source for `/cupdate-roadmap`
+- Every phase has a Goal and a Phase doc link
+- The product phase is complete when all Phase documents' Exit Criteria are satisfied
 
 ## 6. Related Documents
 
-Link only durable product/design references: PRD, project DESIGNs, business rules, architecture references, research summaries, project specs.
+Link durable reference documents: PRD, project DESIGNs, business rules, architecture references, project specs. Each link has a clear reference purpose.

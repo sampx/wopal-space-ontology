@@ -1,102 +1,110 @@
 ---
-description: Create or update product or project DESIGN document
+description: Create or update a product DESIGN or project DESIGN
 ---
 
 # Create or Update DESIGN
 
-Product DESIGN is the overall architecture design, derived from PRD, describing cross-project system composition and contracts. Project DESIGN is the subsystem design, derived from parent product PRD/DESIGN, describing a single project's internal architecture.
+Guide users through discussion to clarify product system architecture (product DESIGN) or project internal design (project DESIGN). The core responsibility is helping users define design boundaries and reach design decisions until conditions are met for the next work phase.
+
+Simple projects may skip product DESIGN and follow the simplified flow: project DESIGN (with self-defined product-level design) → Plan.
 
 **Input**: `$1` `$2`
-**Parameter Notes**: `<name> [product|project]`. When not provided, infer from `docs/products/` and `projects/*/docs/` directory matching; confirm with user if unclear.
+
+**Parameter Notes**: `<name> [product|project]`. When not provided, infer from `docs/products/` and `projects/*/docs/` directory matching; confirm with the user if unclear.
+
+---
 
 ## Core Principles
 
-### Responsibility Boundaries
+### Two Design Flows
 
-| | Product DESIGN | Project DESIGN |
+| Flow | Use Case | Chain |
 |---|---|---|
-| Answers | How the system is organized, how modules interact, why key choices are made | This project's internal architecture, tech stack, interfaces, capability scope, evolution roadmap |
-| Does not repeat | PRD's vision, users, product roadmap | Parent PRD/DESIGN's full vision and architecture |
-| Does not become | Implementation checklist, coding standards, command logs | Same |
+| Standard | Multi-project product requiring cross-project architecture coordination | PRD → Product DESIGN → Roadmap → Project DESIGN → Plan |
+| Simplified | Standalone project with no associated product | Project DESIGN (with product-level design) → Plan |
 
-### Evolution Roadmap Format
+In the standard flow, the product DESIGN is used for phase decomposition and architecture contract definition; the project DESIGN focuses on single-project internal architecture. In the simplified flow, the project DESIGN also assumes product-level design responsibility (Header `Parent Product: N/A`).
 
-Product DESIGN §5 and Project DESIGN §8 use the same format:
+### Discussion Rules
 
-```markdown
-### Phase N: Title
-
-> Phase doc: [phases/<name>-pN-<slug>.md]
-
-- **Goal**: Phase target (one line, ≥20 chars)
-
-- [x] D-01: <design decision, done>
-- [ ] D-02: <design decision, pending>
-```
-
-- D-NN numbering restarts per phase. `[x]` = done, `[ ]` = pending
-- Product DESIGN Goal: product capability target
-- Project DESIGN Goal: derived from parent product phase doc's Involved Projects — what this project delivers in this phase
-- Standalone project mode (Header `Parent Product: N/A`): Goal describes the project's own phase target
-
-### Writing Rules
-
-- Design language, not process language: structure, boundaries, contracts, ownership, technical choices, runtime behavior
-- No template instructions, architectural fluff, or decorative diagrams. Do not use implementation-state labels such as "current location" as primary structure
-- Preserve accurate existing content; revise or delete outdated content when evidence supports it; mark unresolved items as "待确认" (to be confirmed)
-- Project DESIGN §2 Capability Scope inherits the parent PRD's product definition for this module; in standalone mode, define it independently
-
-### Standalone Project Mode
-
-When a project has no associated product (Header `Parent Product: N/A`):
-- §1 Project Role: describe the project's own positioning and reason for existing
-- §2 Capability Scope: define capability boundaries independently
-- §8 Goal: describe phase targets directly, without referencing an external phase doc
+- The command's core role is guiding users to discuss and clarify design decisions. Product DESIGN uses the `design-product.md` template; project DESIGN uses the `design-project.md` template.
+- Product DESIGN discussion focus: system layering and subsystem boundaries, runtime model, end-to-end flows, phase decomposition (at minimum, clarify the current phase's overall goal; detail is deferred to `/cupdate-roadmap`).
+- Project DESIGN discussion focus: project role and boundaries, capability scope, module architecture, technology choices, interface contracts, data model.
+- Preserve accurate existing content. Revise or remove outdated information when evidence is sufficient. Mark unresolved items as needing confirmation.
+- Present the full content and obtain explicit user confirmation before any write operation.
 
 ## Step 1: Gather Context
 
-**Creation**:
+**Standard flow**:
 - Product DESIGN: read the product PRD
-- Project DESIGN: read the parent product PRD + parent product DESIGN. Enter standalone project mode when no parent product exists
-- For WopalSpace: reference `.wopal-space/STRUCTURE.md` and `.wopal-space/REGULATIONS.md`
+- Project DESIGN: read the parent product PRD + parent product DESIGN
+
+**Simplified flow** (Header `Parent Product: N/A`):
+- Read the project's own code and documents for existing design decisions
 
 **Update**:
-- Read the existing DESIGN, user decisions from the current conversation, and implementation facts (code/docs)
-- For Project DESIGN: also read associated phase docs, update §8 D-NN states based on Plan completion
+- Read the existing DESIGN, user decisions from the current conversation, and implementation facts from code and documents
 
-**Output**: Context inventory + items needing confirmation.
+**Output**: Context inventory, items needing confirmation
 
-## Step 2: Write / Update
+## Step 2: Guide Design Discussion
 
-**Creation**: Write section by section following the template (product: `design-product.md`, project: `design-project.md`).
+Guide the user through each template section in order.
 
-**Update**:
-1. Preserve existing paths and titles (unless clearly incorrect)
+**Product DESIGN discussion points**:
+1. System layering and architecture overview
+2. Core subsystem roles, boundaries, and interaction contracts
+3. Runtime model (state locations, configuration layers, lifecycle)
+4. Key end-to-end flows
+5. Phase decomposition: break the product vision into deliverable phases; at minimum, clarify the current phase's overall goal
+
+**Project DESIGN discussion points**:
+1. Project positioning and responsibility boundary within the parent product (simplified flow: self-defined positioning and value proposition)
+2. Target capability scope and explicitly excluded areas
+3. Key architecture decisions and rationale
+4. Internal module decomposition and ownership
+5. Technology stack choices and rationale
+6. External interfaces and integration contracts. If the project includes frontend UI: tech stack selection, design tokens, component conventions, page structure
+7. Data and state model
+
+**Output**: Discussion conclusions for each section
+
+## Step 3: Write DESIGN
+
+Produce the DESIGN document from the discussion conclusions using the template. When updating an existing document:
+
+1. Preserve existing paths and titles
 2. Update the `Updated` date
-3. Align with user decisions, implementation facts, and PRD/DESIGN; update §8 D-NN states
+3. Align discussion conclusions with existing content
 4. Fill in missing sections
-5. Remove or revise outdated architecture, boundaries, interfaces, or state declarations
-6. Append a Change Log entry (only for design intent, architecture, boundary, or contract changes; not for formatting adjustments)
-7. Mark unresolved items as "待确认"
+5. Revise or remove outdated content
+6. Append a Change Log entry (record design intent, architecture, boundary, or contract changes)
+7. Mark unresolved items as needing confirmation
 
-**Header requirements**: Product DESIGN includes `Product Intent`; Project DESIGN includes `Parent Architecture` + `Parent Product` (or `N/A`).
+Present the full content and wait for user confirmation before writing.
 
-**Output**: Complete DESIGN content (confirm with user before writing).
+**Output**: Complete DESIGN content, awaiting confirmation
 
-## Step 3: Quality Check
+## Step 4: Verify
 
-- [ ] Correct template selected (product/project)
-- [ ] Evolution Roadmap uses `### Phase N:` heading + `[x]`/`[ ]` D-NN format
-- [ ] Project DESIGN: §2 Capability Scope aligns with parent PRD (or independently defined in standalone mode)
-- [ ] Project DESIGN: §8 Goal aligns with parent product phase doc (or is a direct phase target in standalone mode)
-- [ ] Design language (structure/boundaries/contracts/ownership); no template instructions, implementation checklists, or architectural fluff
-- [ ] Tech stack choices include rationale and ownership boundaries
-- [ ] Accurate existing content preserved; outdated content revised or deleted
-- [ ] Change Log updated; related documents linked
+After writing, check template section completeness and design language quality.
 
-## Completion Response
+---
+
+## Completion Standard
+
+The command is complete when the following conditions are met:
+
+- Product DESIGN: system architecture boundaries are clear, the current phase's overall goal is defined, and the work is ready for `/cupdate-roadmap` phase refinement
+- Project DESIGN (standard flow): internal architecture decisions are clear, ready for `/cupdate-agent-rules` or Plan creation
+- Project DESIGN (simplified flow): design decisions are sufficiently clear to proceed directly to Plan
+
+---
+
+## Response After Completion
+
+Respond in the user's preferred language with:
 
 1. File path
-2. Creation / update summary
-3. Additions, revisions, removals/deprecations, items needing confirmation
-4. Suggested next step: `/cupdate-roadmap`. For projects that have completed initialization, `/cupdate-agent-rules` can generate or update development rules.
+2. Creation/update summary (additions, revisions, removals/deprecations, items needing confirmation)
+3. Suggested next step: product DESIGN → `/cupdate-roadmap`; standard project DESIGN → `/cupdate-agent-rules`; simplified project DESIGN → create Plan
