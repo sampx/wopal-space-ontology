@@ -1,7 +1,7 @@
 # Ontology — 空间灵魂、规约与能力基因工具包设计
 
 > **Status**: Active
-> **Updated**: 2026-05-28
+> **Updated**: 2026-05-29
 > **Parent Architecture**: `docs/products/wopal-space/DESIGN-wopalspace.md`
 > **Parent Product**: `docs/products/wopal-space/PRD-wopalspace.md`
 
@@ -9,10 +9,8 @@
 
 | Date | Type | Summary |
 |---|---|---|
+| 2026-05-29 | Updated | 明确 STRUCTURE compact schema 与 `/init` 消费 `wopal space scan` JSON 的维护边界。 |
 | 2026-05-28 | Updated | 同步 P1 实施真相：空间初始化模板已补齐，schema 已对齐 runtime/space 结构，`/init` 已收敛为 runtime 维护入口。 |
-| 2026-05-28 | Updated | 收敛 P1 ontology readiness：schema 草案、root AGENTS 职责、REGULATIONS 目标形态、默认 clone 的初始化目标与核心技能入口。 |
-| 2026-05-27 | Updated | 整合原 PRD 的能力范围与演进路线入本设计文档；按新模板重组章节结构。 |
-| 2026-05-25 | Updated | 按 Project DESIGN 模板重构：对齐 PRD Phase 0/1/2 实现状态，分离模块架构与实现进度，补齐接口契约与状态模型 |
 | 2026-05-24 | Updated | 补齐 Agent 体系（Rook + WSF 子代理）、技能规模更新、命令体系扩展、Ontology 目标结构新增 templates 与 config |
 
 ---
@@ -133,19 +131,20 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
 #### `STRUCTURE.md` schema 与生成规则
 
-`STRUCTURE.md` 是空间实例的结构事实文件。模板与 `/init` 按本设计生成和维护结构内容，实例文件聚焦结构事实与组件说明。
+`STRUCTURE.md` 是空间实例的 compact 结构事实文件。它会进入 Agent 启动上下文，因此实例文件只保留低 token、高价值、可行动的空间索引，不承载全量扫描清单。
 
 文件由两层组成：
 
-1. **YAML frontmatter**：机器可解析的结构事实，用于定位空间组件、VCS 边界和标准运行态目录。
-2. **Markdown table**：Agent 可读的结构地图，用于解释路径、类型、层级和职责。
+1. **YAML frontmatter**：机器可解析的启动索引，用于定位空间组件、固定运行态目录和已确认的高价值 repo。
+2. **Markdown table**：Agent / 人类可读的空间资产地图，用于解释已确认资产路径、类型、层级和职责。
 
 frontmatter 生成规则：
 
-- `repo` / `worktree` / `clone` 类组件必须同时出现在 frontmatter 和 Markdown table。
-- 有 `AGENTS.md` 的非 repo 模块必须出现在 Markdown table；frontmatter 可选，且最多记录到二级目录。
-- 无 `AGENTS.md` 的普通目录由 frontmatter 记录一级目录名；Markdown table 可选，通常由 `/init` 分析后补充描述。
-- frontmatter 聚焦结构事实，维护说明、生成规则与 Agent 操作建议保存在设计文档和空间守则中。
+- 保留 `version`、`space`、`space-component-type`、`ontology-worktree`、`space-runtime` 和 `repos`。
+- `space-runtime` 保留目录 / 文件用途描述，因为它直接进入 Agent 启动上下文；`.wopal-space/` 不进入 Markdown table。
+- `repos` 只记录 pinned / high-value repo，不记录 scan 发现的全量 repo；大量低频 repo 留在 scan 输出或用户手工说明中。
+- frontmatter 不记录 `collection`、普通 module、全量 `AGENTS.md`、docs 子目录或临时扫描结果。
+- 用户未知 key 必须保留；结构 key 由 `/init` 在展示 diff 并获得用户确认后更新。
 
 Markdown table schema：
 
@@ -153,13 +152,27 @@ Markdown table schema：
 |---|---|
 | `path` | 相对 space root 的路径 |
 | `type` | 组件类型，如 `ontology-worktree`、`space-runtime`、`projects`、`contents`、`labs`、`docs` |
-| `level` | 结构层级，如 `worktree`、`repo`、`clone`、`moduel`、`dir` |
+| `level` | 结构层级，如 `worktree`、`repo`、`clone`、`module`、`collection`、`dir` |
 | `description` | Agent 可读职责说明，不写规则正文 |
+
+Markdown table 维护规则：
+
+- 表格分为 managed block 与 user block；managed block 可由 `/init` 在确认后重写，user block 永不修改。
+- managed block 默认只放 `.wopal` 固定关键模块、frontmatter pinned repos、用户确认的重要 module / collection。
+- root `AGENTS.md` 是 ellamaka 启动入口，不进入表格。
+- `wopal space scan` 发现的新 repo 或 `AGENTS.md` 模块不自动进入表格；`/init` 只报告并等待用户确认。
+- 用户从 managed table 删除的非固定资产，不得因再次扫描被静默补回。
+
+描述来源规则：
+
+- 受控 repo / module 的首选描述来源是对应 `AGENTS.md` frontmatter `description`。
+- 次选来源是 `AGENTS.md` positioning / 第一段、`README.md` 第一段或 package metadata description。
+- CLI scan 只提取已有描述，不生成描述；需要新描述时由 `/init` 展示方案并等待用户确认。
 
 维护边界：
 
-- CLI 按模板创建初始 `STRUCTURE.md`；智能扫描与复杂描述生成由 `/init` 承担。
-- `/init` 负责后续结构校准：扫描实际目录、按 schema 更新 frontmatter/table、保留用户描述，并在用户确认后写入。
+- CLI 按模板创建初始 `STRUCTURE.md`，并由 `wopal space scan` 提供 repo / module 事实扫描 JSON。
+- `/init` 负责后续结构校准：消费 scan JSON、对照 compact schema 生成更新方案、保留用户描述，并在用户确认后写入。
 - schema 与生成规则维护在设计文档和模板说明中；空间实例的 `STRUCTURE.md` 聚焦结构事实。
 
 #### 最小空间模板设计
@@ -351,11 +364,13 @@ CLI 负责：
 5. 首次渲染 `AGENTS.md`、`.gitignore`、`STRUCTURE.md`、`REGULATIONS.md`、`memory/USER.md`、`memory/MEMORY.md`。
 6. rerun 时创建缺失项并保留已有文件内容。
 7. 在完整成功后注册 space 并设置 active space。
-8. 输出下一步：进入 space、启动 ellamaka、运行 `/init` 做首次智能校准。
+8. 提供 `wopal space scan` 只读扫描入口，输出 repo / module JSON 事实。
+9. 输出下一步：进入 space、启动 ellamaka、运行 `/init` 做首次智能校准。
 
 CLI 边界：
 
-- `/init` 承担智能扫描项目与复杂描述生成。
+- `wopal space scan` 只做 repo / module 事实发现和已有描述提取，不读写 `STRUCTURE.md`。
+- `/init` 承担 scan JSON 消费、结构更新方案生成和用户确认后的写入。
 - 用户与 `/wopal:evolve` 承担运行态文件内容维护。
 - 用户确认流程承接 `REGULATIONS.md` 差异吸收。
 - 记忆命令承接用户偏好与长期记忆沉淀。
@@ -363,13 +378,14 @@ CLI 边界：
 
 `/init` 负责：
 
-1. 读取 `.wopal-space/STRUCTURE.md` 与实际目录。
-2. 按 `STRUCTURE.md` schema 与生成规则生成 frontmatter/table diff。
-3. 校验 `.wopal-space/` runtime 结构。
-4. 提示模板与实例文件之间需要用户人工处理的差异。
-5. 先输出 plan/diff，等待用户确认后写入。
+1. 读取 `.wopal-space/STRUCTURE.md`。
+2. 调用或消费 `wopal space scan` 输出的 repo / module JSON 事实。
+3. 按 compact schema 与 managed/user block 规则生成 frontmatter/table diff。
+4. 校验 `.wopal-space/` runtime 固定结构，不深扫 runtime 内容，不把 runtime 写入 table。
+5. 提示模板与实例文件之间需要用户人工处理的差异。
+6. 先输出 plan/diff，等待用户确认后写入。
 
-`/init` 聚焦 CLI 初始化后的智能校准：结构事实更新、runtime 检查、模板差异提示与用户确认后的写入。
+`/init` 聚焦 CLI 初始化后的结构维护：消费 scan 事实、维护 compact `STRUCTURE.md`、runtime 检查、模板差异提示与用户确认后的写入。
 
 ### 6.4 分发模型
 
