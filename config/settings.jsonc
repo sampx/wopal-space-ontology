@@ -16,7 +16,7 @@
                 "model": "wopal-ai/deepseek-v4-flash"
             },
             "compaction": {                
-                "model": "github-copilot/gpt-5-mini"
+                "model": "wopal-ai/deepseek-v4-flash"
             },
             "wopal": {
                 "model": "wopal-ai/glm-5.1"
