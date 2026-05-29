@@ -12,6 +12,37 @@
 - **Created**: {date}
 - **Status**: planning
 
+<!--
+  ⚠️ Project Path 与 Project Type 字段说明：
+  
+  **Project Path**（标准项目必填，ontology-worktree 自动填充）：
+  - 标准项目：`projects/<name>/`（如 `projects/gesp/`）
+  - ontology-worktree：`.wopal/`
+  
+  **Project Type**：
+  - 标准项目：`standard`
+  - ontology-worktree：`ontology-worktree`
+  
+  查询来源：`.wopal-space/STRUCTURE.md`
+-->
+
+<!--
+  ⚠️ WorktreeContext（approve --confirm 后自动注入，格式如下）：
+  
+  - **Worktree**:
+    - enabled: true
+    - project_type: standard          # standard | ontology-worktree
+    - branch: feature/issue-N-slug    # worktree 分支
+    - path: .worktrees/<project>-issue-<N>-<slug>
+    - repo_root: <absolute path to git repo>
+    - base_branch: main               # 创建时的基线分支
+    - merge_target: main              # 验证通过后合并的目标分支
+    - verify_mode: direct             # direct (standard) | switch-runtime (ontology)
+    - cleanup_policy: archive         # archive | pr-opened | manual
+  
+  使用 `--no-worktree` 跳过 worktree 时不会注入此块。
+-->
+
 ## Scope Assessment
 
 - **Complexity**: Low|Medium|High
@@ -96,7 +127,7 @@
 
 <!--
   ⚠️ Plan 编写时检查是否影响业务规则。
-  1. 读取 `docs/projects/{project}/BUSINESS_RULES.md`（如存在）
+  1. 读取 `projects/{project}/docs/BUSINESS_RULES.md`（如存在）
   2. 判断本次改动是否引入新业务约束或修改已有规则判定条件
   3. 引用 BR 编号而非重写规则全文
   4. 纯技术重构、bug 修复（无新业务约束）时写 "N/A — 无业务规则变更"

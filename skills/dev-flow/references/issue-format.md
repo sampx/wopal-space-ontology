@@ -87,5 +87,7 @@ fix-dev-flow-handle-expired-tokens
 ## Plan 目录规则
 
 - 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件。
-- Plan 目录由 dev-flow 项目名决定，不由组件名决定。
-- 本空间约定：跨项目综合 Plan 使用 `--project wopal-space`，目录为 `docs/projects/wopal-space/plans/`。
+- `--project` 是必填参数，Plan 目录由其决定。
+- **标准项目**：`projects/<project>/docs/plans/`
+- **ontology-worktree**：`.wopal/docs/plans/`
+- `docs/projects/<project>/plans/` 是 **DEPRECATED** 只读回退，禁止新写入。

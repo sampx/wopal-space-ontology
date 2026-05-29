@@ -12,7 +12,8 @@
 |------|------|
 | `plan <issue>` | 创建或定位 Plan |
 | `approve <issue>` | 方案评审 |
-| `approve <issue> --confirm [--worktree]` | 用户审批通过，开始实施 |
+| `approve <issue> --confirm` | 用户审批通过，默认创建 worktree 隔离 |
+| `approve <issue> --confirm --no-worktree` | 用户审批通过，跳过 worktree |
 | `complete <issue> [--pr]` | 实施完成，进入用户验证 |
 | `verify <issue> --confirm` | 用户验证通过 |
 | `archive <issue>` | 归档 Plan，push 代码 |
@@ -92,7 +93,7 @@ flow.sh plan --title "feat(scope): desc" --project <name> --type <type>
 
 先运行这条命令生成或定位 Plan stub，再编辑内容；禁止手写创建新的 Plan 文件。
 
-目录由 `--project` 决定。本空间约定：跨项目综合 Plan 使用 `--project wopal-space`，目录为 `docs/projects/wopal-space/plans/`。
+目录由 `--project` 决定（必填参数）。标准项目：`projects/<project>/docs/plans/`；ontology-worktree：`.wopal/docs/plans/`。`docs/projects/<project>/plans/` 已废弃，仅作只读回退。
 
 ### plan --check
 
@@ -112,8 +113,8 @@ flow.sh sync <issue> --labels-only  # 仅 labels
 ### approve --confirm
 
 ```bash
-flow.sh approve <issue> --confirm              # 直接开始实施
-flow.sh approve <issue> --confirm --worktree   # 隔离 worktree 中实施
+flow.sh approve <issue> --confirm              # 默认创建 worktree
+flow.sh approve <issue> --confirm --no-worktree # 跳过 worktree
 ```
 
 ### complete --pr
@@ -136,8 +137,8 @@ flow.sh verify-switch <issue> --merge
 
 ```bash
 # 从 PRD 拆分 Issue（兼容旧模式）
-flow.sh decompose-prd docs/projects/<project>/PRD.md --dry-run   # 预览
-flow.sh decompose-prd docs/projects/<project>/PRD.md --project <name>  # 创建
+flow.sh decompose-prd projects/<project>/docs/PRD.md --dry-run   # 预览
+flow.sh decompose-prd projects/<project>/docs/PRD.md --project <name>  # 创建
 
 # 从 ROADMAP.md Slices 表生成 Slice Issues
 flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
@@ -148,7 +149,7 @@ flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
 ### roadmap
 
 ```bash
-flow.sh roadmap docs/projects/<project>/PRD.md --product <name> [--project <name>] [--yes] [--dry-run]
+flow.sh roadmap projects/<project>/docs/PRD.md --product <name> [--project <name>] [--yes] [--dry-run]
 ```
 
 四阶段工作流：Analyze → Discuss → Produce → Decompose。
