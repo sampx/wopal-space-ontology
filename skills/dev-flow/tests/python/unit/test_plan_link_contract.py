@@ -254,3 +254,55 @@ class TestUpdateIssuePlanLink:
         assert "docs/plans/done/42-feature-gesp-resolver.md" in new_body
         # Space repo should NOT appear in the blob URL part
         assert "sampx/wopal-space/blob" not in new_body
+
+
+class TestSyncPlanToIssueBody:
+    """Verify sync_plan_to_issue_body only replaces Plan row, not entire body."""
+
+    def test_preserves_other_sections(self, workspace):
+        from issue import sync_plan_to_issue_body
+
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "feature-resolver.md"
+        plan_file.write_text("# Plan\n\n- **Status**: executing\n- **Target Project**: gesp\n")
+
+        full_body = (
+            "## Goal\n\nSome goal text\n\n"
+            "## Related Resources\n\n"
+            "| Resource | Link |\n|------|------|\n"
+            "| Plan | _待关联_ |\n\n"
+            "## Acceptance Criteria\n\n- [ ] AC1\n- [ ] AC2\n"
+        )
+
+        view_result = MagicMock()
+        view_result.stdout = full_body
+        version_result = MagicMock()
+        version_result.returncode = 0
+        edit_result = MagicMock()
+        edit_result.returncode = 0
+
+        with patch("issue.subprocess.run") as mock_run, \
+             patch("plan.resolve_plan_location") as mock_loc:
+            loc = PlanLocation(
+                path=plan_file.resolve(),
+                repo_root=(workspace / "projects" / "gesp").resolve(),
+                repo_relative_path="docs/plans/feature-resolver.md",
+                github_repo="sampx/gesp",
+                branch="main",
+                is_archived=False,
+            )
+            mock_loc.return_value = loc
+            mock_run.side_effect = [version_result, view_result, edit_result]
+
+            sync_plan_to_issue_body(42, str(plan_file), "sampx/wopal-space", str(workspace))
+
+            edit_call = mock_run.call_args_list[2]
+            edit_cmd = edit_call[0][0]
+            body_arg_idx = edit_cmd.index("--body") + 1
+            new_body = edit_cmd[body_arg_idx]
+
+            assert "## Goal" in new_body
+            assert "Some goal text" in new_body
+            assert "## Acceptance Criteria" in new_body
+            assert "AC1" in new_body
+            assert "sampx/gesp" in new_body
+            assert "待关联" not in new_body

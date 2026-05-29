@@ -341,29 +341,68 @@ def sync_status_label(issue_number: int, status: str, repo: str) -> None:
 
 
 def sync_plan_to_issue_body(issue_number: int, plan_file: str, repo: str, workspace_root: str = None) -> None:
-    """Sync approved plan content to Issue body."""
+    """Sync Plan link row in Issue's Related Resources section.
+    
+    Only updates the | Plan | ... | row, preserving all other Issue body content.
+    """
     if not repo:
         return
     
     if not Path(plan_file).exists():
         return
     
-    # Check gh CLI availability
     try:
         subprocess.run(['gh', '--version'], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         return
     
-    # Build plan body content from plan file
     _, _, _build_issue_body = _get_plan_functions()
     plan_name = Path(plan_file).stem
-    body = _build_issue_body(plan_file, plan_name, repo, workspace_root)
+    new_plan_row = _build_issue_body(plan_file, plan_name, repo, workspace_root)
     
-    # Update Issue body
+    if not new_plan_row or "待关联" in new_plan_row:
+        return
+    
+    current_body = _get_issue_body(issue_number, repo)
+    if current_body is None:
+        return
+    
+    new_body = _replace_plan_row_in_body(current_body, new_plan_row)
+    if new_body == current_body:
+        return
+    
     subprocess.run(
-        ['gh', 'issue', 'edit', str(issue_number), '--repo', repo, '--body', body],
+        ['gh', 'issue', 'edit', str(issue_number), '--repo', repo, '--body', new_body],
         capture_output=True,
     )
+
+
+def _get_issue_body(issue_number: int, repo: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ['gh', 'issue', 'view', str(issue_number), '--repo', repo, '--json', 'body', '--jq', '.body'],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _replace_plan_row_in_body(current_body: str, new_plan_row: str) -> str:
+    plan_row_pattern = re.compile(r'\| Plan \| .+ \|')
+    rr_match = re.search(r'^##\s+Related Resources\s*$', current_body, re.MULTILINE)
+    if rr_match:
+        rr_start = rr_match.start()
+        next_section = re.search(r'^##\s+', current_body[rr_match.end():], re.MULTILINE)
+        rr_end = rr_match.end() + next_section.start() if next_section else len(current_body)
+        rr_section = current_body[rr_start:rr_end]
+        if plan_row_pattern.search(rr_section):
+            new_rr = plan_row_pattern.sub(new_plan_row, rr_section, count=1)
+            return current_body[:rr_start] + new_rr + current_body[rr_end:]
+        else:
+            return current_body[:rr_end] + new_plan_row + "\n" + current_body[rr_end:]
+    else:
+        return current_body.rstrip('\n') + f"\n\n## Related Resources\n\n{new_plan_row}\n"
 
 
 def plan_project_to_issue_label(project: str) -> str:
