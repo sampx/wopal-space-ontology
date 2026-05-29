@@ -128,13 +128,13 @@ N/A — 无业务规则变更。本次为 dev-flow 工程工作流重构。
 
 ### Agent Verification
 
-1. [ ] `cd .wopal/skills/dev-flow && python -m pytest tests/python/unit -q` 全部 pass
-2. [ ] `rg -n 'docs/projects/.*/plans|docs/projects/plans' .wopal/skills/dev-flow/scripts -g '*.py'` 仅剩标注 `DEPRECATED` 的 fallback read 代码
-3. [ ] `flow.sh plan --title "test(dev-flow): path smoke" --project wopal-space-ontology --type test --scope dev-flow` 在 `.wopal/docs/plans/` 创建/定位 Plan
-4. [ ] `flow.sh plan --title "test(dev-flow): standard path" --project gesp --type test --scope dev-flow` 在 `projects/gesp/docs/plans/` 创建/定位 Plan
-5. [ ] `flow.sh plan --title "test(dev-flow): no project" --type test` 报错提示 project 必填
-6. [ ] Issue body 中 Plan URL 指向 Plan 所属项目 repo 的真实路径（非空间仓库软链接路径）
-7. [ ] 测试清理完成后，`tests/python/COVERAGE.md` 被删除或重写为当前测试索引
+1. [x] `cd .wopal/skills/dev-flow && python -m pytest tests/python/unit -q` 全部 pass
+2. [x] `rg -n 'docs/projects/.*/plans|docs/projects/plans' .wopal/skills/dev-flow/scripts -g '*.py'` 仅剩标注 `DEPRECATED` 的 fallback read 代码
+3. [x] `flow.sh plan --title "test(dev-flow): path smoke" --project wopal-space-ontology --type test --scope dev-flow` 在 `.wopal/docs/plans/` 创建/定位 Plan
+4. [x] `flow.sh plan --title "test(dev-flow): standard path" --project gesp --type test --scope dev-flow` 在 `projects/gesp/docs/plans/` 创建/定位 Plan
+5. [x] `flow.sh plan --title "test(dev-flow): no project" --type test` 报错提示 project 必填
+6. [x] Issue body 中 Plan URL 指向 Plan 所属项目 repo 的真实路径（非空间仓库软链接路径）
+7. [x] 测试清理完成后，`tests/python/COVERAGE.md` 被删除或重写为当前测试索引
 
 ### User Validation
 
