@@ -7,7 +7,7 @@
 - **Project Path**: .wopal
 - **Project Type**: ontology-worktree
 - **Created**: 2026-05-28
-- **Status**: planning
+- **Status**: executing
 - **Sequel**: phase2-worktree-git-lifecycle
 
 ## Scope Assessment
@@ -189,7 +189,7 @@ rg -n 'docs/projects|FLOW_BIN|legacy-only|Bash → Python|wopal-space/plans' tes
 ```
 
 **Done**:
-- [ ] 实施 Agent 已完成功能开发和验证，确认结果符合预期
+- [x] 实施 Agent 已完成功能开发和验证，确认结果符合预期
 
 ---
 
