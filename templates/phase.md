@@ -29,9 +29,15 @@ One sentence describing the product capability to be delivered in this phase (cr
 
 ## 4. Exit Criteria
 
-- [ ] Product-level acceptance condition 1
-- [ ] Product-level acceptance condition 2
-- [ ] Product-level acceptance condition 3
+Grouped by project, 1–6 checkbox-format acceptance criteria per group. Each item describes an independently verifiable delivery fact.
+
+### <Project Name 1>
+- [ ] acceptance criterion 1
+- [ ] acceptance criterion 2
+
+### <Project Name 2>
+- [ ] acceptance criterion 1
+- [ ] acceptance criterion 2
 
 ## 5. Risks and Dependencies
 

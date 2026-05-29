@@ -126,8 +126,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | `prd.md` | 产品 PRD | PRD 模板 |
 | `design-product.md` | 产品 DESIGN | 总体设计模板 |
 | `design-project.md` | 项目 DESIGN | 项目设计模板（含能力范围与演进路线） |
-| `phase-product.md` | 产品阶段文档 | 跨项目视角 phase 模板 |
-| `phase-project.md` | 项目阶段文档 | 单项目视角 phase 模板 |
+| `phase.md` | 阶段文档 | 产品阶段范围与验收条件模板 |
 | `agents.md` | 项目 AGENTS.md | 开发规范模板 |
 
 #### `STRUCTURE.md` schema 与生成规则
