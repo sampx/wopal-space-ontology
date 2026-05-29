@@ -87,6 +87,11 @@ class TestResolveProjectContext:
         with pytest.raises(ValueError, match="deprecated"):
             resolve_project_context("wopal-space", workspace)
 
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_nonexistent_project_raises(self, mock_slug, workspace):
+        with pytest.raises(ValueError, match="not found"):
+            resolve_project_context("missing-project", workspace)
+
 
 # -- resolve_plan_dir -----------------------------------------------------------
 
@@ -100,6 +105,19 @@ class TestResolvePlanDir:
     def test_ontology(self, mock_slug, workspace):
         result = resolve_plan_dir("wopal-space-ontology", workspace)
         assert result == workspace / ".wopal" / "docs" / "plans"
+
+    def test_empty_name_raises(self, workspace):
+        with pytest.raises(ValueError, match="required"):
+            resolve_plan_dir("", workspace)
+
+    def test_deprecated_wopal_space_raises(self, workspace):
+        with pytest.raises(ValueError, match="deprecated"):
+            resolve_plan_dir("wopal-space", workspace)
+
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_nonexistent_project_raises(self, mock_slug, workspace):
+        with pytest.raises(ValueError, match="not found"):
+            resolve_plan_dir("missing-project", workspace)
 
 
 # -- find_plan ------------------------------------------------------------------

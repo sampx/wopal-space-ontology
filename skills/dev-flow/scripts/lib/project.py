@@ -121,8 +121,13 @@ def resolve_project_context(
         project_path = workspace_root / ".wopal"
         docs_path = workspace_root / ".wopal" / "docs"
     else:
-        ptype = ProjectType.STANDARD
         project_path = workspace_root / "projects" / project_name
+        if not project_path.is_dir():
+            raise ValueError(
+                f"Project '{project_name}' not found at {project_path}. "
+                "Cross-project work should be split into per-project Plans."
+            )
+        ptype = ProjectType.STANDARD
         docs_path = project_path / "docs"
 
     code_repo_path = _resolve_code_repo_path(ptype, project_path, workspace_root)
@@ -146,10 +151,8 @@ def resolve_project_context(
 
 
 def resolve_plan_dir(project_name: str, workspace_root: Path) -> Path:
-    workspace_root = Path(workspace_root).resolve()
-    if _is_ontology_project(project_name, workspace_root):
-        return workspace_root / ".wopal" / "docs" / "plans"
-    return workspace_root / "projects" / project_name / "docs" / "plans"
+    ctx = resolve_project_context(project_name, workspace_root)
+    return ctx.docs_path / "plans"
 
 
 def _search_dirs(workspace_root: Path) -> list[Path]:
