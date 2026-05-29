@@ -41,6 +41,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, 
 - If the user's preferred language is not English, first generate or update the user's preferred-language review version, then sync to the formal English version after approval.
 - `<locale>` uses IETF BCP 47 / RFC 5646 language tags, e.g. `zh-CN`, `en-US`. Never hardcode a specific locale.
 - Review-version titles and body use the target language; mixing Chinese and English titles is forbidden.
+- Localized template review versions must preserve the formal template's English section headings; translate only body text, placeholder guidance, and table content so generated documents do not drift from the formal structure.
 - After review approval, update the English runtime source under `.wopal/`. Both versions must stay semantically aligned.
 - For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `.wopal/docs/LANG/<locale>/<type>/`.
 - For `skills/`, keep the preferred-language review version in the same skill directory as `SKILL.<locale>.md` (for example `SKILL.zh-CN.md`), then sync the approved content to `SKILL.md`.

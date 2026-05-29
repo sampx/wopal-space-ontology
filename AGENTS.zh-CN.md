@@ -41,6 +41,7 @@ WopalSpace 的空间灵魂、规约与能力基因工具包；`agents/`、`rules
 - 若用户偏好语言不是英文，必须先生成或更新用户偏好语言审核版，审核通过后再同步正式英文版。
 - `<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死某个具体 locale。
 - 审核版标题和正文使用目标语言，禁止中英文标题混杂。
+- 本地化模板审核版必须保留正式模板的英文章节标题，只翻译正文、占位说明和表格内容，避免模板生成物与正式版结构漂移。
 - 审核版确认后再更新 `.wopal/` 下对应英文运行源；两个版本的语义必须保持一致。
 - 对于 `agents/`、`rules/`、`commands/`、`templates/`、`prompts/`，审核版放在 `.wopal/docs/LANG/<locale>/<type>/` 下。
 - 对于 `skills/`，用户偏好语言审核版放在 skill 同目录，命名为 `SKILL.<locale>.md`（例如 `SKILL.zh-CN.md`）；审核通过后再同步到 `SKILL.md`。
