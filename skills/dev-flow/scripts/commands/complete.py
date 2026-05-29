@@ -38,7 +38,7 @@ from plan import (
     get_plan_field,
 )
 from plan import commit_project_changes, commit_ontology_worktree
-from lib.git import has_uncommitted_changes, commit_paths
+from lib.git import has_uncommitted_changes, get_common_git_dir, commit_paths
 from plan import resolve_project_path
 from lib.project import resolve_plan_location
 from validation import (
@@ -231,14 +231,15 @@ def cmd_complete(args: argparse.Namespace) -> int:
             else:
                 code_repo_root = str(project_path_obj.resolve())
 
-    # Same repo = Plan file and code share the same working directory root.
+    # Same repo = Plan file and code share the same underlying git repository.
     # This is the condition for merge commit (D-03, D-07).
-    # Worktree paths are different working dirs even if same underlying git repo,
-    # so they won't match here — which is correct (separate commits on separate branches).
-    same_repo = (
-        code_repo_root is not None
-        and Path(plan_repo_root).resolve() == Path(code_repo_root).resolve()
-    )
+    # We compare git common dirs so that worktrees (different working dirs
+    # but same repo) are correctly identified as same-repo.
+    same_repo = False
+    if code_repo_root is not None:
+        plan_git_dir = get_common_git_dir(plan_repo_root)
+        code_git_dir = get_common_git_dir(code_repo_root)
+        same_repo = bool(plan_git_dir and code_git_dir and plan_git_dir == code_git_dir)
 
     if not same_repo:
         # Different repos or worktree: commit code now, Plan status later.

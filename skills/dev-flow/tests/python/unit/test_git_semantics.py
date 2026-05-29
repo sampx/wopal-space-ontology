@@ -493,3 +493,153 @@ class TestArchiveRepoAware:
         assert _get_commit_count(wopal) == initial + 1
         assert not plan_file.exists()
         assert archived_file.exists()
+
+
+# ============================================
+# Regression tests for rook blockers B-01/B-02/B-03
+# ============================================
+
+class TestB01WorktreePathConsistency:
+    """B-01 regression: approve must write actual worktree path, not a reconstructed one."""
+
+    def test_standard_worktree_path_uses_slug_not_raw_branch(self, tmp_path):
+        """When branch contains '/', create_worktree replaces '/' with '-'.
+        WorktreeContext.path must record the actual path, not a raw branch guess."""
+        from lib.worktree import create_worktree
+
+        project_dir = tmp_path / "projects" / "gesp"
+        _git_init(project_dir)
+        # Create an initial commit so worktree add works
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"],
+                       cwd=str(project_dir), capture_output=True)
+
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+
+        # Branch with slash
+        branch = "issue/42-feature"
+        actual_path = create_worktree(project_dir, branch, worktree_base)
+
+        # The actual worktree dir uses slug: "gesp-issue-42-feature"
+        assert actual_path.exists()
+        assert actual_path.name == "gesp-issue-42-feature"
+
+        # The wrong path (what the old code produced) would be:
+        wrong_path = worktree_base / f"gesp-{branch}"
+        assert wrong_path != actual_path
+        assert not wrong_path.exists()
+
+
+class TestB02AbsolutePathResolution:
+    """B-02 regression: verify-switch must handle absolute paths in WorktreeContext."""
+
+    def test_absolute_path_not_concatenated(self, tmp_path):
+        """If WorktreeContext.path is absolute, must not prepend workspace_root."""
+        from commands.verify_switch import _run_switch_runtime_phase1
+        from lib.worktree import WorktreeContext
+
+        # Create a real git repo to serve as repo_root
+        main_repo = tmp_path / "main-repo"
+        _git_init(main_repo)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"],
+                       cwd=str(main_repo), capture_output=True)
+
+        # Create the feature branch on main_repo
+        subprocess.run(
+            ["git", "branch", "feature-test", "HEAD"],
+            cwd=str(main_repo), capture_output=True,
+        )
+
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+
+        # Create .wopal/ as a worktree of main_repo (simulates ontology runtime)
+        wopal_dir = tmp_path / ".wopal"
+        subprocess.run(
+            ["git", "worktree", "add", str(wopal_dir), "HEAD"],
+            cwd=str(main_repo), capture_output=True, check=True,
+        )
+
+        plans_dir = wopal_dir / "docs" / "plans"
+        plans_dir.mkdir(parents=True)
+        plan_file = plans_dir / "test-plan.md"
+        _make_plan_file(plan_file, status="verifying")
+
+        # Commit the plan so the worktree is clean
+        subprocess.run(["git", "add", "."], cwd=str(wopal_dir), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "add plan"],
+                       cwd=str(wopal_dir), capture_output=True)
+
+        # Create the issue worktree (the one Phase 1 should remove)
+        wt_path = worktree_base / "ontology-feature-test"
+        subprocess.run(
+            ["git", "worktree", "add", str(wt_path), "feature-test"],
+            cwd=str(main_repo), capture_output=True, check=True,
+        )
+        assert wt_path.exists()
+
+        ctx = WorktreeContext(
+            enabled=True,
+            project_type="ontology-worktree",
+            branch="feature-test",
+            path=wt_path,  # absolute path
+            repo_root=main_repo,
+            base_branch="main",
+            merge_target="main",
+            verify_mode="switch-runtime",
+            cleanup_policy="archive",
+        )
+
+        # Run Phase 1 — should remove the worktree successfully
+        with patch("commands.verify_switch.set_plan_field"), \
+             patch("commands.verify_switch.get_current_branch", return_value="main"):
+            result = _run_switch_runtime_phase1(
+                tmp_path, str(plan_file), ctx,
+            )
+
+        assert result is True
+        # Worktree should have been removed
+        assert not wt_path.exists()
+
+
+class TestB03SameRepoWorktreeDetection:
+    """B-03 regression: same-repo detection via git common dir, not working dir path."""
+
+    def test_worktree_detected_as_same_repo(self, tmp_path):
+        """A worktree and its main working tree share the same git repo.
+        get_common_git_dir must return the same value for both."""
+        from lib.git import get_common_git_dir
+
+        main_repo = tmp_path / "main-repo"
+        _git_init(main_repo)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"],
+                       cwd=str(main_repo), capture_output=True)
+
+        # Create a worktree
+        subprocess.run(
+            ["git", "branch", "feature-test", "HEAD"],
+            cwd=str(main_repo), capture_output=True,
+        )
+        wt_path = tmp_path / "worktree-checkout"
+        subprocess.run(
+            ["git", "worktree", "add", str(wt_path), "feature-test"],
+            cwd=str(main_repo), capture_output=True, check=True,
+        )
+
+        main_git_dir = get_common_git_dir(str(main_repo))
+        wt_git_dir = get_common_git_dir(str(wt_path))
+
+        assert main_git_dir, "Should resolve common git dir for main repo"
+        assert wt_git_dir, "Should resolve common git dir for worktree"
+        assert main_git_dir == wt_git_dir, "Worktree and main repo share the same git identity"
+
+    def test_different_repos_have_different_git_dirs(self, tmp_path):
+        """Two unrelated repos must have different common git dirs."""
+        from lib.git import get_common_git_dir
+
+        repo_a = tmp_path / "repo-a"
+        repo_b = tmp_path / "repo-b"
+        _git_init(repo_a)
+        _git_init(repo_b)
+
+        assert get_common_git_dir(str(repo_a)) != get_common_git_dir(str(repo_b))

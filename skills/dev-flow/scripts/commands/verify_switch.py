@@ -72,8 +72,9 @@ def _run_switch_runtime_phase1(
     branch = wt_ctx.branch
     wt_path = wt_ctx.path
 
-    # Resolve worktree path against workspace root
-    resolved_wt_path = workspace_root / str(wt_path)
+    # Resolve worktree path: use absolute if already absolute, otherwise relative to workspace root
+    raw_path = Path(str(wt_path))
+    resolved_wt_path = raw_path if raw_path.is_absolute() else workspace_root / str(wt_path)
 
     # Remove the issue worktree using repo_root (not get_ontology_main_repo)
     repo_root = Path(str(wt_ctx.repo_root))

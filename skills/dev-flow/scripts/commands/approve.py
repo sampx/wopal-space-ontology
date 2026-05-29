@@ -204,7 +204,7 @@ def _pop_stash(project_path: Path) -> bool:
 # Worktree Creation
 # ============================================
 
-def _create_worktree(project: str, branch: str, workspace_root: Path) -> bool:
+def _create_worktree(project: str, branch: str, workspace_root: Path) -> Path | None:
     """Create isolated worktree for project execution.
     
     Args:
@@ -213,7 +213,7 @@ def _create_worktree(project: str, branch: str, workspace_root: Path) -> bool:
         workspace_root: Workspace root path
         
     Returns:
-        True if worktree creation succeeded
+        Path to created worktree, or None on failure
     """
     worktree_base = workspace_root / ".worktrees"
     project_dir = workspace_root / project
@@ -224,10 +224,10 @@ def _create_worktree(project: str, branch: str, workspace_root: Path) -> bool:
     try:
         wt_path = create_worktree(project_dir, branch, worktree_base)
         log_success(f"Worktree created successfully: {wt_path}")
-        return True
+        return wt_path
     except Exception as e:
         log_error(f"Worktree creation failed - aborting approve: {e}")
-        return False
+        return None
 
 
 # ============================================
@@ -440,16 +440,18 @@ def cmd_approve(args: argparse.Namespace) -> int:
                 log_success("已 stash 未提交变更")
             
             # Create worktree
-            if _create_worktree(project, branch, workspace_root):
+            actual_wt_path = _create_worktree(project, branch, workspace_root)
+            if actual_wt_path is not None:
                 worktree_created = True
 
                 # Write WorktreeContext to Plan metadata
-                wt_path = workspace_root / ".worktrees" / f"{project}-{branch}"
+                # Use actual_wt_path from create_worktree() — it applies
+                # branch.replace("/", "-") slug transformation that we must not duplicate
                 wt_ctx = WorktreeContext(
                     enabled=True,
                     project_type="standard",
                     branch=branch,
-                    path=wt_path,
+                    path=actual_wt_path,
                     repo_root=project_path,
                     base_branch="main",
                     merge_target="main",

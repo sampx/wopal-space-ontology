@@ -156,6 +156,36 @@ def get_repo_root(path: str) -> str:
     return result.stdout.strip()
 
 
+def get_common_git_dir(path: str) -> str:
+    """Get the common git directory (shared across worktrees).
+
+    For a main working tree this is .git/; for a worktree it resolves
+    to the main repo's .git/ directory.  Comparing this value across
+    two paths is a reliable way to test whether they belong to the
+    same underlying repository.
+
+    Args:
+        path: Any path inside a git repo
+
+    Returns:
+        Absolute path to the common git directory, or empty string
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=path,
+        capture_output=True,
+        text=True,
+    )
+    raw = result.stdout.strip()
+    if not raw:
+        return ""
+    # git rev-parse --git-common-dir returns a path relative to the repo working
+    # directory.  Resolve it against cwd (the `path` argument) so it becomes
+    # absolute regardless of the process CWD.
+    common_dir = (Path(path) / raw).resolve()
+    return str(common_dir)
+
+
 def is_commit_in_remote(repo_path: str, remote: str = "origin", branch: str = "main") -> bool:
     """Check if HEAD commit is already pushed to remote branch.
 
