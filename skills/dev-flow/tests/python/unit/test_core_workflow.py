@@ -12,31 +12,31 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.core.workflow import guard_status, format_suggestion, resolve_space_repo
+from workflow import guard_status, format_suggestion, resolve_space_repo
 
 
 class TestGuardStatus(unittest.TestCase):
     """Test guard_status function."""
 
-    @patch("dev_flow.core.workflow.log_error")
+    @patch("workflow.log_error")
     def test_returns_true_when_status_matches(self, mock_log_error):
         result = guard_status("executing", "executing", "42")
         self.assertTrue(result)
         mock_log_error.assert_not_called()
 
-    @patch("dev_flow.core.workflow.log_error")
+    @patch("workflow.log_error")
     def test_returns_false_when_status_mismatch(self, mock_log_error):
         result = guard_status("planning", "executing", "42")
         self.assertFalse(result)
         self.assertTrue(mock_log_error.called)
 
-    @patch("dev_flow.core.workflow.log_error")
+    @patch("workflow.log_error")
     def test_prints_error_with_expected_and_current(self, mock_log_error):
         guard_status("planning", "executing", "42")
         calls = [str(c) for c in mock_log_error.call_args_list]
         self.assertTrue(any("executing" in c and "planning" in c for c in calls))
 
-    @patch("dev_flow.core.workflow.log_error")
+    @patch("workflow.log_error")
     def test_includes_suggestion_in_output(self, mock_log_error):
         guard_status("planning", "executing", "42")
         calls = [str(c) for c in mock_log_error.call_args_list]
@@ -106,35 +106,35 @@ class TestResolveSpaceRepo(unittest.TestCase):
         result = resolve_space_repo("", Path("/tmp"))
         self.assertEqual(result, "")
 
-    @patch("dev_flow.core.workflow.detect_space_repo")
+    @patch("workflow.detect_space_repo")
     def test_returns_repo_when_issue_and_repo_resolvable(self, mock_detect):
         mock_detect.return_value = "sampx/wopal-space"
         result = resolve_space_repo(42, Path("/workspace"))
         self.assertEqual(result, "sampx/wopal-space")
         mock_detect.assert_called_once_with(Path("/workspace"))
 
-    @patch("dev_flow.core.workflow.detect_space_repo")
+    @patch("workflow.detect_space_repo")
     def test_returns_repo_with_string_issue(self, mock_detect):
         mock_detect.return_value = "owner/repo"
         result = resolve_space_repo("42", Path("/workspace"))
         self.assertEqual(result, "owner/repo")
 
-    @patch("dev_flow.core.workflow.log_warn")
-    @patch("dev_flow.core.workflow.detect_space_repo")
+    @patch("workflow.log_warn")
+    @patch("workflow.detect_space_repo")
     def test_returns_empty_on_repo_error(self, mock_detect, mock_log_warn):
         mock_detect.side_effect = RuntimeError("No origin remote configured")
         result = resolve_space_repo(42, Path("/tmp"))
         self.assertEqual(result, "")
         mock_log_warn.assert_called_once()
 
-    @patch("dev_flow.core.workflow.log_warn")
-    @patch("dev_flow.core.workflow.detect_space_repo")
+    @patch("workflow.log_warn")
+    @patch("workflow.detect_space_repo")
     def test_warns_on_repo_error(self, mock_detect, mock_log_warn):
         mock_detect.side_effect = RuntimeError("No origin remote configured")
         resolve_space_repo(42, Path("/tmp"))
         self.assertIn("Cannot determine space repo", str(mock_log_warn.call_args))
 
-    @patch("dev_flow.core.workflow.detect_space_repo")
+    @patch("workflow.detect_space_repo")
     def test_does_not_call_detect_when_no_issue(self, mock_detect):
         resolve_space_repo(None, Path("/tmp"))
         mock_detect.assert_not_called()

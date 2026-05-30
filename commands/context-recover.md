@@ -1,11 +1,11 @@
 ---
-description: 压缩上下文之后,恢复上下文便继续之前未完成的工作
+description: Recover context after compaction
 ---
 
-我刚刚压缩了你的上下文, 请你立即执行恢复协议, 完成后继续工作.
+I just compacted your context. Immediately execute the recovery protocol, then continue work.
 
 <CRITICAL_RULE>
-1. 重新读取压缩摘要中的重要文件, 特别是 plan 方案, 流程规范等文档资料 (按重要程度, 最多加载 3 个文件,有必要时再按需读取)
-2. 使用关键词搜索, 加载与任务上下文的相关记忆( 每次最多取前 3 条, 避免占用过多上下文) 
-3. 恢复加载之前使用过的技能 (按与当前会话关联程度,最多加载前 2 个)
+1. Re-read important files from the compaction summary, especially plans, workflow specs, and reference documents (prioritize by importance, load up to 3 files; read more on demand if needed).
+2. Use keyword search to load context-relevant memories (fetch top 3 at most per query to avoid excessive context usage).
+3. Reload previously used skills (up to 2 most relevant to the current session).
 </CRITICAL_RULE>

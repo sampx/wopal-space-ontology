@@ -3,6 +3,7 @@
         "$schema": "https://opencode.ai/config.json",
         "default_agent": "wopal",
         "compaction": {
+            "auto": false,
             "tail_turns": 0
         },
         "agent": {
@@ -11,34 +12,45 @@
             "general": {
                 "model": "wopal-ai/glm-5.1"
             },
-            "compaction": {                
-                "model": "wopal-ai/qwen-3.6-plus"
+            "explore": {
+                "model": "wopal-ai/deepseek-v4-flash"
             },
+            "compaction": {                
+                "model": "wopal-ai/deepseek-v4-flash"
+            },
+            "wopal": {
+                "model": "wopal-ai/glm-5.1"
+            },            
             "fae": {
               "model": "wopal-ai/glm-5.1"
-            },            
+            },
+            "rook": {
+              "model": "github-copilot/gpt-5.4"
+            },
             "wsf-planner": {
               "model": "github-copilot/gpt-5.4"
             },
             "wsf-plan-checker": {
-              "model": "wopal-ai/glm-5"
+              "model": "github-copilot/gpt-5.4"
             },
             "wsf-executor": {
-              "model": "wopal-ai/glm-5"
+              "model": "wopal-ai/glm-5.1"
             },
             "wsf-code-reviewer": {
               "model": "github-copilot/gpt-5.4"
             },
             "wsf-code-fixer": {
-              "model": "wopal-ai/glm-5"
+              "model": "wopal-ai/glm-5.1"
             },
             "wsf-codebase-mapper": {
-              "model": "wopal-ai/qwen-3.6-plus"
+              "model": "wopal-ai/deepseek-v4-flash"
             }  
         },
         "instructions": [
-            ".workspace.md",
-            "USER.md"
+            ".wopal-space/STRUCTURE.md",
+            ".wopal-space/REGULATIONS.md",     
+            ".wopal-space/memory/USER.md",
+            ".wopal-space/memory/MEMORY.md"
         ],
         // "skills": {
         //   "paths": ["/Users/sam/coding/wopal/wopal-workspace/.agents/skills"]

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.core.status import update_plan_status
+from workflow import update_plan_status
 
 
 PLAN_TEMPLATE = """# test-plan

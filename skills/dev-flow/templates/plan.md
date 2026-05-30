@@ -5,10 +5,43 @@
 {issue_line}
 {type_line}
 {project_line}
+{product_line}
+{phase_line}
 {project_path_line}
 {project_type_line}
 - **Created**: {date}
 - **Status**: planning
+
+<!--
+  ⚠️ Project Path 与 Project Type 字段说明：
+  
+  **Project Path**（标准项目必填，ontology-worktree 自动填充）：
+  - 标准项目：`projects/<name>/`（如 `projects/gesp/`）
+  - ontology-worktree：`.wopal/`
+  
+  **Project Type**：
+  - 标准项目：`standard`
+  - ontology-worktree：`ontology-worktree`
+  
+  查询来源：`.wopal-space/STRUCTURE.md`
+-->
+
+<!--
+  ⚠️ WorktreeContext（approve --confirm 后自动注入，格式如下）：
+  
+  - **Worktree**:
+    - enabled: true
+    - project_type: standard          # standard | ontology-worktree
+    - branch: feature/issue-N-slug    # worktree 分支
+    - path: .worktrees/<project>-issue-<N>-<slug>
+    - repo_root: <absolute path to git repo>
+    - base_branch: main               # 创建时的基线分支
+    - merge_target: main              # 验证通过后合并的目标分支
+    - verify_mode: direct             # direct (standard) | switch-runtime (ontology)
+    - cleanup_policy: archive         # archive | pr-opened | manual
+  
+  使用 `--no-worktree` 跳过 worktree 时不会注入此块。
+-->
 
 ## Scope Assessment
 
@@ -38,13 +71,28 @@
 
 <!--
   ⚠️ 前期研究结论摘要。
-  **必须附带参考资料列表**——研究来源的文件路径（如 projects/space-flow/agents/wsf-planner.md）或 URL 链接。
   确保后续审阅者可追溯到原始研究材料。
+
+  ⚠️ 参考资料只放上下文文档——Plan 实施时需要理解的外部约束和前置上下文。
+  不是实施目标文档，不是被修改的源文件，不是项目配置文件。
+
+  ✅ 应该放：
+  - 父级产品架构文档（如 docs/products/<product>/DESIGN-<product>.md）
+  - 产品阶段文档（如 docs/products/<product>/phases/<product>-p1-xxx.md）
+  - 上游依赖 Plan（如本 Plan 依赖的其他项目 Plan）
+  - 外部规范/标准文档
+
+  ❌ 不应该放：
+  - 本项目的 DESIGN.md（这是实施目标，已通过 Architecture Context 引用）
+  - 本 Plan 要修改的源文件（已在 Affected Files 表中列出）
+  - 项目配置文件（package.json 等）
+  - 运行时实例文件（.wopal-space/ 下的 STRUCTURE.md、REGULATIONS.md 等）
 -->
 <研究结论摘要>
 
 **参考资料**：
-- `<参考资料文件路径或 URL>`
+<!-- 只放上下文文档：父级架构、阶段文档、依赖 Plan、外部规范。不放本项目 DESIGN、源文件、配置文件、运行时实例。 -->
+- `<上下文文档路径>`
 
 ### Key Decisions
 
@@ -75,6 +123,28 @@
 
 - <本次不做的内容及原因>
 
+## Business Rules Impact
+
+<!--
+  ⚠️ Plan 编写时检查是否影响业务规则。
+  1. 读取 `projects/{project}/docs/BUSINESS_RULES.md`（如存在）
+  2. 判断本次改动是否引入新业务约束或修改已有规则判定条件
+  3. 引用 BR 编号而非重写规则全文
+  4. 纯技术重构、bug 修复（无新业务约束）时写 "N/A — 无业务规则变更"
+-->
+
+### 新增
+<!-- BR-NNN: {规则描述} -->
+
+### 修改
+<!-- BR-NNN: {旧值} → {新值}（原因） -->
+
+### 废弃
+<!-- BR-NNN: {废弃原因} -->
+
+### 同步确认
+- [ ] 已将上述变更同步到 `BUSINESS_RULES.md`
+
 ## Affected Files
 
 | Component | Files | Operation | Role |
@@ -88,8 +158,6 @@
   审阅者在掌握全部上下文后、进入实现细节前，先看到成功标准。
   这是 readability 设计，不是 TDD 执行机制——TDD 约束在 Task 级别生效。
 -->
-
-<!-- agent-verify-guard -->
 
 ### Agent Verification
 

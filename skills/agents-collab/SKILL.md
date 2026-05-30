@@ -1,218 +1,281 @@
 ---
 name: agents-collab
 description: |
-  Wopal 与子 Agent（fae、rook 等）交互的基础规范。⚠️ MUST load before ANY delegation — 涵盖委派工具 API、任务生命周期、通知处理、状态检查与恢复。
+  Foundation rules for how Wopal collaborates with sub-agents such as fae and rook. ⚠️ MUST load before ANY delegation — covers delegation tool APIs, task lifecycle, notifications, status handling, and recovery.
 
-  🔴 Trigger: "委派"、"delegate"、"让 fae 执行"、"fae 任务"、"rook 审查"、"检查状态"、"取消任务"、"agent 协作"、或任何意图将任务交给子 Agent 执行的场景。
+  🔴 Trigger: "delegate", "let fae implement", "fae task", "rook review", "check task status", "cancel task", "abort task", "agent collaboration", "委派", "让 fae 执行", "fae 任务", "rook 审查", "检查状态", or any intent to hand work to a sub-agent.
 
-  🔴 严禁不加载本技能就直接委派，这是严重失职。
+  🔴 Never delegate without loading this skill first. Skipping it is serious negligence.
 
-  注意：本技能不包含与特定工作流（如 dev-flow）绑定的 prompt 模板 — 那些由对应工作流技能提供。
+  Note: this skill does not include workflow-specific prompt templates such as dev-flow templates. Those belong to the corresponding workflow skills.
 ---
 
-# agents-collab — 子 Agent 交互基础
+# agents-collab — Sub-agent collaboration basics
 
-本技能定义**如何**与子 Agent 进行工具级交互。至于**何时**委派、prompt 中应包含哪些工作流特定指令（如 Plan 路径、Done checkbox），由上层工作流技能（如 dev-flow）决定。
-
----
-
-## 子 Agent 类型
-
-| Agent | 角色 | 职责 | `agent` 参数 |
-|-------|------|------|-------------|
-| fae | 实施代理 | 编码、重构、文件操作、构建测试、commit | `fae` |
-| rook | 审查代理 | 只读审查，不修复不实施；输出 PASS/REVISE/BLOCK | `rook` |
-
-**选择原则**：实施类任务 → fae；审查类任务 → rook。不确定时先评估任务性质再选。
+This skill defines **how** Wopal should collaborate with sub-agents at the tool level. **When** to delegate, and which workflow-specific instructions must appear in the prompt (such as Plan paths or done checkboxes), are decided by higher-level workflow skills such as dev-flow.
 
 ---
 
-## 委派工具
+## Tool priority
 
-### wopal_task — 启动任务
+Always prefer `wopal_task` for delegation. Use the built-in `task` tool only when `wopal_task` is unavailable.
+`wopal_task` provides bidirectional communication, progress monitoring, and non-blocking execution. Using `task` means downgrading execution and giving up those capabilities.
+
+---
+
+## Prompt format
+
+Delegation prompts must be precise and complete so the sub-agent can succeed in one pass. Standard format:
+
+```
+Hello <agent>, I am wopal. Because <reason>, please do the following task:
+
+Task: <task description>
+Goal: <goal description>
+
+<precise context: absolute paths, file:line anchors, current code, change locations, and boundaries of what must not be changed>
+```
+
+**Required location context**:
+- If a Plan exists: provide the absolute path to the Plan file
+- If a worktree is involved (such as `.wopal/`): explicitly state the worktree root and warn the sub-agent not to edit the wrong location
+
+**Core principle**: give complete, precise context up front so rework is minimized.
+
+### Code review delegation contract, especially for rook
+
+When delegating code review to rook, you must first define the **change carrier**. Without it, rook cannot establish a correct review boundary:
+
+| Scenario | Required prompt fields | How rook should review |
+|------|----------------|------------------|
+| **Uncommitted changes** | `review_type: implementation`, `project_path`, `change_scope: working_tree`, plus changed file list or an explicit instruction to review `git diff` / `git diff --cached` | Review against the working tree or staged diff using planless diff review |
+| **Committed changes** | `review_type: implementation`, `project_path`, `commit: <hash>` or `commit_range: <A>..<B>`, and `background` | Review against the `git diff` for that commit or range; never rely on file paths alone |
+
+Additional rules:
+
+1. **For committed changes, never provide only file names.** Without a commit or range, rook tends to review whole files and loses precise diff context.
+2. **Planless code review defaults to technical review.** Explicitly tell rook to focus on bugs, tests, repeated logic, convention violations, and technical debt rather than judging business logic.
+3. **If business logic really must be reviewed**, say so explicitly in the prompt, for example: `business_logic_review: requested`. Otherwise rook should place severe logic concerns in a discussion-only section.
+
+---
+
+## Delegation tools
+
+### wopal_task — launch a task
 
 ```typescript
-// 启动异步子 Agent 任务，返回 task_id
 wopal_task({
-  description: "3-5词",
-  prompt: "<任务消息>",
-  agent: "fae"       // 或 "rook"、"general" 等，默认 "general"
+  description: "3-5 words",
+  prompt: "<write the prompt using the format above>",
+  agent: "fae"       // or "rook", "general", etc. Default: "general"
 })
-// 记录返回的 task_id，用于后续监控和交互
+// Returns task_id for later monitoring and communication
 ```
 
-- 异步非阻塞：主 session 不等待，可同时启动多个任务
-- 全空间视野：子 Agent 看到所有项目，与 Wopal 相同
-- 并发上限：最多 3 个任务并行，超出自动排队
-- TTL：30min 无交互自动清理
+- Asynchronous and non-blocking; the main session does not wait and can launch multiple tasks
+- Concurrency limit: at most 3 tasks in parallel; additional tasks are queued automatically
+- TTL: auto-cleanup after 30 minutes with no interaction
 
-### wopal_task_output — 检查状态与输出
+### wopal_task_output — inspect status and output
 
 ```typescript
-// 概要状态
-wopal_task_output({ task_id })
-
-// 按维度查看
-wopal_task_output({ task_id, section: "tools" })       // 工具调用记录
-wopal_task_output({ task_id, section: "text" })         // 文本输出
-wopal_task_output({ task_id, section: "reasoning" })    // 思考过程
-wopal_task_output({ task_id, section: "text", last_n: 3 })  // 只看最近 3 条
+wopal_task_output({ task_id })                              // summary status
+wopal_task_output({ task_id, section: "text" })             // text output
+wopal_task_output({ task_id, section: "tools" })            // tool calls
+wopal_task_output({ task_id, section: "reasoning" })        // reasoning trace
+wopal_task_output({ task_id, section: "text", last_n: 3 })  // last 3 text outputs only
 ```
 
-### wopal_task_reply — 双向交互
+### wopal_task_reply — communicate, resume, or redirect
 
-向运行中或 idle 的子 Agent 发送消息，可恢复执行、纠正方向、追加指令。
+Send a message to an idle, waiting, or stuck task to resume execution or correct direction. `error` tasks cannot be resumed; clean them up with `finish` and recreate them. The sub-agent **will wake up**.
 
 ```typescript
-// 发送消息让子 Agent 继续工作
-wopal_task_reply({ task_id, message: "继续完善测试覆盖" })
-
-// 中断并重定向（abort 当前工作，处理新消息）
-wopal_task_reply({ task_id, message: "停止当前方向，改为...", interrupt: true })
+wopal_task_reply({ task_id, message: "Continue improving test coverage" })
+wopal_task_reply({ task_id, message: "Change direction to...", interrupt: true })  // abort current execution + inject message
 ```
 
-支持的任务状态：
+| Task state | Behavior |
+|---------|------|
+| `waiting` | Send a message and resume execution |
+| `idle` | Clear the idle marker, send a message, and resume execution |
+| `stuck` | Send a message and try again |
+| `error` | Reply is invalid; finish and recreate with valid config |
+| `running` | Must use `interrupt=true`, otherwise the message is queued |
 
-| 当前状态 | reply 行为 |
-|---------|-----------|
-| `waiting` | 发送消息，恢复执行 |
-| `running`（活跃） | 发送消息，排队处理 |
-| `running` + idle | 清除 idle 标记，发送消息，恢复执行 |
-| `completed` | 回退到 running，发新消息，重新执行 |
-| `error` | 回退到 running，发新消息，重新执行 |
+**Forbidden**: `wopal_task_reply({ message: "Task complete" })` — this wakes the sub-agent and causes pointless extra work. `IDLE` is already the completion signal. If the output is accepted, end the task with `wopal_task_finish`.
 
-**关键场景**：
-- 产出不达标 → `wopal_task_reply` 让子 Agent 继续完善，不要重新委派
-- 任务出错 → `wopal_task_reply` 提供修复方向，让子 Agent 继续
-- 需要中止 → `wopal_task_reply({ interrupt: true })` 打断并重定向
+### wopal_task_abort — stop an actively running task
 
-### wopal_task_delete — 清理已完成任务
+Pure stop: no message, no wake-up. Afterward you can either `finish` the task or `reply` to resume it.
 
 ```typescript
-wopal_task_delete({ task_id })
+wopal_task_abort({ task_id })
 ```
 
-仅用于已完成（completed/cancelled）的任务。运行中的任务需先用 `wopal_task_reply({ interrupt: true })` 中止。
+### wopal_task_finish — terminate a task
+
+Terminate an idle, waiting, stuck, or error task and delete its sub-session. The sub-agent **will not wake up**. Running tasks must be `abort`ed first or redirected with `reply(interrupt=true)`.
+
+```typescript
+wopal_task_finish({ task_id })
+```
 
 ---
 
-## 任务生命周期
+## Task lifecycle
 
-### 状态机
+### State model
 
-```
-pending → running → completed
-              ↓         ↓
-           waiting    error
-              ↓
-           running (after reply)
-```
+State model: `running | idle | waiting | stuck | error`
 
-### 状态含义
+- `running`: the only active state; the sub-session is executing
+- `idle`: stopped, with new assistant text, waiting for Wopal acceptance
+- `waiting`: stopped, waiting for a native question reply
+- `stuck`: stopped, with evidence of assistant execution but no new assistant text in the current round; can be resumed or cleaned up
+- `error`: stopped before entering a recoverable execution chain, such as invalid agent config; must be cleaned up and recreated
 
-| 状态 | 含义 | Wopal 行动 |
+### States and actions
+
+| State | Meaning | Wopal action |
 |------|------|-----------|
-| `pending` | 排队中 | 等待 |
-| `running` | 执行中 | 等待通知或 `wopal_task_output` 检查进度 |
-| `waiting` | 子 Agent 在提问 | `wopal_task_reply` 回答 |
-| `completed` | 已完成 | 验证产出 → 满意则 `wopal_task_delete`；不满意则 `wopal_task_reply` 返工 |
-| `error` | 会话级异常 | `wopal_task_output` 检查日志 → `wopal_task_reply` 引导修复 |
-| `cancelled` | 已取消 | `wopal_task_delete` 清理 |
-
-**进度判断**：消息数增长 → 执行中；长时间无新消息 → 可能卡住，检查 reasoning。
+| `running` | Executing | Wait for notifications or inspect output when needed |
+| `idle` | Stopped with output | Accept → `finish`, or reject → `reply` |
+| `waiting` | Waiting for native question reply | Use `reply` to answer via the question.reply path |
+| `stuck` | Execution evidence exists but no fresh output | Inspect output/logs → `reply` to recover or `finish` to clean up |
+| `error` | Startup/config-level failure | Inspect cause → `finish` cleanup → recreate task |
 
 ---
 
-## 通知驱动机制
+## Notification-driven flow
 
-任务状态变更通过系统通知 `[WOPAL TASK *]` 告知 Wopal。不要轮询，等待通知。
+Task state changes are reported through system notifications named `[WOPAL TASK *]`. **Do not poll. Wait for notifications.**
 
-### 通知类型与处理
-
-| 通知 | 触发条件 | 处理流程 |
+| Notification | Trigger | Handling |
 |------|---------|---------|
-| `[WOPAL TASK PROGRESS]` | 定期心跳 | 了解进度即可，无需行动 |
-| `[WOPAL TASK IDLE]` | 子 Agent session idle | ① `wopal_task_output(section="text")` 看输出 → ② 判断：完成则 `wopal_task_delete`；提问则 `wopal_task_reply` 回答；不确定则深入检查 reasoning |
-| `[WOPAL TASK WAITING]` | 子 Agent 使用 question tool | `wopal_task_reply` 回答 |
-| `[WOPAL TASK ERROR]` | 会话级错误 | `wopal_task_output` 查看日志 → `wopal_task_reply` 引导修复 |
-| `[WOPAL TASK STUCK]` | no_activity 或 loop_detected | ① `wopal_task_output(section="reasoning")` 检查思考 → ② 死循环/异常 → `wopal_task_reply({ interrupt: true })` 打断；正常推理 → 继续等待 |
+| `[WOPAL TASK PROGRESS]` | Periodic heartbeat | Understand progress; no action needed |
+| `[WOPAL TASK IDLE]` | Sub-agent session is idle with fresh assistant text | Follow the IDLE decision tree below |
+| `[WOPAL TASK QUESTION]` | Sub-agent used the native question tool and is now waiting | Use `reply` to answer |
+| `[WOPAL TASK STUCK]` | Assistant execution happened, but the current round stopped without fresh assistant text | Inspect `output(section="reasoning")` → `reply` to resume or `finish` to clean up |
+| `[WOPAL TASK ERR]` | No assistant execution evidence before failure | Inspect the cause → `finish` cleanup; do not reply |
 
-### 错误状态说明
-
-- bash 命令报错（exit 1）是正常任务执行，**不会**触发 `ERROR` 通知
-- `ERROR` 仅由会话级异常触发：session.crash、启动失败、promptAsync 失败
-- `wopal_task_reply` 无法更换 agent 类型 — agent 在创建时确定。需要换 agent 只能创建新 task
+`STUCK` is produced when the sub-session stops, there is no new non-synthetic assistant text in the round, but there is prior evidence of assistant execution. `ERR` means the task never entered a recoverable execution chain. Bash command failures do not trigger `ERR`. `reply` cannot change agent type; changing agent type requires a new task.
 
 ---
 
-## Rook 子代理
+## IDLE task decision tree
 
-### 委派契约格式
-
-委派 rook 时 prompt 需包含：
-
-```yaml
-review_type: plan | implementation
-goal: <目标描述>
-plan_path: <Plan 文档路径>
-files_to_read:
-  - <上下文文件列表>
-focus:
-  - <关注点>
-depth: standard | deep
+```
+IDLE notification arrives
+    ↓
+① Inspect text output with wopal_task_output(section="text")
+    ↓
+② Make acceptance decision
+    ├─ Accepted, no more work needed → wopal_task_finish to free resources
+    │                                ❌ Never do nothing and wait for TTL; zombie tasks waste concurrency slots
+    ├─ Accepted, but may be reused later → keep alive
+    ├─ Not accepted → wopal_task_reply for rework (⚠️ see high-context rules below)
+    └─ Sub-agent asked a question → wopal_task_reply with the answer
 ```
 
-### 结果处理
+## STUCK task decision tree
 
-rook 返回结构化报告，判定为 `PASS | REVISE | BLOCK`：
+```
+STUCK notification arrives
+    ↓
+① Inspect reasoning with wopal_task_output(section="reasoning")
+    ↓
+② Decide next action
+    ├─ Reasoning is normal, just no text this round → optionally guide with wopal_task_reply
+    ├─ Dead loop / repeated retries → wopal_task_abort or wopal_task_finish
+    └─ Abnormal stop (session crash, etc.) → try wopal_task_reply or clean up with wopal_task_finish
+```
 
-| 判定 | 含义 | Wopal 行动 |
-|------|------|-----------|
-| **PASS** | 目标已达成，无阻塞问题 | 继续推进 |
-| **REVISE** | 需修订后重新审查 | 修订方案或要求 fae 修正 → 修正后重新委派 rook |
-| **BLOCK** | 存在阻塞问题，必须修复 | 停止推进，根据 Blocker 要求 fae 修复 → 修复后重新委派 rook |
+## ERR task decision tree
 
-**修订循环上限**：同一审查对象最多 3 轮 REVISE/BLOCK 循环。超过 3 轮由用户在决策节点裁决，不再委派 rook。
-
-### 验证要点
-
-Wopal 收到 rook 报告后需检查：
-- 报告包含 `PASS | REVISE | BLOCK` 判定
-- Blocker / Warning 带 `file:line` 证据锚点
-- 修复建议可执行（非泛泛描述）
-- rook 不应有任何文件修改（`git status` 检查工作区）
-
----
-
-## 验证边界
-
-| 验证类型 | 执行者 | 原因 |
-|----------|--------|------|
-| 单元测试、集成测试 | fae | 自动化、确定性、可重复 |
-| E2E 测试、功能验证 | **Wopal** | 需要观察运行时环境 |
-| 技能安装验证 | **Wopal** | 需确认技能在 Agent 上下文中正确加载 |
-| Rook 审查结果验证 | **Wopal** | 判定与证据需人工判断是否合理 |
-
-`completed` ≠ 成功。Wopal 必须读取文件、运行命令验证产出。失败时用 `wopal_task_reply` 反馈。
+```
+ERR notification arrives
+    ↓
+① Inspect the error cause with wopal_task_output
+    ↓
+② Clean up with wopal_task_finish
+    ↓
+③ Recreate a new task if work must continue
+```
 
 ---
 
-## 禁止与限制
+## Rework and reuse strategy
 
-| 禁止 | 原因 |
+### Controller responsibility
+
+Wopal owns delegation rules, review conclusions, and the decision to reuse or replace a task. Fae and rook do not summarize delegation lessons. After receiving a review result, Wopal must actively drive the next step instead of waiting for the user to repeat authorization.
+
+### Reuse priority
+
+As long as the task is still alive, the scope has not materially changed, and context remains healthy, prefer `reply` reuse:
+
+| Scenario | Preferred | Avoid |
+|------|------|--------|
+| Small fae rework | `reply` to continue | Opening a new fae task |
+| Rook returned REVISE/BLOCK and code is fixed | `reply` the original rook task | Opening a new rook task |
+| Supplying more information / continuing work | `reply` | Finishing then recreating |
+
+### When to stop reusing a task
+
+Open a new task, or have Wopal finish the work directly, when any of these is true:
+
+1. Context > 50% (hard threshold)
+2. One rework cycle already happened and context is 45%+
+3. The task scope materially changed, such as moving from code fixing to rule writing
+4. The sub-agent is clearly drifting, looping, or degrading in quality
+
+Rule of thumb: do not interrupt a healthy running task. If quality is poor after IDLE and context is already high, avoid forcing another hard reply cycle.
+
+---
+
+## Child-session context compaction
+
+When receiving `[WOPAL TASK PROGRESS]`, check context usage:
+
+| Usage | Recommendation |
 |------|------|
-| 不加载本技能就委派 | 缺乏机制指引，必然出错 |
-| 频繁轮询 `wopal_task_output` | 浪费上下文，等待通知即可 |
-| 嵌套 wopal_task | 子 Agent 已禁用 |
-| 同一 task 反复 reply 返工（上下文 >50%） | 高上下文下返工质量下降，应新开 task |
+| < 45% | No action needed |
+| 45-55% | Evaluate remaining workload |
+| ≥ 55% | Consider compaction |
+| ≥ 75% | Urgent compaction |
 
-| 限制 | 应对 |
-|------|------|
-| 并发最大 3 | 超出自动排队 |
-| TTL 30min 兜底 | 通知后未处理则自动清理 |
+Before compacting, confirm there are no uncommitted changes, no blocking dependencies, and the task is not stuck.
+
+**Main session**: `context_manage(action="compact")`. After compaction, the plugin sends recovery instructions automatically.
+
+**Child session**: `context_manage(action="compact", session_id="wopal-task-xxx")`. After compaction, the plugin sends `[WOPAL TASK COMPACTED]`, and Wopal should use `reply` with precise recovery instructions.
 
 ---
 
-## 故障排查
+## Cross-agent artifacts in parallel delegation
 
-详见 `references/troubleshooting.md`
+When multiple agents run in parallel, the file list returned by `output` may include work produced by other agents. Focus only on the expected artifacts for the current task, and use `git status` in the relevant project directory to verify them. Do not misclassify other agents' files as anomalies or delete them.
+
+---
+
+## Prohibitions and limits
+
+| Prohibition | Reason |
+|------|------|
+| Delegating without loading this skill | Missing operating rules; errors become likely |
+| Frequent `output` polling | Wastes context; wait for notifications instead |
+| Nested `wopal_task` usage | Sub-agents already have it disabled |
+| Repeated reply-based rework on the same task when context > 50% | Quality degrades in high-context sessions |
+| `reply("Task complete")` | Wakes the sub-agent for no meaningful reason |
+
+| Limit | Response |
+|------|------|
+| Max concurrency is 3 | Additional tasks queue automatically |
+| TTL is 30 minutes | Unhandled tasks are auto-cleaned after notification |
+
+---
+
+## Troubleshooting
+
+See `references/troubleshooting.md`

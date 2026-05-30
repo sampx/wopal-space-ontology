@@ -1,0 +1,38 @@
+version: 1
+
+# 运行时目录（.wopal-space/）
+runtime:
+  path: .wopal-space
+  files:
+    - template: STRUCTURE.md        # 空间结构真相源
+      target: STRUCTURE.md
+    - template: REGULATIONS.md      # 空间守则
+      target: REGULATIONS.md
+    - template: memory/USER.md      # 用户档案
+      target: memory/USER.md
+    - template: memory/MEMORY.md    # 长期记忆骨架
+      target: memory/MEMORY.md
+  dirs:
+    - path: memory/diary            # 会话日记
+      keep: [.gitkeep]
+    - path: logs                    # 空间组件运行日志
+      keep: [.gitkeep]
+    - path: .tmp                    # 临时缓冲
+    - path: INBOX                   # 外部技能暂存（研究）
+    - path: backup                  # 空间内容备份
+      keep: [.gitkeep]
+
+# 空间根目录文件
+space:
+  files:
+    - template: root-AGENTS.md      # 空间启动入口 → 渲染为 AGENTS.md
+      target: AGENTS.md
+    - template: gitignore           # 空间根 .gitignore
+      target: .gitignore
+  dirs:
+    - path: projects                # 项目仓库
+      keep: [.gitkeep]
+    - path: contents                # 内容文档
+      keep: [.gitkeep]
+    - path: docs                    # 空间级文档
+      keep: [.gitkeep]

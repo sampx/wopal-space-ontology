@@ -1,30 +1,30 @@
 ---
-description: 审查和管理 LanceDB 中的长期记忆（列出、搜索、删除）
+description: Manage LanceDB long-term memory
 ---
 
-# /memory — 记忆管理命令
+# /memory — Memory Management Command
 
-**这是一个需要你立即执行的工具调用命令，不是规则说明。** 收到此命令后，你必须立即调用 `memory_manage` tool 执行对应操作。
+**This is an immediate tool-call command, not a rule document.** Upon receiving this command, you must immediately call the `memory_manage` tool to perform the requested operation.
 
-## 参数: `$ARGUMENTS`
+## Arguments: `$ARGUMENTS`
 
-| 用户输入 | 你要做的 |
-|----------|----------|
-| 无参数 / `list` | 调用 `memory_manage(command="list", limit=100)` — 一次拿完，不要分批 |
-| `list --category X` | 调用 `memory_manage(command="list", category="X", limit=100)` |
-| `list --limit N` | 调用 `memory_manage(command="list", limit=N)` — 用户指定了就用用户的 |
-| `search <query>` | 调用 `memory_manage(command="search", query="<query>")` |
-| `stats` | 调用 `memory_manage(command="stats")` |
-| `delete <id1,id2,...>` | **先展示要删除的内容摘要，等用户确认后再调用** `memory_manage(command="delete", query="<ids>")` |
+| User Input | What You Must Do |
+|------------|------------------|
+| No argument / `list` | Call `memory_manage(command="list", limit=100)` — fetch all at once, do not batch |
+| `list --category X` | Call `memory_manage(command="list", category="X", limit=100)` |
+| `list --limit N` | Call `memory_manage(command="list", limit=N)` — use the user-specified limit |
+| `search <query>` | Call `memory_manage(command="search", query="<query>")` |
+| `stats` | Call `memory_manage(command="stats")` |
+| `delete <id1,id2,...>` | **Show summary of content to delete first, wait for user confirmation**, then call `memory_manage(command="delete", query="<ids>")` |
 
-## 输出要求
+## Output Requirements
 
-**用户执行 `list` 的目的是逐条审查记忆内容，决定删除或调整哪一条。** 你必须将 tool 返回的**每一条记忆的完整内容**写入回复，省略任何一条 = 用户无法做出判断 = 任务失败。
+**When the user runs `list`, their goal is to review each memory entry and decide what to keep or remove.** You must write the **full content of every memory entry** returned by the tool into your reply. Omitting any entry = user cannot make informed decisions = task failure.
 
-**tool 返回值对用户不可见。** 只调 tool 不输出 = 用户什么都没看到 = 任务未完成。
+**Tool return values are invisible to the user.** Calling the tool without output = the user sees nothing = task incomplete.
 
-**展示义务说明**：所有通过本命令发起的子命令（包括 search、stats、injected）都必须将结果展示给用户。此展示义务由 `/memory` 命令层控制，与工具层无关——Agent 在其他上下文中自主调用 search 时无需展示。
+**Display obligation**: all subcommands initiated through this command (including search, stats, injected) must display results to the user. This display obligation is controlled by the `/memory` command layer and is separate from the tool layer — when the Agent autonomously calls search in other contexts, display is not required.
 
-## 注意
+## Notes
 
-- 删除不可逆，必须先展示内容等用户确认
+- Deletion is irreversible. Always show content first and wait for user confirmation.

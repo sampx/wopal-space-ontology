@@ -59,10 +59,10 @@ which fc-cli my-fc chrome_remote agent-browser jq
 ### scrape — Single Page
 
 ```bash
-fc-cli scrape <url> [-o docs/scraped/<name>.md] [--format markdown|html|links] [--clean] [--prompt <text>]
+fc-cli scrape <url> [-o .wopal-space/INBOX/docs/scraped/<name>.md] [--format markdown|html|links] [--clean] [--prompt <text>]
 ```
 
-- `-o`: Output file path (recommended: `docs/scraped/<name>.md`)
+- `-o`: Output file path (default: `.wopal-space/INBOX/docs/scraped/<name>.md`)
 - `--format`: Output format (default: markdown)
 - `--clean`🤖: AI removes nav, ads, sidebars
 - `--prompt`🤖: Custom AI processing (implies --clean)
@@ -70,12 +70,12 @@ fc-cli scrape <url> [-o docs/scraped/<name>.md] [--format markdown|html|links] [
 ### crawl — Website Crawling
 
 ```bash
-fc-cli crawl <url> --limit <n> --wait [-o docs/scraped/<site>] [--clean] [--prompt <text>]
+fc-cli crawl <url> --limit <n> --wait [-o .wopal-space/INBOX/docs/scraped/<site>] [--clean] [--prompt <text>]
 ```
 
 - `--limit`: Max pages to crawl
 - `--wait`: Wait for completion
-- `-o`: Output directory (recommended: `docs/scraped/<site>`)
+- `-o`: Output directory (default: `.wopal-space/INBOX/docs/scraped/<site>`)
 - `--clean`🤖: AI content cleaning
 - `--prompt`🤖: Custom AI processing
 
@@ -149,7 +149,7 @@ Status commands: `crawl-status`, `batch-status`
 
 ## Notes
 
-- **Output directory**: Save scraped files to `docs/scraped/` using `-o` option
+- **Output directory**: Save scraped files to `.wopal-space/INBOX/docs/scraped/` using `-o` option
 - **Speed**: Playwright renders 2-5s per page
 - **Large sites**: Test with small `--limit` first
 
@@ -166,7 +166,7 @@ When fc-local fails due to anti-crawling (page keeps navigating, 403/500, captch
 
 ```bash
 # From skill directory:
-./scripts/scrape-cdp.sh "<url>" [-o docs/scraped/<name>.md]
+./scripts/scrape-cdp.sh "<url>" [-o .wopal-space/INBOX/docs/scraped/<name>.md]
 ```
 
 The script automatically:
@@ -184,7 +184,7 @@ chrome_remote -b
 # 2. Navigate and extract
 agent-browser --cdp 9222 open "<url>"
 agent-browser --cdp 9222 wait --load networkidle
-agent-browser --cdp 9222 get text body > docs/scraped/<name>.md
+agent-browser --cdp 9222 get text body > .wopal-space/INBOX/docs/scraped/<name>.md
 
 # 3. Cleanup
 chrome_remote stop

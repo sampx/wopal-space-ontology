@@ -6,9 +6,7 @@
 # Scenarios:
 #   1. body-file reads file content successfully
 #   2. body-file not found raises error
-#   3. body-file and structured parameters coexist: body-file takes priority (warning printed)
-#
-# Note: Tests the --body-file feature from #142 Task 4
+#   3. body-file provides content, --body ignored when body_file is set
 
 import unittest
 import sys
@@ -21,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.issue import cmd_issue_create
+from commands.issue import cmd_issue_create
 
 
 class TestIssueBodyFile(unittest.TestCase):
@@ -38,7 +36,7 @@ class TestIssueBodyFile(unittest.TestCase):
         
         try:
             # Mock gh CLI call
-            with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.subprocess.run') as mock_run:
                 mock_result = MagicMock()
                 mock_result.returncode = 0
                 mock_result.stdout = "https://github.com/test/repo/issues/42\n"
@@ -46,9 +44,9 @@ class TestIssueBodyFile(unittest.TestCase):
                 mock_run.return_value = mock_result
                 
                 # Mock workspace detection
-                with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-                    with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                        with patch('dev_flow.commands.issue.resolve_project_info', return_value=('standard', None)):
+                with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+                    with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                        with patch('commands.issue.resolve_project_info', return_value=('standard', None)):
                             # Create args with body-file
                             args = MagicMock()
                             args.title = "feat(cli): test body-file"
@@ -56,23 +54,6 @@ class TestIssueBodyFile(unittest.TestCase):
                             args.type = "feat"
                             args.body_file = temp_file
                             args.body = None
-                            args.goal = None
-                            args.background = None
-                            args.scope = None
-                            args.out_of_scope = None
-                            args.reference = None
-                            args.confirmed_bugs = None
-                            args.content_model_defects = None
-                            args.cleanup_scope = None
-                            args.key_findings = None
-                            args.baseline = None
-                            args.target = None
-                            args.affected_components = None
-                            args.refactor_strategy = None
-                            args.target_documents = None
-                            args.audience = None
-                            args.test_scope = None
-                            args.test_strategy = None
                             
                             result = cmd_issue_create(args)
                             
@@ -106,27 +87,10 @@ class TestIssueBodyFile(unittest.TestCase):
         args.type = "feat"
         args.body_file = nonexistent_file
         args.body = None
-        args.goal = None
-        args.background = None
-        args.scope = None
-        args.out_of_scope = None
-        args.reference = None
-        args.confirmed_bugs = None
-        args.content_model_defects = None
-        args.cleanup_scope = None
-        args.key_findings = None
-        args.baseline = None
-        args.target = None
-        args.affected_components = None
-        args.refactor_strategy = None
-        args.target_documents = None
-        args.audience = None
-        args.test_scope = None
-        args.test_strategy = None
         
         # Mock workspace detection
-        with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-            with patch('dev_flow.commands.issue.log_error') as mock_log_error:
+        with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+            with patch('commands.issue.log_error') as mock_log_error:
                 result = cmd_issue_create(args)
                 
                 # Should fail
@@ -137,8 +101,8 @@ class TestIssueBodyFile(unittest.TestCase):
                 found_error = any('body-file' in call.lower() or 'not found' in call.lower() for call in error_calls)
                 self.assertTrue(found_error, f"Error should mention body-file or not found: {error_calls}")
 
-    def test_body_file_takes_priority_over_structured_params(self):
-        """body-file: when both body-file and structured params provided, body-file takes priority"""
+    def test_body_file_takes_priority_over_body_param(self):
+        """body-file: when both body-file and --body provided, body-file takes priority"""
         # Create a temp file with specific content
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write("Body from file - this should be used\n")
@@ -146,7 +110,7 @@ class TestIssueBodyFile(unittest.TestCase):
         
         try:
             # Mock gh CLI call
-            with patch('dev_flow.commands.issue.subprocess.run') as mock_run:
+            with patch('commands.issue.subprocess.run') as mock_run:
                 mock_result = MagicMock()
                 mock_result.returncode = 0
                 mock_result.stdout = "https://github.com/test/repo/issues/42\n"
@@ -154,52 +118,28 @@ class TestIssueBodyFile(unittest.TestCase):
                 mock_run.return_value = mock_result
                 
                 # Mock workspace detection
-                with patch('dev_flow.commands.issue.find_workspace_root', return_value='/test/workspace'):
-                    with patch('dev_flow.commands.issue.detect_space_repo', return_value='test/repo'):
-                        with patch('dev_flow.commands.issue.resolve_project_info', return_value=('standard', None)):
-                            with patch('dev_flow.commands.issue.log_info') as mock_log_info:
-                                # Create args with BOTH body-file and structured params
-                                args = MagicMock()
-                                args.title = "feat(cli): test body-file priority"
-                                args.project = "test-project"
-                                args.type = "feat"
-                                args.body_file = temp_file  # Body file provided
-                                args.body = None
-                                args.goal = "Goal from param"  # Structured param also provided
-                                args.background = "Background from param"
-                                args.scope = None
-                                args.out_of_scope = None
-                                args.reference = None
-                                args.confirmed_bugs = None
-                                args.content_model_defects = None
-                                args.cleanup_scope = None
-                                args.key_findings = None
-                                args.baseline = None
-                                args.target = None
-                                args.affected_components = None
-                                args.refactor_strategy = None
-                                args.target_documents = None
-                                args.audience = None
-                                args.test_scope = None
-                                args.test_strategy = None
-                                
-                                result = cmd_issue_create(args)
-                                
-                                # Should succeed
-                                self.assertEqual(result, 0)
-                                
-                                # Verify warning printed
-                                warning_calls = [str(call) for call in mock_log_info.call_args_list]
-                                found_warning = any('warning' in call.lower() or 'ignoring' in call.lower() or 'body-file' in call.lower() for call in warning_calls)
-                                self.assertTrue(found_warning, f"Should print warning about ignoring structured params: {warning_calls}")
-                                
-                                # Verify gh call received file content (NOT structured params)
-                                call_args = mock_run.call_args[0][0]
-                                body_idx = call_args.index('--body')
-                                body_content = call_args[body_idx + 1]
-                                self.assertIn("Body from file", body_content)
-                                self.assertNotIn("Goal from param", body_content)
-                                self.assertNotIn("Background from param", body_content)
+                with patch('commands.issue.find_workspace_root', return_value='/test/workspace'):
+                    with patch('commands.issue.detect_space_repo', return_value='test/repo'):
+                        with patch('commands.issue.resolve_project_info', return_value=('standard', None)):
+                            # Create args with BOTH body-file and --body
+                            args = MagicMock()
+                            args.title = "feat(cli): test body-file priority"
+                            args.project = "test-project"
+                            args.type = "feat"
+                            args.body_file = temp_file  # Body file provided
+                            args.body = "Body from --body param"  # Also provided
+                            
+                            result = cmd_issue_create(args)
+                            
+                            # Should succeed
+                            self.assertEqual(result, 0)
+                            
+                            # Verify gh call received file content (NOT --body param)
+                            call_args = mock_run.call_args[0][0]
+                            body_idx = call_args.index('--body')
+                            body_content = call_args[body_idx + 1]
+                            self.assertIn("Body from file", body_content)
+                            self.assertNotIn("Body from --body param", body_content)
         finally:
             os.unlink(temp_file)
 

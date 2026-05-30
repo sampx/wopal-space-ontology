@@ -9,17 +9,20 @@ from __future__ import annotations
 import argparse
 import sys
 
-from dev_flow import __version__
-from dev_flow.commands.issue import register_issue_parser, cmd_issue
-from dev_flow.commands.query import cmd_query_status, cmd_query_list
-from dev_flow.commands.sync import register_sync_parser, cmd_sync
-from dev_flow.commands.archive import register_archive_parser, cmd_archive
-from dev_flow.commands.approve import register_approve_parser, cmd_approve
-from dev_flow.commands.complete import register_complete_parser, cmd_complete
-from dev_flow.commands.verify import register_verify_parser, cmd_verify
-from dev_flow.commands.plan import register_plan_parser, cmd_plan
-from dev_flow.commands.decompose import register_decompose_parser, cmd_decompose
-from dev_flow.commands.reset import register_reset_parser, cmd_reset
+__version__ = "0.1.0"
+
+from commands.issue import register_issue_parser, cmd_issue
+from commands.query import cmd_query_status, cmd_query_list
+from commands.sync import register_sync_parser, cmd_sync
+from commands.archive import register_archive_parser, cmd_archive
+from commands.approve import register_approve_parser, cmd_approve
+from commands.complete import register_complete_parser, cmd_complete
+from commands.verify import register_verify_parser, cmd_verify
+from commands.plan import register_plan_parser, cmd_plan
+from commands.decompose import register_decompose_parser, cmd_decompose
+from commands.roadmap import register_roadmap_parser, cmd_roadmap
+from commands.reset import register_reset_parser, cmd_reset
+from commands.verify_switch import run_verify_switch
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
     # Register decompose-prd subcommand (top-level alias)
     register_decompose_parser(subparsers)
 
+    # Register roadmap subcommand
+    register_roadmap_parser(subparsers)
+
     # Register reset subcommand
     register_reset_parser(subparsers)
 
@@ -70,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Register list as top-level command
     list_parser = subparsers.add_parser("list", help="List active Plans")
+
+    # Register verify-switch subcommand
+    vs_parser = subparsers.add_parser("verify-switch", help="Switch .wopal/ to feature branch for verification")
+    vs_parser.add_argument("issue", help="Issue number or plan name")
+    vs_parser.add_argument("--merge", action="store_true", help="Phase 2: merge feature branch back to main")
 
     return parser
 
@@ -96,11 +107,17 @@ def main(argv: list[str] | None = None) -> int:
         print("  approve         Review and approve a Plan")
         print("  complete        Mark implementation complete")
         print("  verify          Verify and confirm completion")
+        print("  verify-switch   Switch .wopal/ for worktree verification")
         print("  archive         Archive a completed Plan")
         print("")
         print("Utility commands:")
         print("  decompose-prd   Create Issues from PRD phases")
+        print("  decompose       Create Issues from PRD or ROADMAP.md slices")
+        print("  roadmap         Product phase roadmap (Analyze/Discuss/Produce/Decompose)")
         print("  reset           Reset Plan to planning status")
+        print("  query           Low-level data queries")
+        print("")
+        print("For detailed options: flow.sh <command> --help")
         return 0
 
     # Dispatch issue subcommand
@@ -131,9 +148,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "plan":
         return cmd_plan(args)
 
-    # Dispatch decompose-prd subcommand
-    if args.command == "decompose-prd":
+    # Dispatch decompose-prd / decompose subcommand
+    if args.command in ("decompose-prd", "decompose"):
         return cmd_decompose(args)
+
+    # Dispatch roadmap subcommand
+    if args.command == "roadmap":
+        return cmd_roadmap(args)
 
     # Dispatch reset subcommand
     if args.command == "reset":
@@ -146,6 +167,10 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch list as top-level command
     if args.command == "list":
         return cmd_query_list(args)
+
+    # Dispatch verify-switch
+    if args.command == "verify-switch":
+        return 0 if run_verify_switch(args.issue, merge=args.merge) else 1
 
     return 0
 

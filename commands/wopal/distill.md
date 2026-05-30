@@ -1,41 +1,37 @@
 ---
-description: |
-  蒸馏当前会话，提取有价值的记忆存入数据库。
-
-  **触发场景**（用户说以下任意）：
-  - "蒸馏会话"、"提取记忆"、"总结这次对话"
+description: Distill session memories to database
 ---
 
-这是一个立即执行命令，不是规则阅读任务。
-你必须立刻调用 memory_manage 工具，不要解释命令，不要复述规则。
+This is an immediate execution command, not a rule-reading task.
+You must immediately call the memory_manage tool. Do not explain the command. Do not restate rules.
 
-以下行为是错误的：
-- 总结或复述命令内容
-- 询问用户"是否要执行蒸馏"
-- 解释蒸馏的原理或流程
-- 重新格式化工具返回的内容
+The following behaviors are wrong:
+- Summarizing or restating command content
+- Asking the user "would you like to distill?"
+- Explaining distillation principles or workflow
+- Reformatting tool output
 
-# /distill — 会话记忆蒸馏
+# /distill — Session Memory Distillation
 
-## 第一步：Preview
+## Step 1: Preview
 
-无参数 / `distill` / `distill --force` → 调用 `memory_manage({"command": "distill"})`，`--force` 时加 `{"force": true}`
+No arguments / `distill` / `distill --force` → call `memory_manage({"command": "distill"})`, add `{"force": true}` when `--force`
 
-**输出规则**：工具返回完整的候选列表和 Next Steps 指引，你必须将返回内容**原样写入回复**，不要重新格式化、不要添加额外说明。用户看到报告后会告诉你下一步。
+**Output rule**: the tool returns a complete candidate list and Next Steps guide. You must output the returned content **verbatim** in your reply — do not reformat, do not add extra notes. The user will tell you the next step after seeing the report.
 
-## 第二步：Confirm / Cancel
+## Step 2: Confirm / Cancel
 
-根据用户回复调用对应参数：
+Based on user reply, call the corresponding parameters:
 
-| 用户说 | 调用 |
-|--------|------|
-| "确认"/"全部"/"写入"/"好的" | `memory_manage({"command": "confirm"})` |
-| "只要 0, 2, 3"（索引号） | `memory_manage({"command": "confirm", "selectedIndices": [0, 2, 3]})` |
-| "取消"/"不要了" | `memory_manage({"command": "cancel"})` |
+| User Says | Call |
+|-----------|------|
+| "confirm" / "all" / "write" / "ok" | `memory_manage({"command": "confirm"})` |
+| "only 0, 2, 3" (indices) | `memory_manage({"command": "confirm", "selectedIndices": [0, 2, 3]})` |
+| "cancel" / "no" | `memory_manage({"command": "cancel"})` |
 
-**输出规则**：confirm 返回去重报告，同样**原样写入回复**。
+**Output rule**: confirm returns a dedup report — also output **verbatim** in your reply.
 
-## 注意
+## Notes
 
-- preview 和 confirm 必须在同一 session 中完成
-- 候选数据暂存在 session 缓存中，长时间不响应可能过期
+- Preview and confirm must complete within the same session
+- Candidate data is temporarily cached in session storage; prolonged inactivity may cause expiration

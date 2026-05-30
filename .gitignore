@@ -27,7 +27,7 @@ package.json
 # TypeScript
 *.tsbuildinfo
 
-# 环境变量（如需提交示例请用 .env.example）
+# 环境变量
 .env
 .env.*
 !.env.example
@@ -46,12 +46,7 @@ package.json
 # Logs
 *.log
 
-# Git worktrees
-.worktrees/
 
 # tmp
-.INBOX
 wsf-file-manifest.json
-# ai
-.opencode
 

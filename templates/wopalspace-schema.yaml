@@ -1,0 +1,36 @@
+version: 1
+
+runtime:
+  path: .wopal-space
+  files:
+    - template: STRUCTURE.md
+      target: STRUCTURE.md
+    - template: REGULATIONS.md
+      target: REGULATIONS.md
+    - template: memory/USER.md
+      target: memory/USER.md
+    - template: memory/MEMORY.md
+      target: memory/MEMORY.md
+  dirs:
+    - path: memory/diary
+      keep: [.gitkeep]
+    - path: logs
+      keep: [.gitkeep]
+    - path: .tmp
+    - path: INBOX
+    - path: backup
+      keep: [.gitkeep]
+
+space:
+  files:
+    - template: root-AGENTS.md
+      target: AGENTS.md
+    - template: gitignore
+      target: .gitignore
+  dirs:
+    - path: projects
+      keep: [.gitkeep]
+    - path: contents
+      keep: [.gitkeep]
+    - path: docs
+      keep: [.gitkeep]

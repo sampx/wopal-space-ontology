@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.commands.complete import cmd_complete
-from dev_flow.commands.verify import cmd_verify
+from commands.complete import cmd_complete
+from commands.verify import cmd_verify
 
 
 def _create_no_issue_plan(tmp_dir: str, status: str = "executing") -> str:
@@ -72,13 +72,13 @@ class TestNoIssueComplete(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp_dir)
 
-    @patch("dev_flow.commands.complete.sync_plan_to_issue_body")
-    @patch("dev_flow.commands.complete.sync_status_label")
-    @patch("dev_flow.commands.complete.update_plan_status", return_value=True)
-    @patch("dev_flow.commands.complete.check_acceptance_criteria")
-    @patch("dev_flow.commands.complete.check_step_completion")
-    @patch("dev_flow.commands.complete.find_workspace_root")
-    @patch("dev_flow.commands.complete.find_plan")
+    @patch("commands.complete.sync_plan_to_issue_body")
+    @patch("commands.complete.sync_status_label")
+    @patch("commands.complete.update_plan_status", return_value=True)
+    @patch("commands.complete.check_acceptance_criteria")
+    @patch("commands.complete.check_step_completion")
+    @patch("commands.complete.find_workspace_root")
+    @patch("commands.complete.find_plan")
     def test_complete_no_issue_succeeds(
         self, mock_find_plan, mock_workspace, mock_check_step,
         mock_check_ac, mock_update_status, mock_sync_label, mock_sync_body
@@ -95,13 +95,13 @@ class TestNoIssueComplete(unittest.TestCase):
 
         self.assertEqual(result, 0, "complete should succeed for no-issue plan")
 
-    @patch("dev_flow.commands.complete.sync_plan_to_issue_body")
-    @patch("dev_flow.commands.complete.sync_status_label")
-    @patch("dev_flow.commands.complete.update_plan_status", return_value=True)
-    @patch("dev_flow.commands.complete.check_acceptance_criteria")
-    @patch("dev_flow.commands.complete.check_step_completion")
-    @patch("dev_flow.commands.complete.find_workspace_root")
-    @patch("dev_flow.commands.complete.find_plan")
+    @patch("commands.complete.sync_plan_to_issue_body")
+    @patch("commands.complete.sync_status_label")
+    @patch("commands.complete.update_plan_status", return_value=True)
+    @patch("commands.complete.check_acceptance_criteria")
+    @patch("commands.complete.check_step_completion")
+    @patch("commands.complete.find_workspace_root")
+    @patch("commands.complete.find_plan")
     def test_complete_no_issue_skips_issue_sync(
         self, mock_find_plan, mock_workspace, mock_check_step,
         mock_check_ac, mock_update_status, mock_sync_label, mock_sync_body
@@ -131,12 +131,12 @@ class TestNoIssueVerify(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp_dir)
 
-    @patch("dev_flow.commands.verify.sync_plan_to_issue_body")
-    @patch("dev_flow.commands.verify.sync_status_label")
-    @patch("dev_flow.commands.verify.update_plan_status", return_value=True)
-    @patch("dev_flow.commands.verify.check_user_validation")
-    @patch("dev_flow.commands.verify.find_workspace_root")
-    @patch("dev_flow.commands.verify.find_plan")
+    @patch("commands.verify.sync_plan_to_issue_body")
+    @patch("commands.verify.sync_status_label")
+    @patch("commands.verify.update_plan_status", return_value=True)
+    @patch("commands.verify.check_user_validation")
+    @patch("commands.verify.find_workspace_root")
+    @patch("commands.verify.find_plan")
     def test_verify_no_issue_succeeds(
         self, mock_find_plan, mock_workspace, mock_check_uv,
         mock_update_status, mock_sync_label, mock_sync_body
@@ -153,12 +153,12 @@ class TestNoIssueVerify(unittest.TestCase):
 
         self.assertEqual(result, 0, "verify should succeed for no-issue plan")
 
-    @patch("dev_flow.commands.verify.sync_plan_to_issue_body")
-    @patch("dev_flow.commands.verify.sync_status_label")
-    @patch("dev_flow.commands.verify.update_plan_status", return_value=True)
-    @patch("dev_flow.commands.verify.check_user_validation")
-    @patch("dev_flow.commands.verify.find_workspace_root")
-    @patch("dev_flow.commands.verify.find_plan")
+    @patch("commands.verify.sync_plan_to_issue_body")
+    @patch("commands.verify.sync_status_label")
+    @patch("commands.verify.update_plan_status", return_value=True)
+    @patch("commands.verify.check_user_validation")
+    @patch("commands.verify.find_workspace_root")
+    @patch("commands.verify.find_plan")
     def test_verify_no_issue_skips_issue_sync(
         self, mock_find_plan, mock_workspace, mock_check_uv,
         mock_update_status, mock_sync_label, mock_sync_body

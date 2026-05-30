@@ -2,16 +2,17 @@
 
 <一句话描述目标>
 
-## Background
+## Context
 
-<背景和问题描述>
+<!-- 背景、研究发现、决策依据、参考资料 —— agent 自由写入 -->
 
-## In Scope
+## Scope
+
+### In
 
 - 范围项 1
-- 范围项 2
 
-## Out of Scope
+### Out
 
 - 不做的项（原因）
 
@@ -23,5 +24,4 @@
 
 | Resource | Link |
 |----------|------|
-| Research | _待关联_ |
 | Plan | _待关联_ |

@@ -1,75 +1,75 @@
 ---
-description: 进化沉淀：从短期记忆提取高价值信息到长期文件
+description: Evolve short-term memory to long-term knowledge
 ---
 
-# 自我进化 (Evolve)
+# Self-Evolution (Evolve)
 
-## 目标
+## Goal
 
-从日记中提炼有价值的信息，沉淀到正确位置。
+Extract valuable information from diaries and preserve it in the right location.
 
-> 日记是暂存池，进化是真正的沉淀——不只是记录发生了什么，而是从经验中**学习**。
+> Diaries are a staging pool. Evolution is true preservation — not just recording what happened, but **learning** from experience.
 
-## 流程
+## Workflow
 
-### 1. 扫描信息源
+### 1. Scan Information Sources
 
-同时扫描：
-- **本次会话**：关键事件、决策、错误
-- **短期记忆**：`memory/diary/` 下的日记
+Scan simultaneously:
+- **Current session**: key events, decisions, errors
+- **Short-term memory**: diaries under `memory/diary/`
 
-**跳过已标记条目**：`[进化吸收]` `[进化排除]`
+**Skip tagged entries**: `[进化吸收]` `[进化排除]`
 
-### 2. 判断去向
+### 2. Determine Destination
 
-参见 `AGENTS.md` 记忆与进化章节的"沉淀位置"和"优化方向"：
+See the "Preservation Locations" and "Optimization Directions" in the Memory & Evolution section of `AGENTS.md`:
 
-| 信息性质 | 沉淀位置 |
-|----------|----------|
-| 跨会话通用知识/经验 | `MEMORY.md` |
-| 用户偏好 | `USER.md` |
-| 工作规则/约定 | `AGENTS.md` |
-| 项目特定知识 | 项目 `AGENTS.md` |
-| 核心行为特质 | 灵魂（系统提示词） |
+| Information Type | Destination |
+|------------------|-------------|
+| Cross-session general knowledge / experience | `MEMORY.md` |
+| User preferences | `USER.md` |
+| Work rules / conventions | `AGENTS.md` |
+| Project-specific knowledge | Project `AGENTS.md` |
+| Core behavioral traits | Soul (system prompt) |
 
-### 3. 展示方案
+### 3. Present Plan
 
 ```
-进化方案：
+Evolution Plan:
 
 📝 MEMORY.md
-  + [知识] OpenCode API 在 labs/ref-repos/opencode/packages/sdk/openapi.json
+  + [Knowledge] OpenCode API at labs/ref-repos/opencode/packages/sdk/openapi.json
 
 👤 USER.md
-  + [偏好] "出方案" = 写方案文档，不是口头说明
+  + [Preference] "出方案" = write a plan document, not verbal explanation
 
 📐 AGENTS.md
-  + [规则] 技能脚本必须先 cd 进目录再执行
+  + [Rule] Skill scripts must cd into directory before execution
 
-确认执行？
+Confirm execution?
 ```
 
-### 4. 执行与标记
+### 4. Execute and Tag
 
-用户确认后：
-1. 写入对应长期文件
-2. 在日记条目**类型标签内**追加进化标记：
-   - 已沉淀 → `[类型-进化吸收: 简短原因]`
-   - 无需沉淀 → `[类型-进化排除: 简短原因]`
+After user confirmation:
+1. Write to the corresponding long-term file
+2. Append evolution tag **inside the type label** of the diary entry:
+   - Preserved → `[Type-进化吸收: brief reason]`
+   - Not preserved → `[Type-进化排除: brief reason]`
 
 ```markdown
-- [隐性知识-进化吸收: 写入 MEMORY.md] **背景**：... **事件**：... **结论**：...
-- [避坑方法-进化排除: 具体实现细节] **背景**：... **事件**：... **结论**：...
+- [Tacit Knowledge-进化吸收: written to MEMORY.md] **Background**: ... **Event**: ... **Conclusion**: ...
+- [Pitfall-进化排除: implementation detail] **Background**: ... **Event**: ... **Conclusion**: ...
 ```
 
-### 5. 日记归档
+### 5. Diary Archival
 
-将除今天以外的日记移动到 `memory/diary/archived/`。用 `date '+%Y-%m-%d'` 获取今天日期，仅保留与今天同名的日记文件，其余全部归档。
+Move all diaries except today's to `memory/diary/archived/`. Use `date '+%Y-%m-%d'` to get today's date. Keep only the diary file matching today's date; archive all others.
 
-## 价值判断
+## Value Judgment
 
-参见 `AGENTS.md` 记忆与进化章节的"捕获三问"和"不记录"规则。
+See the "Capture Three Questions" and "Do Not Record" rules in the Memory & Evolution section of `AGENTS.md`.
 
-**核心原则**：
-- 只沉淀与空间优化、项目建设**高度相关**且具有**长期复用价值**的信息
-- 不记录通用知识、临时状态、会话流水、单纯的错误描述
+**Core principle**:
+- Only preserve information that is **highly relevant** to space optimization and project construction with **long-term reuse value**
+- Do not record general knowledge, transient state, session logs, or mere error descriptions

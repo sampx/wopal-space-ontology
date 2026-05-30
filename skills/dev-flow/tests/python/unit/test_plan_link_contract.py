@@ -1,70 +1,308 @@
 #!/usr/bin/env python3
-# test_plan_link_contract.py - Test build_repo_blob_url and find_plan_by_issue functions
+# test_plan_link_contract.py - TDD tests for Task 4: fix Issue Plan links
 #
-# Test Case: Plan link contract (blob URL format)
-#
-# Scenarios:
-#   1. build_repo_blob_url creates GitHub blob links
-#   2. build_issue_body_from_plan uses blob URL for plan link
-#   3. find_plan_by_issue resolves archived plans in done directory
+# Verifies that Plan blob URLs point to the Plan's project repo,
+# not always the space repo.
 
-import unittest
 import sys
-import os
 from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from dev_flow.domain.issue.link import build_repo_blob_url
-from dev_flow.domain.plan.find import find_plan_by_issue
+from lib.project import PlanLocation
+from plan import build_plan_link_for_issue, update_issue_plan_link
 
 
-class TestBuildRepoBlobUrl(unittest.TestCase):
-    """Test build_repo_blob_url function"""
+@pytest.fixture
+def workspace(tmp_path):
+    """Create a workspace with a standard project and ontology worktree."""
+    ws = tmp_path / "workspace"
+    wopal = ws / ".wopal"
+    wopal.mkdir(parents=True)
+    (wopal / ".git").write_text("gitdir: /fake/ontology-main/.git/worktrees/-wopal\n")
+    (wopal / "docs" / "plans").mkdir(parents=True)
 
-    def test_creates_github_blob_links(self):
-        """build_repo_blob_url creates GitHub blob links"""
-        url = build_repo_blob_url('sampx/wopal-space', 'docs/products/ontology/plans/120-demo.md')
-        self.assertEqual(url, 'https://github.com/sampx/wopal-space/blob/main/docs/products/ontology/plans/120-demo.md')
+    gesp = ws / "projects" / "gesp"
+    gesp.mkdir(parents=True)
+    (gesp / ".git").mkdir()
+    (gesp / "docs" / "plans").mkdir(parents=True)
 
-    def test_with_different_repo(self):
-        """build_repo_blob_url with different repo"""
-        url = build_repo_blob_url('wopal-cn/ontology', 'docs/products/plans/121-test.md')
-        self.assertEqual(url, 'https://github.com/wopal-cn/ontology/blob/main/docs/products/plans/121-test.md')
-
-
-class TestFindPlanByIssue(unittest.TestCase):
-    """Test find_plan_by_issue function"""
-
-    def test_resolves_archived_plans_in_done_directory(self):
-        """find_plan_by_issue resolves archived plans in done directory"""
-        import tempfile
-        import shutil
-        tmp_dir = tempfile.mkdtemp()
-        try:
-            archived_dir = os.path.join(tmp_dir, 'docs', 'products', 'ontology', 'plans', 'done')
-            os.makedirs(archived_dir)
-            archived_plan = os.path.join(archived_dir, '20260422-120-refactor-dev-flow-optimize-new-issue-flow.md')
-            with open(archived_plan, 'w') as f:
-                f.write("""# 120-refactor-dev-flow-optimize-new-issue-flow
-
-## Metadata
-
-- **Issue**: #120
-- **Type**: refactor
-- **Target Project**: ontology
-- **Created**: 2026-04-21
-- **Status**: done
-""")
-            
-            # Mock find_workspace_root
-            resolved = find_plan_by_issue(120, workspace_root=tmp_dir)
-            self.assertEqual(resolved, archived_plan)
-        finally:
-            shutil.rmtree(tmp_dir)
+    return ws
 
 
-if __name__ == '__main__':
-    unittest.main()
+def _slug_by_path(path):
+    p = str(path)
+    if p.endswith(".wopal") or (".wopal" in p and "projects" not in p):
+        return "wopal-cn/wopal-space-ontology"
+    if "gesp" in p:
+        return "sampx/gesp"
+    return None
+
+
+def _write_plan(path, status="executing", project="gesp"):
+    """Write a minimal Plan file with metadata."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"- **Status**: {status}\n"
+        f"- **Target Project**: {project}\n"
+        f"- **Type**: feature\n"
+        f"- **Issue**: #42\n"
+    )
+
+
+# =============================================================================
+# Scenario 1: Active standard project Plan link -> URL uses project repo
+# =============================================================================
+
+class TestBuildPlanLinkActiveStandard:
+    @patch("lib.project._get_default_branch", return_value="main")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_url_uses_project_repo(self, mock_slug, mock_branch, workspace):
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="executing", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        # URL must use gesp's repo, NOT the space repo
+        assert "sampx/gesp" in result
+        assert "blob/main/docs/plans/42-feature-gesp-resolver.md" in result
+        assert "sampx/wopal-space" not in result
+
+    @patch("lib.project._get_default_branch", return_value="main")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_returns_table_row_format(self, mock_slug, mock_branch, workspace):
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="executing", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        assert result.startswith("| Plan |")
+        assert result.endswith(" |")
+        assert "[42-feature-gesp-resolver]" in result
+
+
+# =============================================================================
+# Scenario 2: Archived standard project Plan link -> URL uses project repo
+# =============================================================================
+
+class TestBuildPlanLinkArchivedStandard:
+    @patch("lib.project._get_default_branch", return_value="main")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_archived_url_uses_project_repo(self, mock_slug, mock_branch, workspace):
+        done_dir = workspace / "projects" / "gesp" / "docs" / "plans" / "done"
+        done_dir.mkdir(parents=True)
+        plan_file = done_dir / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="done", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        assert "sampx/gesp" in result
+        assert "blob/main/docs/plans/done/42-feature-gesp-resolver.md" in result
+        assert "sampx/wopal-space" not in result
+
+
+# =============================================================================
+# Scenario 3: Ontology Plan link -> URL uses ontology repo + current branch
+# =============================================================================
+
+class TestBuildPlanLinkOntology:
+    @patch("lib.project.get_current_branch", return_value="space/main")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_ontology_uses_current_branch(self, mock_slug, mock_branch, workspace):
+        plan_file = workspace / ".wopal" / "docs" / "plans" / "feature-dev-flow-resolver.md"
+        _write_plan(plan_file, status="executing", project="wopal-space-ontology")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "feature-dev-flow-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        # URL must use ontology repo and current branch (space/main), NOT "main"
+        assert "wopal-cn/wopal-space-ontology" in result
+        assert "blob/space/main/docs/plans/feature-dev-flow-resolver.md" in result
+
+    @patch("lib.project.get_current_branch", return_value="feature/some-branch")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    def test_ontology_feature_branch(self, mock_slug, mock_branch, workspace):
+        plan_file = workspace / ".wopal" / "docs" / "plans" / "feature-dev-flow-resolver.md"
+        _write_plan(plan_file, status="executing", project="wopal-space-ontology")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "feature-dev-flow-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        assert "wopal-cn/wopal-space-ontology" in result
+        assert "blob/feature/some-branch/" in result
+
+
+# =============================================================================
+# Scenario 4: Plan with no github_repo -> empty string / placeholder
+# =============================================================================
+
+class TestBuildPlanLinkNoRepo:
+    @patch("lib.project._get_default_branch", return_value="main")
+    @patch("lib.project._get_repo_slug", return_value=None)
+    def test_no_repo_returns_placeholder(self, mock_slug, mock_branch, workspace):
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="executing", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        # When no github_repo, URL is empty — link text only
+        assert "| Plan | [42-feature-gesp-resolver]() |" == result
+
+
+# =============================================================================
+# Scenario 5: Planning/draft status -> placeholder (unchanged behavior)
+# =============================================================================
+
+class TestBuildPlanLinkDraftStatus:
+    def test_planning_status_returns_placeholder(self, workspace):
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="planning", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        assert result == "| Plan | _待关联_ |"
+
+    def test_draft_status_returns_placeholder(self, workspace):
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="draft", project="gesp")
+
+        result = build_plan_link_for_issue(
+            str(plan_file), "42-feature-gesp-resolver",
+            "sampx/wopal-space", str(workspace),
+        )
+
+        assert result == "| Plan | _待关联_ |"
+
+
+# =============================================================================
+# Scenario 6: update_issue_plan_link uses Plan's project repo
+# =============================================================================
+
+class TestUpdateIssuePlanLink:
+    @patch("lib.project._get_default_branch", return_value="main")
+    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("subprocess.run")
+    def test_archive_link_uses_project_repo(self, mock_run, mock_slug, mock_branch, workspace):
+        # Setup: create an archived plan
+        done_dir = workspace / "projects" / "gesp" / "docs" / "plans" / "done"
+        done_dir.mkdir(parents=True)
+        plan_file = done_dir / "42-feature-gesp-resolver.md"
+        _write_plan(plan_file, status="done", project="gesp")
+
+        # Do NOT create state_dir — force the gh CLI path
+        # (when state_dir exists, code writes to edit-args.txt instead of gh)
+
+        # Mock: first gh call = issue view (returns body with old link)
+        #       second gh call = issue edit
+        view_result = MagicMock()
+        view_result.returncode = 0
+        view_result.stdout = (
+            "## Related Resources\n\n"
+            "| Resource | Link |\n"
+            "|----------|------|\n"
+            "| Plan | [42-feature-gesp-resolver](https://github.com/sampx/wopal-space/blob/main/old/path.md) |\n"
+        )
+        edit_result = MagicMock()
+        edit_result.returncode = 0
+
+        mock_run.side_effect = [view_result, edit_result]
+
+        update_issue_plan_link(
+            issue_number=42,
+            plan_file=str(plan_file),
+            repo="sampx/wopal-space",
+            workspace_root=str(workspace),
+        )
+
+        # Verify: second call is gh issue edit with the correct repo URL
+        assert mock_run.call_count == 2
+        edit_call = mock_run.call_args_list[1]
+        edit_cmd = edit_call[0][0]
+
+        assert edit_cmd[0] == "gh"
+        assert "edit" in edit_cmd
+
+        # Find --body argument
+        body_arg_idx = edit_cmd.index("--body") + 1
+        new_body = edit_cmd[body_arg_idx]
+
+        assert "sampx/gesp" in new_body
+        assert "docs/plans/done/42-feature-gesp-resolver.md" in new_body
+        # Space repo should NOT appear in the blob URL part
+        assert "sampx/wopal-space/blob" not in new_body
+
+
+class TestSyncPlanToIssueBody:
+    """Verify sync_plan_to_issue_body only replaces Plan row, not entire body."""
+
+    def test_preserves_other_sections(self, workspace):
+        from issue import sync_plan_to_issue_body
+
+        plan_file = workspace / "projects" / "gesp" / "docs" / "plans" / "feature-resolver.md"
+        plan_file.write_text("# Plan\n\n- **Status**: executing\n- **Target Project**: gesp\n")
+
+        full_body = (
+            "## Goal\n\nSome goal text\n\n"
+            "## Related Resources\n\n"
+            "| Resource | Link |\n|------|------|\n"
+            "| Plan | _待关联_ |\n\n"
+            "## Acceptance Criteria\n\n- [ ] AC1\n- [ ] AC2\n"
+        )
+
+        view_result = MagicMock()
+        view_result.stdout = full_body
+        version_result = MagicMock()
+        version_result.returncode = 0
+        edit_result = MagicMock()
+        edit_result.returncode = 0
+
+        with patch("issue.subprocess.run") as mock_run, \
+             patch("plan.resolve_plan_location") as mock_loc:
+            loc = PlanLocation(
+                path=plan_file.resolve(),
+                repo_root=(workspace / "projects" / "gesp").resolve(),
+                repo_relative_path="docs/plans/feature-resolver.md",
+                github_repo="sampx/gesp",
+                branch="main",
+                is_archived=False,
+            )
+            mock_loc.return_value = loc
+            mock_run.side_effect = [version_result, view_result, edit_result]
+
+            sync_plan_to_issue_body(42, str(plan_file), "sampx/wopal-space", str(workspace))
+
+            edit_call = mock_run.call_args_list[2]
+            edit_cmd = edit_call[0][0]
+            body_arg_idx = edit_cmd.index("--body") + 1
+            new_body = edit_cmd[body_arg_idx]
+
+            assert "## Goal" in new_body
+            assert "Some goal text" in new_body
+            assert "## Acceptance Criteria" in new_body
+            assert "AC1" in new_body
+            assert "sampx/gesp" in new_body
+            assert "待关联" not in new_body

@@ -1,249 +1,104 @@
-# WopalSpace ontology — 本体能力锻造层
-
-> **定位**：WopalSpace 的 Agent 能力研发中心。
-
+---
+name: WopalSpace Ontology AGENT RULES
+description: WopalSpace soul, regulations, and capability gene toolkit — agents, rules, skills, commands, plugins, templates, and scripts
 ---
 
-## 核心能力：技能（Skills）
+# Agent Development Rules
 
-技能是本项目的**首要产出**，是可复用、可分发、可版本化的 Agent 能力单元。
+## 1. Canonical References
 
-### 技能开发规范
-
-#### 目录结构
+- DESIGN: `.wopal/docs/DESIGN.md`
+- Business Rules: `.wopal/rules/business-rules.md`
+- Parent Rules: `.wopal-space/REGULATIONS.md`
+- Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
 
-```
-skill-name/
-├── SKILL.md          # 必须：YAML frontmatter + Markdown 指令
-├── scripts/          # 可选：可执行脚本（确定性/重复任务）
-├── references/       # 可选：按需加载的参考文档
-└── assets/           # 可选：模板、图标等静态资源
-```
+## 2. Architecture and Directories
 
-#### 渐进式披露（三级加载）
+Execution chain: modify ontology source → if load-path-related, user restarts ellamaka → verify at ellamaka runtime.
 
-| 层级 | 内容 | 限制 | 说明 |
-|------|------|------|------|
-| 元数据 | name + description | ~100 字 | 始终可见，决定是否触发 |
-| 主体 | SKILL.md body | <500 行 | 触发后加载，核心流程 |
-| 资源 | scripts/references/assets | 无限制 | 按需读取或执行 |
+Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses IETF BCP 47 / RFC 5647 tags, e.g. `zh-CN`, `en-US`. Never hardcode `zh-CN`.
 
-**原则**：主体超 500 行时拆分到 references/，SKILL.md 中明确指引。
-
-#### Description 编写
-
-**是主要触发机制**，需包含：
-1. 技能做什么
-2. 何时使用（具体场景/用户短语）
-3. 适当"pushy"——宁可多触发也不要漏触发
+| Directory | Responsibility |
+|---|---|
+| `agents/` | Agent soul and permission configuration |
+| `rules/` | Rule definitions; shared rules and agent-specific rules |
+| `skills/` | Skill definitions; scripts live in each skill's `scripts/` |
+| `commands/` | Command definitions; `commands/wopal/` holds Wopal-specific commands |
+| `plugins/wopal-plugin/` | ellamaka plugin; see sub-module AGENTS for internal architecture and code rules |
+| `templates/` | Space init templates and document templates |
+| `prompts/` | Agent prompt templates |
+| `scripts/` | Ontology maintenance, git hooks, and auxiliary automation scripts |
+| `config/` | Space-level ellamaka configuration layer |
 
-**示例**：
-```yaml
-description: |
-  Compress official documentation into concise AI references. ⚠️ MUST use when user requests:
-  (1) Documentation compression or condensing, (2) Creating AI-friendly reference materials,
-  (3) Reducing token usage for large documentation, (4) Extracting technical specifications.
-  🔴 Trigger even when user does not explicitly mention "AI reference" if the task involves
-  documentation compression or spec extraction.
-```
-
-**🚫 禁止包含**：
-- 详细执行步骤（属于 SKILL.md body）
-- 代码示例或模板（属于 scripts/ 或 assets/）
-- 框架/平台特定细节（属于 references/）
-- 模糊触发条件（如"相关场景"、"类似任务"）
-
-#### SKILL.md 编写
-
-**结构**：
-1. 标题 + 一句话定位
-2. 核心流程（步骤化）
-3. 输出格式（模板/示例）
-4. 注意事项（边缘情况）
+## 3. Development Commands
 
-**风格**：
-- 用祈使句（"执行 X"，而非"你应该执行 X"）
-- 解释 **why** 而非堆砌 `MUST`/`ALWAYS`——LLM 理解原理后更可靠
-- 避免强制固定步骤顺序，保持适应不同场景的灵活性
-- 包含真实示例，展示输入/输出
+| Scenario | Command | When |
+|---|---|---|
+| Plugin build & test | See `.wopal/plugins/wopal-plugin/AGENTS.md` | After any plugin code change |
+| Content change verification | Remind user to restart ellamaka | Any change involving load paths |
 
-**🚫 禁止包含**：
-- 恶意代码、exploit、数据窃取逻辑
-- 过度具体的硬编码参数（应提取到 references/ 或配置文件）
-- 冗余的背景介绍（用户不需要知道技能的历史）
-- 技能设计原理、优化过程、版本历史等元信息（属于开发者文档，非 Agent 指令）
+## 4. Implementation Rules
 
-**必须显式声明**：
-- 依赖的其他技能或工具（如"依赖 `skill-master` 技能，执行前必须加载"）
-- 必需的环境变量或外部配置
-- 与其他技能协作时的调用顺序
+### i18n / Multilingual
 
-#### 质量验证
+Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, `prompts/`, `skills/`.
 
-1. **设计 2-3 个真实测试用例**——用户实际会说的 prompt
-2. **迭代循环**：执行 → 评估 → 改进 → 重复
-3. **观察重复工作**：多测试用例出现相同脚本 → 提取到 scripts/
+- The formal English version is the runtime source, located under `.wopal/` in the corresponding directory.
+- If the user's preferred language is not English, first generate or update the user's preferred-language review version, then sync to the formal English version after approval.
+- `<locale>` uses IETF BCP 47 / RFC 5646 language tags. Never hardcode a specific locale.
+- Review-version titles and body use the target language; mixing Chinese and English titles is forbidden.
+- Localized template review versions must preserve the formal template's English section headings; translate only body text, placeholder guidance, and table content.
+- After review approval, update the English runtime source under `.wopal/`. Both versions must stay semantically aligned.
+- For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `.wopal/docs/LANG/<locale>/<type>/`.
+- For `skills/`, keep the preferred-language review version in the same skill directory as `SKILL.<locale>.md`, then sync to `SKILL.md` after approval.
+- If the user's preferred language is English, update the formal English file directly. Do not create English locale variants.
 
-#### 资源引用
+### Skill
 
-在 SKILL.md 中清晰指引何时读取：
-```markdown
-## 参考
-- 云平台部署参数见 `references/aws.md`（仅 AWS 场景读取）
-- API 规范见 `references/api-schema.md`
-```
+- To create or modify a skill: load the `skill-creator` skill first.
+- If the user's preferred language is not English, draft or update `SKILL.<locale>.md` first, then translate and sync to `SKILL.md` after approval.
+- frontmatter must have `name` and `description`.
+- `description` drives triggering: state what it does and when to trigger; triggering conditions go in frontmatter, not the body.
+- The body only covers workflow, output, and notes; long content offloads to `references/`.
+- `scripts/` holds only deterministic, reusable logic.
 
-大参考文件（>300 行）包含目录，便于定位。
+### Soul Prompts: `agents/`
 
----
+- Soul prompts only cover: role positioning, decision principles, output style, and permission.
+- Workflow, skill routing, tool APIs, delegation timing, and command steps do not go in soul prompts; those go into skills, commands, or rules respectively.
+- `permission` goes in frontmatter. Study ellamaka source and references for the configuration approach; solidify into the `ellamaka-config` skill.
 
-## 插件开发
+### Commands: `commands/`
 
-**详细规范**：`wopal-plugin/AGENTS.md`
+- Shared commands go in `commands/*.md`; Wopal-specific commands go in `commands/wopal/*.md`.
+- Write uniformly per `.wopal/templates/command.md`.
+- frontmatter: `description` required (≤50 chars); sub-task commands: `subtask: true`.
+- Use `$ARGUMENTS` or `$1...$N` for parameters; the highest `$N` consumes remaining arguments (rest semantics).
 
-插件是 TypeScript 编写的 OpenCode 运行时扩展，提供：
+### Rules: `rules/`
 
-| 能力 | 描述 |
-|------|------|
-| **规则注入** | 发现规则文件 → 匹配条件 → 注入系统提示词 |
-| **任务委派** | 非阻塞子会话启动、状态监控、双向通信 |
-| **记忆系统** | LanceDB 存储、语义检索、蒸馏注入 |
-| **上下文管理** | 会话摘要、session title 管理、上下文压缩（由 space-master skill 控制策略） |
+- Shared rules go in `rules/*.md`; agent-specific rules go in `rules/<agent>/`.
+- frontmatter must have `trigger`, `description`, and `keywords`.
+- `trigger` declares the matching mode (e.g. `model_decision`); `keywords` declare triggering keywords.
+- The body only contains agent-executable constraints, not product intent or implementation details.
 
----
+### Workflows: `wsf/`
 
-## 资源层次与归属
+- Workflow definitions go in `wsf/workflows/*.md`; workflow templates go in `wsf/templates/`.
+- `wsf/` is for internal consumption by the WSF skill family.
+- This module is produced by the space-flow project. See `wsf-file-manifest.json` for the full workflow asset inventory.
+- This module may be modified directly only at the user's explicit request; otherwise it should be deployed via the space-flow project.
 
-### 源码结构
+### Plugin
 
-> `.wopal/` 是 `sampx/wopal-space-ontology`（`wopal-cn/ontology` 的 fork）的 git worktree，直接编辑即生效。
+- Plugin internal architecture, logging, type safety, error handling, development, and testing rules: **follow** `.wopal/plugins/wopal-plugin/AGENTS.md`.
 
-```
-.wopal/
-├── skills/              # 所有技能统一存放
-├── commands/            # 命令定义（Agent 通过 permission 控制可见性）
-│   ├── *.md             # 共享命令
-│   └── wopal/           # Wopal 专属命令
-├── rules/               # 规则定义
-│   ├── *.md             # 共享规则
-│   └── wopal/           # Wopal 专属规则
-├── agents/              # Agent 灵魂定义（wopal.md, wopal-cn.md, fae.md, fae-cn.md）
-├── wopal-plugin/        # 空间唯一插件（规则注入、任务委派、记忆、上下文管理）
-└── config/              # 空间本地配置（不提交到 git）
-```
+## 5. Testing
 
-### Agent 技能权限
+- Plugin code follows TDD: write a failing test first, then implement code to make it pass.
+- After any declarative content change, remind the user to restart ellamaka for verification. Do not commit frequently before verification passes.
 
-Agent 通过 `permission.skill` 配置控制技能可见性：
+## 6. User-Supplied Rules
 
-```yaml
-# Fae 示例：仅允许特定技能
-permission:
-  skill:
-    "*": deny
-    project-worktrees: allow
-
-# Wopal 示例：允许所有技能
-permission:
-  "*": allow
-  project-worktrees: deny
-
-# Rook 示例：仅允许审查技能
-permission:
-  skill:
-    "*": deny
-    df-plan-review: allow
-    df-implement-review: allow
-```
-
-**原则**：技能统一存放在 `skills/` 目录，通过 Permission 实现 Agent 间隔离。修改 `permission.skill` 即可调整 Agent 可用技能。
-
----
-
-## Agent 生态
-
-### Wopal（主控 Agent）
-
-**定位**：IT 女巫师，研究、方案制定与执行编排的负责人。
-
-**文件位置**：
-- 中文灵魂层：`agents/wopal-cn.md`
-- 英文灵魂层：`agents/wopal.md`
-
-**职责**：
-- 研究、方案设计、任务拆解
-- 委派 fae 实施、委派 rook 审查
-- 验证产出、推进流程、决策权衡
-- 与用户沟通、管理上下文
-
-**协作关系**：主控中枢，所有子代理的委派者。
-
-### fae（执行 Agent）
-
-**定位**：敏捷精灵，专注于实施执行，不负责规划与审查。
-
-**文件位置**：
-- 中文灵魂层：`agents/fae-cn.md`
-- 英文灵魂层：`agents/fae.md`
-
-**职责**：
-- 执行 Wopal 委派的实施类 Task
-- 文件编辑、构建运行、测试执行、git 操作
-- 返回可验证的执行结果（文件路径、命令输出）
-
-**只读边界**：无。fae 可以修改文件、运行命令、提交代码。
-
-**协作关系**：Wopal 的执行者，rook 的审查对象。
-
-### rook（审查 Agent）
-
-**定位**：职业质疑者，只读审查代理，Plan 与代码质量的守门员。
-
-**文件位置**：
-- 中文灵魂层：`agents/rook-cn.md`
-- 英文灵魂层：`agents/rook.md`
-
-**专属技能**：
-- `df-plan-review` — Plan 质量审查（目标覆盖、任务完整性、依赖正确性、验证可证伪性）
-- `df-implement-review` — 代码质量审查（目标验证、bug/security/debt 扫描、测试质量审计）
-
-**职责**：
-- Plan 审查：审核方案是否真的能达成目标（不是检查模板是否填完）
-- 代码审查：复核 fae 实施结果是否让目标成为事实（不是检查代码是否跑起来）
-- 返回结构化报告：PASS / REVISE / BLOCK + Blocker/Warning/Info + 证据锚点
-
-**只读边界**：
-- **绝对禁止**：写入文件、修改代码、运行构建/测试、提交 git、修复 bug
-- **唯一输出**：通过会话文本输出结构化审查报告
-
-**协作关系**：
-- Wopal 在关键节点委派 rook（Plan 写完后、fae 实施后）
-- rook 审查 fae 产出，返回判定
-- Wopal 根据判定决定推进或要求 fae 修正
-- fae 未经 rook 审查不得进入 complete
-
-**委派时机（强制）**：
-1. Plan 写完后（approve 前）— 先审方案质量
-2. fae 关键实施波次后 — 复核代码质量
-3. fae 最终交付后（complete 前）— 完整审查
-
-**修订循环上限**：同一 Plan 或实现最多 3 轮 REVISE/BLOCK 循环，超过 3 轮由用户裁决。
-
----
-
-## 运行时验证要求
-
-OpenCode / ellamaka 的 agent 与 command 在启动时缓存加载。新增 agent 或 skill 后：
-
-**必须重启运行时**才能稳定识别：
-- 新增 agent（如 rook）→ 重启后才能委派
-- 新增 skill（如 df-plan-review、df-implement-review）→ 重启后才能触发
-
-**验证步骤**：
-1. 重启 OpenCode 运行时
-2. 让 Wopal 委派 rook 做一次 Plan 审查
-3. 观察 rook 是否返回 PASS/REVISE/BLOCK 结构化结果
-4. 让 Wopal 委派 rook 做一次代码审查
-5. 观察报告是否包含概要、等级统计、证据锚点、修复建议
-
-
+- Never hardcode the review path as `zh-CN`.
+- Never hardcode paths or information highly specific to this space or particular tasks in skills or soul prompts, as it harms generality.
