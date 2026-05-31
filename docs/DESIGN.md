@@ -9,6 +9,7 @@
 
 | Date | Type | Summary |
 |---|---|---|
+| 2026-05-30 | Updated | 将详细分发契约下沉到 `docs/DISTRIBUTION.md`，本文件只保留 Git source/worktree 分发摘要。 |
 | 2026-05-29 | Updated | 对齐 design-project 模板：§3 重构为 Key Decisions 表格、§4.6 合约内容迁入 §6.4、§7 列名对齐、§5 列名对齐、删除 §8 Evolution Roadmap（实施进度归属 Phase 文档）、§9 重编为 §8。 |
 | 2026-05-29 | Updated | 新增 Design Document Layering（§6.5）与 Memory Runtime Files（§7.1），承接产品 DESIGN 迁移的项目级细节。 |
 | 2026-05-29 | Updated | 明确 STRUCTURE compact schema 与 `/init` 消费 `wopal space scan` JSON 的维护边界。 |
@@ -413,13 +414,18 @@ WopalSpace 的设计知识按三层分工，避免细节错位和维护混乱：
 - 产品 DESIGN 引用但不复制项目 DESIGN 细节；Phase 文档引用但不复制 DESIGN 契约。
 - Phase 讨论中形成的设计决策，在讨论完毕后沉淀到对应项目 DESIGN；Phase 文档只保留范围和验收。
 
-### 6.6 分发模型
+### 6.6 Distribution Summary
 
-```
-ontology source → clone by default / fork with --fork → space/<name> branch → <space>/.wopal/ worktree
-```
+ontology 的分发走 Git source + worktree 模型。wopal-cli 通过 `wopal space init` / `wopal setup` 封装 clone/fork/worktree 过程，将其与 space runtime 初始化串联。
 
-`.wopal/` 是当前 space 的 worktree。P1 默认从 ontology source clone，降低新用户初始化门槛；需要长期回流、多设备同步或 upstream 协作时再使用 `--fork` 模式。变更先进入当前 space 的 ontology 分支，再通过 ellamaka 加载链路进入运行时验证；通用能力成熟后回流 fork / upstream。
+稳定边界：
+
+1. 默认使用 clone-based canonical source flow。
+2. `--fork` 是显式选择的替代模式。
+3. `space/<name>` 分支承载 space-specific 演化。
+4. `<space>/.wopal/` 是 ontology worktree，由 CLI materialize，由 ellamaka 运行时加载。
+
+详细 source 输入、materialization、template handoff 和 runtime loading handoff 见 `docs/DISTRIBUTION.md`。
 
 ---
 
@@ -468,4 +474,5 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 | 文档 | 说明 |
 |------|------|
 | `projects/wopal-cli/docs/DESIGN.md` | wopal-cli 子系统设计 — 统一操作入口 |
+| `.wopal/docs/DISTRIBUTION.md` | ontology 的 Git source、worktree、template handoff 与 runtime loading 契约 |
 | `.wopal/docs/BUSINESS_RULES.md` | 本体业务规则 |
