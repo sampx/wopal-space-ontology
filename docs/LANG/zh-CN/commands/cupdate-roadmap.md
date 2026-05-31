@@ -39,7 +39,17 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: 确认的阶段 Goal
 
-## Step 3: 讨论阶段范围
+## Step 3: 讨论现状与 Gap
+
+结合产品 DESIGN 和各项目 DESIGN，盘点本阶段相关能力的当前实现状况，明确从现状到目标的差距。
+
+- 盘点各项目已完成的相关功能、已确立的接口和已落地的机制
+- 逐项目或子系统列出本阶段必须填补的能力缺口
+- Gap 描述应足够具体，可作为 Exit Criteria 的输入
+
+**Output**: 已有能力清单 + 待补 Gap 清单
+
+## Step 4: 讨论阶段范围
 
 明确本阶段的产品能力边界：
 
@@ -48,7 +58,7 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: Scope 和 Out of Scope 清单
 
-## Step 4: 明确涉及项目
+## Step 5: 明确涉及项目
 
 确定哪些项目参与本阶段，各自承担什么角色。
 
@@ -58,7 +68,7 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: Involved Projects 表（项目、角色、阶段设计目标）
 
-## Step 5: 确定验收条件
+## Step 6: 确定验收条件
 
 为每个涉及项目逐条确定 Exit Criteria。
 
@@ -68,13 +78,13 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: 按项目分组的 Exit Criteria
 
-## Step 6: 讨论风险与依赖
+## Step 7: 讨论风险与依赖
 
 识别跨项目依赖和协调风险，讨论缓解措施。
 
 **Output**: 风险/依赖表（风险、影响、缓解措施）
 
-## Step 7: 生成 Phase 文档
+## Step 8: 生成 Phase 文档
 
 按 `.wopal/templates/phase.md` 模板，汇总以上讨论结果生成 Phase 文档。
 
@@ -87,7 +97,7 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: Phase 文档内容，等待确认
 
-## Step 8: 写入并回写 DESIGN
+## Step 9: 写入并回写 DESIGN
 
 用户确认后：
 
@@ -98,7 +108,7 @@ description: 引导产品阶段讨论，生成阶段定义与跟踪文档
 
 **Output**: 已写入的文件路径，DESIGN 引用变更
 
-## Step 9: 引导拆分 Plan
+## Step 10: 引导拆分 Plan
 
 Phase 文档就绪后，引导用户为每个项目的 Involved Project 创建 Plan，将阶段验收条件分解为可执行的开发任务。
 

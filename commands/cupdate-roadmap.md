@@ -39,7 +39,17 @@ Discuss the product capability goal for this phase with the user, anchoring on t
 
 **Output**: Confirmed phase Goal
 
-## Step 3: Discuss Phase Scope
+## Step 3: Discuss Current State and Gap
+
+Review the current implementation status of capabilities relevant to this phase against the product DESIGN and project DESIGNs. Clarify the gap from current state to the phase goal.
+
+- Inventory completed features, established interfaces, and implemented mechanisms across projects that relate to this phase goal
+- List capability gaps this phase must address, grouped by project or subsystem
+- Gap descriptions should be concrete enough to serve as input for Exit Criteria
+
+**Output**: Existing capabilities list + gaps to fill list
+
+## Step 4: Discuss Phase Scope
 
 Clarify the product capability boundaries for this phase:
 
@@ -48,7 +58,7 @@ Clarify the product capability boundaries for this phase:
 
 **Output**: Scope and Out of Scope lists
 
-## Step 4: Identify Involved Projects
+## Step 5: Identify Involved Projects
 
 Determine which projects participate in this phase and what role each plays.
 
@@ -58,7 +68,7 @@ For each project, discuss:
 
 **Output**: Involved Projects table (project, role, phase design objectives)
 
-## Step 5: Determine Exit Criteria
+## Step 6: Determine Exit Criteria
 
 Define Exit Criteria for each involved project, one by one.
 
@@ -68,13 +78,13 @@ Define Exit Criteria for each involved project, one by one.
 
 **Output**: Exit Criteria grouped by project
 
-## Step 6: Discuss Risks and Dependencies
+## Step 7: Discuss Risks and Dependencies
 
 Identify cross-project dependencies and coordination risks. Discuss mitigation measures.
 
 **Output**: Risk/dependency table (risk, impact, mitigation)
 
-## Step 7: Generate the Phase Document
+## Step 8: Generate the Phase Document
 
 Use the `.wopal/templates/phase.md` template to produce the Phase document from the discussion results.
 
@@ -87,7 +97,7 @@ Present the full document content and file path. Wait for user confirmation.
 
 **Output**: Phase document content, awaiting confirmation
 
-## Step 8: Write and Back-Reference DESIGNs
+## Step 9: Write and Back-Reference DESIGNs
 
 After user confirmation:
 
@@ -98,7 +108,7 @@ After user confirmation:
 
 **Output**: Written file paths, DESIGN reference changes
 
-## Step 9: Guide Plan Decomposition
+## Step 10: Guide Plan Decomposition
 
 Once the Phase document is ready, guide the user to create Plans for each project's Involved Project, decomposing phase exit criteria into executable development tasks.
 
