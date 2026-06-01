@@ -9,7 +9,7 @@
 - **Product**: wopal-space
 - **Phase**: P1 — One-click Distribution
 - **Created**: 2026-06-01
-- **Status**: executing
+- **Status**: verifying
 - **P1 Plan ID**: P1-01
 - **Depends On**: None — P1 ontology source contract foundation
 - **Unblocks**:
@@ -128,15 +128,15 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
 
 ### Agent Verification
 
-1. [ ] `rg 'version: 1' .wopal/templates/wopalspace-schema.yaml && rg 'runtime:' .wopal/templates/wopalspace-schema.yaml && rg 'space:' .wopal/templates/wopalspace-schema.yaml` 均有匹配（schema 存在且声明 runtime/space）
-2. [ ] `rg 'ONTOLOGY_REPO' .wopal/templates/STRUCTURE.md && rg 'MANAGED:START|USER:START' .wopal/templates/STRUCTURE.md` 均有匹配（STRUCTURE 模板包含 canonical identity 与 managed/user block）
-3. [ ] `rg 'space-master|agents-collab|dev-flow' .wopal/templates/REGULATIONS.md` ≥ 1（REGULATIONS 模板覆盖核心技能入口）
-4. [ ] `rg 'wopal space scan|STRUCTURE|user confirm' .wopal/commands/init.md` ≥ 1（`/init` 明确消费 scan facts、维护 STRUCTURE、等待用户确认）
-5. [ ] `rg 'wopalspace-schema.yaml|base.capabilit' .wopal/docs/DISTRIBUTION.md` ≥ 1（schema 和 base capability source 契约已记录在分发文档中）
-6. [ ] `ls .wopal/agents/*.md | wc -l` ≥ 3（base agents 目录包含至少 3 个 agent）
-7. [ ] `ls .wopal/skills/ | wc -l` ≥ 10（base skills 目录包含至少 10 个技能）
-8. [ ] `ls .wopal/commands/*.md .wopal/commands/wopal/*.md 2>/dev/null | wc -l` ≥ 5（base commands 目录包含至少 5 个命令）
-9. [ ] `rg 'agents.*commands|commands/wopal|skill units|base.*overlay|symlink|managed copy' .wopal/docs/DISTRIBUTION.md` ≥ 1（base materialization traversal 与 overlay contract 可被 CLI 消费）
+1. [x] `rg 'version: 1' .wopal/templates/wopalspace-schema.yaml && rg 'runtime:' .wopal/templates/wopalspace-schema.yaml && rg 'space:' .wopal/templates/wopalspace-schema.yaml` 均有匹配（schema 存在且声明 runtime/space）
+2. [x] `rg 'ONTOLOGY_REPO' .wopal/templates/STRUCTURE.md && rg 'MANAGED:START|USER:START' .wopal/templates/STRUCTURE.md` 均有匹配（STRUCTURE 模板包含 canonical identity 与 managed/user block）
+3. [x] `rg 'space-master|agents-collab|dev-flow' .wopal/templates/REGULATIONS.md` ≥ 1（REGULATIONS 模板覆盖核心技能入口）
+4. [x] `rg 'wopal space scan|STRUCTURE|user confirm' .wopal/commands/init.md` ≥ 1（`/init` 明确消费 scan facts、维护 STRUCTURE、等待用户确认）
+5. [x] `rg 'wopalspace-schema.yaml|base.capabilit' .wopal/docs/DISTRIBUTION.md` ≥ 1（schema 和 base capability source 契约已记录在分发文档中）
+6. [x] `ls .wopal/agents/*.md | wc -l` ≥ 3（base agents 目录包含至少 3 个 agent）
+7. [x] `ls .wopal/skills/ | wc -l` ≥ 10（base skills 目录包含至少 10 个技能）
+8. [x] `ls .wopal/commands/*.md .wopal/commands/wopal/*.md 2>/dev/null | wc -l` ≥ 5（base commands 目录包含至少 5 个命令）
+9. [x] `rg 'agents.*commands|commands/wopal|skill units|base.*overlay|symlink|managed copy' .wopal/docs/DISTRIBUTION.md` ≥ 1（base materialization traversal 与 overlay contract 可被 CLI 消费）
 
 ### User Validation
 
@@ -150,7 +150,7 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
   4. 查阅 `docs/DISTRIBUTION.md` 确认 base capability source 物化契约完整
 - Expected Result: 所有模板可被 CLI 直接消费，无歧义字段，无缺失条目
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
@@ -192,7 +192,7 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
 **Done**:
 
 任务产出：确认 `wopalspace-schema.yaml` 与 DESIGN §6.4 完全对齐，修正不一致字段
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ### Task 2: 审查并完善初始化模板集
 
@@ -245,7 +245,7 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
 **Done**:
 
 任务产出：确认初始化模板集与 canonical identity、规则入口和 P1 runtime skeleton 对齐
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ### Task 3: 确认 base capability source 目录结构并更新 DISTRIBUTION.md
 
@@ -293,7 +293,7 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
 **Done**:
 
 任务产出：确认 base capability source 目录完整，DISTRIBUTION.md 包含物化契约说明
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ### Task 4: 确认 /init 命令边界定义与 P1 对齐
 
@@ -331,7 +331,7 @@ N/A — 无业务规则变更。`BUSINESS_RULES.md` 不存在于 ontology 项目
 **Done**:
 
 任务产出：确认 /init 命令边界与 P1 设计对齐，与 CLI space init 职责无重叠
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
