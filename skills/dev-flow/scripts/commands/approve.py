@@ -159,56 +159,33 @@ def _commit_and_push_plan(plan_path: str, issue_number: int | None, workspace_ro
     return True
 
 
-def _stash_project_changes(project_path: Path, issue_number: int | None) -> bool:
-    """Stash uncommitted changes in project repo.
+def _has_unmerged_files(repo_path: str) -> bool:
+    """Check if git repo has unmerged (UU) files from incomplete merge.
     
     Args:
-        project_path: Path to project directory
-        issue_number: Issue number (for stash message)
+        repo_path: Path to git repository root
         
     Returns:
-        True if stash succeeded
+        True if any file is in unmerged state
     """
-    stash_msg = f"dev-flow: stash before worktree for #{issue_number}" if issue_number else "dev-flow: stash before worktree"
-    
     result = subprocess.run(
-        ["git", "stash", "push", "-m", stash_msg],
-        cwd=str(project_path),
+        ["git", "ls-files", "--unmerged"],
+        cwd=repo_path,
         capture_output=True,
         text=True,
     )
-    
-    return result.returncode == 0
-
-
-def _pop_stash(project_path: Path) -> bool:
-    """Pop stashed changes in project repo.
-    
-    Args:
-        project_path: Path to project directory
-        
-    Returns:
-        True if pop succeeded
-    """
-    result = subprocess.run(
-        ["git", "stash", "pop"],
-        cwd=str(project_path),
-        capture_output=True,
-        text=True,
-    )
-    
-    return result.returncode == 0
+    return bool(result.stdout.strip())
 
 
 # ============================================
 # Worktree Creation
 # ============================================
 
-def _create_worktree(project: str, branch: str, workspace_root: Path) -> Path | None:
+def _create_worktree(project_dir: Path, branch: str, workspace_root: Path) -> Path | None:
     """Create isolated worktree for project execution.
     
     Args:
-        project: Project name
+        project_dir: Resolved project git root path
         branch: Branch name for worktree
         workspace_root: Workspace root path
         
@@ -216,10 +193,9 @@ def _create_worktree(project: str, branch: str, workspace_root: Path) -> Path | 
         Path to created worktree, or None on failure
     """
     worktree_base = workspace_root / ".worktrees"
-    project_dir = workspace_root / project
     
     log_step("Pre-flight: creating worktree...")
-    log_info(f"Project: {project}, Branch: {branch}")
+    log_info(f"Project: {project_dir.name}, Branch: {branch}")
     
     try:
         wt_path = create_worktree(project_dir, branch, worktree_base)
@@ -322,7 +298,6 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # --- Preflight Check 1: Target Project dirty workspace ---
     project_path = resolve_project_path(plan_path, project, workspace_root) if project else None
     dirty_workspace = False
-    stashed = False
     
     if project_path:
         dirty_workspace = is_repo_dirty(str(project_path))
@@ -430,20 +405,24 @@ def cmd_approve(args: argparse.Namespace) -> int:
         
         # --- Standard project branch ---
         else:
-            # Stash dirty workspace changes before worktree creation
+            # Block on unmerged files — worktree needs a clean index
+            if project_path and _has_unmerged_files(str(project_path)):
+                log_error(f"目标项目 {project} 有未解决的合并冲突（UU 状态），请先解决后再执行 approve")
+                return 1
+            
+            # Warn about dirty workspace but proceed (worktree creation doesn't require clean tree)
             if dirty_workspace:
-                log_warn(f"目标项目 {project} 有未提交的变更，自动 stash 以创建 worktree")
-                if not _stash_project_changes(project_path, issue_number):
-                    log_error("Stash 失败，无法继续创建 worktree")
-                    return 1
-                stashed = True
-                log_success("已 stash 未提交变更")
+                log_warn(f"目标项目 {project} 有未提交的变更，建议先提交后再执行 approve")
             
             # Create worktree
-            actual_wt_path = _create_worktree(project, branch, workspace_root)
+            if not project_path:
+                log_error(f"无法解析项目路径: {project}")
+                return 1
+            actual_wt_path = _create_worktree(project_path, branch, workspace_root)
             if actual_wt_path is not None:
                 worktree_created = True
-
+                worktree_path = actual_wt_path
+                
                 # Write WorktreeContext to Plan metadata
                 # Use actual_wt_path from create_worktree() — it applies
                 # branch.replace("/", "-") slug transformation that we must not duplicate
@@ -462,20 +441,8 @@ def cmd_approve(args: argparse.Namespace) -> int:
                     log_success(f"Plan WorktreeContext written: {branch}")
                 else:
                     log_warn("Failed to write WorktreeContext to Plan")
-
-                # Restore stashed changes to main workspace
-                if stashed:
-                    if _pop_stash(project_path):
-                        log_success("已恢复之前 stash 的变更")
-                    else:
-                        log_warn(f"Stash restore 失败，变更仍在 stash 中: cd {project_path} && git stash list")
             else:
                 log_error("Worktree creation failed - aborting approve")
-                
-                # Restore stashed changes on failure
-                if stashed:
-                    _pop_stash(project_path)
-                    log_warn("已恢复之前 stash 的变更")
                 
                 print("")
                 print("Plan 状态保持 planning，未进入 executing")
