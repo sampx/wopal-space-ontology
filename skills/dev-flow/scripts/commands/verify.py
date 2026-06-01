@@ -300,8 +300,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_error(f"Invalid state transition: {current_status} -> {target_status}")
         return 1
 
-    # 10. Update Plan status to done
-    if update_plan_status(plan_path, target_status):
+    # 10. Update Plan status to done (use active Plan path)
+    if update_plan_status(str(active.active_plan_path), target_status):
         log_success(f"Plan status updated: {target_status}")
     else:
         log_error("Failed to update Plan status")
@@ -313,11 +313,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
     if plan_issue:
         plan_commit_msg = f"docs(plan): verify plan #{plan_issue}"
     else:
-        plan_commit_msg = f"docs(plan): verify plan {_get_plan_name(plan_path)}"
+        plan_commit_msg = f"docs(plan): verify plan {_get_plan_name(str(active.active_plan_path))}"
         max_total = 72
         if len(plan_commit_msg) > max_total:
             prefix = "docs(plan): verify plan "
-            plan_commit_msg = prefix + _get_plan_name(plan_path)[:max_total - len(prefix)]
+            plan_commit_msg = prefix + _get_plan_name(str(active.active_plan_path))[:max_total - len(prefix)]
     if not commit_paths(plan_repo_root, [plan_rel], plan_commit_msg):
         log_warn("Failed to commit Plan status=done in Plan's repo")
     else:

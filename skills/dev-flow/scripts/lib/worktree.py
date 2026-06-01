@@ -345,16 +345,22 @@ def resolve_active_plan(
     # Step 4: verify + unmerged -> block
     if command_phase == "verify":
         # Check if the feature branch has been merged into the integration branch
-        from lib.git import get_current_branch as _get_branch
+        # using git ancestry, not just current branch name
+        from lib.git import is_branch_merged as _is_merged, get_current_branch as _get_branch
 
         current_branch = _get_branch(str(main_loc.repo_root))
         if current_branch and current_branch == branch:
-            # Still on feature branch — not merged
+            # Still on feature branch — definitely not merged
             raise ResolveActivePlanError(
                 f"Feature branch '{branch}' has not been merged. "
                 f"Run verify-switch --merge first."
             )
-        # Merged or on integration branch
+        # Even on integration branch, verify feature is actually merged
+        if branch and not _is_merged(branch, current_branch or "HEAD", str(main_loc.repo_root)):
+            raise ResolveActivePlanError(
+                f"Feature branch '{branch}' has not been merged into '{current_branch}'. "
+                f"Run verify-switch --merge first."
+            )
         return ActivePlanInfo(
             active_plan_path=main_plan,
             commit_repo_root=main_loc.repo_root,

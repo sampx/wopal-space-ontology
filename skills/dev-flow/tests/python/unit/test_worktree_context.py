@@ -553,8 +553,17 @@ class TestResolveActivePlanVerify:
         subprocess.run(["git", "add", "."], cwd=str(repo), capture_output=True)
         subprocess.run(["git", "commit", "-m", "init"], cwd=str(repo), capture_output=True)
 
-        # We're on main branch — feature-merged is a different branch.
-        # Current branch != feature branch, so resolve considers it merged.
+        # Create and merge the feature branch so ancestry check passes
+        subprocess.run(["git", "checkout", "-b", "feature-merged"],
+                       cwd=str(repo), capture_output=True, check=True)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "feature work"],
+                       cwd=str(repo), capture_output=True, check=True)
+        subprocess.run(["git", "checkout", "main"],
+                       cwd=str(repo), capture_output=True, check=True)
+        subprocess.run(["git", "merge", "--no-ff", "feature-merged"],
+                       cwd=str(repo), capture_output=True, check=True)
+
+        # Now on main with feature-merged actually merged via ancestry
         info = resolve_active_plan(str(plan_file), "verify", workspace_root=tmp_path)
 
         assert info.branch_context == "integration"

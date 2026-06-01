@@ -93,8 +93,9 @@ def _detect_worktree(
     # Try Plan metadata first
     wt = get_plan_worktree(plan_path)
     if wt:
-        # Verify the path actually exists
-        if Path(wt['path']).exists():
+        # Verify the path actually exists (resolve workspace-relative)
+        wt_full_path = workspace_root / wt['path']
+        if wt_full_path.exists():
             return wt
         # Path gone — metadata stale
         return None
