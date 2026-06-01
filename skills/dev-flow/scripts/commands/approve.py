@@ -29,17 +29,15 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
-import re
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root, detect_space_repo, get_ontology_main_repo
 from workflow import update_plan_status
-from plan import find_plan, find_plan_by_issue, find_plan_by_name
-from plan import get_plan_project, get_plan_issue, get_plan_status, set_plan_worktree, get_plan_field
-from plan import validate_plan_name
+from plan import find_plan
+from plan import get_plan_project, get_plan_issue, get_plan_status, get_plan_field
 from plan import resolve_project_path, ProjectType
-from workflow import parse_plan_status, is_valid_transition
+from workflow import parse_plan_status
 from validation import check_doc_plan, ValidationError
 from issue import (
     sync_status_label,
@@ -49,13 +47,12 @@ from issue import (
 from lib.git import (
     is_repo_dirty,
     is_commit_in_remote,
-    get_relative_path,
     get_current_branch,
     commit_paths,
     push_repo,
 )
 from lib.project import resolve_plan_location
-from lib.worktree import create_worktree, WorktreeContext, write_worktree_context
+from lib.worktree import create_worktree, write_worktree_context
 
 
 # ============================================
@@ -302,33 +299,105 @@ def cmd_approve(args: argparse.Namespace) -> int:
     if project_path:
         dirty_workspace = is_repo_dirty(str(project_path))
     
-    # --- Preflight Check 2: Worktree creation (default; skip with --no-worktree) ---
+    # --- Preflight: compute worktree parameters ---
     worktree_created = False
     branch = ""
-    wt_ctx = None  # WorktreeContext for structured metadata
-    
+    worktree_path = None  # type: Path | None
+
     if use_worktree:
         if not project:
             log_error("Cannot create worktree: no Target Project in plan")
             return 1
-        
+
         # Read Project Type from Plan metadata
         project_type_str = get_plan_field(plan_path, "Project Type")
-        
-        # Determine verify_mode based on project type
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            verify_mode = "switch-runtime"
-        else:
-            verify_mode = "direct"
-        
+
         # Generate branch name
         slug = _extract_slug(plan_name)
         if issue_number:
             branch = f"issue-{issue_number}-{slug}"
         else:
             branch = slug
+
+        # Determine planned worktree path (without creating it yet)
+        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
+            worktrees_dir = workspace_root / ".worktrees"
+            worktree_name = f"ontology-{branch}"
+            worktree_path = worktrees_dir / worktree_name
+        else:
+            # Standard: predict path using same slug logic as create_worktree
+            worktree_base = workspace_root / ".worktrees"
+            project_name = project_path.name if project_path else project
+            branch_slug = branch.replace("/", "-")
+            worktree_path = worktree_base / f"{project_name}-{branch_slug}"
         
-        # --- Ontology-worktree branch ---
+        # Block on unmerged files for standard projects
+        if project_type_str != ProjectType.ONTOLOGY_WORKTREE.value:
+            if project_path and _has_unmerged_files(str(project_path)):
+                log_error(f"目标项目 {project} 有未解决的合并冲突（UU 状态），请先解决后再执行 approve")
+                return 1
+            
+            # Warn about dirty workspace but proceed
+            if dirty_workspace:
+                log_warn(f"目标项目 {project} 有未提交的变更，建议先提交后再执行 approve")
+
+        # Write minimal Worktree metadata (branch + path) to Plan
+        wt_rel = str(worktree_path)
+        if write_worktree_context(plan_path, branch, wt_rel):
+            log_success(f"Plan Worktree metadata written: {branch}")
+        else:
+            log_warn("Failed to write Worktree metadata to Plan")
+
+    elif dirty_workspace:
+        # --no-worktree with dirty workspace: block and warn
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(project_path),
+            capture_output=True,
+            text=True,
+        )
+        git_status = status_result.stdout.strip()
+        
+        log_error(f"目标项目 {project} 有未提交的变更")
+        print("")
+        print("未提交文件列表:")
+        for line in git_status.split('\n')[:10]:
+            if line:
+                print(f"  {line}")
+        print("")
+        print("风险: 新任务与旧变更混在一起会污染当前 Issue，增加回滚与验证成本")
+        print("")
+        print("建议处理方式:")
+        print(f"  1. 先提交当前变更: cd {project_path} && git add . && git commit")
+        print(f"  2. 默认会创建 worktree 隔离（当前使用了 --no-worktree）")
+        print("")
+        return 1
+    
+    # ============================================
+    # STATE TRANSITION (commit Plan BEFORE worktree creation)
+    # ============================================
+    
+    log_step("Transitioning state: planning -> executing")
+    
+    # Update Plan status to executing
+    if not update_plan_status(plan_path, "executing"):
+        log_error("Failed to update Plan status")
+        return 1
+    
+    log_success("Plan status updated to: executing")
+    
+    # Commit/push the Plan baseline (executing + Worktree metadata) on integration branch
+    if not _commit_and_push_plan(plan_path, issue_number, workspace_root):
+        log_error("Failed to commit/push Plan baseline")
+        return 1
+    
+    # ============================================
+    # WORKTREE CREATION (after Plan baseline is committed)
+    # ============================================
+    
+    if use_worktree and branch and worktree_path:
+        project_type_str = get_plan_field(plan_path, "Project Type")
+
         if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
             # Resolve ontology main repo path
             main_repo = get_ontology_main_repo(workspace_root)
@@ -337,13 +406,9 @@ def cmd_approve(args: argparse.Namespace) -> int:
                 log_error("请检查 .wopal/.git 文件是否存在且格式正确（worktree 指针）")
                 return 1
             
-            log_step("Creating ontology worktree...")
+            log_step("Creating ontology worktree from committed baseline...")
             log_info(f"Main repo: {main_repo}")
             log_info(f"Branch: {branch}")
-            
-            worktrees_dir = workspace_root / ".worktrees"
-            worktree_name = f"ontology-{branch}"
-            worktree_path = worktrees_dir / worktree_name
             
             # Determine base branch from .wopal/ worktree's current branch
             ontology_worktree = workspace_root / ".wopal"
@@ -385,112 +450,25 @@ def cmd_approve(args: argparse.Namespace) -> int:
             
             log_success(f"Ontology worktree created: {worktree_path}")
             worktree_created = True
-            
-            # Write WorktreeContext to Plan metadata
-            wt_ctx = WorktreeContext(
-                enabled=True,
-                project_type="ontology-worktree",
-                branch=branch,
-                path=worktree_path,
-                repo_root=main_repo,
-                base_branch=base_branch,
-                merge_target=base_branch,
-                verify_mode=verify_mode,
-                cleanup_policy="archive",
-            )
-            if write_worktree_context(plan_path, wt_ctx):
-                log_success(f"Plan WorktreeContext written: {branch}")
-            else:
-                log_warn("Failed to write WorktreeContext to Plan")
-        
-        # --- Standard project branch ---
+
         else:
-            # Block on unmerged files — worktree needs a clean index
-            if project_path and _has_unmerged_files(str(project_path)):
-                log_error(f"目标项目 {project} 有未解决的合并冲突（UU 状态），请先解决后再执行 approve")
-                return 1
-            
-            # Warn about dirty workspace but proceed (worktree creation doesn't require clean tree)
-            if dirty_workspace:
-                log_warn(f"目标项目 {project} 有未提交的变更，建议先提交后再执行 approve")
-            
-            # Create worktree
+            # Standard project: create worktree from committed baseline
             if not project_path:
                 log_error(f"无法解析项目路径: {project}")
                 return 1
+            
+            log_step("Creating worktree from committed baseline...")
             actual_wt_path = _create_worktree(project_path, branch, workspace_root)
             if actual_wt_path is not None:
                 worktree_created = True
                 worktree_path = actual_wt_path
-                
-                # Write WorktreeContext to Plan metadata
-                # Use actual_wt_path from create_worktree() — it applies
-                # branch.replace("/", "-") slug transformation that we must not duplicate
-                wt_ctx = WorktreeContext(
-                    enabled=True,
-                    project_type="standard",
-                    branch=branch,
-                    path=actual_wt_path,
-                    repo_root=project_path,
-                    base_branch="main",
-                    merge_target="main",
-                    verify_mode=verify_mode,
-                    cleanup_policy="archive",
-                )
-                if write_worktree_context(plan_path, wt_ctx):
-                    log_success(f"Plan WorktreeContext written: {branch}")
-                else:
-                    log_warn("Failed to write WorktreeContext to Plan")
+                log_success(f"Worktree created: {worktree_path}")
             else:
                 log_error("Worktree creation failed - aborting approve")
-                
                 print("")
                 print("Plan 状态保持 planning，未进入 executing")
                 print("请检查 worktree 创建失败原因后重试")
                 return 1
-    
-    elif dirty_workspace:
-        # --no-worktree with dirty workspace: block and warn
-        status_result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(project_path),
-            capture_output=True,
-            text=True,
-        )
-        git_status = status_result.stdout.strip()
-        
-        log_error(f"目标项目 {project} 有未提交的变更")
-        print("")
-        print("未提交文件列表:")
-        for line in git_status.split('\n')[:10]:
-            if line:
-                print(f"  {line}")
-        print("")
-        print("风险: 新任务与旧变更混在一起会污染当前 Issue，增加回滚与验证成本")
-        print("")
-        print("建议处理方式:")
-        print(f"  1. 先提交当前变更: cd {project_path} && git add . && git commit")
-        print(f"  2. 默认会创建 worktree 隔离（当前使用了 --no-worktree）")
-        print("")
-        return 1
-    
-    # ============================================
-    # STATE TRANSITION (only after all checks pass)
-    # ============================================
-    
-    log_step("Transitioning state: planning -> executing")
-    
-    # Update Plan status to executing
-    if not update_plan_status(plan_path, "executing"):
-        log_error("Failed to update Plan status")
-        return 1
-    
-    log_success("Plan status updated to: executing")
-    
-    # Commit/push the status transition before syncing Issue
-    if not _commit_and_push_plan(plan_path, issue_number, workspace_root):
-        log_error("Failed to commit/push Plan file")
-        return 1
     
     # ============================================
     # Issue sync (if plan has Issue link)

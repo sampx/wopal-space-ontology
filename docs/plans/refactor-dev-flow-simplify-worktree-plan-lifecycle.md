@@ -254,7 +254,7 @@ branch_context
 
 **Done**:
 任务产出：Approve 从已提交基线创建 worktree，complete 是带脏代码防护的 Plan-only 状态转换。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
