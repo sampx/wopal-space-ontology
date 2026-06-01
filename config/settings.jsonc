@@ -25,7 +25,8 @@
               "model": "wopal-ai/glm-5.1"
             },
             "rook": {
-              "model": "github-copilot/gpt-5.4"
+              "model": "github-copilot/gpt-5.4",
+              "variant": "xhigh"
             },
             "wsf-planner": {
               "model": "github-copilot/gpt-5.4"
