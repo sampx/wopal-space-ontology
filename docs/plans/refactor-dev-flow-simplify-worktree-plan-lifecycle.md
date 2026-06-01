@@ -106,12 +106,12 @@ N/A — 无业务规则变更。
 
 ### Agent Verification
 
-1. [ ] `rg -n "Plan branch ownership|active Plan path|Plan-only" skills/dev-flow/SKILL.md` 返回匹配结果，确认生命周期契约已记录。
-2. [ ] `rg -n "branch:|path:|Worktree" skills/dev-flow/SKILL.md skills/dev-flow/scripts/lib/worktree.py` 确认显式字段元数据契约已记录并实现。
-3. [ ] `rg -n "commit_project_changes|commit_ontology_worktree|commit_all" skills/dev-flow/scripts/commands/complete.py skills/dev-flow/scripts/commands/archive.py` 返回空结果，确认无生命周期代码路径提交实施代码。
-4. [ ] `rg -n "Plan branch ownership|active Plan path|Plan-only" AGENTS.md` 确认模块规范已同步生命周期语义变更。
-5. [ ] `python -m pytest skills/dev-flow/tests/python/unit/test_worktree_context.py skills/dev-flow/tests/python/unit/test_git_semantics.py skills/dev-flow/tests/python/unit/test_verify_switch.py -q` 通过。
-6. [ ] `python -m pytest skills/dev-flow/tests/python/integration/test_no_issue_lifecycle.py -q` 通过，或记录已有的不相关失败。
+1. [x] `rg -n "Plan branch ownership|active Plan path|Plan-only" skills/dev-flow/SKILL.md` 返回匹配结果，确认生命周期契约已记录。
+2. [x] `rg -n "branch:|path:|Worktree" skills/dev-flow/SKILL.md skills/dev-flow/scripts/lib/worktree.py` 确认显式字段元数据契约已记录并实现。
+3. [x] `rg -n "commit_project_changes|commit_ontology_worktree|commit_all" skills/dev-flow/scripts/commands/complete.py skills/dev-flow/scripts/commands/archive.py` 返回空结果，确认无生命周期代码路径提交实施代码。
+4. [x] `rg -n "Plan branch ownership|active Plan path|Plan-only" AGENTS.md` 确认模块规范已同步生命周期语义变更。
+5. [x] `python -m pytest skills/dev-flow/tests/python/unit/test_worktree_context.py skills/dev-flow/tests/python/unit/test_git_semantics.py skills/dev-flow/tests/python/unit/test_verify_switch.py -q` 通过。
+6. [x] `python -m pytest skills/dev-flow/tests/python/integration/test_no_issue_lifecycle.py -q` 通过，或记录已有的不相关失败。
 
 ### User Validation
 
