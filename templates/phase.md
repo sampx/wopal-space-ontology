@@ -13,55 +13,70 @@
 
 One sentence describing the product capability to be delivered in this phase (cross-project perspective).
 
-## 1. Current State / Gap
+## 1. Current State
 
-Describe the current implementation status of capabilities relevant to this phase, and the gap from current state to the phase goal.
-
-- Existing capabilities: completed features, established interfaces, and implemented mechanisms across projects that relate to this phase goal
-- Gaps to fill: capability gaps this phase must address, grouped by project or subsystem
+Describe the current state for each project or subsystem in concise narrative prose. Cover both existing capabilities and what is missing — present the full gap between current state and the phase goal.
 
 ## 2. Scope
 
-- Product capability scope for this phase
-- Summary of involved subsystems or projects
+A concise summary list of product capabilities to be delivered in this phase, so humans and agents can grasp the full scope at a glance. One line per scope area with Owner. Example:
+
+- **CLI 分发** — Node SEA release packaging → public release carrier → installer one-click install. Owner: wopal-cli
+- **ellamaka 分发** — artifact branding + 4-platform matrix + GitHub Release. Owner: ellamaka
 
 ## 3. Out of Scope
 
 - Capabilities or projects explicitly excluded from this product phase
 
-## 4. Involved Projects
+## 4. Targets and Gaps
 
-| Project | Role | Notes |
-|---------|------|-------|
-| `<project>` | core delivery / tooling / enablement | Positioning and deliverables for this project in this phase |
+Each scope area from §2 gets a detailed gap analysis here. Organized by `###` for each scope area, with `#### Gaps` and `#####` for individual gaps.
 
-## 5. Exit Criteria
+Gap structure:
 
-Grouped by project, 1–6 checkbox-format acceptance criteria per group. Each item describes an independently verifiable delivery fact.
+- **Current**: current state (what is missing)
+- **Target**: the target state after the gap is closed
+- **Design**: where the solution is documented (project DESIGN or DISTRIBUTION path)
+- **Exit**: checkbox-format exit criteria — one line when single, multi-line `- [ ]` when multiple. Each gap must have at least one exit criterion. Exit criteria checkboxes collectively define the phase's completion.
 
-### <Project Name 1>
-- [ ] acceptance criterion 1
-- [ ] acceptance criterion 2
+```
+### <Scope Area>
+Owner: <project>
 
-### <Project Name 2>
-- [ ] acceptance criterion 1
-- [ ] acceptance criterion 2
+#### Gaps
 
-## 6. Risks and Dependencies
+##### <Gap Title>
+- **Current**: ...
+- **Target**: ...
+- **Design**: ...
+- **Exit**:
+  - [ ] exit criterion
+  - [ ] exit criterion
+```
 
-<!-- Cross-project coordination risks, external dependencies -->
+Writing rules for gaps:
 
-| Risk / Dependency | Impact | Mitigation |
-|-------------------|--------|------------|
+- A gap without a design solution does not belong here — it belongs in §6 Risks.
+- Exit criteria describe delivery facts, not implementation steps.
+- Each scope area should have ≥1 gap.
+- Each gap should be independently verifiable via its exit criteria.
 
-## 7. Related Plans
+## 5. Related Plans
 
 <!-- Maintained automatically or manually after Plans are linked -->
 
 | Project | Plan | Status |
 |---------|------|--------|
 
-## 8. References
+## 6. Risks
 
-- Project DESIGN: `<project-design-path>`
+Only items without a design solution go here. Gaps with design solutions are managed in §4.
+
+| Risk / Dependency | Impact | Why no design solution |
+|-------------------|--------|------------------------|
+
+## 7. References
+
+Do not repeat documents already referenced in the Phase document header. List project DESIGNs and other relevant references.
+
 - Project DESIGN: `<project-design-path>`
