@@ -21,7 +21,7 @@ compatibility:
 
 1. 先进入 Plan 生命周期，再开始实施。
 2. `approve --confirm` 和 `verify --confirm` 都是人类授权门。
-3. `complete` 表示"实施完成，代码已提交，进入用户验证阶段"，不代表"用户已验证通过"。
+3. `complete` 表示"实施完成，活动 Plan 状态已更新为 verifying，进入用户验证阶段"，不代表"用户已验证通过"。代码提交由实施 agent 负责。
 4. `archive` 只做 push + 归档收尾，不承担验证职责。
 5. **Plan 必须先通过 `flow.sh plan ...` 生成或定位 stub**；禁止手写创建 Plan 文件，禁止自行猜测 Plan 路径。
 
@@ -39,9 +39,9 @@ compatibility:
 | `plan` | 无 | `planning` | 创建或定位 Plan |
 | `approve` | `planning` | `planning` | 校验 Plan，提交方案评审 |
 | `approve --confirm` | `planning` | `executing` | 用户审批通过，开始实施 |
-| `complete` | `executing` | `verifying` | 实施完成，提交代码 |
-| `verify --confirm` | `verifying` | `done` | 用户验证通过 |
-| `archive` | `done` | 归档 | push 代码，归档 Plan，关闭 Issue |
+| `complete` | `executing` | `verifying` | 实施完成，Plan-only 提交活动 Plan（脏实施树报错退出） |
+| `verify --confirm` | `verifying` | `done` | 用户验证通过，Plan-only 提交到集成分支 |
+| `archive` | `done` | 归档 | 归档 Plan，清理 worktree，关闭 Issue |
 
 命令顺序不合法时，回到正确状态顺序执行，不要强行推进。
 
@@ -124,6 +124,8 @@ rook 契约格式见 agents-collab。委派 rook 前不预加载 df-plan-review 
 
 **委派 prompt 必须**：末尾附加 Done checkbox 更新指令（格式见 `references/plan-authoring.md`）。
 
+**委派用活动 Plan 路径**：子代理 prompt 中的 Plan 路径必须使用活动 Plan 的本地路径。对于 worktree 隔离的 executing Plan，活动 Plan 位于 feature 分支的 worktree 内，与 main 分支上的 Plan 是独立副本。禁止在委派 prompt 中使用 main 分支的 Plan 路径——这会导致代理在 feature 分支上实施时读取或更新错误的 Plan 副本。
+
 ### D. 实施完成后，进入用户验证
 
 1. 确认所有 Task Done 已勾选
@@ -133,33 +135,48 @@ rook 契约格式见 agents-collab。委派 rook 前不预加载 df-plan-review 
 5. **同步业务规则**：如 Plan 的 `## Business Rules Impact` 非 N/A，将变更同步到 `projects/<project>/docs/BUSINESS_RULES.md`，勾选 Plan 中的同步确认 checkbox
 6. `flow.sh complete <issue>`
 
-`complete` 硬门控：所有 Task Done ✓ + Agent Verification ✓ + rook PASS ✓。
+`complete` 硬门控：所有 Task Done ✓ + Agent Verification ✓ + rook PASS ✓。`complete` 在脏实施树上报错退出，不提交代码——代码提交由实施 agent 负责。
 
 ### worktree 隔离下的验证切换
 
-`complete` 后代码在 feature 分支。用户验证需切换运行时环境：
+`complete` 将活动 feature Plan 状态更新为 `verifying`。此时代码和 Plan 都在 feature 分支上。用户验证在 feature 分支上进行。
 
-**Phase 1 — 切换验证**：
+**Phase 1 — 切换到 feature 分支验证**：
 ```bash
 flow.sh verify-switch <issue>
 ```
-自动完成：移除隔离 worktree → 检出 feature 分支 → 记录主分支。提示用户重启验证。
+检出 feature 分支。提示用户在 feature 分支上验证实施结果。
 
-**Phase 2 — 合并回主分支**（用户确认验证通过后，Wopal 自动执行）：
+**Phase 2 — 用户确认后合并到集成分支**：
 ```bash
 flow.sh verify-switch <issue> --merge
 ```
-自动完成：检出主分支 → merge feature 分支 → `flow.sh verify <issue> --confirm`。
+检出集成分支（main） → merge feature 分支。合并后 feature 分支的工作已集成到 main。
 
-**⚠️ 硬约束**：合并（Phase 2）**必须**在用户明确确认验证通过后执行。禁止手动 merge，统一使用本命令。
+**⚠️ 硬约束**：`verify-switch --merge` **必须**在用户明确确认验证通过后执行。禁止手动 merge，统一使用本命令。
 
 ### E. 用户验证通过后进入 done
 
-用户确认后：`flow.sh verify <issue> --confirm`。前置：Plan 状态 = `verifying`，User Validation 最终 checkbox 已勾选。
+feature 分支已集成到 main 后：`flow.sh verify <issue> --confirm`。前置：Plan 状态 = `verifying`，User Validation 最终 checkbox 已勾选，feature 分支已合并到集成分支。
+
+`verify --confirm` 在集成分支上提交 Plan-only commit（`verifying` → `done`）。对于 PR 流程，需确认 PR 已合并后才在 main 上提交 `done`。
 
 ### F. 最后归档
 
 `flow.sh archive <issue>`。前置：Plan 状态 = `done`。
+
+`archive` 在集成分支上将已接受 Plan 移至 `done/` 目录，清理 worktree，更新 Issue 链接。`archive` 永远不提交代码。
+
+## Wopal 编排规则
+
+以下规则约束 Wopal 在 dev-flow worktree 生命周期中的编排行为：
+
+1. **活动 Plan 路径委派**：Wopal 只使用活动 Plan 的本地路径委派实施。对于 worktree 隔离的 Plan，活动 Plan 位于 feature 分支的 worktree 内。
+2. **脏树交接失败**：Wopal 将脏的实施树视为交接失败。如果 `complete` 因脏树报错，Wopal 要求实施 agent（fae）提交代码后重试。
+3. **feature 分支验证**：Wopal 在 feature 分支上运行 `verify-switch` 供用户验证实施结果。
+4. **合并需用户确认**：Wopal 仅在用户明确验证确认后运行 `verify-switch --merge`。
+5. **done 需已集成**：Wopal 仅在 feature 分支已集成到集成分支或 PR 已合并后运行 `verify --confirm`。
+6. **不要求脚本提交代码**：Wopal 不要求生命周期脚本提交代码。代码提交由实施 agent 负责。
 
 ## Roadmap
 
@@ -225,36 +242,37 @@ flow.sh approve <issue> --confirm              # 默认创建 worktree
 flow.sh approve <issue> --confirm --no-worktree # 跳过 worktree
 ```
 
-WorktreeContext 结构化元数据（9 字段）自动写入 Plan metadata：
+Worktree 元数据（2 字段）自动写入 Plan metadata：
 
 ```yaml
 - **Worktree**:
-  - enabled: true
-  - project_type: standard
-  - branch: feature/test-1-slug
-  - path: .worktrees/project-issue-1-slug
-  - repo_root: /path/to/project/repo
-  - base_branch: main
-  - merge_target: main
-  - verify_mode: direct          # standard=direct, ontology=switch-runtime
-  - cleanup_policy: archive
+  - branch: <feature-branch-name>
+  - path: <workspace-relative-worktree-path>
 ```
+
+- `branch`：feature 分支名
+- `path`：worktree 的 workspace 相对路径
 
 验证目录结构：`ls .worktrees/<project>-issue-<N>-*/`
 
 禁止在主工作空间编辑——所有变更在 worktree 内进行。
 
-## Git 语义（repo-aware）
+## Plan 分支归属
 
-Plan 文件在其所属 repo 中提交和推送：
+Plan 在不同阶段归属于不同分支：
 
-| 阶段 | Git 行为 |
-|------|---------|
-| `approve --confirm` | Plan-only 提交到 `PlanLocation.repo_root`（planning → executing） |
-| `complete` | 同仓（Plan 与代码同一 repo）：代码+Plan status=verifying 单次提交；不同仓：分别提交 |
-| `verify --confirm` | Plan status=done 提交到 Plan 所属 repo |
-| `archive` | git mv/commit/push 在 Plan 所属 repo 内完成 |
-| ontology-worktree complete | `.wopal` 内代码+Plan 单次提交 |
+| 阶段 | 归属分支 | Plan 状态 | 说明 |
+|------|---------|----------|------|
+| `planning` | 集成分支（main 或 space/main） | `planning` | Plan 基线在集成分支上提交 |
+| `approve --confirm` | 集成分支 → 创建 feature 分支 | `executing` | 先在集成分支提交 executing + Worktree 元数据，再从该基线创建 worktree |
+| 实施（executing） | feature 分支 | `executing` | 实施在 feature 分支的 worktree 中进行 |
+| `complete` | feature 分支 | `verifying` | Plan-only 提交活动 Plan（脏实施树报错退出） |
+| 用户验证 | feature 分支 | `verifying` | 用户在 feature 分支上验证实施结果 |
+| `verify-switch --merge` | feature → 集成分支 | `verifying` | 用户确认后将 feature 合并到集成分支 |
+| `verify --confirm` | 集成分支 | `done` | Plan-only 提交到集成分支 |
+| `archive` | 集成分支 | 归档 | 移至 `done/`，清理 worktree |
+
+**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent（fae）负责。脚本在遇到脏实施树时报错退出，而非代为提交代码。
 
 ## 不要这样做
 
