@@ -150,7 +150,7 @@
             [
                 "../plugins/tui-ellamaka.tsx",
                 {
-"enabled": true,
+                    "enabled": false,
                     "label": "ellamaka"
                 }
             ]
