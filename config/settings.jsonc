@@ -148,16 +148,10 @@
         "$schema": "https://opencode.ai/tui.json",
         "plugin": [
             [
-                "../plugins/tui-smoke.tsx",
+                "../plugins/tui-ellamaka.tsx",
                 {
-                    "enabled": false,
-                    "label": "WopalSpace",
-                    "keybinds": {
-                        "modal": "ctrl+shift+m",
-                        "screen": "ctrl+shift+o",
-                        "home": "escape,ctrl+shift+h",
-                        "dialog_close": "escape,q"
-                    }
+                    "enabled": true,
+                    "label": "ELLAMAKA"
                 }
             ]
         ]
