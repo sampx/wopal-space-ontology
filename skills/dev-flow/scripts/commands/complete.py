@@ -161,48 +161,46 @@ def cmd_complete(args: argparse.Namespace) -> int:
     # Extract Issue number from Plan metadata
     plan_issue = get_plan_issue(plan_path)
 
-    # 2. Check current Plan status
-    current_status = parse_plan_status(plan_path)
-
-    if not current_status:
-        log_error("Cannot parse Plan status")
+    # 2. Resolve active Plan path early — validation gates must use the
+    #    worktree Plan (where Done checkboxes are actually ticked),
+    #    not the main branch Plan.
+    try:
+        active = resolve_active_plan(plan_path, "complete", workspace_root)
+    except ResolveActivePlanError as e:
+        log_error(str(e))
         return 1
 
-    # 3. Validate state is "executing"
+    active_plan_path = str(active.active_plan_path)
+
+    # 4. Validate state is "executing" — check active Plan
+    current_status = parse_plan_status(active_plan_path)
     if not guard_status(current_status, "executing", input_ref):
         return 1
 
-    # 4. Check Done/Step checkboxes in Implementation (hard gate)
+    # 5. Check Done/Step checkboxes in Implementation (hard gate) — active Plan
     try:
-        check_step_completion(plan_path)
+        check_step_completion(active_plan_path)
     except ValidationError as e:
         log_error("")
         log_error(f"Cannot complete: {e}")
         log_error("")
         log_error("Please check the completed steps and update the Plan file:")
-        log_error(f"  {plan_path}")
+        log_error(f"  {active_plan_path}")
         log_error("")
         log_error(f"After completing, run: flow.sh complete {input_ref}")
         return 1
 
-    # 5. Check Agent Verification Acceptance Criteria (hard gate)
+    # 6. Check Agent Verification Acceptance Criteria (hard gate) — active Plan
     try:
-        check_acceptance_criteria(plan_path)
+        check_acceptance_criteria(active_plan_path)
     except ValidationError as e:
         log_error("")
         log_error(f"Cannot complete: {e}")
         log_error("")
         log_error(f"Please complete the remaining items and update the Plan file:")
-        log_error(f"  {plan_path}")
+        log_error(f"  {active_plan_path}")
         log_error("")
         log_error(f"After completing, run: flow.sh complete {input_ref}")
-        return 1
-
-    # 6. Resolve active Plan path using resolve_active_plan
-    try:
-        active = resolve_active_plan(plan_path, "complete", workspace_root)
-    except ResolveActivePlanError as e:
-        log_error(str(e))
         return 1
 
     # 7. Dirty working tree check — block if uncommitted changes exist

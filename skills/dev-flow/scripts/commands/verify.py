@@ -277,9 +277,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_error(str(e))
         return 1
 
-    # 8. HARD GATE: User Validation must pass
+    # 8. HARD GATE: User Validation must pass — check active Plan
     try:
-        check_user_validation(plan_path)
+        check_user_validation(str(active.active_plan_path))
     except ValidationError as e:
         log_error("")
         log_error(f"User Validation gate failed - cannot proceed with verify --confirm")
