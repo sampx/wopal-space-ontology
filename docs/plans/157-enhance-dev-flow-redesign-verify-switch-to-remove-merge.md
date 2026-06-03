@@ -8,10 +8,7 @@
 - **Project Path**: .wopal
 - **Project Type**: ontology-worktree
 - **Created**: 2026-06-03
-- **Status**: verifying
-- **Worktree**:
-  - branch: issue-157-flow-redesign-verify-switch-to-remove-merge
-  - path: /Users/sam/coding/wopal/wopal-workspace/.worktrees/ontology-issue-157-flow-redesign-verify-switch-to-remove-merge
+- **Status**: done
 
 ## Scope Assessment
 
@@ -134,7 +131,7 @@ N/A — 无业务规则变更
 - User Actions: 执行 `flow.sh verify <plan> --confirm`
 - Expected Result: 报错提示 feature 分支尚未合并到集成分支，exit 1
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
