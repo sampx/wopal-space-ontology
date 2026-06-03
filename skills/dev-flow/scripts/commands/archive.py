@@ -68,6 +68,104 @@ from lib.project import resolve_plan_location
 
 
 # ============================================
+# Phase Doc Plan Status Update
+# ============================================
+
+_PHASE_TABLE_HEADER = "| Project | Plan | Status |"
+_PHASE_TABLE_SEP = "|---------|------|--------|"
+
+
+def _update_phase_doc_plan_status(
+    workspace_root: Path,
+    plan_name: str,
+    product: str,
+    phase: str,
+    new_status: str = "done",
+) -> bool:
+    """Update Plan status in a product phase doc's Related Plans table.
+
+    Searches ``docs/products/<product>/phases/*<phase>*.md`` for a Related
+    Plans table and sets the Status column to *new_status* for the row whose
+    Plan column matches *plan_name*.
+
+    Args:
+        workspace_root: Workspace root path.
+        plan_name: Plan slug to match in the table.
+        product: Product name from Plan metadata.
+        phase: Phase name from Plan metadata.
+        new_status: Status value to write (default ``"done"``).
+
+    Returns:
+        True if the file was updated, False otherwise (silently skipped or
+        warned).
+    """
+    if not product or not phase:
+        log_info("No Product/Phase metadata, skipping phase doc update")
+        return False
+
+    phases_dir = workspace_root / "docs" / "products" / product / "phases"
+    if not phases_dir.exists():
+        log_warn(f"Phases directory not found: {phases_dir}")
+        return False
+
+    # Find matching phase doc(s) — prefer exact match, then glob
+    candidates = sorted(phases_dir.glob(f"*{phase}*.md"))
+
+    if not candidates:
+        log_warn(f"No phase doc found for product={product}, phase={phase}")
+        return False
+
+    phase_doc_path = candidates[0]
+
+    content = phase_doc_path.read_text()
+    lines = content.splitlines(keepends=True)
+
+    header_idx = None
+    for i, line in enumerate(lines):
+        if line.strip() == _PHASE_TABLE_HEADER:
+            header_idx = i
+            break
+
+    if header_idx is None:
+        log_warn(f"No Related Plans table found in {phase_doc_path.name}")
+        return False
+
+    # Walk rows after separator
+    updated = False
+    for i in range(header_idx + 2, len(lines)):
+        raw = lines[i]
+        # Stop at blank line or next non-table line
+        stripped = raw.strip()
+        if not stripped or not stripped.startswith("|"):
+            break
+
+        # Parse table row cells
+        cells = [c.strip() for c in stripped.split("|")]
+        # cells from split on "| a | b | c |" → ['', ' a ', ' b ', ' c ', '']
+        # Filter empty edge cells
+        cells = [c for c in cells if c != ""]
+        if len(cells) < 3:
+            continue
+
+        plan_cell = cells[1]
+        if plan_cell == plan_name:
+            # Replace Status column (last cell) with new_status
+            # Rebuild the line preserving original spacing style
+            old_status = cells[2]
+            lines[i] = raw.replace(old_status, new_status, 1)
+            updated = True
+            break
+
+    if not updated:
+        log_warn(f"Plan '{plan_name}' not found in phase doc Related Plans table")
+        return False
+
+    phase_doc_path.write_text("".join(lines))
+    log_success(f"Updated phase doc {phase_doc_path.name}: {plan_name} → {new_status}")
+    return True
+
+
+# ============================================
 # Worktree / Project Change Detection
 # ============================================
 
@@ -591,6 +689,13 @@ def cmd_archive(args: argparse.Namespace) -> int:
             log_success(f"Issue #{plan_issue} closed")
         else:
             log_warn(f"Failed to close Issue #{plan_issue}")
+
+    # 9. Update phase doc Related Plans table (if Product + Phase metadata present)
+    product_meta = get_plan_field(plan_path, "Product")
+    phase_meta = get_plan_field(plan_path, "Phase")
+    _update_phase_doc_plan_status(
+        workspace_root, plan_name, product_meta, phase_meta,
+    )
 
     # Output summary
     print("")
