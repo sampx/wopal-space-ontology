@@ -11,16 +11,16 @@ description: |
 
 ## 状态机
 
-`planning → executing → verifying → done`
+`planning → reviewing → executing → verifying → done`
 
 | 命令 | 前置状态 | 后置状态 | 作用 |
 |------|---------|---------|------|
 | `plan` | 无 | `planning` | 创建或定位 Plan |
-| `approve` | `planning` | `planning` | 校验 Plan，提交方案评审 |
-| `approve --confirm` | `planning` | `executing` | 用户审批通过，开始实施 |
+| `submit` | `planning` | `reviewing` | 提交人工审阅 |
+| `approve --confirm` | `reviewing` 或 `planning` | `executing` | 用户审批通过，开始实施 |
 | `complete` | `executing` | `verifying` | 实施完成，Plan-only 提交活动 Plan |
 | `verify --confirm` | `verifying` | `done` | 用户验证通过，Plan-only 提交到集成分支 |
-| `archive` | `done` | 归档 | 归档 Plan，清理 worktree，关闭 Issue |
+| `archive` | `done` | 归档 | 归档 Plan，清理 worktree，关闭 Issue，同步阶段文档 |
 
 命令顺序不合法时，回到正确状态顺序执行，不要强行推进。
 
@@ -32,6 +32,16 @@ description: |
 4. **Plan-only commit**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。
 5. **活动 Plan 路径**：委派实施时，Plan 路径必须使用 feature 分支 worktree 中的活动副本，禁止使用 main 分支路径。
 
+## 如何定位 Plan
+
+当用户提到某个 Plan 名称（如 `155-enhance-dev-flow`）时，**必须**用脚本定位，**严禁** `grep`、`glob`、`read` 在空间内盲目搜索。
+
+- `flow.sh plan <name>` — 快速定位 Plan 文件路径（O(1)）
+- `flow.sh plan status <name>` — 查看 Plan 完整状态，含状态机位置、关联 Issue、worktree 信息
+- `flow.sh plan list` — 浏览所有活跃 Plan（含 `--issue` 模式查看 GitHub Issues）
+
+脚本命令直接命中 Plan 目录，搜索引擎需要多次交互才可能找到——烧 token 且可靠性差。
+
 ## 人类授权门
 
 | 命令 | 用户信号 |
@@ -39,6 +49,8 @@ description: |
 | `approve --confirm` | "审批通过"、"approved"、"可以开始" |
 | `verify --confirm` | "验证通过"、"没问题"、"validation passed" |
 | `reset` | "重置"、"reset" |
+
+`submit` 不需要用户授权——Plan 审阅通过后 agent 可直接执行 `flow.sh submit <issue>`。`approve --confirm` 才是用户审批门。
 
 ## 标准流程
 
@@ -49,9 +61,11 @@ flow.sh plan <issue>                    # Issue 驱动
 flow.sh plan --title "..." --project <name> --type <type>  # 无 Issue
 ```
 
+完整命令链：`plan → submit → approve --confirm → complete → verify --confirm → archive`。`flow.sh submit <issue>` 提交审阅，`flow.sh approve <issue> --confirm` 批准实施。
+
 **Plan 目录**：标准项目 `projects/<project>/docs/plans/`；ontology-worktree `.wopal/docs/plans/`。`--project` 必填。
 
-### B. Plan 审查
+### B. Plan 审查与提交
 
 ```bash
 flow.sh plan <issue> --check           # 校验 Plan 质量
@@ -60,9 +74,10 @@ flow.sh sync <issue> --body-only       # 同步 Issue body（如需）
 
 1. 委派 rook 审 Plan（强制）— prompt 契约见 agents-collab
 2. rook PASS → 继续；REVISE/BLOCK → 修订后重审（最多 3 轮）
-3. 通过后：`flow.sh approve <issue>`，停止推进，等用户审批
+3. 通过后：`flow.sh submit <issue>` — 提交人工审阅（planning → reviewing）
+4. 等用户审批后：`flow.sh approve <issue> --confirm` — 批准通过（reviewing/planning → executing）
 
-禁止：跳过 rook 审查直接 approve、rook BLOCK 后强行 approve。
+禁止：跳过 rook 审查直接 submit、rook BLOCK 后强行 submit。
 
 ### C. Executing
 
@@ -134,6 +149,7 @@ Implementation 中每个 Task 的 `- [ ]` checkbox，以及 `### Agent Verificat
 | 阶段 | 归属分支 | 说明 |
 |------|---------|------|
 | `planning` | 集成分支 | Plan 基线在集成分支上提交 |
+| `reviewing` | 集成分支 | `submit` 提交 Plan 状态变更到集成分支 |
 | `executing` | feature 分支 | 实施在 worktree 中进行 |
 | `complete` | feature 分支 | Plan-only 提交活动 Plan |
 | `verify --confirm` | 集成分支 | Plan-only 提交到集成分支 |
@@ -152,8 +168,10 @@ Implementation 中每个 Task 的 `- [ ]` checkbox，以及 `### Agent Verificat
 
 - Done checkbox 积压不即时勾选
 - Agent Verification 未完成就推进
-- 跳过 rook 审查直接 complete
-- rook BLOCK 后强行 complete
+- 跳过 rook 审查直接 submit 或 complete
+- rook BLOCK 后强行 submit 或 complete
+- `approve` 不带 `--confirm` — 不带 `--confirm` 时 approve 直接报错，使用 `submit` 提审
+- **禁止 grep/glob 搜索 Plan** — 使用 `flow.sh plan <name>` 或 `flow.sh plan status <name>` 定位
 - **User Validation 越权代勾** — 这是用户的验证权，不是 agent 的
 - **verify-switch 误用于 standard 项目** — standard 项目直接在 worktree 目录验证
 - 未实际验证就标记 AC 完成

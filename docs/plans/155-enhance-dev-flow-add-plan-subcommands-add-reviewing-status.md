@@ -216,7 +216,7 @@ N/A — 无业务规则变更
 
 **Done**:
 任务产出：workflow.py 支持 reviewing 状态和完整转换表
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
@@ -265,7 +265,7 @@ N/A — 无业务规则变更
 
 **Done**:
 任务产出：submit 命令创建，approve 重构为仅 --confirm，共享 commit/push 逻辑
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
@@ -376,7 +376,7 @@ Active Plans & Issues
 
 **Done**:
 任务产出：plan 子命令 new/status/list 可用，query.py 和顶层 list/status 已清理
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
@@ -417,7 +417,7 @@ Active Plans & Issues
 
 **Done**:
 任务产出：archive 完成时自动同步阶段文档 Related Plans 到 done
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
 
 ---
 
