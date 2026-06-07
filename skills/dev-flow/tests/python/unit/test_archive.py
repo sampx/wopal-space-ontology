@@ -2,9 +2,13 @@
 # test_archive.py - Unit tests for archive command helpers
 #
 # Task 4 (Issue #155): Phase doc Related Plans table update on archive.
+# Bug fix: _detect_worktree must return metadata even when worktree path
+# has been cleaned up by verify-switch.
 
 import unittest
 import sys
+import tempfile
+import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -21,7 +25,12 @@ for mod in [
     sys.modules.setdefault(mod, MagicMock())
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts" / "commands"))
-from archive import _update_phase_doc_plan_status, _PHASE_TABLE_HEADER, _PHASE_TABLE_SEP
+from archive import (
+    _update_phase_doc_plan_status,
+    _detect_worktree,
+    _PHASE_TABLE_HEADER,
+    _PHASE_TABLE_SEP,
+)
 
 # Restore real logging for the function (used internally)
 from lib.logging import log_info, log_warn, log_success
@@ -199,6 +208,79 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
         warn_msg = str(mock_warn.call_args[0][0])
         self.assertIn("No Related Plans table found", warn_msg)
         mock_ok.assert_not_called()
+
+
+class TestDetectWorktree(unittest.TestCase):
+    """Tests for _detect_worktree.
+
+    Regression: after verify-switch cleans up the worktree directory,
+    the Plan metadata still records the branch that needs cleanup.
+    _detect_worktree must return the metadata so archive can delete
+    the feature branch.
+    """
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.ws_root = self.tmpdir
+        # Plan file location (mirror real layout)
+        self.plans_dir = self.tmpdir / "plans"
+        self.plans_dir.mkdir(parents=True)
+        self.plan_path = self.plans_dir / "test-plan.md"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _write_plan_with_worktree(self, branch: str, wt_path: str) -> None:
+        self.plan_path.write_text(
+            f"# test-plan\n\n"
+            f"## Metadata\n\n"
+            f"- **Type**: feature\n"
+            f"- **Target Project**: wopal-cli\n"
+            f"- **Status**: done\n"
+            f"- **Worktree**:\n"
+            f"  - branch: {branch}\n"
+            f"  - path: {wt_path}\n"
+        )
+
+    @patch("archive.get_plan_worktree")
+    def test_returns_metadata_when_worktree_path_exists(self, mock_gpw):
+        """Sanity: when path exists, metadata is returned as-is."""
+        wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-my-feature"
+        wt_dir.mkdir(parents=True)
+        mock_gpw.return_value = {
+            "branch": "my-feature",
+            "path": str(wt_dir.relative_to(self.ws_root)),
+        }
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["branch"], "my-feature")
+
+    @patch("archive.get_plan_worktree")
+    def test_returns_metadata_when_worktree_path_missing(self, mock_gpw):
+        """Regression: path cleaned up by verify-switch must not erase
+        branch metadata — the feature branch still needs deletion."""
+        missing_path = self.tmpdir / ".worktrees" / "wopal-cli-my-feature"
+        self.assertFalse(missing_path.exists())
+
+        mock_gpw.return_value = {
+            "branch": "my-feature",
+            "path": str(missing_path.relative_to(self.ws_root)),
+        }
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result, "must return metadata even when path is gone")
+        self.assertEqual(result["branch"], "my-feature")
+
+    @patch("archive.get_plan_worktree")
+    def test_returns_none_when_no_metadata_and_no_glob_match(self, mock_gpw):
+        mock_gpw.return_value = None
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

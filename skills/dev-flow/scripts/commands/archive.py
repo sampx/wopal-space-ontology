@@ -167,6 +167,11 @@ def _detect_worktree(
     1. Plan Worktree field (set by approve --confirm --worktree)
     2. Fallback: glob match .worktrees/<project>-issue-<N>-*
 
+    Plan metadata is returned even when the worktree directory has been
+    cleaned up (e.g. by verify-switch). The branch recorded there still
+    needs to be deleted by archive. Path-existence checks belong to the
+    caller.
+
     Args:
         plan_path: Path to Plan file
         project: Project name
@@ -175,17 +180,13 @@ def _detect_worktree(
     Returns:
         Dict with 'branch' and 'path' keys, or None
     """
-    # Try Plan metadata first
+    # Plan metadata always wins — even if path is gone the branch still
+    # needs cleanup
     wt = get_plan_worktree(plan_path)
     if wt:
-        # Verify the path actually exists (resolve workspace-relative)
-        wt_full_path = workspace_root / wt['path']
-        if wt_full_path.exists():
-            return wt
-        # Path gone — metadata stale
-        return None
+        return wt
 
-    # Fallback: glob match
+    # Fallback: glob match (only when Plan metadata is absent)
     plan_issue = get_plan_issue(plan_path)
     if not plan_issue:
         return None
@@ -600,30 +601,52 @@ def cmd_archive(args: argparse.Namespace) -> int:
                     _cleanup_worktree(str(project_path), branch, wt_path, workspace_root)
                     worktree_handled = True
                 else:
-                    # Has worktree + no PR → merge branch to main
-                    # Check worktree for uncommitted changes first
-                    if has_uncommitted_changes(wt_path):
-                        log_error(f"Worktree has uncommitted changes: {wt_path}")
-                        log_error("Commit changes in worktree first, then re-run archive")
-                        return 1
+                    # Has worktree + no PR
+                    # Resolve wt_path (may be absolute or workspace-relative)
+                    wt_path_resolved = Path(wt_path)
+                    if not wt_path_resolved.is_absolute():
+                        wt_path_resolved = workspace_root / wt_path_resolved
 
-                    success, conflicts = _merge_worktree_branch(
-                        str(project_path), branch, wt_path,
-                    )
-
-                    if not success:
-                        if conflicts:
-                            log_error("Resolve merge conflicts before archiving")
-                        return 1
-
-                    # Push merged main
-                    if push_branch(str(project_path), 'main'):
-                        log_success("Merged main pushed to origin")
+                    if not wt_path_resolved.exists():
+                        # Worktree directory was cleaned up earlier (typically
+                        # by verify-switch). The feature branch may still be
+                        # present in the project repo. Skip merge — by this
+                        # point the branch has either been merged into the
+                        # integration branch (verify --confirm ensures this)
+                        # or is intentionally orphaned.
+                        log_info(f"Worktree path no longer exists: {wt_path_resolved}")
+                        log_info("Skipping merge; cleaning up feature branch only")
                     else:
-                        log_warn("Failed to push merged main")
+                        # Worktree directory present → normal flow
+                        if has_uncommitted_changes(str(wt_path_resolved)):
+                            log_error(f"Worktree has uncommitted changes: {wt_path_resolved}")
+                            log_error("Commit changes in worktree first, then re-run archive")
+                            return 1
 
-                    # Cleanup worktree
-                    _cleanup_worktree(str(project_path), branch, wt_path, workspace_root)
+                        success, conflicts = _merge_worktree_branch(
+                            str(project_path), branch, str(wt_path_resolved),
+                        )
+
+                        if not success:
+                            if conflicts:
+                                log_error("Resolve merge conflicts before archiving")
+                            return 1
+
+                        # Push merged main
+                        if push_branch(str(project_path), 'main'):
+                            log_success("Merged main pushed to origin")
+                        else:
+                            log_warn("Failed to push merged main")
+
+                    # Always cleanup — clean_worktree is safe when the
+                    # worktree directory is gone; it still deletes the
+                    # feature branch.
+                    _cleanup_worktree(
+                        str(project_path),
+                        branch,
+                        str(wt_path_resolved),
+                        workspace_root,
+                    )
                     worktree_handled = True
             else:
                 # No worktree → push project changes (committed during complete)

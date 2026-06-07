@@ -2,8 +2,7 @@
 name: dev-flow
 description: |
   Issue/Plan 驱动的开发工作流。⚠️ 任务需以 GitHub Issue 或 Plan 为执行载体。
-
-  🔴 Trigger: "#14"、"这个 issue"、"出个计划"、"开始开发"、"执行计划"、Plan 生命周期推进（approve/complete/verify/archive）、从 PRD 拆分 Issue。
+  🔴 Trigger: "#14"、"创建 issue"、"出个计划"、"实施 plan"、"执行计划"、Plan 生命周期推进（approve/complete/verify/archive）、从 PRD 拆分 Issue。
   ❌ Skip: spec 驱动流程、单纯研究/讨论/解释、不需 Issue/Plan 的临时小改动。
 ---
 
