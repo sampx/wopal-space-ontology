@@ -45,7 +45,7 @@ from lib.git import (
     is_repo_dirty,
     get_current_branch,
 )
-from lib.plan_commit import commit_and_push_plan
+from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 from lib.worktree import create_worktree, write_worktree_context
 
 
@@ -312,8 +312,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     log_success("Plan status updated to: executing")
     
     # Commit/push the Plan baseline (executing + Worktree metadata) on integration branch
-    if not commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve"):
-        log_error("Failed to commit/push Plan baseline")
+    result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve")
+    if result == RESULT_PUSH_FAILED:
+        log_error("Approve succeeded locally but push failed. See error above.")
+        return 1
+    if result != RESULT_OK:
+        log_error("Failed to commit Plan baseline")
         return 1
     
     # ============================================

@@ -19,12 +19,13 @@ from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
 from commands.submit import cmd_submit, register_submit_parser
+from lib.plan_commit import RESULT_OK
 
 
 class TestSubmitHappyPath(unittest.TestCase):
     """Test submit happy path: planning → reviewing."""
 
-    @patch("commands.submit.commit_and_push_plan", return_value=True)
+    @patch("commands.submit.commit_and_push_plan", return_value=RESULT_OK)
     @patch("commands.submit.update_plan_status", return_value=True)
     @patch("commands.submit.check_doc_plan")
     @patch("commands.submit.get_plan_issue", return_value=42)
@@ -41,7 +42,7 @@ class TestSubmitHappyPath(unittest.TestCase):
         self.assertEqual(result, 0)
         mock_update.assert_called_once_with("/ws/.wopal/docs/plans/42-fix-test.md", "reviewing")
 
-    @patch("commands.submit.commit_and_push_plan", return_value=True)
+    @patch("commands.submit.commit_and_push_plan", return_value=RESULT_OK)
     @patch("commands.submit.update_plan_status", return_value=True)
     @patch("commands.submit.check_doc_plan")
     @patch("commands.submit.get_plan_issue", return_value=42)

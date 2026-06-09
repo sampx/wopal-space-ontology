@@ -16,13 +16,17 @@ from lib.git import (
 )
 from lib.project import resolve_plan_location
 
+RESULT_OK = "ok"
+RESULT_COMMIT_FAILED = "commit_failed"
+RESULT_PUSH_FAILED = "push_failed"
+
 
 def commit_and_push_plan(
     plan_path: str,
     issue_number: int | None,
     workspace_root: Path,
     message_prefix: str = "approve",
-) -> bool:
+) -> str:
     """Commit and push Plan file after status transition.
 
     Repo-aware: resolves Plan's repo via resolve_plan_location() and
@@ -35,12 +39,13 @@ def commit_and_push_plan(
         message_prefix: Prefix for commit message verb (e.g. "approve", "submit")
 
     Returns:
-        True if commit/push succeeded, False if failed
+        RESULT_OK / RESULT_COMMIT_FAILED / RESULT_PUSH_FAILED
     """
     # Resolve Plan's owning repo
     plan_location = resolve_plan_location(Path(plan_path), workspace_root)
     repo_root = str(plan_location.repo_root)
     plan_relative = plan_location.repo_relative_path
+    current_branch = plan_location.branch
 
     # Check if plan file has uncommitted changes
     status_result = subprocess.run(
@@ -66,19 +71,20 @@ def commit_and_push_plan(
                 commit_msg = prefix + plan_filename[:max_name]
 
         if not commit_paths(repo_root, [plan_relative], commit_msg):
-            log_error("Auto-commit failed. Please commit manually")
-            return False
+            log_error("Commit failed")
+            return RESULT_COMMIT_FAILED
 
         log_success(f"Plan file committed: {commit_msg}")
 
     # Push if not already in remote
-    current_branch = plan_location.branch
-
     if not is_commit_in_remote(repo_root, "origin", current_branch):
         log_step(f"Auto-pushing Plan file to origin/{current_branch}...")
         if not push_repo(repo_root, current_branch):
-            log_error(f"Auto-push failed. Please push manually: cd {repo_root} && git push")
-            return False
+            log_error(
+                f"Push failed (commit is safe locally). "
+                f"Retry: cd {repo_root} && git push"
+            )
+            return RESULT_PUSH_FAILED
         log_success("Plan file pushed successfully")
 
-    return True
+    return RESULT_OK

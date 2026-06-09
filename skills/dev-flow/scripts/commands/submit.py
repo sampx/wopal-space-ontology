@@ -25,7 +25,7 @@ from lib.workspace import find_workspace_root
 from workflow import update_plan_status, parse_plan_status, STATUS_PLANNING
 from plan import find_plan, get_plan_issue, get_plan_status
 from validation import check_doc_plan, ValidationError
-from lib.plan_commit import commit_and_push_plan
+from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 
 
 def cmd_submit(args: argparse.Namespace) -> int:
@@ -99,8 +99,12 @@ def cmd_submit(args: argparse.Namespace) -> int:
     log_success("Plan status updated to: reviewing")
 
     # 6. Commit and push
-    if not commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="submit"):
-        log_error("Failed to commit/push Plan")
+    result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="submit")
+    if result == RESULT_PUSH_FAILED:
+        log_error("Submit succeeded locally but push failed. See error above.")
+        return 1
+    if result != RESULT_OK:
+        log_error("Failed to commit Plan")
         return 1
 
     # Output confirmation
