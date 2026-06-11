@@ -1,19 +1,20 @@
 /**
  * Runtime Context
  *
- * Detects the execution environment: WOPAL_HOME, wopal-space status,
- * and log directory routing. Initialized once at plugin startup.
+ * Detects the execution environment: WOPAL_HOME, wopal-space status
+ * (via WOPAL_SPACE_ROOT set by ellamaka), and log directory routing.
+ * Initialized once at plugin startup.
  */
 
 import { homedir } from "os";
 import { join } from "path";
-import { existsSync } from "fs";
 
 export interface RuntimeContext {
   wopalHome: string;       // process.env.WOPAL_HOME ?? ~/.wopal
-  workspaceRoot: string;   // from pluginInput.directory
-  isWopalSpace: boolean;   // workspaceRoot/.wopal/ exists
-  logDir: string;          // space: .wopal-space/logs/ ; else: WOPAL_HOME/logs/
+  directory: string;        // ellamaka working directory (from pluginInput.directory)
+  isWopalSpace: boolean;   // WOPAL_SPACE_ROOT is set
+  spaceRoot?: string;       // WOPAL_SPACE_ROOT, the wopal-space root directory
+  logDir: string;           // space: <spaceRoot>/.wopal-space/logs/ ; else: WOPAL_HOME/logs/
 }
 
 let _context: RuntimeContext | null = null;
@@ -23,14 +24,21 @@ let _context: RuntimeContext | null = null;
  * Must be called once at plugin startup before any other module
  * accesses the context via getRuntimeContext().
  */
-export function initRuntimeContext(workspaceRoot: string): RuntimeContext {
+export function initRuntimeContext(directory: string): RuntimeContext {
   const wopalHome = process.env.WOPAL_HOME || join(homedir(), ".wopal");
-  const isWopalSpace = existsSync(join(workspaceRoot, ".wopal"));
+  const spaceRoot = process.env.WOPAL_SPACE_ROOT;
+  const isWopalSpace = spaceRoot !== undefined;
   const logDir = isWopalSpace
-    ? join(workspaceRoot, ".wopal-space", "logs")
+    ? join(spaceRoot, ".wopal-space", "logs")
     : join(wopalHome, "logs");
 
-  _context = { wopalHome, workspaceRoot, isWopalSpace, logDir };
+  _context = {
+    wopalHome,
+    directory,
+    isWopalSpace,
+    logDir,
+    ...(spaceRoot !== undefined ? { spaceRoot } : {}),
+  };
   return _context;
 }
 

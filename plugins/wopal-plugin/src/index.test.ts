@@ -396,6 +396,7 @@ describe("Two-layer env loading", () => {
   let envTestDir: string;
   let wopalHomeDir: string;
   let savedWopalHome: string | undefined;
+  let savedWopalSpaceRoot: string | undefined;
   let savedInjectionEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
@@ -405,6 +406,7 @@ describe("Two-layer env loading", () => {
     mkdirSync(path.join(wopalHomeDir, "logs"), { recursive: true });
 
     savedWopalHome = process.env.WOPAL_HOME;
+    savedWopalSpaceRoot = process.env.WOPAL_SPACE_ROOT;
     savedInjectionEnv = {
       WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
       WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
@@ -414,6 +416,7 @@ describe("Two-layer env loading", () => {
     delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
     delete process.env.WOPAL_MEMORY_ENABLED;
     delete process.env.WOPAL_HOME;
+    delete process.env.WOPAL_SPACE_ROOT;
   });
 
   afterEach(() => {
@@ -421,6 +424,11 @@ describe("Two-layer env loading", () => {
       process.env.WOPAL_HOME = savedWopalHome;
     } else {
       delete process.env.WOPAL_HOME;
+    }
+    if (savedWopalSpaceRoot !== undefined) {
+      process.env.WOPAL_SPACE_ROOT = savedWopalSpaceRoot;
+    } else {
+      delete process.env.WOPAL_SPACE_ROOT;
     }
     for (const [key, value] of Object.entries(savedInjectionEnv)) {
       if (value !== undefined) {
@@ -475,6 +483,7 @@ describe("Two-layer env loading", () => {
     // Create a wopal-space workspace with .wopal/ directory
     const spaceDir = path.join(envTestDir, "workspace");
     mkdirSync(path.join(spaceDir, ".wopal"), { recursive: true });
+    process.env.WOPAL_SPACE_ROOT = spaceDir;
 
     // Create space-level .env
     writeFileSync(

@@ -68,7 +68,7 @@ export function resolvePromptFile(envVar: string, filename: string): string | nu
 
   // Layer 2: space-level template
   if (ctx.isWopalSpace) {
-    const spacePath = join(ctx.workspaceRoot, ".wopal", "prompts", filename);
+    const spacePath = join(ctx.spaceRoot!, ".wopal", "prompts", filename);
     if (existsSync(spacePath)) {
       return spacePath;
     }

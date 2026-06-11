@@ -53,7 +53,7 @@ function loadEnvFile(envPath: string, preExisting: Set<string>): void {
 /**
  * Load environment variables in two layers:
  * 1. User-level: WOPAL_HOME/.env
- * 2. Space-level (if wopal-space): <workspace>/.wopal/.env
+ * 2. Space-level (if wopal-space): <spaceRoot>/.wopal/.env
  *
  * Priority: process.env pre-existing > space-level > user-level.
  * Requires RuntimeContext to be initialized first.
@@ -71,7 +71,7 @@ export function loadWopalEnv(): void {
 
   // Layer 2: space-level env (overrides user-level if present)
   if (runtimeCtx.isWopalSpace) {
-    loadEnvFile(join(runtimeCtx.workspaceRoot, ".wopal", ".env"), preExisting);
+    loadEnvFile(join(runtimeCtx.spaceRoot!, ".wopal", ".env"), preExisting);
   }
 }
 
