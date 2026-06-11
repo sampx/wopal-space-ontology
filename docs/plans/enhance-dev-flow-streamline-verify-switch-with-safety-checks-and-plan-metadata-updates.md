@@ -7,7 +7,7 @@
 - **Project Path**: .wopal/
 - **Project Type**: ontology-worktree
 - **Created**: 2026-06-11
-- **Status**: verifying
+- **Status**: done
 - **Worktree**:
   - branch: flow-streamline-verify-switch-with-safety-checks-and-plan-metadata-updates
   - path: /Users/sam/coding/wopal/wopal-workspace/.worktrees/ontology-flow-streamline-verify-switch-with-safety-checks-and-plan-metadata-updates
@@ -118,7 +118,7 @@ N/A — 纯流程优化，无业务规则变更。
   4. 检查 Plan 文件 Worktree 元数据
 - Expected Result: projects/<name>/ 在特性分支上，工作树目录已删除，Plan 中 Worktree path 为 "(removed)"，存在 Verification Dir 字段
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
