@@ -807,3 +807,63 @@ class TestCompletePlanOnlyCommit:
         assert _get_commit_count(repo) == initial_commits + 1
         files = _get_last_commit_files(repo)
         assert "docs/plans/test-plan.md" in files
+
+
+# -- is_repo_dirty ignore_paths tests -----------------------------------------
+
+
+class TestIsRepoDirtyIgnorePath:
+    """is_repo_dirty with ignore_paths: Plan file dirty should not count as dirty."""
+
+    def test_ignore_plan_returns_clean_when_only_plan_dirty(self, tmp_path):
+        """Plan dirty + ignore Plan → is_repo_dirty returns False."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        plan = _make_plan_file(repo / "docs" / "plans" / "test-plan.md")
+
+        # Commit the plan first so repo is clean
+        subprocess.run(["git", "add", "."], cwd=str(repo), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "add plan"], cwd=str(repo), capture_output=True)
+
+        # Now modify the plan (simulating AC checkbox marks)
+        plan.write_text(plan.read_text() + "\n- [x] AC #1\n")
+
+        # Without ignore: dirty
+        assert is_repo_dirty(str(repo)) is True
+
+        # With ignore: clean (Plan dirty is legal)
+        assert is_repo_dirty(str(repo), ignore_paths=[str(plan)]) is False
+
+    def test_ignore_plan_still_returns_dirty_when_impl_dirty(self, tmp_path):
+        """Plan dirty + implementation dirty + ignore Plan → still dirty."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        plan = _make_plan_file(repo / "docs" / "plans" / "test-plan.md")
+        impl = repo / "scripts" / "foo.py"
+        impl.parent.mkdir(parents=True, exist_ok=True)
+        impl.write_text("print('hello')\n")
+
+        # Commit both
+        subprocess.run(["git", "add", "."], cwd=str(repo), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=str(repo), capture_output=True)
+
+        # Modify both
+        plan.write_text(plan.read_text() + "\n- [x] AC #1\n")
+        impl.write_text("print('changed')\n")
+
+        # Without ignore: dirty
+        assert is_repo_dirty(str(repo)) is True
+
+        # With ignore plan: still dirty (implementation not ignored)
+        assert is_repo_dirty(str(repo), ignore_paths=[str(plan)]) is True
+
+    def test_no_ignore_paths_unchanged_behavior(self, tmp_path):
+        """is_repo_dirty without ignore_paths behaves same as before."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        f = repo / "README.md"
+        f.write_text("# changed\n")
+
+        assert is_repo_dirty(str(repo)) is True
+        # Default None also works
+        assert is_repo_dirty(str(repo), ignore_paths=None) is True

@@ -8,17 +8,37 @@ import subprocess
 from pathlib import Path
 
 
-def is_repo_dirty(repo_path: str) -> bool:
+def is_repo_dirty(repo_path: str, ignore_paths: list[str] | None = None) -> bool:
     """Check if git repo has uncommitted changes.
 
     Args:
         repo_path: Path to git repository root
+        ignore_paths: Optional list of absolute paths to exclude from dirty check.
+            When the only dirty files are in this list, returns False.
 
     Returns:
         True if repo has uncommitted changes (staged or unstaged)
-        False if repo is clean or path is not a valid repo
+        False if repo is clean, path is not a valid repo, or only ignored files are dirty
     """
-    return bool(get_dirty_lines(repo_path))
+    dirty_lines = get_dirty_lines(repo_path)
+    if not dirty_lines:
+        return False
+    if not ignore_paths:
+        return True
+
+    # Resolve both repo and ignore paths to canonical form (handles macOS /var→/private/var)
+    repo = Path(repo_path).resolve()
+    ignored_resolved: set[str] = set()
+    for ip in ignore_paths:
+        ignored_resolved.add(str(Path(ip).resolve()))
+
+    # Filter out dirty lines whose resolved path matches an ignored path
+    for line in dirty_lines:
+        file_path = line[3:].strip()
+        full_path = str((repo / file_path).resolve())
+        if full_path not in ignored_resolved:
+            return True
+    return False
 
 
 def get_dirty_lines(repo_path: str) -> list[str]:
@@ -38,7 +58,7 @@ def get_dirty_lines(repo_path: str) -> list[str]:
     )
     if result.returncode != 0:
         return []
-    return [line for line in result.stdout.strip().split("\n") if line]
+    return [line for line in result.stdout.split("\n") if line.strip()]
 
 
 def get_current_branch(repo_path: str) -> str:

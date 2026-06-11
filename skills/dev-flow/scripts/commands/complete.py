@@ -273,8 +273,10 @@ def cmd_complete(args: argparse.Namespace) -> int:
         log_error(f"After completing, run: flow.sh complete {input_ref}")
         return 1
 
-    # 7. Dirty working tree check — block if uncommitted changes exist
-    if is_repo_dirty(str(active.commit_repo_root)):
+    # 7. Dirty working tree check — block if uncommitted implementation code exists.
+    # Plan file dirty is allowed here: AC checkbox marks are Plan-only changes
+    # that complete will commit together with the status transition.
+    if is_repo_dirty(str(active.commit_repo_root), ignore_paths=[str(active.active_plan_path)]):
         log_error("实施工作树有未提交的变更 — complete 不提交实施代码")
         log_error("")
         log_error("请先提交或储藏未提交的变更:")
