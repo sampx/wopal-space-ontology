@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
+import { getRuntimeContext } from "./runtime-context.js"
 
 // ---------------------------------------------------------------------------
 // Level definitions
@@ -34,7 +35,12 @@ export function getLogFile(): string {
   }
   const env = process.env.WOPAL_PLUGIN_LOG_FILE
   if (env) return env
-  return join(process.cwd(), ".wopal-space", "logs", "wopal-plugin.log")
+  try {
+    return join(getRuntimeContext().logDir, "wopal-plugin.log")
+  } catch {
+    // RuntimeContext not yet initialized — fall back to cwd
+    return join(process.cwd(), ".wopal-space", "logs", "wopal-plugin.log")
+  }
 }
 
 function getAllowedModules(): Set<string> | null {

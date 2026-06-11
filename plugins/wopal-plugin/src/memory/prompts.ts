@@ -1,7 +1,12 @@
 /**
  * Prompt Loading
  *
- * Loads prompt templates from plugin's prompts/ directory at runtime for hot-reload support.
+ * Loads prompt templates via 4-layer cascading:
+ * 1. Env var override (absolute/~/relative path)
+ * 2. Space-level: <workspace>/.wopal/prompts/<filename>
+ * 3. User-level: WOPAL_HOME/prompts/<filename>
+ * 4. Inline fallback (caller provides)
+ *
  * Env vars WOPAL_DISTILL_PROMPT_FILE / WOPAL_DEDUP_PROMPT_FILE / WOPAL_TITLE_PROMPT_FILE
  * override file paths with higher priority.
  */
@@ -11,17 +16,7 @@ import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import type { MemoryCategory } from "./types.js";
 import { memoryLogger } from "../logger.js";
-
-/** Plugin root directory — set during initialization */
-let _pluginDir: string | null = null;
-
-/**
- * Set plugin root directory for prompt file resolution.
- * Must be called before any prompt loading functions.
- */
-export function setPluginDirectory(dir: string): void {
-  _pluginDir = dir;
-}
+import { getRuntimeContext } from "../runtime-context.js";
 
 /**
  * Resolve prompt file path from environment variable.
@@ -47,32 +42,63 @@ function resolveEnvFilePath(envVar: string): string | null {
 }
 
 /**
- * Load a prompt file: env var override → plugin prompts/ dir.
- * Returns null if neither source is available.
+ * Resolve a prompt template file via 4-layer cascading.
+ * Returns the file path if found, null otherwise (caller falls back to inline default).
+ *
+ * Layers:
+ * 1. Env var override — resolved via resolveEnvFilePath
+ * 2. Space-level — .wopal/prompts/<filename> (if running inside a wopal-space)
+ * 3. User-level — WOPAL_HOME/prompts/<filename>
+ * 4. null — caller uses inline default
  */
-function loadPromptFile(envVar: string, filename: string): string | null {
+export function resolvePromptFile(envVar: string, filename: string): string | null {
+  // Layer 1: env var override
   const envPath = resolveEnvFilePath(envVar);
   if (envPath && existsSync(envPath)) {
-    try {
-      memoryLogger.debug(`Loaded prompt from env: ${envPath}`);
-      return readFileSync(envPath, "utf-8");
-    } catch (error) {
-      memoryLogger.warn(`Failed to load prompt from ${envPath}: ${error}`);
+    return envPath;
+  }
+
+  // Layers 2-3 require RuntimeContext (may not be initialized in test contexts)
+  let ctx: import("../runtime-context.js").RuntimeContext;
+  try {
+    ctx = getRuntimeContext();
+  } catch {
+    return null;
+  }
+
+  // Layer 2: space-level template
+  if (ctx.isWopalSpace) {
+    const spacePath = join(ctx.workspaceRoot, ".wopal", "prompts", filename);
+    if (existsSync(spacePath)) {
+      return spacePath;
     }
   }
 
-  if (_pluginDir) {
-    const pluginPath = join(_pluginDir, "prompts", filename);
-    if (existsSync(pluginPath)) {
-      try {
-        return readFileSync(pluginPath, "utf-8");
-      } catch (error) {
-        memoryLogger.warn(`Failed to load prompt from ${pluginPath}: ${error}`);
-      }
-    }
+  // Layer 3: user-level template
+  const userPath = join(ctx.wopalHome, "prompts", filename);
+  if (existsSync(userPath)) {
+    return userPath;
   }
 
+  // Layer 4: no file found — caller falls back to inline default
   return null;
+}
+
+/**
+ * Load a prompt file: env var override → space-level → user-level → null.
+ * Returns null if no source is available (caller uses inline default).
+ */
+function loadPromptFile(envVar: string, filename: string): string | null {
+  const filePath = resolvePromptFile(envVar, filename);
+  if (!filePath) return null;
+
+  try {
+    memoryLogger.debug(`Loaded prompt from: ${filePath}`);
+    return readFileSync(filePath, "utf-8");
+  } catch (error) {
+    memoryLogger.warn(`Failed to load prompt from ${filePath}: ${error}`);
+    return null;
+  }
 }
 
 /** Title generation prompt for session title after compaction */
