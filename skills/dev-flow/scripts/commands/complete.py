@@ -355,6 +355,22 @@ def cmd_complete(args: argparse.Namespace) -> int:
             return 1
         log_success(f"Plan status updated: {target_status}")
 
+        # Store feature branch tip SHA for robust merge detection in verify --confirm.
+        # Using commit SHA allows ancestry check without depending on branch ref existence.
+        wt_meta = get_plan_worktree(plan_path)
+        if wt_meta and wt_meta.get("branch"):
+            sha_result = subprocess.run(
+                ["git", "rev-parse", wt_meta["branch"]],
+                cwd=str(active.commit_repo_root),
+                capture_output=True, text=True,
+            )
+            if sha_result.returncode == 0 and sha_result.stdout.strip():
+                set_plan_field(
+                    str(active.active_plan_path),
+                    "Verification Commit",
+                    sha_result.stdout.strip(),
+                )
+
         # Plan-only commit
         commit_msg = _build_plan_only_commit_msg(plan_issue, plan_name)
         if not commit_paths(str(active.commit_repo_root), [active.repo_relative_plan_path], commit_msg):

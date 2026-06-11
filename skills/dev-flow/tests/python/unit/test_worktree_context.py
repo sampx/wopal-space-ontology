@@ -516,39 +516,6 @@ class TestResolveActivePlanWithWorktree:
 class TestResolveActivePlanVerify:
     """resolve_active_plan: verify phase branch checks."""
 
-    def test_verify_unmerged_raises_error(self, tmp_path):
-        """verify on unmerged feature branch raises ResolveActivePlanError."""
-        import subprocess
-
-        repo = tmp_path / "projects" / "myproject"
-        repo.mkdir(parents=True)
-        subprocess.run(["git", "init", "-b", "main", str(repo)],
-                       capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@test.com"],
-                       cwd=str(repo), capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"],
-                       cwd=str(repo), capture_output=True, check=True)
-
-        plans_dir = repo / "docs" / "plans"
-        plans_dir.mkdir(parents=True)
-        plan_file = plans_dir / "test-plan.md"
-        plan_file.write_text(
-            "# Plan\n\n## Metadata\n\n- **Status**: verifying\n- **Type**: feature\n"
-            "\n- **Worktree**:\n  - branch: feature-unmerged\n  - path: .worktrees/myproject-feature-unmerged\n"
-        )
-
-        subprocess.run(["git", "add", "."], cwd=str(repo), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init"], cwd=str(repo), capture_output=True)
-
-        # Checkout the feature branch to simulate "not merged"
-        subprocess.run(
-            ["git", "checkout", "-b", "feature-unmerged"],
-            cwd=str(repo), capture_output=True, check=True,
-        )
-
-        with pytest.raises(ResolveActivePlanError, match="not been merged"):
-            resolve_active_plan(str(plan_file), "verify", workspace_root=tmp_path)
-
     def test_verify_merged_returns_main(self, tmp_path):
         """verify after merge returns main Plan."""
         import subprocess

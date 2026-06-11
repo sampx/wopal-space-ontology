@@ -199,6 +199,26 @@ def _check_feature_branch_merged(workspace_root: Path, plan_path: str) -> int:
     else:
         repo_root = str(workspace_root)
 
+    # Prefer Verification Commit SHA — works even if branch ref is deleted
+    verification_commit = get_plan_field(plan_path, "Verification Commit")
+    if verification_commit:
+        try:
+            result = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", verification_commit, integration_branch],
+                cwd=repo_root,
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                return 0
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+        # SHA not found in ancestry — not merged
+        log_error(
+            f"Feature branch '{feature_branch}' not yet merged to "
+            f"{integration_branch}. Please merge first."
+        )
+        return 1
+
     # Run git branch --merged <integration> and check for feature branch
     try:
         result = subprocess.run(
