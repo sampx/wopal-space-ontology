@@ -4,6 +4,7 @@ mode: primary
 temperature: 0.1
 permission:
   "*": allow
+  plan_exit: deny
   skill:
     "*": allow
     project-worktrees: deny
