@@ -1,7 +1,7 @@
 # Ontology — 空间灵魂、规约与能力基因工具包设计
 
 > **Status**: Active
-> **Updated**: 2026-05-31
+> **Updated**: 2026-06-12
 > **Parent Architecture**: `docs/products/wopal-space/DESIGN-wopalspace.md`
 > **Parent Product**: `docs/products/wopal-space/PRD-wopalspace.md`
 
@@ -9,6 +9,7 @@
 
 | Date | Type | Summary |
 |---|---|---|
+| 2026-06-12 | Added | §6.8 Ontology Branch Model and Collaboration — branch naming convention, clone/fork topology, sync operations, agent workflow. |
 | 2026-05-31 | Updated | 收敛 base capabilities + space overlay：setup 从 ontology main 物化 base，space overlay 同名覆盖。 |
 | 2026-05-30 | Updated | 将 Git source / worktree 分发细节下沉到 `docs/DISTRIBUTION.md`。 |
 | 2026-05-29 | Updated | 明确 STRUCTURE compact schema、Design Document Layering 与 `/init` 消费 `wopal space scan` JSON 的维护边界。 |
@@ -441,6 +442,74 @@ Ontology 通过两层模型为 WopalSpace 提供可覆盖的能力分发：
 覆盖机制：ellamaka 先并发解析所有 `SKILL.md`，再按目录优先级顺序串行合并；后出现的同名 skill 稳定覆盖前者。Agents / commands / rules / plugins 的加载机制同理。
 
 本模型将 ontology main repo 的基础能力与各 space 的定制能力解耦：通用能力由 ontology main 统一维护，setup 只负责物化 base capabilities；space 内自由定制增量覆盖。
+
+### 6.8 Ontology Branch Model and Collaboration
+
+Ontology 以 Git 分支承载能力演化，按角色分为五类分支。`wopal ontology` 命令族提供 clone 和 fork 两种模式下统一的同步、更新与贡献操作。
+
+#### Branch Naming Convention
+
+| Prefix | Semantics | Source |
+|---|---|---|
+| `main` | 通用本体基线，所有类型空间共享的基础能力 | origin pull |
+| `type/<name>` | 上游维护的类型本体（如 type/coding、type/content、type/hr） | 从 main 衍生，上游维护 |
+| `type/<user>/<name>` | 用户自建的类型本体 | 用户从 main 或 type/* 衍生 |
+| `space/<user>/<name>` | 空间实例本体，绑定到特定 space，`<name>` 为空间所在目录名 | 从 type/* 或 main 衍生，space init 时创建 |
+| `contribute/<target>/<topic>` | 贡献分支，用于向上游提交 PR | 临时，PR 合并后删除 |
+| `feature/<name>` | 开发分支，dev-flow worktree 使用 | 临时，合并后删除 |
+
+#### Topology
+
+```
+origin (wopal-cn/ontology)
+  ├── main                ← 通用基线
+  ├── type/coding         ← 编码类型本体
+  ├── type/content        ← 自媒体类型本体
+  └── type/hr             ← 人力资源类型本体
+
+~/.wopal/ontologies/wopal-space-ontology/  (本地克隆)
+  ├── main                ← origin/main 镜像
+  ├── type/coding         ← origin/type/coding 镜像
+  ├── type/sampx/content  ← 用户自建类型本体
+  ├── space/sampx/wopal-workspace  ← 空间实例（基于 type/coding）
+  └── space/sampx/media-space     ← 另一个空间实例（基于 type/content）
+
+<space>/.wopal/           ← 对应 space/<user>/<name> 分支的 worktree
+```
+
+#### Mode: Clone vs Fork
+
+Clone 是降低使用门槛的默认模式，fork 作为可选替代保留：
+
+| 模式 | origin 指向 | 启动方式 | push 能力 |
+|---|---|---|---|
+| Clone（默认） | wopal-cn/ontology（上游） | `wopal space init` | 无直接 push，贡献走 auto-fork PR |
+| Fork | `<user>/wopal-space-ontology`（用户 fork） | `wopal space init --fork` | 可 push 到 fork |
+
+两种模式下分支命名和同步操作完全一致。
+
+#### 同步操作
+
+`wopal ontology` 命令族提供统一的同步接口，设计为 agent 与人类均可使用：
+
+| 命令 | 操作 | 说明 |
+|---|---|---|
+| `list` | 列出所有已注册的 ontology（上游 URL、本地路径、模式、被哪些空间使用） | 全局视图，不需 effective space |
+| `status` | 读取分支状态（ahead/behind、未提交变更） | agent 解读结构化输出后与用户讨论 |
+| `save [-m]` | 提交 worktree 变更 | 纯本地操作 |
+| `update` | 拉取 type 分支更新到 space 分支 | fetch origin + merge |
+| `sync --from A --to B` | 本地分支间合并 | 带删除检测安全校验 |
+| `contribute` | 从分支精选 commits → auto-fork PR | 贡献回上游 |
+
+**Agent 工作流模式**：CLI 输出清晰 Markdown 格式，agent 解读后与用户讨论选择哪些变更同步、贡献哪些 commits，再构造精确 CLI 命令执行。CLI 不做自主决策。
+
+#### baseBranch 约束
+
+空间实例在 `space init` 时记录其衍生来源 `baseBranch`，存储于空间注册表。`baseBranch` 仅允许 `main` 或 `type/*`，禁止指向 `space/*` 或其他分支类型。
+
+#### 安全机制
+
+`sync` 操作自动检测源分支是否删除了目标分支上存在的文件，发现时警告但不阻断——合并决策由用户或 agent 判断。
 
 ---
 
