@@ -64,6 +64,24 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 6. **rook 门禁**：Plan 审查（submit 前）和实施审查（complete 前）必须委派 rook，rook PASS 才能推进。最多 3 轮修订。
 7. **Plan 语言与结构**：Plan 文档正文使用用户偏好语言编写，章节标题保持英文（与模板一致）。禁止混用中英文标题。
 
+## Plan Task 字段要求
+
+写 Plan 时每个 Task 必须包含以下字段（按顺序），详见 `references/plan-guide.md`：
+
+| Field | Required | Format |
+|-------|----------|--------|
+| Verification Intent | ✅ | AC#N |
+| Behavior | ✅ TDD=true | 输入 → 输出映射 |
+| Files | ✅ | `path/to/file` |
+| Pre-read | ✅ | 文件路径或 N/A |
+| Design | ✅ | 完整实施设计（非空） |
+| TDD | ✅ | true / false |
+| Changes | ✅ | 编号列表（禁止 checkbox） |
+| Verify | ✅ | 可执行命令 |
+| Done | ✅ | 产出描述 + 1 个 checkbox |
+
+**提交前必跑**：`flow.sh plan check <name>`
+
 ## Plan 定位
 
 当用户提到某个 Plan 名称（如 `155-enhance-dev-flow`）时，**必须**用脚本定位，**严禁** `grep`、`glob`、`read` 在空间内盲目搜索。
@@ -266,8 +284,11 @@ flow.sh archive <issue>
 | 优先 `wopal_task` | 委派时必须优先用 `wopal_task`，不可用时才用 Task |
 | 委派前检查 | 加载记忆"委派"、检查路径（基于空间根的相对路径）、确认项目上下文 |
 | 活动 Plan 路径 | 委派 prompt 使用 feature 分支 worktree 中的 Plan 路径 |
-| Done checkbox 指令 | 委派 fae 的 prompt 必须包含"完成后勾选对应 Task 的 Done checkbox" |
+| Done checkbox 指令 | 委派 fae 的 prompt 必须包含"完成后勾选对应 Task 的 Done checkbox" + "禁止修改 Plan Status" |
 | 树交接失败 | complete 因脏树报错 → 要求 fae 提交代码后重试 |
+| **委派边界** | Plan Task → 委派 fae；单文件小变更（删几行、改配置）→ 直接执行，不委派 |
+| **强依赖处理** | 多 Task 存在强逻辑依赖时，整组委派给单个 fae，禁止拆分导致上下文丢失 |
+| **非 dev-flow 的 rook** | 对话模式下小修小补，委派 rook 前先征得用户同意；dev-flow 中的 rook 审查自动执行 |
 
 ## 不要这样做
 
@@ -287,17 +308,13 @@ flow.sh archive <issue>
 - **手动创建或删除分支** — 分支生命周期由脚本独占：`approve --confirm` 创建，`archive` 删除。Agent 唯一的分支操作是 merge
 - **手动删除工作树** — 工作树由 `verify-switch` 或 `archive` 删除
 - **跳过 `complete` 直接邀用户验证** — 代码提交 + rook PASS 后必须先 `flow.sh complete` 推进到 `verifying`，然后才能进入用户验证。未达 `verifying` 前请求用户验收 = 严重失职
+- **归档时清理未声明的资源** — archive 只处理 Plan metadata 中声明的 Worktree/分支。看到名字相似不等于归属相同，必须确认。误删用户活跃分支 = 严重失职
 
 ## 参考
 
 | 文件 | 用途 |
 |------|------|
 | `references/commands.md` | 命令完整参数与使用模式 |
-| `references/plan-authoring.md` | Plan 质量门、AC、TDD、委派 prompt 格式 |
-| `references/plan-branch-ownership.md` | Plan 分支归属完整说明 |
-| `references/troubleshooting.md` | 错误处理、边缘场景、PR 工作流 |
-| `templates/plan.md` | Plan 骨架模板 |
-| `templates/issue*.md` | 各类型 Issue 模板 |
-| `references/plan-validation.md` | Plan 校验规则 |
-| `references/tdd-guide.md` | TDD Task 编写指南 |
-| `references/issue-format.md` | Issue 标题、Plan 命名规范 |
+| `references/plan-guide.md` | Plan 编写详细指导：TDD、AV/UV 规则、Metadata、委派 prompt、分支归属 |
+| `references/issue-guide.md` | Issue 编写指南：标题格式、body 结构、同步规则、Plan 命名 |
+| `references/troubleshooting.md` | 错误处理、边缘场景 |

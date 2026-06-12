@@ -2,46 +2,16 @@
 
 ## Metadata
 
-{issue_line}
-{type_line}
-{project_line}
-{product_line}
-{phase_line}
-{project_path_line}
-{project_type_line}
+- **Issue**: #{issue}
+- **Type**: {type}
+- **Target Project**: {project}
+- **Product**: {product}
+- **Phase**: {phase}
+- **Project Path**: {path}
+- **Project Type**: {ptype}
 - **Created**: {date}
 - **Status**: planning
 
-<!--
-  ⚠️ Project Path 与 Project Type 字段说明：
-  
-  **Project Path**（标准项目必填，ontology-worktree 自动填充）：
-  - 标准项目：`projects/<name>/`（如 `projects/gesp/`）
-  - ontology-worktree：`.wopal/`
-  
-  **Project Type**：
-  - 标准项目：`standard`
-  - ontology-worktree：`ontology-worktree`
-  
-  查询来源：`.wopal-space/STRUCTURE.md`
--->
-
-<!--
-  ⚠️ WorktreeContext（approve --confirm 后自动注入，格式如下）：
-  
-  - **Worktree**:
-    - enabled: true
-    - project_type: standard          # standard | ontology-worktree
-    - branch: feature/issue-N-slug    # worktree 分支
-    - path: .worktrees/<project>-issue-<N>-<slug>
-    - repo_root: <absolute path to git repo>
-    - base_branch: main               # 创建时的基线分支
-    - merge_target: main              # 验证通过后合并的目标分支
-    - verify_mode: direct             # direct (standard) | switch-runtime (ontology)
-    - cleanup_policy: archive         # archive | pr-opened | manual
-  
-  使用 `--no-worktree` 跳过 worktree 时不会注入此块。
--->
 
 ## Scope Assessment
 
@@ -54,60 +24,29 @@
 
 ## Technical Context
 
-<!--
-  ⚠️ Technical Context 由以下 4 个子节组成（均为可选，至少填写一个）。
-  根据任务复杂度选择填写的子节：简单任务只填 Architecture Context 即可。
--->
+<!-- 4 个子节均为可选，至少填写一个。简单任务只填 Architecture Context 即可。 -->
 
 ### Architecture Context
 
-<!--
-  当前架构现状、涉及模块、为什么需要变更。
-  描述系统边界和变更影响范围。
--->
+<!-- 当前架构现状、涉及模块、为什么需要变更。 -->
 <当前架构描述，涉及模块，为什么需要变更>
 
 ### Research Findings
 
-<!--
-  ⚠️ 前期研究结论摘要。
-  确保后续审阅者可追溯到原始研究材料。
-
-  ⚠️ 参考资料只放上下文文档——Plan 实施时需要理解的外部约束和前置上下文。
-  不是实施目标文档，不是被修改的源文件，不是项目配置文件。
-
-  ✅ 应该放：
-  - 父级产品架构文档（如 docs/products/<product>/DESIGN-<product>.md）
-  - 产品阶段文档（如 docs/products/<product>/phases/<product>-p1-xxx.md）
-  - 上游依赖 Plan（如本 Plan 依赖的其他项目 Plan）
-  - 外部规范/标准文档
-
-  ❌ 不应该放：
-  - 本项目的 DESIGN.md（这是实施目标，已通过 Architecture Context 引用）
-  - 本 Plan 要修改的源文件（已在 Affected Files 表中列出）
-  - 项目配置文件（package.json 等）
-  - 运行时实例文件（.wopal-space/ 下的 STRUCTURE.md、REGULATIONS.md 等）
--->
+<!-- 前期研究结论摘要。参考资料只放上下文文档，不放本项目 DESIGN、源文件、配置文件。 -->
 <研究结论摘要>
 
 **参考资料**：
-<!-- 只放上下文文档：父级架构、阶段文档、依赖 Plan、外部规范。不放本项目 DESIGN、源文件、配置文件、运行时实例。 -->
 - `<上下文文档路径>`
 
 ### Key Decisions
 
-<!--
-  已确定的技术决策，使用 D-NN 编号格式。
-  每条决策说明决策内容及其理由。
--->
+<!-- 已确定的技术决策，使用 D-NN 编号格式。 -->
 - D-01: <决策内容及理由>
 
 ### Key Interfaces
 
-<!--
-  关键类型/接口定义、模块间契约。
-  代码块示例或类型签名。
--->
+<!-- 关键类型/接口定义、模块间契约。 -->
 <关键接口定义>
 
 ## In Scope
@@ -123,28 +62,6 @@
 
 - <本次不做的内容及原因>
 
-## Business Rules Impact
-
-<!--
-  ⚠️ Plan 编写时检查是否影响业务规则。
-  1. 读取 `projects/{project}/docs/BUSINESS_RULES.md`（如存在）
-  2. 判断本次改动是否引入新业务约束或修改已有规则判定条件
-  3. 引用 BR 编号而非重写规则全文
-  4. 纯技术重构、bug 修复（无新业务约束）时写 "N/A — 无业务规则变更"
--->
-
-### 新增
-<!-- BR-NNN: {规则描述} -->
-
-### 修改
-<!-- BR-NNN: {旧值} → {新值}（原因） -->
-
-### 废弃
-<!-- BR-NNN: {废弃原因} -->
-
-### 同步确认
-- [ ] 已将上述变更同步到 `BUSINESS_RULES.md`
-
 ## Affected Files
 
 | Component | Files | Operation | Role |
@@ -153,56 +70,17 @@
 
 ## Acceptance Criteria
 
-<!--
-  ⚠️ Acceptance Criteria 位于 Implementation 之前。
-  审阅者在掌握全部上下文后、进入实现细节前，先看到成功标准。
-  这是 readability 设计，不是 TDD 执行机制——TDD 约束在 Task 级别生效。
--->
+<!-- 审阅者先看成功标准，再看实现细节。详见 plan-guide.md 的 AV/UV 规则。 -->
 
 ### Agent Verification
 
-<!--
-  ⚠️ Agent 可自动验证的项。每条必须写具体命令和预期输出。
-
-  **格式要求**："命令 → 预期输出"
-  - ✅ `rg -c 'pattern' file` ≥ 1（字段存在）
-  - ✅ `python -m pytest tests/ -v` 全部 pass
-  - ❌ "代码构建通过"（纯描述，不可执行）
-  - ❌ "单元测试通过"（纯描述，不可执行）
-
-  **承载范围**：同时承载单 Task 内验证和跨 Task 集成验证。
-  原 Test Plan 中可自动化的验证项统一归入此处。
-
-  flow.sh complete 会校验此子章节的 checkbox 是否全部勾选。
--->
+<!-- 每条必须写可执行命令。禁止纯描述。详见 plan-guide.md。 -->
 1. [ ] <可执行命令 1：如 `rg -c '### Architecture Context' templates/plan.md` ≥ 1>
 2. [ ] <可执行命令 2：如 `python -m pytest tests/ -v` 全部 pass>
 
 ### User Validation
 
-<!--
-  ⚠️ 用户人工感知验证项。
-
-  **必须遵守以下结构**（每个场景）：
-  - Scenario 标题（#### Scenario N: <简短描述>）
-  - Goal: 本次变更后用户能感知到什么行为差异
-  - Precondition: 验证前的前置状态
-  - User Actions: 用户操作步骤
-  - Expected Result: 用户可观察到的结果
-
-  **排除规则**：禁止放入 Agent 可自动验证的项：
-  - ❌ 编译 / 构建（npm build, cargo build, tsc ...）
-  - ❌ 单元测试 / 集成测试（npm test, pytest, bun test ...）
-  - ❌ Lint / 格式化（eslint, prettier, ruff ...）
-  - ❌ CLI 自测（任何 Agent 可在终端执行的命令）
-
-  此节只含人工感知验证：UI / UX、交互体验、业务流程、视觉确认。
-
-  **最终确认 checkbox**：
-  - 下方唯一的 checkbox 是 verify --confirm 的硬 gate
-  - 只有用户本人在实际完成场景验证后才能勾选
-  - Agent 禁止代为勾选（违反 = 严重失职）
--->
+<!-- 用户人工感知验证项。禁止放入 Agent 可自动验证的项。详见 plan-guide.md。 -->
 
 #### Scenario 1: <本次变更影响的可感知行为>
 - Goal: <确认什么行为差异>
@@ -216,16 +94,7 @@
 
 ## Implementation
 
-<!--
-  ⚠️ 每个 Task 按以下字段顺序排列（TDD 驱动）：
-  Verification Intent → Behavior → Files → Pre-read → Design → TDD → Changes → Verify → Done
-
-  关键约束：
-  - **Behavior** 在 **Design** 之前：先定义"什么是对的"，再写实现设计
-  - **Changes** 使用编号列表（1. 2. 3.），禁止使用 checkbox 格式
-  - **Done** 是每个 Task 中唯一的 checkbox，Agent 运行 Verify 命令通过后才可打勾
-  - **每 Task 仅 1 次 Plan 编辑**：Done 打勾。无其他 checkbox。
--->
+<!-- 每个 Task 按字段顺序排列（TDD 驱动）。详细指导见 plan-guide.md。 -->
 
 ### Task 1: Task Title
 
@@ -238,93 +107,36 @@
 **Pre-read**: <实施前需阅读的文件路径，无必要可写 N/A>
 
 **Design**:
-<!--
-  ⚠️ 完整实施设计（必填）。
-  包含技术方案、关键实现思路、需要注意的约束。
-  必须在 Behavior 之后。
--->
+<!-- 完整实施设计（必填）。在 Behavior 之后。 -->
 <完整实施设计>
 
 **TDD**: true
 
-<!--
-  TDD 标记说明：
-  - true（默认）：代码 Task，Changes 按 RED → GREEN → REFACTOR 组织，Behavior 必填
-  - false：非代码 Task（UI 布局、配置变更、胶水代码、探索性原型），需在注释中说明理由
-  - 参考 references/tdd-guide.md 判断是否适合 TDD
--->
+<!-- true：代码 Task，Behavior 必填；false：非代码 Task，需说明理由。 -->
 
 **Changes**:
-<!--
-  ⚠️ 使用编号列表格式（1. 2. 3.），无 checkbox。
-  禁止使用 `- [ ] Step N:` 格式。
--->
+<!-- 编号列表格式，禁止 checkbox。 -->
 1. <具体改动点 1>
 2. <具体改动点 2>
 
 **Verify**:
-<!--
-  ⚠️ 必填。Agent 可自动执行的验证命令。
-  格式：shell 命令（如 `rg -c 'pattern' file`）或 `Manual — 理由`（纯人工验证场景）。
-  Agent 必须运行 Verify 命令看到 exit 0 后才能勾选 Done checkbox。
--->
+<!-- 可执行命令。Agent 必须运行看到 exit 0 后才能勾选 Done。 -->
 <验证命令，如 `rg -c 'pattern' file` ≥ 1>
 
 **Done**:
-<!--
-  ⚠️ 任务产出说明（一句话描述）+ 唯一 checkbox。
-  Agent 运行 Verify 命令通过后才可打勾。
-  这是每个 Task 中唯一的 checkbox。
--->
+<!-- 任务产出说明 + 要求委派的子 agent 实施后勾选, 每完成一个 task  后提交 git。 -->
 任务产出：<一句话描述本 Task 产出>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
 
 ## Delegation Strategy
 
 <!--
-  ⚠️ 委派策略规范：
-
-  **何时必须填写**：
-  - Plan 有 2+ Task 或 Complexity = High 时必须填写
-  - 单一 Task + Complexity ≠ High 时可写 N/A
-
-  **Wave 分配规则**（与 WSF 对齐）：
-  - 用 wave 代替批次编号，同 wave 内 Task 并行执行（files 不交集）
-  - 高 wave 依赖低 wave 的产出
-
-  **默认委派规则**：
-  - Wopal 是主控 Agent：所有实施类 Task 默认委派 fae 执行
-  - Wopal 的职责：Plan 切片 → 委派 fae → 验证产出 → 推进下一 Wave
-  - 只有以下例外可由 Wopal 直接执行（需在委派理由中说明）：
-    - 极小收尾工作（如勾选 checkbox、同步 Issue body、修改 Plan 文档状态）
-    - 非代码操作（如更新记忆、纯审查确认）
-  - "代码复杂"或"需谨慎"不是跳过委派的理由 — 越复杂的任务越应该委派
-
-  **Autonomous 标记**：
-  - 每个 Task 需说明是否含 checkpoint
-  - 含 checkpoint 则标记 autonomous: false 并在 fae prompt 中明确停止点
-
-  **强依赖处理**：
-  - 多个 Task 存在强逻辑依赖时整组委派给单个 fae（不拆分）
-  - 在 prompt 中明确执行顺序
-
-  **步骤上限**：单个委派任务 ≤30 步
-
-  **Wave 间门控**：
-  - 每 wave 完成后 Wopal 运行 Verify 命令验证产出
-  - 通过后才释放下一 wave
-
-  **委派 prompt 必含项**：
-  - 每次委派 fae 执行 Task 时，prompt 末尾必须附加勾选 Done 指令：
-    `完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<绝对路径>`
-  - 这是结构性保障，缺少此指令 = fae 不会主动更新 Plan
+  Plan 有 2+ Task 或 Complexity = High 时必须填写。单一 Task 可写 N/A。
+  用 wave 划分并行批次，高 wave 依赖低 wave。详见 plan-guide.md。
 -->
 
 | Wave | Task | 执行者 | 依赖 | 委派理由 |
 |------|------|--------|------|---------|
 | 1 | Task 1 | fae | 无 | <委派理由> |
-| _ | _ | _ | _ | _ |
-
-<!-- 或简单填写：N/A — 单一任务，无需并行委派 -->
