@@ -16,28 +16,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-# archive.py has heavy imports (plan, workflow, issue, lib.*).
-# Mock them before importing to avoid circular imports / side effects.
-for mod in [
-    "lib.logging", "lib.workspace", "lib.git", "lib.worktree", "lib.project",
-    "workflow", "plan", "issue",
-]:
-    sys.modules.setdefault(mod, MagicMock())
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts" / "commands"))
-from archive import (
+from commands.archive import (
     _update_phase_doc_plan_status,
     _detect_worktree,
     _PHASE_TABLE_HEADER,
     _PHASE_TABLE_SEP,
 )
-
-# Restore real logging for the function (used internally)
-from lib.logging import log_info, log_warn, log_success
-archive_mod = sys.modules["archive"]
-archive_mod.log_info = log_info
-archive_mod.log_warn = log_warn
-archive_mod.log_success = log_success
 
 
 def _make_phase_doc(path: Path, rows: list[tuple[str, str, str]]) -> None:
@@ -79,9 +63,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- happy path: update status to done ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_updates_status_to_done(self, mock_ok, mock_warn, mock_info):
         phases = self._create_phase_dir()
         doc = phases / "wopal-space-p1-one-click.md"
@@ -104,9 +88,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- skip: Product missing ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_skip_when_product_missing(self, mock_ok, mock_warn, mock_info):
         result = _update_phase_doc_plan_status(
             self.ws_root, "some-plan", "", "p1",
@@ -120,9 +104,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- skip: Phase missing ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_skip_when_phase_missing(self, mock_ok, mock_warn, mock_info):
         result = _update_phase_doc_plan_status(
             self.ws_root, "some-plan", "wopal-space", "",
@@ -136,9 +120,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- warn: phase doc not found ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_warn_when_phase_doc_not_found(self, mock_ok, mock_warn, mock_info):
         self._create_phase_dir()  # empty phases dir
         result = _update_phase_doc_plan_status(
@@ -152,9 +136,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- warn: plan row not found in table ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_warn_when_plan_not_in_table(self, mock_ok, mock_warn, mock_info):
         phases = self._create_phase_dir()
         doc = phases / "wopal-space-p1-one-click.md"
@@ -176,9 +160,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- warn: phases directory does not exist ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_warn_when_phases_dir_missing(self, mock_ok, mock_warn, mock_info):
         result = _update_phase_doc_plan_status(
             self.ws_root, "some-plan", "nonexistent-product", "p1",
@@ -191,9 +175,9 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
 
     # ---- no table in doc ----
 
-    @patch("archive.log_info")
-    @patch("archive.log_warn")
-    @patch("archive.log_success")
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
     def test_warn_when_no_table_in_doc(self, mock_ok, mock_warn, mock_info):
         phases = self._create_phase_dir()
         doc = phases / "wopal-space-p1.md"
@@ -242,7 +226,7 @@ class TestDetectWorktree(unittest.TestCase):
             f"  - path: {wt_path}\n"
         )
 
-    @patch("archive.get_plan_worktree")
+    @patch("commands.archive.get_plan_worktree")
     def test_returns_metadata_when_worktree_path_exists(self, mock_gpw):
         """Sanity: when path exists, metadata is returned as-is."""
         wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-my-feature"
@@ -257,7 +241,7 @@ class TestDetectWorktree(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["branch"], "my-feature")
 
-    @patch("archive.get_plan_worktree")
+    @patch("commands.archive.get_plan_worktree")
     def test_returns_metadata_when_worktree_path_missing(self, mock_gpw):
         """Regression: path cleaned up by verify-switch must not erase
         branch metadata — the feature branch still needs deletion."""
@@ -274,7 +258,7 @@ class TestDetectWorktree(unittest.TestCase):
         self.assertIsNotNone(result, "must return metadata even when path is gone")
         self.assertEqual(result["branch"], "my-feature")
 
-    @patch("archive.get_plan_worktree")
+    @patch("commands.archive.get_plan_worktree")
     def test_returns_none_when_no_metadata_and_no_glob_match(self, mock_gpw):
         mock_gpw.return_value = None
 

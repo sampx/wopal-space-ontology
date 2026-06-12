@@ -137,7 +137,7 @@ def _get_git_porcelain(cwd: str) -> list[str]:
     return get_dirty_lines(cwd)
 
 
-def _print_standard_verification_guidance(wt_ctx, issue, workspace_root) -> None:
+def _print_standard_verification_guidance(wt_ctx, issue, workspace_root, plan_path) -> None:
     """Print verification options for standard projects.
 
     Shows both worktree-verify and branch-switch options with canonical path status.
@@ -146,7 +146,11 @@ def _print_standard_verification_guidance(wt_ctx, issue, workspace_root) -> None
 
     assert isinstance(wt_ctx, WorktreeContext)
 
-    repo_root = str(wt_ctx.repo_root)
+    # Get repo_root from Plan metadata Project Path
+    project = get_plan_field(plan_path, "Target Project")
+    repo_path = resolve_project_path(plan_path, project, workspace_root)
+    repo_root = str(repo_path) if repo_path else ""
+
     worktree_path = str(workspace_root / wt_ctx.path) if not Path(wt_ctx.path).is_absolute() else str(wt_ctx.path)
 
     # Check canonical path dirty status
@@ -396,10 +400,11 @@ def cmd_complete(args: argparse.Namespace) -> int:
         # Verification guidance — print canonical path status and options
         try:
             wt_ctx = parse_worktree_context(plan_path)
-            if wt_ctx and wt_ctx.project_type == "ontology-worktree":
+            project_type = get_plan_field(plan_path, "Project Type") or "standard"
+            if wt_ctx and project_type == "ontology-worktree":
                 _print_ontology_verification_guidance(wt_ctx, next_ref, workspace_root)
             elif wt_ctx:
-                _print_standard_verification_guidance(wt_ctx, next_ref, workspace_root)
+                _print_standard_verification_guidance(wt_ctx, next_ref, workspace_root, plan_path)
         except Exception as e:
             log_warn(f"Failed to generate verification guidance: {e}")
 

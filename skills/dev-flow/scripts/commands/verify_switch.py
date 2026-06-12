@@ -13,7 +13,7 @@ from lib.git import commit_paths, get_dirty_lines, get_relative_path
 from lib.workspace import find_workspace_root, get_ontology_main_repo
 from lib.worktree import parse_worktree_context
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
-from plan import find_plan, get_plan_field
+from plan import find_plan, get_plan_field, get_plan_project_path, resolve_project_path
 
 
 
@@ -183,10 +183,13 @@ def _switch_ontology(
         True if switch succeeded
     """
     wopal_dir = workspace_root / ".wopal"
-    repo_root = str(wt_ctx.repo_root)
     branch = wt_ctx.branch
-    merge_target = getattr(wt_ctx, "merge_target", "space/main")
+    merge_target = "space/main"
     wt_path = str(_resolve_wt_path(wt_ctx.path, workspace_root))
+
+    # Get repo_root from ontology main repo for guidance message
+    main_repo = get_ontology_main_repo(workspace_root)
+    repo_root = str(main_repo) if main_repo else str(wopal_dir)
 
     # 1. Check dirty on .wopal/
     dirty_files = _check_dirty(str(wopal_dir))
@@ -248,10 +251,17 @@ def _switch_standard(
     Returns:
         True if switch succeeded
     """
-    repo_root = str(wt_ctx.repo_root)
     branch = wt_ctx.branch
     wt_path = str(_resolve_wt_path(wt_ctx.path, workspace_root))
-    merge_target = getattr(wt_ctx, "merge_target", "main")
+    merge_target = "main"
+
+    # Get repo_root from Plan metadata (Project Path)
+    project = get_plan_field(plan_path, "Target Project")
+    repo_path = resolve_project_path(plan_path, project, workspace_root)
+    if not repo_path:
+        log_error(f"Cannot resolve project path from Plan metadata")
+        return False
+    repo_root = str(repo_path)
 
     # 1. Fetch
     if not _git_fetch(repo_root):

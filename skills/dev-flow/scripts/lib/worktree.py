@@ -29,26 +29,17 @@ from lib.project import resolve_plan_location
 class WorktreeContext:
     """Structured worktree configuration stored in Plan metadata.
 
-    Fields:
-        enabled: Whether worktree isolation is active
-        project_type: "standard" or "ontology-worktree"
+    Minimal fields written by write_worktree_context:
         branch: Worktree branch name
         path: Worktree directory path (relative to workspace root)
-        repo_root: Git repo root for the worktree
-        base_branch: Branch the worktree was created from
-        merge_target: Target branch for merging (usually same as base_branch)
-        verify_mode: "direct" (standard) or "switch-runtime" (ontology-worktree)
-        cleanup_policy: "archive" (auto-cleanup) or "manual"
+        project_type: "standard" or "ontology-worktree" (from Plan metadata)
+
+    Other info read from Plan Metadata:
+        Project Path: repo root path (used instead of repo_root)
     """
-    enabled: bool
-    project_type: str  # "standard" | "ontology-worktree"
     branch: str
     path: Path
-    repo_root: Path
-    base_branch: str
-    merge_target: str
-    verify_mode: str  # "direct" | "switch-runtime"
-    cleanup_policy: str  # "archive" | "manual"
+    project_type: str = "standard"  # "standard" | "ontology-worktree"
 
 
 def _worktree_field_name(field: str) -> str:
@@ -81,38 +72,20 @@ def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
     # Try new structured format first
     ctx = _parse_structured_worktree(content)
     if ctx is not None:
+        # Read project_type from Plan metadata if not in WorktreeContext
         if ctx.project_type == 'standard':
             meta_type = _read_plan_project_type(content)
             if meta_type and meta_type != 'standard':
-                ctx = WorktreeContext(
-                    enabled=ctx.enabled,
-                    project_type=meta_type,
-                    branch=ctx.branch,
-                    path=ctx.path,
-                    repo_root=ctx.repo_root,
-                    base_branch=ctx.base_branch,
-                    merge_target=ctx.merge_target,
-                    verify_mode=ctx.verify_mode,
-                    cleanup_policy=ctx.cleanup_policy,
-                )
+                ctx.project_type = meta_type
         return ctx
 
     # Fallback to legacy format: "- **Worktree**: branch | path"
     ctx = _parse_legacy_worktree(content)
     if ctx is not None:
+        # Read project_type from Plan metadata
         meta_type = _read_plan_project_type(content)
         if meta_type:
-            ctx = WorktreeContext(
-                enabled=ctx.enabled,
-                project_type=meta_type,
-                branch=ctx.branch,
-                path=ctx.path,
-                repo_root=ctx.repo_root,
-                base_branch=ctx.base_branch,
-                merge_target=ctx.merge_target,
-                verify_mode=ctx.verify_mode,
-                cleanup_policy=ctx.cleanup_policy,
-            )
+            ctx.project_type = meta_type
         return ctx
 
     return None
@@ -166,15 +139,9 @@ def _parse_structured_worktree(content: str) -> WorktreeContext | None:
     # Build WorktreeContext from parsed kv
     try:
         return WorktreeContext(
-            enabled=kv.get('enabled', 'false').lower() == 'true',
-            project_type=kv.get('project_type', 'standard'),
             branch=kv.get('branch', ''),
             path=Path(kv.get('path', '')),
-            repo_root=Path(kv.get('repo_root', '')),
-            base_branch=kv.get('base_branch', 'main'),
-            merge_target=kv.get('merge_target', kv.get('base_branch', 'main')),
-            verify_mode=kv.get('verify_mode', 'direct'),
-            cleanup_policy=kv.get('cleanup_policy', 'archive'),
+            project_type=kv.get('project_type', 'standard'),
         )
     except Exception:
         return None
@@ -199,15 +166,9 @@ def _parse_legacy_worktree(content: str) -> WorktreeContext | None:
         return None
 
     return WorktreeContext(
-        enabled=True,
-        project_type='standard',
         branch=branch,
         path=Path(wt_path),
-        repo_root=Path(''),
-        base_branch='main',
-        merge_target='main',
-        verify_mode='direct',
-        cleanup_policy='archive',
+        project_type='standard',
     )
 
 

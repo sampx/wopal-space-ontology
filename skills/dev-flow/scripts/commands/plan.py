@@ -255,48 +255,26 @@ def create_plan_from_template(
     
     template_content = template_path.read_text()
     
-    # Build metadata lines
-    if issue_number:
-        issue_line = f"- **Issue**: #{issue_number}"
-    else:
-        issue_line = ""  # Empty for no-issue mode
-    
-    type_line = f"- **Type**: {plan_type}"
-    project_line = f"- **Target Project**: {project}"
-    
-    # Project path and type lines (for ontology-worktree projects)
-    if project_path:
-        project_path_line = f"- **Project Path**: {project_path}"
-    else:
-        project_path_line = ""
-    
-    if project_type:
-        project_type_line = f"- **Project Type**: {project_type}"
-    else:
-        project_type_line = ""
-
-    # Product and phase lines
-    if product:
-        product_line = f"- **Product**: {product}"
-    else:
-        product_line = ""
-
-    if phase:
-        phase_line = f"- **Phase**: {phase}"
-    else:
-        phase_line = ""
+    # Build metadata values (just the value part, not the full line)
+    issue_value = str(issue_number) if issue_number else ""
+    type_value = plan_type
+    project_value = project
+    project_path_value = project_path or ""
+    project_type_value = project_type or ""
+    product_value = product or ""
+    phase_value = phase or ""
 
     created_date = date.today().strftime("%Y-%m-%d")
     
-    # Replace placeholders
+    # Replace placeholders (template shows the full markdown format)
     content = template_content.replace("{plan_name}", plan_name)
-    content = content.replace("{issue_line}", issue_line)
-    content = content.replace("{type_line}", type_line)
-    content = content.replace("{project_line}", project_line)
-    content = content.replace("{project_path_line}", project_path_line)
-    content = content.replace("{project_type_line}", project_type_line)
-    content = content.replace("{product_line}", product_line)
-    content = content.replace("{phase_line}", phase_line)
+    content = content.replace("{issue}", issue_value)
+    content = content.replace("{type}", type_value)
+    content = content.replace("{project}", project_value)
+    content = content.replace("{path}", project_path_value)
+    content = content.replace("{ptype}", project_type_value)
+    content = content.replace("{product}", product_value)
+    content = content.replace("{phase}", phase_value)
     content = content.replace("{date}", created_date)
     
     # Handle --deep and --prd placeholders if present in template
@@ -310,14 +288,22 @@ def create_plan_from_template(
     elif "{prd_path}" in content:
         content = content.replace("{prd_path}", "")
     
-    # Remove empty lines in metadata section (when lines are empty)
+    # Remove metadata lines with empty values (optional fields)
+    # Pattern: "- **Field**: " with nothing after the colon+space
+    content = re.sub(
+        r'^\s*-\s+\*\*[^*]+\*\*:\s*$',
+        '',
+        content,
+        flags=re.MULTILINE,
+    )
+    
+    # Collapse consecutive empty lines
     lines = content.split("\n")
     cleaned_lines = []
     prev_empty = False
     
     for line in lines:
         is_empty = line.strip() == ""
-        # Skip consecutive empty lines
         if is_empty and prev_empty:
             continue
         cleaned_lines.append(line)
