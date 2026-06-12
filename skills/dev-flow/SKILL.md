@@ -8,6 +8,55 @@ description: |
 
 # dev-flow — Issue / Plan 驱动开发流程
 
+## 脚本执行
+
+所有 `flow.sh` 命令必须从本技能根目录执行：
+
+- **workdir**: `.wopal/skills/dev-flow/`
+- **命令格式**: `bash scripts/flow.sh <command> [args]`
+
+本文档中所有 `flow.sh xxx` 引用（如 `flow.sh plan new`、`flow.sh complete`、`flow.sh verify-switch`）均按此方式执行。禁止 `source`、禁止绝对路径直接调用、禁止在非技能目录下执行。
+
+## 命令速查
+
+详细参数和边缘场景见 `references/commands.md`。
+
+### 状态机推进
+
+| 命令 | 场景 | 说明 |
+|------|------|------|
+| `plan new <issue>` | 创建 Plan | Issue 驱动；无 Issue 用 `--title --project --type` |
+| `plan status <name>` | 查看 Plan 状态 | 含状态机位置、关联 Issue、worktree 信息 |
+| `plan list [--issue]` | 浏览活跃 Plan | `--issue` 含 GitHub Issues 合并展示 |
+| `plan check <name>` | 校验 Plan 质量 | submit 前必走 |
+| `submit <plan>` | planning → reviewing | 提交人工审阅 |
+| `approve <plan> --confirm` | reviewing → executing | 用户审批，默认创建 worktree；`--no-worktree` 跳过 |
+| `complete <plan>` | executing → verifying | 实施完成，进入用户验证；脏树报错退出 |
+| `verify <plan> --confirm` | verifying → done | 用户验证通过；需先 merge feature → 集成分支 |
+| `archive <plan>` | done → 归档 | 归档 Plan、清理 worktree 和 feature 分支 |
+
+### 验证辅助
+
+| 命令 | 场景 | 说明 |
+|------|------|------|
+| `verify-switch <plan>` | 需在规范路径验证 | 移除 worktree + checkout feature 分支 |
+
+### Issue 管理
+
+| 命令 | 场景 | 说明 |
+|------|------|------|
+| `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue | `--body-file` 为主路径 |
+| `issue write <issue> --body-file <path>` | 全量替换 Issue body | |
+| `sync <plan> [--body-only\|--labels-only]` | Plan → Issue 同步 | Plan 内容变更后必走 |
+
+### 其他
+
+| 命令 | 场景 | 说明 |
+|------|------|------|
+| `decompose-prd <prd-path>` | 从 PRD 拆分 Issue | `--dry-run` 预览 |
+| `roadmap <prd-path> --product <name>` | 产品阶段规划 | 四阶段工作流 |
+| `reset <plan>` | 重置 Plan | 破坏性，仅用户明确要求时使用 |
+
 ## 心智模型
 
 dev-flow 管理两类产物，它们在 git 中独立演化：

@@ -56,6 +56,7 @@ from validation import ValidationError as CheckDocValidationError
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root, detect_space_repo
 from lib import project as _project_resolver
+from lib.worktree import parse_worktree_meta
 from workflow import PLAN_STATES
 
 
@@ -670,7 +671,8 @@ def _cmd_plan_status(input_ref: str) -> int:
         return 1
 
     plan_name = Path(plan_file).stem
-    metadata = _get_plan_metadata(plan_file)
+    active_plan_file = _resolve_active_plan_for_display(Path(plan_file), workspace_root)
+    metadata = _get_plan_metadata(str(active_plan_file))
 
     status = metadata.get('status', 'draft')
     prd = metadata.get('prd', '')
@@ -707,6 +709,8 @@ def _cmd_plan_status(input_ref: str) -> int:
 
     print(f"Plan: {plan_name}")
     print(f"  File: {plan_file}")
+    if active_plan_file != Path(plan_file):
+        print(f"  Active: {active_plan_file} (worktree)")
     print(f"  Status: {status}")
     print(f"  PRD: {prd or '<none>'}")
     print(f"  Created: {created}")
@@ -763,6 +767,43 @@ def _cmd_plan_status(input_ref: str) -> int:
 # ============================================
 
 
+def _resolve_active_plan_for_display(plan_file: str | Path, workspace_root: Path) -> Path:
+    """Resolve the active Plan path for display and metadata reading.
+
+    When a Plan has a worktree and the worktree copy exists, return the worktree
+    copy (which has the latest status and checkbox progress). Otherwise return
+    the original plan file path.
+
+    Args:
+        plan_file: Path to the integration-branch Plan file.
+        workspace_root: Workspace root path.
+
+    Returns:
+        Path to the active Plan file (worktree copy or original).
+    """
+    plan_path = Path(plan_file) if isinstance(plan_file, str) else plan_file
+
+    wt_meta = parse_worktree_meta(str(plan_path))
+    if wt_meta is None:
+        return plan_path
+
+    wt_rel_path = wt_meta.get("path", "")
+    if not wt_rel_path:
+        return plan_path
+
+    # Compute the repo-relative path of the Plan within its git repo
+    plan_loc = _project_resolver.resolve_plan_location(plan_path, workspace_root)
+    repo_relative = plan_loc.repo_relative_path
+
+    # Construct the worktree Plan path
+    worktree_plan = workspace_root / wt_rel_path / repo_relative
+
+    if worktree_plan.exists():
+        return worktree_plan
+
+    return plan_path
+
+
 def _scan_local_plans(workspace_root: str | Path) -> list[dict]:
     """Scan local Plan files (excluding done/ directories).
 
@@ -795,7 +836,8 @@ def _scan_local_plans(workspace_root: str | Path) -> list[dict]:
                 continue
 
             plan_name = f.stem
-            metadata = _get_plan_metadata(str(f))
+            active_file = _resolve_active_plan_for_display(f, ws)
+            metadata = _get_plan_metadata(str(active_file))
             status = metadata.get('status', 'draft')
             issue_str = metadata.get('issue', '')
 
