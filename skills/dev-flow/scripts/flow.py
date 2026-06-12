@@ -76,7 +76,6 @@ def build_parser() -> argparse.ArgumentParser:
     # Register verify-switch subcommand
     vs_parser = subparsers.add_parser("verify-switch", help="Switch workspace to feature branch for verification")
     vs_parser.add_argument("issue", help="Issue number or plan name")
-    vs_parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
 
     return parser
 
@@ -164,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Dispatch verify-switch
     if args.command == "verify-switch":
-        return 0 if run_verify_switch(args.issue, yes=args.yes) else 1
+        return 0 if run_verify_switch(args.issue) else 1
 
     return 0
 

@@ -162,50 +162,29 @@ agent 必须将其完整传达给用户，由用户选择验证方式。
 
 #### 验证场景
 
-以下四个场景覆盖所有可能的验证路径。Agent 根据用户选择执行对应步骤。
+`complete` 后 agent 必须将验证选项完整呈现给用户，由用户选择验证方式。
+Agent 不得自行决定跳过任何场景。
 
 ##### 场景 1：工作树内验证
 
-适用于 standard 项目（ontology-worktree 不适用：ellamaka 从 `.wopal/` 加载，工作树内无法验证）。
-
-1. `complete` 输出工作树路径 → agent 转发给用户
-2. 用户在工作树目录内验证功能
-3. 用户确认通过后：
-   a. agent 切换到集成分支并 merge：`cd <repo_root> && git checkout main && git pull && git merge <feature_branch>`
-   b. agent 执行 `flow.sh verify <issue> --confirm`
-   c. agent 执行 `flow.sh archive <issue>`
+条件：有 worktree，且项目在 worktree 目录内可独立运行/测试（无路径依赖）。
+流程：用户在 worktree 路径验证 → merge → verify --confirm → archive。
 
 ##### 场景 2：verify-switch 切换验证
 
-适用于 standard 和 ontology-worktree 项目。
-
-1. `complete` 输出 verify-switch 命令 → agent 转发给用户
-2. 用户选择后，agent 执行 `flow.sh verify-switch <issue>`
-   （脚本自动：移除工作树 → checkout feature 分支 → 更新 Plan 元数据 → commit）
-3. 用户在规范路径验证功能
-4. 用户确认通过后：
-   a. agent 切换到集成分支并 merge：`cd <repo_root> && git checkout <集成> && git pull && git merge <feature_branch>`
-   b. agent 执行 `flow.sh verify <issue> --confirm`
-   c. agent 执行 `flow.sh archive <issue>`
+条件：项目有路径依赖（目录结构要求、运行时加载路径、配置文件位置等），
+必须在规范路径（repo 根目录）验证。适用于 standard 和 ontology-worktree 项目。
+流程：agent 执行 `flow.sh verify-switch <issue>`（移除 worktree + checkout feature）→ 用户在规范路径验证 → merge → verify --confirm → archive。
 
 ##### 场景 3：先合并后验证
 
-用户希望直接在集成分支验证。适用于所有项目类型。
+条件：用户希望在集成分支直接验证，无需保留 feature 分支隔离。
+流程：merge → 用户在集成分支验证 → verify --confirm → archive。
 
-1. agent 先完成 merge：`cd <repo_root> && git checkout <集成> && git pull && git merge <feature_branch>`
-2. 用户在集成分支验证功能
-3. 用户确认通过后：
-   a. agent 执行 `flow.sh verify <issue> --confirm`
-   b. agent 执行 `flow.sh archive <issue>`
+##### 场景 4：无 worktree（`--no-worktree`）
 
-##### 场景 4：无工作树（`--no-worktree`）
-
-`approve --confirm --no-worktree` 时，开发和 Plan 都在集成分支上，无 feature 分支。
-
-1. `complete` 后用户直接在集成分支验证
-2. 用户确认通过后：
-   a. agent 执行 `flow.sh verify <issue> --confirm`（无需 merge）
-   b. agent 执行 `flow.sh archive <issue>`
+条件：`approve --confirm --no-worktree` 时全程在集成分支，无 feature 分支。
+流程：用户直接在集成分支验证 → verify --confirm → archive。
 
 #### verify --confirm 内部机制
 

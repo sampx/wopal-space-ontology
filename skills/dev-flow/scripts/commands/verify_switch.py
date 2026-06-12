@@ -3,8 +3,6 @@
 Switches workspace to feature branch for verification:
   - ontology-worktree: git checkout .wopal/ to feature branch
   - standard: git checkout project repo to feature branch + remove worktree
-
-User confirmation is required unless --yes is passed.
 """
 
 import re
@@ -17,26 +15,6 @@ from lib.worktree import parse_worktree_context
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from plan import find_plan, get_plan_worktree, get_plan_field
 
-
-def _confirm_switch(branch: str, target_desc: str) -> bool:
-    """Prompt user to confirm switching to feature branch.
-
-    Args:
-        branch: Feature branch name
-        target_desc: Description of the target directory being switched
-
-    Returns:
-        True if user confirms, False otherwise
-    """
-    try:
-        answer = input(
-            f"Switch {target_desc} to '{branch}' for verification? [y/N] "
-        )
-        return answer.strip().lower() == "y"
-    except EOFError:
-        # Non-interactive environment without --yes
-        log_error("Non-interactive terminal. Use --yes to skip confirmation.")
-        return False
 
 
 def _git_fetch(cwd: str) -> bool:
@@ -83,7 +61,10 @@ def _git_checkout(branch: str, cwd: str) -> bool:
 
 
 def _remove_worktree(repo_root: str, worktree_path: str) -> bool:
-    """Remove a git worktree from the given repository.
+    """Remove a git worktree and prune stale references.
+
+    Uses git worktree remove --force then git worktree prune
+    to ensure complete cleanup (avoids "branch already used by worktree" errors).
 
     Args:
         repo_root: Path to the git repository root
@@ -103,8 +84,17 @@ def _remove_worktree(repo_root: str, worktree_path: str) -> bool:
         text=True,
     )
     if result.returncode != 0:
-        log_warn(f"Failed to remove worktree at {target}: {result.stderr.strip()}")
+        log_error(f"Failed to remove worktree at {target}: {result.stderr.strip()}")
         return False
+
+    # Prune stale worktree references
+    subprocess.run(
+        ["git", "worktree", "prune"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+
     return True
 
 
@@ -209,7 +199,9 @@ def _switch_ontology(
     # 2. Remove worktree from main repo
     main_repo = get_ontology_main_repo(workspace_root)
     if main_repo:
-        _remove_worktree(str(main_repo), wt_path)
+        if not _remove_worktree(str(main_repo), wt_path):
+            log_error("Failed to remove worktree for ontology-worktree switch")
+            return False
 
     # 3. Fetch
     if not _git_fetch(str(wopal_dir)):
@@ -274,7 +266,9 @@ def _switch_standard(
         )
 
     # 3. Remove worktree FIRST
-    _remove_worktree(repo_root, wt_path)
+    if not _remove_worktree(repo_root, wt_path):
+        log_error("Failed to remove worktree for standard project switch")
+        return False
 
     # 4. THEN checkout
     if not _git_checkout(branch, repo_root):
@@ -343,19 +337,17 @@ def _switch_legacy(
     return True
 
 
-def run_verify_switch(issue: str, yes: bool = False) -> bool:
+def run_verify_switch(issue: str) -> bool:
     """Execute the unified verification switch workflow.
 
     Switches workspace to feature branch for verification:
     - Reads Plan Worktree metadata (WorktreeContext preferred, legacy fallback)
     - Determines target directory based on project type
-    - Prompts user for confirmation (skipped with --yes)
     - Executes git fetch + git checkout
     - Standard: cleans up worktree after switch
 
     Args:
         issue: Issue number or plan name
-        yes: If True, skip user confirmation prompt
 
     Returns:
         True if successful
@@ -378,16 +370,6 @@ def run_verify_switch(issue: str, yes: bool = False) -> bool:
     if wt_ctx is not None:
         branch = wt_ctx.branch
         project_type = wt_ctx.project_type
-
-        if project_type == "ontology-worktree":
-            target_desc = ".wopal/ (ontology-worktree)"
-        else:
-            target_desc = f"{wt_ctx.repo_root} (standard project)"
-
-        # User confirmation (skip with --yes)
-        if not yes and not _confirm_switch(branch, target_desc):
-            log_info("Switch cancelled by user.")
-            return False
 
         if project_type == "ontology-worktree":
             return _switch_ontology(workspace_root, wt_ctx, issue, str(plan_path))
@@ -413,7 +395,6 @@ def run_verify_switch(issue: str, yes: bool = False) -> bool:
     # Resolve target directory from Plan metadata
     if legacy_project_type == "ontology-worktree":
         legacy_target = str(workspace_root / ".wopal")
-        target_desc = ".wopal/ (ontology-worktree)"
     else:
         # standard or unknown — default to standard, resolve from Project Path / Target Project
         pp = get_plan_field(plan_path, "Project Path")
@@ -428,12 +409,6 @@ def run_verify_switch(issue: str, yes: bool = False) -> bool:
                 "Missing Project Path and Target Project in Plan metadata."
             )
             return False
-        target_desc = f"{legacy_target} (standard project)"
-
-    # User confirmation (skip with --yes)
-    if not yes and not _confirm_switch(branch, target_desc):
-        log_info("Switch cancelled by user.")
-        return False
 
     return _switch_legacy(
         workspace_root, wt, issue,
@@ -448,12 +423,7 @@ if __name__ == "__main__":
         description="Unified verification switch for dev-flow"
     )
     parser.add_argument("issue", help="Issue number or plan name")
-    parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip confirmation prompt",
-    )
     args = parser.parse_args()
 
-    success = run_verify_switch(args.issue, yes=args.yes)
+    success = run_verify_switch(args.issue)
     exit(0 if success else 1)
