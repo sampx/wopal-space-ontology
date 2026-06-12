@@ -218,11 +218,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     project = get_plan_project(plan_path)
     
     # --- Preflight Check 1: Target Project dirty workspace ---
+    # Exclude Plan file itself from dirty check — approve will commit it as part of state transition
     project_path = resolve_project_path(plan_path, project, workspace_root) if project else None
     dirty_workspace = False
-    
+
     if project_path:
-        dirty_workspace = is_repo_dirty(str(project_path))
+        dirty_workspace = is_repo_dirty(str(project_path), ignore_paths=[plan_path])
     
     # --- Preflight: compute worktree parameters ---
     worktree_created = False
