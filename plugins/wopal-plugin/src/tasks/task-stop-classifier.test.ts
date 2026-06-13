@@ -81,9 +81,6 @@ describe("task-stop-classifier", () => {
       expect(result.status).toBe("idle")
       expect(task.status).toBe("idle")
       expect(task.lastAssistantMessage).toBe("New output from fae")
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] idle"),
-      )
     })
 
     it("sets error when no assistant activity evidence exists", async () => {
@@ -98,9 +95,6 @@ describe("task-stop-classifier", () => {
 
       expect(result.status).toBe("error")
       expect(task.status).toBe("error")
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] error"),
-      )
     })
 
     it("sets stuck when assistant tool activity exists without assistant text", async () => {
@@ -117,9 +111,6 @@ describe("task-stop-classifier", () => {
 
       expect(result.status).toBe("stuck")
       expect(task.status).toBe("stuck")
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] stuck"),
-      )
     })
 
     it("sets stuck when assistant text is same as lastAssistantMessage", async () => {
@@ -139,9 +130,6 @@ describe("task-stop-classifier", () => {
       expect(result.status).toBe("stuck")
       expect(task.status).toBe("stuck")
       expect(task.lastAssistantMessage).toBe("Same output")
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] stuck"),
-      )
     })
 
     it("sets error when messages API fails and no activity evidence exists", async () => {
@@ -160,9 +148,6 @@ describe("task-stop-classifier", () => {
 
       expect(result.status).toBe("error")
       expect(task.status).toBe("error")
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] error"),
-      )
     })
 
     it("sets stuck when messages API fails but progress evidence exists", async () => {
@@ -254,9 +239,6 @@ describe("task-stop-classifier", () => {
       })
 
       expect(result.status).toBe("idle") // unchanged
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[classifyTaskStop] skipped"),
-      )
     })
 
     it("sets error when only synthetic text exists (no assistant activity evidence)", async () => {

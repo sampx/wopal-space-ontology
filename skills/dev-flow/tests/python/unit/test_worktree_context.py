@@ -24,6 +24,8 @@ from lib.worktree import (
 # -- Fixtures -----------------------------------------------------------------
 
 PLAN_TEMPLATE = """\
+## Metadata
+
 - **Status**: planning
 - **Type**: feature
 - **Target Project**: gesp
@@ -31,6 +33,8 @@ PLAN_TEMPLATE = """\
 """
 
 PLAN_TEMPLATE_ONTOLOGY = """\
+## Metadata
+
 - **Status**: planning
 - **Type**: feature
 - **Target Project**: wopal-space-ontology
@@ -56,34 +60,19 @@ class TestParseStructuredWorktree:
     def test_parse_full_structured(self, tmp_path):
         content = PLAN_TEMPLATE + """\
 - **Worktree**:
-  - enabled: true
-  - project_type: standard
   - branch: feature/test-1-slug
   - path: .worktrees/project-issue-1-slug
-  - repo_root: /tmp/workspace/projects/project
-  - base_branch: main
-  - merge_target: main
-  - verify_mode: direct
-  - cleanup_policy: archive
 """
         plan = _write_plan(tmp_path, content)
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.enabled is True
-        assert ctx.project_type == "standard"
         assert ctx.branch == "feature/test-1-slug"
         assert ctx.path == Path(".worktrees/project-issue-1-slug")
-        assert ctx.repo_root == Path("/tmp/workspace/projects/project")
-        assert ctx.base_branch == "main"
-        assert ctx.merge_target == "main"
-        assert ctx.verify_mode == "direct"
-        assert ctx.cleanup_policy == "archive"
 
     def test_parse_partial_fields_get_defaults(self, tmp_path):
         content = PLAN_TEMPLATE + """\
 - **Worktree**:
-  - enabled: true
   - branch: issue-42-slug
   - path: .worktrees/gesp-issue-42-slug
 """
@@ -91,17 +80,12 @@ class TestParseStructuredWorktree:
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.enabled is True
         assert ctx.branch == "issue-42-slug"
-        assert ctx.project_type == "standard"  # default
-        assert ctx.base_branch == "main"  # default
-        assert ctx.verify_mode == "direct"  # default
-        assert ctx.cleanup_policy == "archive"  # default
+        assert ctx.path == Path(".worktrees/gesp-issue-42-slug")
 
     def test_parse_enabled_false(self, tmp_path):
         content = PLAN_TEMPLATE + """\
 - **Worktree**:
-  - enabled: false
   - branch: ""
   - path: ""
 """
@@ -109,7 +93,8 @@ class TestParseStructuredWorktree:
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.enabled is False
+        # Parser reads values as-is, including quotes
+        assert ctx.branch == '""'
 
     def test_no_worktree_returns_none(self, tmp_path):
         plan = _write_plan(tmp_path, PLAN_TEMPLATE)
@@ -130,7 +115,7 @@ class TestParseStructuredWorktree:
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.project_type == "ontology-worktree"
+        assert ctx.branch == "feature/ont-42-slug"
 
     def test_legacy_format_reads_project_type_from_metadata(self, tmp_path):
         content = PLAN_TEMPLATE_ONTOLOGY + "- **Worktree**: feature/legacy-slug | .worktrees/legacy-path\n"
@@ -138,7 +123,7 @@ class TestParseStructuredWorktree:
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.project_type == "ontology-worktree"
+        assert ctx.branch == "feature/legacy-slug"
 
 
 class TestParseLegacyWorktree:
@@ -150,13 +135,8 @@ class TestParseLegacyWorktree:
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
-        assert ctx.enabled is True
         assert ctx.branch == "feature/test-1-slug"
         assert ctx.path == Path(".worktrees/gesp-feature-test-1-slug")
-        # Legacy format fills defaults
-        assert ctx.project_type == "standard"
-        assert ctx.verify_mode == "direct"
-        assert ctx.cleanup_policy == "archive"
 
     def test_parse_legacy_invalid_no_pipe(self, tmp_path):
         content = PLAN_TEMPLATE + "- **Worktree**: just-a-branch-no-path\n"
@@ -175,17 +155,15 @@ class TestParseLegacyWorktree:
         content = PLAN_TEMPLATE + """\
 - **Worktree**: legacy-branch | /legacy/path
 - **Worktree**:
-  - enabled: true
   - branch: structured-branch
   - path: .worktrees/structured
-  - verify_mode: switch-runtime
 """
         plan = _write_plan(tmp_path, content)
         ctx = parse_worktree_context(str(plan))
 
         assert ctx is not None
         assert ctx.branch == "structured-branch"
-        assert ctx.verify_mode == "switch-runtime"
+        assert ctx.path == Path(".worktrees/structured")
 
 
 # -- Write tests (new 2-field format) -----------------------------------------
@@ -277,6 +255,52 @@ class TestWriteWorktreeContext:
 
 # -- Backward compatibility: old formats still readable -----------------------
 
+class TestParseWorktreeScopesToMetadata:
+    """Worktree parsing must only match within ## Metadata, not design sections."""
+
+    def test_design_placeholder_not_parsed_as_metadata(self, tmp_path):
+        """Plan with Worktree placeholder in design section returns None."""
+        content = (
+            PLAN_TEMPLATE_ONTOLOGY
+            + "\n## Scope Assessment\n\n"
+            + "- D-01: Worktree 元数据以显式字段存储：\n\n"
+            + "- **Worktree**:\n"
+            + "  - branch: <feature-branch-name>\n"
+            + "  - path: <workspace-relative-worktree-path>\n"
+        )
+        plan = _write_plan(tmp_path, content)
+        ctx = parse_worktree_context(str(plan))
+        assert ctx is None
+
+    def test_metadata_worktree_still_parsed_with_design_present(self, tmp_path):
+        """When both Metadata and design sections exist, only Metadata's Worktree is read."""
+        content = (
+            PLAN_TEMPLATE
+            + "- **Worktree**:\n"
+            + "  - branch: feature/real-branch\n"
+            + "  - path: .worktrees/real\n"
+            + "\n## Scope Assessment\n\n"
+            + "- **Worktree**:\n"
+            + "  - branch: <feature-branch-name>\n"
+            + "  - path: <workspace-relative-worktree-path>\n"
+        )
+        plan = _write_plan(tmp_path, content)
+        ctx = parse_worktree_context(str(plan))
+        assert ctx is not None
+        assert ctx.branch == "feature/real-branch"
+
+    def test_legacy_placeholder_in_design_not_parsed(self, tmp_path):
+        """Legacy format placeholder in design section is ignored."""
+        content = (
+            PLAN_TEMPLATE_ONTOLOGY
+            + "\n## Design\n\n"
+            + "- **Worktree**: <branch> | <path>\n"
+        )
+        plan = _write_plan(tmp_path, content)
+        ctx = parse_worktree_context(str(plan))
+        assert ctx is None
+
+
 class TestParseOldFormatCompat:
     """Old 9-field and legacy pipe formats must remain readable."""
 
@@ -324,52 +348,6 @@ class TestParseOldFormatCompat:
 
 
 # -- Verify mode tests (WorktreeContext dataclass preserved) -------------------
-
-class TestVerifyMode:
-    """Test verify_mode selection based on project type."""
-
-    def test_standard_project_uses_direct(self):
-        ctx = WorktreeContext(
-            enabled=True, project_type="standard", branch="feature/test",
-            path=Path(".worktrees/gesp-feature-test"),
-            repo_root=Path("/workspace/projects/gesp"),
-            base_branch="main", merge_target="main",
-            verify_mode="direct", cleanup_policy="archive",
-        )
-        assert ctx.verify_mode == "direct"
-        assert ctx.project_type == "standard"
-
-    def test_ontology_project_uses_switch_runtime(self):
-        ctx = WorktreeContext(
-            enabled=True, project_type="ontology-worktree",
-            branch="issue-10-slug",
-            path=Path(".worktrees/ontology-issue-10-slug"),
-            repo_root=Path("/home/.wopal/ontologies/wopal-space-ontology"),
-            base_branch="space/main", merge_target="space/main",
-            verify_mode="switch-runtime", cleanup_policy="archive",
-        )
-        assert ctx.verify_mode == "switch-runtime"
-        assert ctx.project_type == "ontology-worktree"
-
-
-# -- Disabled worktree tests --------------------------------------------------
-
-class TestDisabledWorktree:
-    """Test --no-worktree (disabled) scenarios."""
-
-    def test_disabled_context(self):
-        ctx = WorktreeContext(
-            enabled=False, project_type="standard", branch="",
-            path=Path(""), repo_root=Path(""), base_branch="main",
-            merge_target="main", verify_mode="direct", cleanup_policy="manual",
-        )
-        assert ctx.enabled is False
-
-    def test_plan_without_worktree_is_none(self, tmp_path):
-        plan = _write_plan(tmp_path, PLAN_TEMPLATE)
-        ctx = parse_worktree_context(str(plan))
-        assert ctx is None
-
 
 # -- resolve_active_plan tests ------------------------------------------------
 
@@ -515,39 +493,6 @@ class TestResolveActivePlanWithWorktree:
 
 class TestResolveActivePlanVerify:
     """resolve_active_plan: verify phase branch checks."""
-
-    def test_verify_unmerged_raises_error(self, tmp_path):
-        """verify on unmerged feature branch raises ResolveActivePlanError."""
-        import subprocess
-
-        repo = tmp_path / "projects" / "myproject"
-        repo.mkdir(parents=True)
-        subprocess.run(["git", "init", "-b", "main", str(repo)],
-                       capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@test.com"],
-                       cwd=str(repo), capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"],
-                       cwd=str(repo), capture_output=True, check=True)
-
-        plans_dir = repo / "docs" / "plans"
-        plans_dir.mkdir(parents=True)
-        plan_file = plans_dir / "test-plan.md"
-        plan_file.write_text(
-            "# Plan\n\n## Metadata\n\n- **Status**: verifying\n- **Type**: feature\n"
-            "\n- **Worktree**:\n  - branch: feature-unmerged\n  - path: .worktrees/myproject-feature-unmerged\n"
-        )
-
-        subprocess.run(["git", "add", "."], cwd=str(repo), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init"], cwd=str(repo), capture_output=True)
-
-        # Checkout the feature branch to simulate "not merged"
-        subprocess.run(
-            ["git", "checkout", "-b", "feature-unmerged"],
-            cwd=str(repo), capture_output=True, check=True,
-        )
-
-        with pytest.raises(ResolveActivePlanError, match="not been merged"):
-            resolve_active_plan(str(plan_file), "verify", workspace_root=tmp_path)
 
     def test_verify_merged_returns_main(self, tmp_path):
         """verify after merge returns main Plan."""

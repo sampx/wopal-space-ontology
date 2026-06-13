@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
+from lib.plan_commit import RESULT_OK
+
 
 def _make_approve_mocks(status="planning"):
     """Common mock dict for approve --confirm tests.
@@ -36,7 +38,7 @@ def _make_approve_mocks(status="planning"):
         "detect_space_repo": "wopal-space-ontology",
         "is_repo_dirty": False,
         "write_worktree_context": True,
-        "commit_and_push_plan": True,
+        "commit_and_push_plan": RESULT_OK,
         "update_plan_status": True,
         "sync_status_label": None,
         "sync_plan_to_issue_body": None,

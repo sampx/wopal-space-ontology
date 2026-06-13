@@ -1,159 +1,169 @@
-# 能力分层与同步契约
+# 能力层级与同步契约
 
-本节定义 ontology fork main 与 space/main 之间的能力分层模型、同步铁律以及下放/裁剪流程。
+ontology 的能力按分支层级组织。每个层级承载不同成熟度的能力，层级之间通过 `wopal ontology` CLI 命令同步。
 
-`upstream/main` ↔ `fork main` 的外部协作见 `upstream-sync.md`，本节专注于 ontology 仓库内部的两个分支关系。
+本节描述层级结构、能力分类、同步契约和删除安全。仓库拓扑和 CLI 命令详情见 `upstream-sync.md`。
 
 ---
 
-## 双栈独立扫描
+## 层级模型
 
-ellamaka 启动时**独立扫描两个目录**加载能力（agents / skills / plugins / commands / rules）：
+ontology 使用三层分支结构承载不同粒度的能力：
 
 ```
-~/.wopal/{agents,skills,plugins,commands,rules}
-    ← 软链接到 ~/.wopal/ontologies/wopal-space-ontology/ 的 fork main checkout
-    ← 用户级能力全集（跨空间共享）
-
-<workspace>/.wopal/{agents,skills,plugins,commands,rules}
-    ← space/<name> 分支的 worktree
-    ← 空间级裁剪与扩展
+main                    ← 通用能力，所有空间共享
+  └── type/<name>       ← 类型特定能力，某类空间共享
+        └── space/<user>/<name>  ← 空间实例定制，单个空间独享
 ```
 
-**关键含义**：space/main **不需要是 fork main 的超集**。两个目录独立扫描。装饰性能力（如音效、主题）只在 fork main 上存在即可，通过 `~/.wopal/plugins` 软链接对所有空间全局可见。
+| 层级 | 分支命名 | 定位 | 变更权限 |
+|------|---------|------|---------|
+| 通用层 | `main` | 所有空间共享的基线能力 | 维护者提交 + PR 审核 |
+| 类型层 | `type/<name>` | 某类空间共享的能力变体 | 维护者提交 + PR 审核 |
+| 空间层 | `space/<user>/<name>` | 单个空间实例的定制 | 空间所有者直接编辑 |
 
-ellamaka 的具体加载机制（哪些是覆盖、哪些是补充、哪些是合并）以项目源码和文档为准，本节仅描述 ontology 仓库层的契约。
+`main` 是 ontology 的权威分支。`type/<name>` 从 `main` 分出，承载特定场景的定制。`space/<user>/<name>` 从 `type/<name>` 分出，是当前运行的空间实例。
 
 ---
 
 ## 能力分类
 
-| 类型 | 定义 | 仓库归属 | 典型例子 |
+| 分类 | 属性 | 所属层级 | 典型例子 |
 |------|------|---------|---------|
-| **用户级** | 跨空间共享、稳定的通用能力 | fork main | agents、skills、rules、装饰性 plugins（音效/主题）、功能性 plugins（wopal-plugin） |
-| **空间级** | 特定空间的定制、未成熟的实验性能力 | space/main | 空间专属 templates、配置覆盖 |
-| **过渡期** | 在 space/main 孵化，成熟后下放 | 先 space/main，后 fork main | 大多数新能力默认从空间级开始 |
+| **通用能力** | 跨所有空间共享、稳定 | `main` | 核心 agent 定义、基础技能、空间模板、wopal-plugin |
+| **类型能力** | 某类空间共享、该类型的定制 | `type/<name>` | 前端项目空间的专属技能、特定技术栈的规则变体 |
+| **空间能力** | 单个空间独享、实例级定制 | `space/<user>/<name>` | 用户个人偏好命令、空间专属配置覆盖、实验性技能 |
+| **孵化能力** | 从空间层起步，验证后提升 | 先 `space/<user>/<name>`，后 `type/<name>` 或 `main` | 大多数新能力 |
 
-**关键承认**：能力归属是**事后追溯**的，不是事前明确的。新能力默认从空间级开始孵化，使用一段时间后再决定是否下放。
+核心原则：**能力在空间中孵化，成熟后提升到类型层或通用层**。
 
----
+不需要事先判断一个能力属于哪个层级。新能力一律从 `space/<user>/<name>` 开始。使用一段时间后，根据实际需求决定是否提升：
 
-## 同步铁律
-
-### 唯一禁止：`space/main → fork main` 直接 merge
-
-| 方向 | 允许？ | 方式 | 触发时机 |
-|------|-------|------|---------|
-| `upstream/main → fork main` | ✅ | `git merge` | 上游有更新 |
-| `fork main → space/main` | ✅ | `git merge` | 同步上游增强到空间 |
-| **`space/main → fork main` 直接 merge** | ❌ **禁止** | — | — |
-| `space/main → fork main` 单向下放 | ✅ | `git checkout space/main -- <files>` + 新 commit | 单个能力下放 |
-| `fork main → upstream` | ✅ | GitHub PR | 贡献通用能力 |
-
-**禁止原因**：space/main 上对用户级能力的 `git rm`（合理裁剪）若反向 merge 到 fork main，会从 fork main 上永久丢失这些能力，并通过 `~/.wopal` 软链接破坏所有空间的能力栈。
-
-历史教训：fork main 上曾有 `Merge branch 'space/main'` 提交（`d4a717c`），导致装饰性插件一度被反向删除。已通过 `91cf6b0` 部分恢复，但 `wopal-plugin` 等仍需手动下放（见下文操作流程）。
-
-### `space/main` 上 `git rm` 用户级能力：允许且合理
-
-**允许场景**：你认为某些 fork main 上的能力（如装饰性插件）不该出现在 space/main。直接 `git rm` 是合理操作。
-
-**约束**：**只要不做反向 merge**，这些能力仍在 fork main 上、通过 `~/.wopal` 软链接全局可见，没有损失。
-
-**当前实例**：本空间（wopal-workspace）已 git rm 了 `plugins/tui-ellamaka.tsx`、`plugins/ellamaka-theme.json`、`plugins/asset/*.wav` 等装饰性插件。这些文件仍在 fork main 上，通过 `~/.wopal/plugins` 软链接对本空间可见——状态健康。
+- 多个同类空间都需要 → 提升到 `type/<name>`
+- 所有空间都需要 → 提升到 `main`
+- 仅当前空间使用 → 保留在 `space/<user>/<name>`
 
 ---
 
-## 操作流程
+## 同步契约
 
-### 流程 1：能力下放（space/main → fork main 单向）
+层级之间的同步通过 `wopal ontology` CLI 命令完成，agent 负责读取状态、与用户讨论、构建命令。
 
-**场景**：在 space/main 上孵化成熟的能力，希望跨空间共享。
+### 契约 1：通用层 → 类型层
 
-```bash
-cd ~/.wopal/ontologies/wopal-space-ontology
-git checkout main                               # 确认在 fork main
-git checkout space/main -- <files-or-dirs>      # 单向拉取文件状态
-git status                                       # 检查变更范围
-git add <files>
-git commit -m "feat(<scope>): promote <capability> to user-level"
+```
+main ──merge──→ type/<name>
 ```
 
-**注意**：不要 push（push 是用户权限）。
+**场景**：`main` 有了新的通用能力或重要修复，类型层需要同步。
 
-**下放后**：下一次 `fork main → space/main` merge 时不会冲突（内容已一致）。
+**操作**：`wopal ontology sync --from main --to type/<name>`
 
-### 流程 2：同步上游增强（fork main → space/main）
+**安全检查**：
+- 同步前确认 `type/<name>` 没有删除 `main` 上的文件
+- 若有删除，agent 应提示用户：是保留本地修改还是接受上游版本
 
-```bash
-cd <workspace>/.wopal
-git merge main --no-edit
-# 冲突优先保留上游版本，自定义内容手动合并
+**要点**：通用更新应尽量及时同步到类型层，避免积累过多差异导致合并冲突。
+
+### 契约 2：类型层 → 空间层
+
+```
+type/<name> ──merge──→ space/<user>/<name>
 ```
 
-### 流程 3：在 fork main 上直接开发用户级能力
+**场景**：类型层有了更新，当前空间实例需要跟进。
 
-适合从一开始就明确是用户级的能力：
+**操作**：`wopal ontology update`
 
-```bash
-cd ~/.wopal/ontologies/wopal-space-ontology
-git checkout main
-# 直接修改 agents/skills/plugins/rules
-git commit -m "feat(<scope>): description"
+**安全检查**：
+- `wopal ontology status` 会显示空间层与类型层的差异
+- agent 应向用户解释将要合并的变更内容
+- 空间层的本地定制不会丢失（merge 保留双方变更）
 
-# 同步到所有空间
-cd <workspace>/.wopal
-git merge main --no-edit
+**要点**：这是最常见的同步方向，定期执行即可保持空间与类型层对齐。
+
+### 契约 3：空间层 → 类型层（贡献）
+
+```
+space/<user>/<name> ──cherry-pick + PR──→ type/<name>
 ```
 
-### 流程 4：空间裁剪（不删除源文件）
+**场景**：空间中孵化出一个能力，适合提升到类型层。
 
-**优先策略**：用 ellamaka 配置层禁用（如 agent 级 `"disable": true`），具体支持范围以 ellamaka 项目源码为准。
+**操作**：`wopal ontology contribute --target type/<name>`
 
-**兜底策略**：plugin/skill 等不支持配置禁用的层级，通过"不引用即不加载"自然失效——只要 config 不指向它，文件即使存在也不会被加载。
+**安全检查**：
+- agent 应与用户讨论：哪些 commit 适合贡献，哪些属于空间私有定制
+- 只 cherry-pick 通用性的变更，不包含空间特定的路径、配置或个人偏好
 
-**已经用 `git rm` 裁剪了怎么办**：不需要修复。只要 fork main 上还在，能力就全局可见。space/main 上的"缺失"是合理状态。
+**要点**：贡献是单向的。cherry-pick 到类型分支后创建 PR，经审核后合入。
+
+### 契约 4：空间层 → 通用层（贡献）
+
+```
+space/<user>/<name> ──cherry-pick + PR──→ main
+```
+
+**场景**：空间中孵化出一个能力，适合提升到通用层。
+
+**操作**：`wopal ontology contribute --target main`
+
+**安全检查**：
+- 与契约 3 相同的 commit 筛选讨论
+- 额外确认该能力确实适用于所有空间，而非仅特定类型
+
+**要点**：提升到 `main` 是最高级别的贡献，审核更严格。能力应先经过多个空间验证后再考虑。
 
 ---
 
-## 安全检查脚本
+## 删除安全
 
-**反向上放前的安全检查**（执行 `git checkout space/main --` 前可选）：
+删除是层级同步中最容易出问题的操作。Git merge 会传播删除——如果低层级删除了高层级的文件，merge 会把删除带到高层级。
 
-```bash
-# 列出 space/main 上 git rm 但 fork main 仍存在的文件
-cd ~/.wopal/ontologies/wopal-space-ontology
-git log --diff-filter=D --name-only main..space/main | sort -u
-```
+### 规则
 
-输出非空 = space/main 上做过裁剪。可以继续单向拉取，**但绝不能直接 merge**。
+| 场景 | 行为 | 处理方式 |
+|------|------|---------|
+| `main` 删除文件 | 删除通过 sync 传播到 `type/<name>` 和 `space/<user>/<name>` | 正常接受，这是维护者的意图 |
+| `type/<name>` 删除文件 | 删除通过 update 传播到 `space/<user>/<name>` | 正常接受，类型层决定该类型不需要该能力 |
+| `space/<user>/<name>` 删除文件 | **不会**传播到 `type/<name>` 或 `main` | 安全——贡献是 cherry-pick，不是 merge |
+| `space/<user>/<name>` 隐藏能力 | 通过 ellamaka 配置禁用或"不引用即不加载" | 优先于删除，避免影响后续同步 |
+
+### 向上 merge 前的检查
+
+`wopal ontology status` 会报告层级间的文件差异。agent 在执行向上 sync 前，应检查输出中是否有删除标记（D 状态的文件），并与用户确认：
+
+- 删除的是废弃文件 → 可以同步
+- 删除的是高层级能力 → 先在低层级恢复，再执行同步
+
+### 空间裁剪策略
+
+优先用 ellamaka 配置层禁用不需要的能力（如 agent 级 `"disable": true`）。若配置不支持，通过"不引用即不加载"自然失效——只要配置不指向它，文件存在也不会被加载。
 
 ---
 
-## 常见问题
+## ellamaka 双扫描模型
 
-### Q1: 如何判断能力是用户级还是空间级？
+ellamaka 启动时独立扫描两个目录加载能力：
 
-**不用事先判断**。新能力一律从 space/main 开始孵化。使用一段时间后：
-- 跨多个空间都用 → 下放到 fork main
-- 仅本空间使用 → 保留 space/main
+```
+$WOPAL_HOME/{agents,skills,commands,rules,plugins}
+    ← ontology main 的 symlink 或 managed copy
+    ← 通用基础能力（跨空间共享）
 
-### Q2: 装饰性 plugin 为什么不需要在 space/main 上？
-
-ellamaka 通过 `~/.wopal/plugins` 软链接全局加载 fork main 上的所有 plugin。space/main 上有没有这些文件，对 plugin 加载没有影响。让 fork main 持有即可。
-
-### Q3: 想恢复已被 space/main `git rm` 的能力怎么办？
-
-**不需要恢复**。只要 fork main 上还在，能力就仍然全局可见。space/main 上的"缺失"是合理裁剪状态，不是问题。
-
-### Q4: fork main 上误删了用户级能力怎么办？
-
-用 **新 commit** 修正（不用 rebase 或 revert）：
-
-```bash
-cd ~/.wopal/ontologies/wopal-space-ontology
-git checkout space/main -- <files>   # 从 space/main 单向拉取
-git commit -m "feat(<scope>): restore <capability> as user-level"
+<space>/.wopal/{agents,skills,commands,rules,plugins}
+    ← space/<user>/<name> 分支的 worktree
+    ← 空间定制与扩展
 ```
 
-历史教训参考：fork main 上 `91cf6b0` 是混合提交（加了音效增强但误删 wopal-plugin），已通过 `git checkout space/main --` 在 `24b1bde` 修正恢复。
+同名能力由 space overlay 覆盖 base，ellamaka 按目录优先级顺序串行合并。
+
+### 为什么层级重要
+
+双扫描模型意味着两个目录是**独立加载**的，不需要 space 分支是 main 的超集。这也解释了为什么层级间同步需要显式操作而不是隐式覆盖：
+
+- `main` 的变更通过 `wopal ontology sync` 传播到类型层和空间层
+- 空间层的定制通过 overlay 机制直接生效，无需 merge 到 main
+- 贡献（cherry-pick + PR）是显式的、可审核的，防止未经验证的能力污染上层
+
+具体加载机制（哪些覆盖、哪些补充、哪些合并）以 ellamaka 项目源码为准。

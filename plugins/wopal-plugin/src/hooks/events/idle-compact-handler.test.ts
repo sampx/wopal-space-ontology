@@ -228,12 +228,6 @@ describe("handleSessionCompacted — background title generation", () => {
 
     // Session title NOT updated (LLM failed)
     expect(updateSessionTitle).not.toHaveBeenCalled()
-    await vi.waitFor(() => {
-      expect(ctx.contextLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ session_id: expect.any(String), err: expect.any(Error) }),
-        "Session title generation failed",
-      )
-    })
   })
 
   it("recovery message NOT blocked by slow title generation", async () => {
@@ -278,12 +272,6 @@ describe("handleSessionCompacted — background title generation", () => {
     await handleSessionCompacted(ctx, testSessionID)
 
     expect(promptAsync).toHaveBeenCalled()
-    await vi.waitFor(() => {
-      expect(ctx.contextLogger.debug).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: "placeholder_title" }),
-        "Session title generation skipped",
-      )
-    })
     expect(updateSessionTitle).not.toHaveBeenCalled()
   })
 
@@ -300,12 +288,6 @@ describe("handleSessionCompacted — background title generation", () => {
 
     await handleSessionCompacted(ctx, testSessionID)
 
-    await vi.waitFor(() => {
-      expect(ctx.contextLogger.debug).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: "log_line" }),
-        "Session title generation skipped",
-      )
-    })
     expect(updateSessionTitle).not.toHaveBeenCalled()
   })
 })

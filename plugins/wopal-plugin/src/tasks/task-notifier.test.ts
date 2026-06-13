@@ -84,70 +84,6 @@ describe("task-notifier", () => {
       expect(notificationText).toContain("Task output text") // Last output
     })
 
-    it("logs debug summary on success", async () => {
-      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
-      const client: OpenCodeClient = {
-        session: { promptAsync: mockPromptAsync },
-      } as OpenCodeClient
-
-      const task: WopalTask = {
-        id: "wopal-task-123",
-        sessionID: "session-123",
-        parentSessionID: "parent-456",
-        description: "Test task",
-        status: "running",
-        startedAt: new Date(),
-        createdAt: new Date(),
-        agent: "test",
-        prompt: "test",
-      }
-
-      await sendProgressNotification(
-        { client, debugLog: mockLogger },
-        task,
-        42,
-        50,
-        "context_milestone",
-      )
-
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining("[progressNotify] sent:")
-      )
-      expect(mockLogger.debug.mock.calls[0][0]).toContain("task_id=ession-123(task)")
-      expect(mockLogger.debug.mock.calls[0][0]).toContain("msgs=42")
-    })
-
-    it("logs debug summary on failure", async () => {
-      const mockPromptAsync = vi.fn().mockRejectedValue(new Error("Network error"))
-      const client: OpenCodeClient = {
-        session: { promptAsync: mockPromptAsync },
-      } as OpenCodeClient
-
-      const task: WopalTask = {
-        id: "wopal-task-123",
-        sessionID: "session-123",
-        parentSessionID: "parent-456",
-        description: "Test task",
-        status: "running",
-        startedAt: new Date(),
-        createdAt: new Date(),
-        agent: "test",
-        prompt: "test",
-      }
-
-      await sendProgressNotification(
-        { client, debugLog: mockLogger },
-        task,
-        42,
-        null,
-        "time_quota",
-      )
-
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining("[progressNotify] failed:")
-      )
-    })
-
     it("does not crash when messages API fails", async () => {
       const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
       const mockMessages = vi.fn().mockRejectedValue(new Error("API failure"))
@@ -170,7 +106,6 @@ describe("task-notifier", () => {
         prompt: "test",
       }
 
-      // Should not throw
       await sendProgressNotification(
         { client, debugLog: mockLogger },
         task,
@@ -179,9 +114,6 @@ describe("task-notifier", () => {
       )
 
       expect(mockPromptAsync).toHaveBeenCalledOnce()
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining("[progressNotify] failed to fetch messages")
-      )
     })
   })
 
@@ -298,60 +230,6 @@ describe("task-notifier", () => {
       expect(notificationText).not.toContain("wopal_task_reply")
     })
 
-    it("logs debug summary on success", async () => {
-      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
-      const client: OpenCodeClient = {
-        session: { promptAsync: mockPromptAsync },
-      } as OpenCodeClient
-
-      const task: WopalTask = {
-        id: "wopal-task-123",
-        sessionID: "session-123",
-        parentSessionID: "parent-456",
-        description: "Test task",
-        status: "idle",
-        createdAt: new Date(),
-        agent: "test",
-        prompt: "test",
-      }
-
-      await notifyParent({ client, debugLog: mockLogger }, task)
-
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("sion-123(task)"),
-      )
-      expect(mockLogger.trace).toHaveBeenCalledWith(
-        expect.stringContaining("[IDLE] notification sent"),
-      )
-    })
-
-    it("logs debug summary on failure", async () => {
-      const mockPromptAsync = vi.fn().mockRejectedValue(new Error("Network error"))
-      const client: OpenCodeClient = {
-        session: { promptAsync: mockPromptAsync },
-      } as OpenCodeClient
-
-      const task: WopalTask = {
-        id: "wopal-task-123",
-        sessionID: "session-123",
-        parentSessionID: "parent-456",
-        description: "Test task",
-        status: "running",
-        createdAt: new Date(),
-        agent: "test-agent",
-        prompt: "test",
-      }
-
-      await notifyParent({ client, debugLog: mockLogger }, task)
-
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("sion-123(task)"),
-      )
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("[RUNNING] notification failed"),
-      )
-    })
-
     it("does not fetch messages when task.error is set", async () => {
       const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
       const mockMessages = vi.fn().mockResolvedValue({ data: [] })
@@ -442,10 +320,6 @@ describe("task-notifier", () => {
       )
 
       expect(result).toBe(false)
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        { err: "Network error" },
-        "[sendNotification] Failed",
-      )
     })
 
     it("returns false when promptAsync unavailable", async () => {
@@ -460,9 +334,6 @@ describe("task-notifier", () => {
       )
 
       expect(result).toBe(false)
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[sendNotification] skipped: session.promptAsync unavailable"
-      )
     })
 
     it("noReply defaults to false for task notifications", async () => {

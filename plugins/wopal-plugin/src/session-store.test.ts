@@ -106,6 +106,20 @@ describe("SessionStore", () => {
       expect(state?.needsAutoContinue).toBe(true);
       expect(state?.needsSkillReload).toBe(true);
     });
+
+    it("clears lastTokens to prevent post-compact context false positive", () => {
+      const store = new SessionStore({ max: 100 });
+      store.upsert("ses_c", (s) => {
+        s.isCompacting = true;
+        s.compactingSince = 1000;
+        s.lastTokens = { input: 90000, output: 5000, updatedAt: Date.now() };
+      });
+
+      store.markCompacted("ses_c");
+
+      const state = store.get("ses_c");
+      expect(state?.lastTokens).toBeUndefined();
+    });
   });
 
   describe("recordSkillLoaded", () => {
