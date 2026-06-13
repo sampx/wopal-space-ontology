@@ -20,90 +20,28 @@ import type {
   TuiPluginModule,
   TuiSlotPlugin,
 } from "@opencode-ai/plugin/tui";
-import { join } from "node:path";
-
-type Color = RGBA;
-
-const LOGO_LEFT = [
-  "                 ",
-  "█▀▀▀ █   █   █▀▀█",
-  "█▀▀▀ █   █   █▀▀█",
-  "▀▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀",
-];
-
-const LOGO_RIGHT = [
-  "                    ",
-  "█▀▀▀█ █▀▀█ █  ▀ █▀▀█",
-  "█ ▀ █ █▀▀█ █▀▀  █▀▀█",
-  "▀ ▀ ▀ ▀  ▀ ▀  ▀ ▀  ▀",
-];
-
-const ASSET_DIR = import.meta.dir + "/asset";
-const PULSE_FILES = ["pulse-a.wav", "pulse-b.wav", "pulse-c.wav"];
-
-type ThemeLike = {
-  primary: Color;
-  background: Color;
-  text: Color;
-  textMuted: Color;
-};
-
-const ink = (
-  map: Record<string, unknown>,
-  name: string,
-  fallback: string,
-): Color => {
-  const value = map[name];
-  if (value instanceof RGBA) return value;
-  if (typeof value === "string") return RGBA.fromHex(value);
-  return RGBA.fromHex(fallback);
-};
-
-const extractTheme = (map: Record<string, unknown>): ThemeLike => ({
-  primary: ink(map, "primary", "#5E81AC"),
-  background: ink(map, "background", "#2E3440"),
-  text: ink(map, "text", "#ECEFF4"),
-  textMuted: ink(map, "textMuted", "#8B95A7"),
-});
 
 // ─── Sound ───────────────────────────────────────────────────────────
 
-let humProc: ReturnType<typeof Bun.spawn> | undefined;
-let shot = 0;
+// Sound effects now use api.attention for playback
+// instead of external audio processes. See tui() entry for initialization.
+
+let attention: { notify: (opts: { sound?: unknown }) => Promise<unknown>; soundboard: { activate: (id: string) => boolean } } | undefined
 
 function soundStart() {
-  soundStop();
-  try {
-    humProc = Bun.spawn(["afplay", join(ASSET_DIR, "charge.wav")], {
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-  } catch {}
+  attention?.notify({ sound: { name: "permission" } })
 }
 
 function soundStop() {
-  if (humProc) {
-    try {
-      humProc.kill();
-    } catch {}
-    humProc = undefined;
-  }
+  // no-op: attention API manages its own lifecycle
 }
 
-function soundPulse(_scale = 1) {
-  const file = PULSE_FILES[shot++ % PULSE_FILES.length];
-  try {
-    Bun.spawn(["afplay", join(ASSET_DIR, file)], {
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-  } catch {}
+function soundPulse() {
+  attention?.soundboard.activate("default")
 }
 
 function soundDispose() {
-  soundStop();
+  // no-op
 }
 
 // ─── Animation Constants ─────────────────────────────────────────────
@@ -1149,10 +1087,12 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
 
 const tui: TuiPlugin = async (api, options) => {
   if (options?.enabled === false) return;
+  attention = api.attention
   await api.theme.install("./ellamaka-theme.json");
   api.theme.set("ellamaka-theme");
   const theme = extractTheme(api.theme.current);
   api.slots.register(branding(theme, options?.label));
+  api.attention.notify({ sound: { name: "default", when: "blurred" } })
 };
 
 const plugin: TuiPluginModule & { id: string } = {

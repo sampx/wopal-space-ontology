@@ -76,7 +76,6 @@ def build_parser() -> argparse.ArgumentParser:
     # Register verify-switch subcommand
     vs_parser = subparsers.add_parser("verify-switch", help="Switch workspace to feature branch for verification")
     vs_parser.add_argument("issue", help="Issue number or plan name")
-    vs_parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
 
     return parser
 
@@ -97,16 +96,17 @@ def main(argv: list[str] | None = None) -> int:
         print("  sync --labels-only  Sync only Issue labels")
         print("")
         print("Workflow commands:")
-        print("  plan            Create or locate a Plan")
-        print("  plan new        Create a new Plan")
-        print("  plan status     Show Plan status details")
-        print("  plan list       List active Plans")
-        print("  submit          Submit Plan for review (planning -> reviewing)")
-        print("  approve         Approve a reviewed Plan (--confirm required)")
-        print("  complete        Mark implementation complete")
-        print("  verify          Verify and confirm completion")
-        print("  verify-switch   Switch workspace for worktree verification")
-        print("  archive         Archive a completed Plan")
+        print("  plan new <issue>              Create a new Plan from Issue")
+        print("  plan new --title ...         Create a new Plan without Issue")
+        print("  plan status <plan-id>        Show Plan status details")
+        print("  plan list [--issue]          List active Plans")
+        print("  plan check <name-or-path>    Validate Plan against quality gates")
+        print("  submit                       Submit Plan for review (planning -> reviewing)")
+        print("  approve                      Approve a reviewed Plan (--confirm required)")
+        print("  complete                     Mark implementation complete")
+        print("  verify                       Verify and confirm completion")
+        print("  verify-switch                Switch workspace for worktree verification")
+        print("  archive                      Archive a completed Plan")
         print("")
         print("Utility commands:")
         print("  decompose-prd   Create Issues from PRD phases")
@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Dispatch verify-switch
     if args.command == "verify-switch":
-        return 0 if run_verify_switch(args.issue, yes=args.yes) else 1
+        return 0 if run_verify_switch(args.issue) else 1
 
     return 0
 

@@ -9,10 +9,8 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 - Parent Rules: `.wopal/AGENTS.md`
 - Commands: `references/commands.md`
-- Plan Authoring & Delegation: `references/plan-authoring.md`
-- Plan Validation: `references/plan-validation.md`
-- TDD Guide: `references/tdd-guide.md`
-- Issue Format & Naming: `references/issue-format.md`
+- Plan Guide: `references/plan-guide.md`
+- Issue Guide: `references/issue-guide.md`
 - Troubleshooting: `references/troubleshooting.md`
 
 ## 2. Architecture and Directories
@@ -24,7 +22,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 | `scripts/commands/` | Subcommand implementations (submit, approve, complete, verify, plan, issue, sync, archive, roadmap, decompose, reset) |
 | `scripts/lib/` | Shared libraries (git, github, project, workspace, worktree, logging) |
 | `templates/` | Plan and Issue templates |
-| `references/` | Command reference, plan validation rules, TDD guide, troubleshooting |
+| `references/` | Command reference, plan guide, troubleshooting |
 | `tests/python/` | unit/ + integration/ tests |
 
 ## 3. Development Commands
@@ -74,6 +72,17 @@ Each command requires a prerequisite state; invalid transitions error out. New c
 - Test support utilities: `tests/python/support/bootstrap.py`
 - **TDD requirement**: new commands or `scripts/lib/` module features must have a failing test written first, then implementation to make it pass
 - After modifying subcommand logic, run the corresponding unit tests to confirm no regression
+
+### Test Isolation and Quality Rules
+
+**No module-level mocking**: Never inject mocks via `sys.modules[name] = MagicMock()` at the top of a test file. This pollutes the global module cache, causing subsequent test files to receive fake modules instead of real code. Instead, import real modules directly and use `@patch` at the function level for side-effecting functions (git, network, logging).
+
+**Function-level mock principle**: Only mock functions with side effects (git operations, network requests, log output). Python module import = loading function definitions, no side effects execute. Tests that operate on the filesystem must use `tempfile.mkdtemp()` for isolation and clean up in `tearDown`.
+
+**Test behavior, not implementation**:
+- Do not enumerate dictionary lookup tables with N `assertEqual(func("key"), "value")` tests — use `subTest` parametrization
+- Do not assert exact output format strings (e.g., `">> planning <<"`) — assert return codes and key substrings
+- Do not search source code as strings (e.g., `assert "--merge" not in source`) — this is an implementation detail that breaks on refactor
 
 ## 6. User-Supplied Rules
 

@@ -2,11 +2,11 @@
 # roadmap.py - Roadmap command: 4-phase workflow (Analyze/Discuss/Produce/Decompose)
 #
 # Command:
-#   roadmap <prd-path> [--product <name>] [--project <project>] [--yes]
+#   roadmap <prd-path> [--product <name>] [--project <project>]
 #
 # Flow:
 #   1. Analyze: Parse PRD, extract phase headings -> List[PhaseInfo]
-#   2. Discuss: Interactive confirmation (skip with --yes) -> List[ConfirmedPhase]
+#   2. Discuss: Auto-confirm all phases -> List[ConfirmedPhase]
 #   3. Produce: Write phase documents to phases/ directory -> List[Path]
 #   4. Decompose: Create GitHub Issues per involved project
 
@@ -16,7 +16,6 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -287,70 +286,6 @@ def _analyze(args: argparse.Namespace) -> tuple[list[PhaseInfo], str]:
 
 
 # ============================================
-# Discuss: interactive confirmation
-# ============================================
-
-
-def _discuss(
-    phases: list[PhaseInfo],
-    args: argparse.Namespace,
-) -> list[ConfirmedPhase]:
-    """Discuss phase: interactive confirmation of each phase.
-
-    With --yes, auto-confirms all phases. Without --yes on non-TTY, raises.
-    """
-    yes_mode = getattr(args, "yes", False)
-
-    if not yes_mode and not sys.stdin.isatty():
-        log_error("Non-interactive terminal. Use --yes to auto-confirm.")
-        raise RuntimeError("Non-interactive terminal without --yes")
-
-    confirmed: list[ConfirmedPhase] = []
-
-    for phase in phases:
-        print("")
-        log_step(f"Discuss: Phase {phase.id}")
-        print(f"  Title: {phase.title}")
-        print(f"  Goal: {phase.goal or '(empty)'}")
-        print(f"  Involved Projects: {', '.join(phase.involved_projects) or '(none)'}")
-        print(f"  Exit Criteria: {len(phase.exit_criteria)} items")
-
-        if yes_mode:
-            log_info("Auto-confirmed (--yes)")
-            confirmed.append(ConfirmedPhase(
-                id=phase.id,
-                title=phase.title,
-                goal=phase.goal,
-                involved_projects=list(phase.involved_projects),
-                exit_criteria=list(phase.exit_criteria),
-            ))
-            continue
-
-        # Interactive: allow overrides
-        title = _prompt_default("  Title", phase.title)
-        goal = _prompt_default("  Goal", phase.goal)
-
-        confirmed.append(ConfirmedPhase(
-            id=phase.id,
-            title=title,
-            goal=goal,
-            involved_projects=list(phase.involved_projects),
-            exit_criteria=list(phase.exit_criteria),
-        ))
-
-    return confirmed
-
-
-def _prompt_default(label: str, default: str) -> str:
-    """Prompt user with a default value. Empty input keeps default."""
-    try:
-        value = input(f"{label} [{default}]: ").strip()
-    except EOFError:
-        return default
-    return value if value else default
-
-
-# ============================================
 # Produce: write phase documents
 # ============================================
 
@@ -602,7 +537,7 @@ def cmd_roadmap(args: argparse.Namespace) -> int:
 
     if not prd_path:
         log_error("PRD path required")
-        print("Usage: flow.sh roadmap <prd-path> [--product <name>] [--yes]")
+        print("Usage: flow.sh roadmap <prd-path> [--product <name>]")
         return 1
 
     workspace_root = find_workspace_root()
@@ -632,9 +567,18 @@ def cmd_roadmap(args: argparse.Namespace) -> int:
         log_error("No phases found. Check PRD format (expected '## Phase N: ...' headings)")
         return 1
 
-    # Phase 2: Discuss
+    # Phase 2: Discuss (auto-confirm all phases)
     print("")
-    confirmed = _discuss(phases, args)
+    confirmed = [
+        ConfirmedPhase(
+            id=phase.id,
+            title=phase.title,
+            goal=phase.goal,
+            involved_projects=list(phase.involved_projects),
+            exit_criteria=list(phase.exit_criteria),
+        )
+        for phase in phases
+    ]
 
     # Phase 3: Produce
     print("")
@@ -667,10 +611,10 @@ def register_roadmap_parser(subparsers: argparse._SubParsersAction) -> None:
             "Run 4-phase roadmap workflow on a PRD file.\n\n"
             "Phases:\n"
             "  1. Analyze  — Parse PRD, extract phase definitions\n"
-            "  2. Discuss  — Interactive confirmation (skip with --yes)\n"
+            "  2. Discuss  — Auto-confirm all phases\n"
             "  3. Produce  — Write phase documents to phases/ directory\n"
             "  4. Decompose — Create GitHub Issues per involved project\n\n"
-            "Usage: flow.sh roadmap <prd-path> [--product <name>] [--project <project>] [--yes] [--dry-run]"
+            "Usage: flow.sh roadmap <prd-path> [--product <name>] [--project <project>] [--dry-run]"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -686,11 +630,6 @@ def register_roadmap_parser(subparsers: argparse._SubParsersAction) -> None:
     roadmap_parser.add_argument(
         "--project",
         help="Default project name for Issues (used when phase has no involved_projects)",
-    )
-    roadmap_parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip interactive confirmation (auto-confirm all phases)",
     )
     roadmap_parser.add_argument(
         "--dry-run",

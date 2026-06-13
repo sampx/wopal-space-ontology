@@ -223,8 +223,7 @@ export async function handleMessagePartUpdated(
       }
       const compactingPct = compactingContextLimit && compactingContextLimit > 0 ? Math.round((used / compactingContextLimit) * 100) : undefined
       ctx.contextLog.info(
-        { session_id: formatSessionID(sessionID, isTask), agent, model: formatModel(modelInfo), input: t.input ?? 0, output: t.output ?? 0, cache_read: cache.read ?? 0, cache_write: cache.write ?? 0, ...(compactingPct !== undefined ? { pct: compactingPct } : {}) },
-        "Token usage",
+        `${formatSessionID(sessionID, isTask)} ${agent} ${formatModel(modelInfo)} in=${t.input ?? 0} out=${t.output ?? 0} cache=${cache.read ?? 0}/${cache.write ?? 0}${compactingPct !== undefined ? ` ctx=${compactingPct}%` : ""}`,
       )
       return
     }
@@ -243,8 +242,7 @@ export async function handleMessagePartUpdated(
     const pct = contextLimit && contextLimit > 0 ? Math.round((used / contextLimit) * 100) : undefined
 
     ctx.contextLog.info(
-      { session_id: formatSessionID(sessionID, isTask), agent, model: formatModel(modelInfo), input: t.input ?? 0, output: t.output ?? 0, cache_read: cache.read ?? 0, cache_write: cache.write ?? 0, ...(pct !== undefined ? { pct } : {}) },
-      "Token usage",
+      `${formatSessionID(sessionID, isTask)} ${agent} ${formatModel(modelInfo)} in=${t.input ?? 0} out=${t.output ?? 0} cache=${cache.read ?? 0}/${cache.write ?? 0}${pct !== undefined ? ` ctx=${pct}%` : ""}`,
     )
 
     // Store token data + context limit + title in sessionStore

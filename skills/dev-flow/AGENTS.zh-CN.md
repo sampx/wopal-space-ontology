@@ -9,10 +9,8 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 - Parent Rules: `.wopal/AGENTS.md`
 - Commands: `references/commands.md`
-- Plan Authoring & Delegation: `references/plan-authoring.md`
-- Plan Validation: `references/plan-validation.md`
-- TDD Guide: `references/tdd-guide.md`
-- Issue Format & Naming: `references/issue-format.md`
+- Plan Guide: `references/plan-guide.md`
+- Issue Guide: `references/issue-guide.md`
 - Troubleshooting: `references/troubleshooting.md`
 
 ## 2. Architecture and Directories
@@ -24,7 +22,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 | `scripts/commands/` | 子命令实现 (submit, approve, complete, verify, plan, issue, sync, archive, roadmap, decompose, reset) |
 | `scripts/lib/` | 共享库 (git, github, project, workspace, worktree, logging) |
 | `templates/` | Plan 和 Issue 模板 |
-| `references/` | 命令参考、Plan 校验规则、TDD 指南、故障处理 |
+| `references/` | 命令参考、Plan 编写指南、故障处理 |
 | `tests/python/` | unit/ + integration/ 测试 |
 
 ## 3. Development Commands
@@ -74,6 +72,17 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 - 测试支持工具：`tests/python/support/bootstrap.py`
 - **TDD 要求**：新命令或 `scripts/lib/` 模块功能必须先写失败测试，再实现功能使测试通过
 - 修改子命令逻辑后必须运行对应单元测试确认无回归
+
+### 测试隔离与质量规则
+
+**模块级 mock 禁令**：禁止在测试文件顶层用 `sys.modules[name] = MagicMock()` 注入 mock。这种做法会污染全局模块缓存，导致后续测试文件拿到假模块而非真实代码。正确做法是直接 import 真实模块，在函数级用 `@patch` mock 有副作用的函数。
+
+**函数级 mock 原则**：只 mock 有副作用的函数（git 操作、网络请求、日志输出），不要 mock 整个模块。Python 导入模块 = 加载函数定义，不会执行任何副作用。被测函数操作文件系统时必须用 `tempfile.mkdtemp()` 隔离，`tearDown` 中清理。
+
+**测试行为而非实现**：
+- 禁止穷举字典查找表写 N 个 `assertEqual(func("key"), "value")` — 用 `subTest` 参数化
+- 禁止断言精确的输出格式字符串（如 `">> planning <<"`）— 断言返回码和关键子串
+- 禁止对源码做字符串搜索（如 `assert "--merge" not in source`）— 这是实现细节，会随重构失效
 
 ## 6. User-Supplied Rules
 

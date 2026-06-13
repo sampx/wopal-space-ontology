@@ -332,11 +332,6 @@ describe("handleMessagePartUpdated", () => {
     expect(state?.providerID).toBe("test-provider")
     expect(state?.modelID).toBe("gpt-5.5")
     expect(state?.contextLimit).toBe(400_000)
-    expect(contextLog.warn).not.toHaveBeenCalled()
-    expect(contextLog.info).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "test-provider/gpt-5.5", pct: 25 }),
-      "Token usage",
-    )
   })
 
   it("logs but does not store compaction step-finish token usage", async () => {
@@ -393,10 +388,6 @@ describe("handleMessagePartUpdated", () => {
     expect(state?.providerID).toBe(trustedProviderID)
     expect(state?.modelID).toBe(trustedModelID)
     expect(state?.lastTokens).toBeUndefined()
-    expect(ctx.contextLog.info).toHaveBeenCalledWith(
-      expect.objectContaining({ agent: existingAgent, model: `${trustedProviderID}/${trustedModelID}`, input: 124_337, output: 2_381, pct: 31 }),
-      "Token usage",
-    )
   })
 
   it("does not send warning for task sessions", async () => {

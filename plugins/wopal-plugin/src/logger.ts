@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
+import { getRuntimeContext } from "./runtime-context.js"
 
 // ---------------------------------------------------------------------------
 // Level definitions
@@ -29,9 +30,17 @@ export function getMinLevelName(): string {
 }
 
 export function getLogFile(): string {
+  if (process.env.VITEST) {
+    return process.env.WOPAL_PLUGIN_LOG_FILE ?? ""
+  }
   const env = process.env.WOPAL_PLUGIN_LOG_FILE
   if (env) return env
-  return join(process.cwd(), ".wopal-space", "logs", "wopal-plugin.log")
+  try {
+    return join(getRuntimeContext().logDir, "wopal-plugin.log")
+  } catch {
+    // RuntimeContext not yet initialized — fall back to cwd
+    return join(process.cwd(), ".wopal-space", "logs", "wopal-plugin.log")
+  }
 }
 
 function getAllowedModules(): Set<string> | null {
@@ -131,14 +140,13 @@ function ensureLogFile(logFile: string): boolean {
 }
 
 function writeLine(line: string): void {
-  if (process.env.VITEST && !process.env.WOPAL_PLUGIN_LOG_FILE) return
   const logFile = getLogFile()
+  if (!logFile) return
   if (!ensureLogFile(logFile)) return
   try {
     if (!_logInitialized) {
       _logInitialized = true
-      const minLevel = getMinLevel()
-      const clearOnStart = minLevel <= LEVELS["debug"]!
+      const clearOnStart = !process.env.VITEST && getMinLevel() <= LEVELS["debug"]!
       if (clearOnStart) {
         writeFileSync(logFile, line, "utf-8")
       } else {

@@ -56,6 +56,7 @@ from validation import ValidationError as CheckDocValidationError
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root, detect_space_repo
 from lib import project as _project_resolver
+from lib.worktree import parse_worktree_meta
 from workflow import PLAN_STATES
 
 
@@ -255,48 +256,26 @@ def create_plan_from_template(
     
     template_content = template_path.read_text()
     
-    # Build metadata lines
-    if issue_number:
-        issue_line = f"- **Issue**: #{issue_number}"
-    else:
-        issue_line = ""  # Empty for no-issue mode
-    
-    type_line = f"- **Type**: {plan_type}"
-    project_line = f"- **Target Project**: {project}"
-    
-    # Project path and type lines (for ontology-worktree projects)
-    if project_path:
-        project_path_line = f"- **Project Path**: {project_path}"
-    else:
-        project_path_line = ""
-    
-    if project_type:
-        project_type_line = f"- **Project Type**: {project_type}"
-    else:
-        project_type_line = ""
-
-    # Product and phase lines
-    if product:
-        product_line = f"- **Product**: {product}"
-    else:
-        product_line = ""
-
-    if phase:
-        phase_line = f"- **Phase**: {phase}"
-    else:
-        phase_line = ""
+    # Build metadata values (just the value part, not the full line)
+    issue_value = str(issue_number) if issue_number else ""
+    type_value = plan_type
+    project_value = project
+    project_path_value = project_path or ""
+    project_type_value = project_type or ""
+    product_value = product or ""
+    phase_value = phase or ""
 
     created_date = date.today().strftime("%Y-%m-%d")
     
-    # Replace placeholders
+    # Replace placeholders (template shows the full markdown format)
     content = template_content.replace("{plan_name}", plan_name)
-    content = content.replace("{issue_line}", issue_line)
-    content = content.replace("{type_line}", type_line)
-    content = content.replace("{project_line}", project_line)
-    content = content.replace("{project_path_line}", project_path_line)
-    content = content.replace("{project_type_line}", project_type_line)
-    content = content.replace("{product_line}", product_line)
-    content = content.replace("{phase_line}", phase_line)
+    content = content.replace("{issue}", issue_value)
+    content = content.replace("{type}", type_value)
+    content = content.replace("{project}", project_value)
+    content = content.replace("{path}", project_path_value)
+    content = content.replace("{ptype}", project_type_value)
+    content = content.replace("{product}", product_value)
+    content = content.replace("{phase}", phase_value)
     content = content.replace("{date}", created_date)
     
     # Handle --deep and --prd placeholders if present in template
@@ -310,14 +289,22 @@ def create_plan_from_template(
     elif "{prd_path}" in content:
         content = content.replace("{prd_path}", "")
     
-    # Remove empty lines in metadata section (when lines are empty)
+    # Remove metadata lines with empty values (optional fields)
+    # Pattern: "- **Field**: " with nothing after the colon+space
+    content = re.sub(
+        r'^\s*-\s+\*\*[^*]+\*\*:\s*$',
+        '',
+        content,
+        flags=re.MULTILINE,
+    )
+    
+    # Collapse consecutive empty lines
     lines = content.split("\n")
     cleaned_lines = []
     prev_empty = False
     
     for line in lines:
         is_empty = line.strip() == ""
-        # Skip consecutive empty lines
         if is_empty and prev_empty:
             continue
         cleaned_lines.append(line)
@@ -332,73 +319,70 @@ def create_plan_from_template(
 
 
 # ============================================
-# plan command
+# plan command (subcommand dispatch)
 # ============================================
 
 def cmd_plan(args: argparse.Namespace) -> int:
-    """Create a Plan from Issue or from title (no-issue mode).
-    
-    Modes:
-    1. plan new <issue> [--project <name>] [--prd <path>] [--deep]  -- alias for creation
-    2. plan status <plan-id>  -- show Plan status details
-    3. plan list [--issue]  -- list active Plans (optionally with GitHub Issues)
-    4. plan <issue> [--project <name>] [--prd <path>] [--deep] [--check]  -- backward-compatible creation
-    5. plan --title "<title>" --project <name> --type <type> [--scope <scope>]  -- no-issue creation
-    
+    """Dispatch to plan subcommand: new / status / list / check.
+
+    Subcommands:
+      new <issue>|--title TITLE   Create a new Plan
+      status <plan-id>            Show Plan status details
+      list [--issue]              List active Plans
+      check <name-or-path>        Validate Plan against quality gates
+
     Returns:
         0 on success, 1 on error
     """
-    input_ref = args.target
+    sub = getattr(args, "plan_command", None)
 
-    # ========================================
-    # Subcommand dispatch: new / status / list
-    # ========================================
-    if input_ref == "new":
-        # Consume "new" and treat remaining args as bare plan creation
-        args.target = args._extra_target if hasattr(args, '_extra_target') else None
-        if args.target:
-            input_ref = args.target
-        else:
-            log_error("Issue number or Plan name required after 'new'")
-            print("Usage: flow.sh plan new <issue-or-plan> [--project <name>] [--prd <path>] [--deep]")
-            return 1
-    elif input_ref == "status":
-        plan_ref = args._extra_target if hasattr(args, '_extra_target') else None
-        if not plan_ref:
-            log_error("Plan ID required after 'status'")
-            print("Usage: flow.sh plan status <plan-id>")
-            return 1
-        return _cmd_plan_status(plan_ref)
-    elif input_ref == "list":
+    if sub == "new":
+        return _cmd_plan_new(args)
+    if sub == "status":
+        return _cmd_plan_status(args.plan_id)
+    if sub == "list":
         return _cmd_plan_list(args)
+    if sub == "check":
+        return _cmd_plan_check(args)
 
-    # ========================================
-    # Existing plan creation logic (backward-compatible)
-    # ========================================
+    # No subcommand — print usage
+    log_error("Missing plan subcommand.")
+    print("Usage:")
+    print("  flow.sh plan new <issue>")
+    print("  flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>]")
+    print("  flow.sh plan status <plan-id>")
+    print("  flow.sh plan list [--issue]")
+    print("  flow.sh plan check <plan-name-or-path>")
+    return 1
+
+
+def _cmd_plan_new(args: argparse.Namespace) -> int:
+    """Create a new Plan from Issue or from --title (no-issue mode).
+
+    Issue mode:    flow.sh plan new <issue-number>
+    No-issue mode: flow.sh plan new --title "..." --project X --type Y [--scope S]
+    """
     issue_number = None
-    input_ref = args.target
+    if args.issue and re.match(r'^\d+$', args.issue):
+        issue_number = int(args.issue)
     title = args.title
     project = args.project
     plan_type_arg = args.type
     scope_arg = args.scope
     prd_path = args.prd
     deep_mode = args.deep
-    check_only = args.check
-    
+
+    # Validate: either Issue number OR title required (early exit before
+    # touching git, so missing args fail fast without RuntimeError).
+    if not issue_number and not title:
+        log_error("Either Issue number or --title required")
+        print("Usage: flow.sh plan new <issue>")
+        print("   or: flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>]")
+        return 1
+
     workspace_root = find_workspace_root()
     repo = detect_space_repo(workspace_root)
-    
-    # Resolve input_ref: digits → issue_number, string → plan name for check mode
-    if input_ref and re.match(r'^\d+$', input_ref):
-        issue_number = int(input_ref)
-    
-    # Validate: either Issue number OR title required
-    if not input_ref and not title:
-        log_error("Either Issue number, plan name, or --title required")
-        log_error("Usage: flow.sh plan <issue-or-plan> [--project <name>] [--prd <path>] [--deep] [--check]")
-        log_error("   or: flow.sh plan --title \"<title>\" --project <name> --type <type> [--scope <scope>] [--deep] [--check]")
-        return 1
-    
+
     # No-issue mode: require title, project, and type
     if title:
         if not project:
@@ -408,7 +392,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
             log_error("--type required when using --title")
             log_error("Available types: feature, enhance, fix, perf, refactor, docs, chore, test")
             return 1
-        # Validate type
         try:
             plan_type = normalize_plan_type(plan_type_arg)
         except LabelsValidationError as e:
@@ -417,75 +400,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
             return 1
     else:
         plan_type = ""
-    
-    # Resolve scope for no-issue mode
+
     scope = scope_arg or ""
     if title and not scope:
         scope = _resolve_scope_from_title(title)
-    
-    # ========================================
-    # --check mode: find plan and validate
-    # ========================================
-    if check_only:
-        plan_file = None
-        
-        if input_ref and Path(input_ref).exists():
-            # input_ref is already a valid file path
-            plan_file = str(Path(input_ref).resolve())
-        elif issue_number:
-            # Find by Issue
-            try:
-                plan_file = find_plan_by_issue(issue_number, str(workspace_root))
-            except FileNotFoundError:
-                pass
-        elif input_ref:
-            # Find by plan name
-            try:
-                plan_file = find_plan_by_name(input_ref, str(workspace_root))
-            except FileNotFoundError:
-                pass
-        else:
-            # No-issue: reconstruct plan name
-            if not scope:
-                log_error("Scope required for no-issue plans. Add --scope <name> or use title pattern: type(scope): description")
-                return 1
-            
-            slug = _title_to_slug(title)
-            slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-            plan_name = f"{plan_type}-{scope}-{slug}"
-            plan_dir = _resolve_plan_dir(project, workspace_root)
-            plan_file = str(plan_dir / f"{plan_name}.md")
-        
-        if not plan_file or not Path(plan_file).exists():
-            log_error("No plan found")
-            if issue_number:
-                log_error(f"Create plan first: flow.sh plan {issue_number}")
-            elif input_ref:
-                log_error(f"Create plan first: flow.sh plan {input_ref}")
-            else:
-                log_error(f"Create plan first: flow.sh plan --title \"{title}\" --project {project} --type {plan_type} --scope {scope}")
-            return 1
-        
-        # Validate plan
-        try:
-            check_doc_plan(plan_file)
-            log_success("Plan passes validation")
-            if issue_number:
-                print(f"Next: flow.sh approve {issue_number}")
-            elif input_ref:
-                print(f"Next: flow.sh approve {input_ref}")
-            else:
-                # For no-issue, reconstruct plan name for hint
-                slug = _title_to_slug(title)
-                slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-                plan_name = f"{plan_type}-{scope}-{slug}"
-                print(f"Next: flow.sh approve {plan_name}")
-            return 0
-        except CheckDocValidationError as e:
-            log_error("Plan has issues. Fix and re-run with --check")
-            print(str(e))
-            return 1
-    
+
     # Initialize issue context variables (may remain None for no-issue mode)
     issue_product = None
     issue_phase = None
@@ -503,118 +422,83 @@ def cmd_plan(args: argparse.Namespace) -> int:
         except FileNotFoundError:
             # No existing plan, proceed to create
             pass
-    
-    # ========================================
-    # No-issue mode: check existing plan by plan-name
-    # ========================================
-    if input_ref and not issue_number:
-        # Check if input_ref is already a valid file path
-        if Path(input_ref).exists():
-            plan_file = str(Path(input_ref).resolve())
-            _print_existing_plan_info(plan_file, input_ref)
-            return 0
-        # Plan-name lookup
-        try:
-            plan_file = find_plan_by_name(input_ref, str(workspace_root))
-            _print_existing_plan_info(str(plan_file), input_ref)
-            return 0
-        except FileNotFoundError:
-            # No existing plan, proceed to create
-            pass
-    
-    # ========================================
-    # No-issue mode: check existing plan
-    # ========================================
-    if title and scope:
-        slug = _title_to_slug(title)
-        slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-        plan_name = f"{plan_type}-{scope}-{slug}"
-        plan_dir = _resolve_plan_dir(project, workspace_root)
-        plan_file = plan_dir / f"{plan_name}.md"
-        
-        if plan_file.exists():
-            _print_existing_plan_info(str(plan_file), plan_name)
-            return 0
-    
+
     # ========================================
     # Create new plan
     # ========================================
-    issue_project_type = None
-    issue_project_path = None
-    
     if issue_number:
         # Issue mode: fetch info from Issue
         log_info(f"Fetching Issue #{issue_number}")
         issue_info = _get_issue_info(issue_number, repo)
         title = issue_info.get("title", "")
-        
+
         if not title:
             log_error(f"Issue #{issue_number} has no title")
             return 1
-        
+
         # Extract project from labels (or use --project override)
         if not project:
             project = _extract_project_from_labels(issue_info)
-        
+
         if not project:
             log_error(f"Cannot determine project from Issue #{issue_number}")
             log_error("Please add a 'project/<name>' label to the Issue")
             return 1
-        
+
         # Extract type and scope from title
         raw_type = extract_type(title)
         scope = extract_scope(title)
-        
+
         if not scope:
             log_error(f"Issue title missing scope: {title}")
             log_error("Expected format: <type>(<scope>): <description>")
             return 1
-        
+
         if not raw_type:
             log_error(f"Issue title missing type: {title}")
             return 1
-        
+
         # Normalize type
         try:
             plan_type = normalize_plan_type(raw_type)
         except LabelsValidationError as e:
             log_error(str(e))
             return 1
-        
+
         # Generate plan name
         slug = _title_to_slug(title)
         slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-        
+
         try:
             plan_name = make_plan_name(issue_number, plan_type, scope, slug)
         except NamingValidationError as e:
             log_error(str(e))
             return 1
-        
+
         # Extract Project Type and Project Path from Issue body
         issue_project_type, issue_project_path = _extract_project_metadata_from_body(issue_info)
         # Extract Product and Phase from Issue body
         issue_product, issue_phase = _extract_product_phase_from_body(issue_info)
     else:
-        # No-issue mode: use provided title, project, type, scope
+        # No-issue mode: validate scope
         if not scope:
             log_error("Scope required for no-issue plans. Add --scope <name> or use title pattern: type(scope): description")
             return 1
-        
+
         slug = _title_to_slug(title)
         slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-        
+
         try:
             plan_name = make_plan_name(None, plan_type, scope, slug)
         except NamingValidationError as e:
             log_error(str(e))
             return 1
-    
+
     log_info(f"Plan name: {plan_name}")
-    
+
     # Resolve plan directory
     plan_dir = _resolve_plan_dir(project, workspace_root)
-    
+
     # Create plan file from template
     try:
         plan_file = create_plan_from_template(
@@ -635,12 +519,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
     except (FileExistsError, FileNotFoundError) as e:
         log_error(str(e))
         return 1
-    
+
     # Issue mode: Update Issue labels
     if issue_number:
         ensure_label_exists("status/planning", repo)
         sync_status_label_group(issue_number, "status/planning", repo)
-        
+
         # Output summary
         print(f"Plan: {plan_file}")
         print(f"Issue: #{issue_number} | Project: {project} | Status: planning")
@@ -650,8 +534,61 @@ def cmd_plan(args: argparse.Namespace) -> int:
         print(f"Plan: {plan_file}")
         print(f"Project: {project} | Status: planning")
         print(f"Next: flow.sh approve {plan_name}")
-    
+
     return 0
+
+
+def _cmd_plan_check(args: argparse.Namespace) -> int:
+    """Validate a Plan against quality gates.
+
+    Usage: flow.sh plan check <issue-or-name-or-path>
+
+    Accepts:
+      - Issue number (e.g. 42)
+      - Plan name (e.g. chore-ellamaka-merge-upstream-opencode-v11513)
+      - File path to a Plan .md
+    """
+    target = args.target
+    workspace_root = find_workspace_root()
+
+    if not target:
+        log_error("Plan name, Issue number, or file path required")
+        print("Usage: flow.sh plan check <plan-name-or-path>")
+        return 1
+
+    plan_file = None
+
+    # 1. Direct file path
+    if Path(target).exists():
+        plan_file = str(Path(target).resolve())
+    # 2. Issue number
+    elif re.match(r'^\d+$', target):
+        try:
+            plan_file = find_plan_by_issue(int(target), str(workspace_root))
+        except FileNotFoundError:
+            pass
+    # 3. Plan name
+    else:
+        try:
+            plan_file = find_plan_by_name(target, str(workspace_root))
+        except FileNotFoundError:
+            pass
+
+    if not plan_file or not Path(plan_file).exists():
+        log_error(f"No plan found for: {target}")
+        print("Usage: flow.sh plan check <plan-name-or-path>")
+        return 1
+
+    try:
+        check_doc_plan(plan_file)
+        log_success("Plan passes validation")
+        plan_name = Path(plan_file).stem
+        print(f"Next: flow.sh approve {plan_name}")
+        return 0
+    except CheckDocValidationError as e:
+        log_error("Plan has issues. Fix and re-run with --check")
+        print(str(e))
+        return 1
 
 
 # ============================================
@@ -734,7 +671,8 @@ def _cmd_plan_status(input_ref: str) -> int:
         return 1
 
     plan_name = Path(plan_file).stem
-    metadata = _get_plan_metadata(plan_file)
+    active_plan_file = _resolve_active_plan_for_display(Path(plan_file), workspace_root)
+    metadata = _get_plan_metadata(str(active_plan_file))
 
     status = metadata.get('status', 'draft')
     prd = metadata.get('prd', '')
@@ -771,6 +709,8 @@ def _cmd_plan_status(input_ref: str) -> int:
 
     print(f"Plan: {plan_name}")
     print(f"  File: {plan_file}")
+    if active_plan_file != Path(plan_file):
+        print(f"  Active: {active_plan_file} (worktree)")
     print(f"  Status: {status}")
     print(f"  PRD: {prd or '<none>'}")
     print(f"  Created: {created}")
@@ -827,6 +767,43 @@ def _cmd_plan_status(input_ref: str) -> int:
 # ============================================
 
 
+def _resolve_active_plan_for_display(plan_file: str | Path, workspace_root: Path) -> Path:
+    """Resolve the active Plan path for display and metadata reading.
+
+    When a Plan has a worktree and the worktree copy exists, return the worktree
+    copy (which has the latest status and checkbox progress). Otherwise return
+    the original plan file path.
+
+    Args:
+        plan_file: Path to the integration-branch Plan file.
+        workspace_root: Workspace root path.
+
+    Returns:
+        Path to the active Plan file (worktree copy or original).
+    """
+    plan_path = Path(plan_file) if isinstance(plan_file, str) else plan_file
+
+    wt_meta = parse_worktree_meta(str(plan_path))
+    if wt_meta is None:
+        return plan_path
+
+    wt_rel_path = wt_meta.get("path", "")
+    if not wt_rel_path:
+        return plan_path
+
+    # Compute the repo-relative path of the Plan within its git repo
+    plan_loc = _project_resolver.resolve_plan_location(plan_path, workspace_root)
+    repo_relative = plan_loc.repo_relative_path
+
+    # Construct the worktree Plan path
+    worktree_plan = workspace_root / wt_rel_path / repo_relative
+
+    if worktree_plan.exists():
+        return worktree_plan
+
+    return plan_path
+
+
 def _scan_local_plans(workspace_root: str | Path) -> list[dict]:
     """Scan local Plan files (excluding done/ directories).
 
@@ -859,7 +836,8 @@ def _scan_local_plans(workspace_root: str | Path) -> list[dict]:
                 continue
 
             plan_name = f.stem
-            metadata = _get_plan_metadata(str(f))
+            active_file = _resolve_active_plan_for_display(f, ws)
+            metadata = _get_plan_metadata(str(active_file))
             status = metadata.get('status', 'draft')
             issue_str = metadata.get('issue', '')
 
@@ -1026,61 +1004,102 @@ def _cmd_plan_list_with_issue(local_plans: list[dict], workspace_root: Path) -> 
 # ============================================
 
 def register_plan_parser(subparsers: argparse._SubParsersAction) -> None:
-    """Register plan subcommand."""
+    """Register plan subcommand.
+
+    Subcommands:
+      new <issue>                                Create from Issue
+      new --title TITLE --project X --type Y     Create from title (no-issue mode)
+      status <plan-id>                           Show Plan status
+      list [--issue]                             List active Plans
+      check <plan-name-or-path>                  Validate Plan
+    """
     plan_parser = subparsers.add_parser(
         "plan",
-        help="Plan commands: create, show status, list active plans",
-        description="Plan lifecycle commands.\n\n"
-        "Subcommands:\n"
-        "  plan new <issue>   Create a new Plan\n"
-        "  plan status <id>   Show Plan status details\n"
-        "  plan list [--issue] List active Plans\n"
-        "  plan <issue>        Create Plan (backward-compatible)",
+        help="Plan lifecycle: new / status / list / check",
+        description=(
+            "Plan lifecycle commands.\n\n"
+            "Subcommands:\n"
+            "  new <issue>                            Create from Issue number\n"
+            "  new --title TITLE --project X --type Y Create from title (no-issue mode)\n"
+            "  status <plan-id>                       Show Plan status details\n"
+            "  list [--issue]                         List active Plans\n"
+            "  check <plan-name-or-path>              Validate Plan against quality gates"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    plan_parser.add_argument(
-        "target",
-        nargs="?",
-        help="Subcommand (new/status/list) or Issue number or Plan name"
+
+    plan_subparsers = plan_parser.add_subparsers(
+        dest="plan_command",
+        metavar="<new|status|list|check>",
     )
-    plan_parser.add_argument(
-        "_extra_target",
-        nargs="?",
-        help="(internal) second positional arg for status/new subcommands"
+
+    # ---- plan new ----
+    new_parser = plan_subparsers.add_parser(
+        "new",
+        help="Create a new Plan",
+        description="Create a new Plan from Issue or from --title.",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
+        "issue",
+        nargs="?",
+        help="Issue number (Issue mode). Omit to use --title (no-issue mode).",
+    )
+    new_parser.add_argument(
         "--title",
-        help="Plan title (required in no-issue mode, format: type(scope): description)"
+        help="Plan title in no-issue mode, format: type(scope): description",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
         "--project",
-        help="Target Project name (extracted from Issue labels in issue mode, required in no-issue mode)"
+        help="Target Project name (required in no-issue mode)",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
         "--type",
-        help="Plan type: feature, enhance, fix, perf, refactor, docs, chore, test (required in no-issue mode)"
+        help="Plan type: feature, enhance, fix, perf, refactor, docs, chore, test (required in no-issue mode)",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
         "--scope",
-        help="Scope identifier (extracted from title pattern in no-issue mode if omitted)"
+        help="Scope identifier (no-issue mode; auto-extracted from title pattern if omitted)",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
         "--prd",
-        help="PRD file path to reference in plan"
+        help="PRD file path to reference in plan",
     )
-    plan_parser.add_argument(
+    new_parser.add_argument(
         "--deep",
         action="store_true",
-        help="Enable deep mode for enhanced plan structure"
+        help="Enable deep mode for enhanced plan structure",
     )
-    plan_parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check existing plan validation instead of creating new plan"
+
+    # ---- plan status ----
+    status_parser = plan_subparsers.add_parser(
+        "status",
+        help="Show Plan status details",
+        description="Show Plan status, Issue info, and worktree state.",
     )
-    plan_parser.add_argument(
+    status_parser.add_argument(
+        "plan_id",
+        help="Issue number or Plan name",
+    )
+
+    # ---- plan list ----
+    list_parser = plan_subparsers.add_parser(
+        "list",
+        help="List active Plans",
+        description="List active Plans (--issue to merge with GitHub Issues).",
+    )
+    list_parser.add_argument(
         "--issue",
         action="store_true",
-        dest="issue",
-        help="Include GitHub Issues in plan list output"
+        help="Include GitHub Issues in output",
+    )
+
+    # ---- plan check ----
+    check_parser = plan_subparsers.add_parser(
+        "check",
+        help="Validate Plan against quality gates",
+        description="Run validation checks on a Plan file.",
+    )
+    check_parser.add_argument(
+        "target",
+        help="Issue number, Plan name, or path to Plan file",
     )
