@@ -26,18 +26,18 @@ import type {
 // Sound effects now use api.attention for playback
 // instead of external audio processes. See tui() entry for initialization.
 
-let attention: { notify: (opts: { sound?: unknown }) => Promise<unknown>; soundboard: { activate: (id: string) => boolean } } | undefined
+let attention: { notify: (opts: { message?: string; notification?: false; sound?: { name?: string; when?: string; volume?: number } }) => Promise<unknown>; soundboard: { activate: (id: string) => boolean } } | undefined
 
 function soundStart() {
-  attention?.notify({ sound: { name: "permission" } })
+  void attention?.notify({ message: " ", notification: false, sound: { name: "permission", when: "always" } })
 }
 
 function soundStop() {
   // no-op: attention API manages its own lifecycle
 }
 
-function soundPulse() {
-  attention?.soundboard.activate("default")
+function soundPulse(volume = 1) {
+  void attention?.notify({ message: " ", notification: false, sound: { name: "default", when: "always", volume } })
 }
 
 function soundDispose() {
@@ -212,6 +212,24 @@ function key(x: number, y: number) {
 
 // ─── Color Utilities ─────────────────────────────────────────────────
 
+type Color = RGBA
+
+type ThemeLike = {
+  primary: Color
+  background: Color
+  text: Color
+  textMuted: Color
+}
+
+function extractTheme(theme: { primary: RGBA; background: RGBA; text: RGBA; textMuted: RGBA }): ThemeLike {
+  return {
+    primary: theme.primary,
+    background: theme.background,
+    text: theme.text,
+    textMuted: theme.textMuted,
+  }
+}
+
 function tint(base: Color, overlay: Color, alpha: number): Color {
   const r = base.r + (overlay.r - base.r) * alpha;
   const g = base.g + (overlay.g - base.g) * alpha;
@@ -343,6 +361,20 @@ function build(shape: LogoShape): LogoContext {
   const SPAN = Math.hypot(FULL[0]?.length ?? 0, FULL.length * 2) * 0.94;
   return { LEFT, FULL, SPAN, MAP: mapGlyphs(FULL), shape };
 }
+
+const LOGO_LEFT = [
+  "                 ",
+  "█▀▀▀ █   █   █▀▀█",
+  "█▀▀▀ █   █   █▀▀█",
+  "▀▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀",
+];
+
+const LOGO_RIGHT = [
+  "                    ",
+  "█▀▀▀█ █▀▀█ █  ▀ █▀▀█",
+  "█ ▀ █ █▀▀█ █▀▀  █▀▀█",
+  "▀ ▀ ▀ ▀  ▀ ▀  ▀ ▀  ▀",
+];
 
 const CTX = build({ left: LOGO_LEFT, right: LOGO_RIGHT });
 
