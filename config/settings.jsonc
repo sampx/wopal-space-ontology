@@ -90,6 +90,10 @@
           "label": "WOPALSPACE"
         }
       ]
-    ]
+    ],
+    "attention": {
+      "enabled": true,
+      "sound": true
+    }
   }
 }

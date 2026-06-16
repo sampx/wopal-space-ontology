@@ -26,10 +26,10 @@ import type {
 // Sound effects now use api.attention for playback
 // instead of external audio processes. See tui() entry for initialization.
 
-let attention: { notify: (opts: { message?: string; notification?: false; sound?: { name?: string; when?: string; volume?: number } }) => Promise<unknown>; soundboard: { activate: (id: string) => boolean } } | undefined
+let attention: { notify: (opts: { message?: string; notification?: false; sound?: { name?: string; when?: string; volume?: number } }) => Promise<unknown> } | undefined
 
 function soundStart() {
-  void attention?.notify({ message: " ", notification: false, sound: { name: "permission", when: "always" } })
+  void attention?.notify({ message: "·", notification: false, sound: { name: "permission", when: "always" } })
 }
 
 function soundStop() {
@@ -37,7 +37,7 @@ function soundStop() {
 }
 
 function soundPulse(volume = 1) {
-  void attention?.notify({ message: " ", notification: false, sound: { name: "default", when: "always", volume } })
+  void attention?.notify({ message: "·", notification: false, sound: { name: "default", when: "always", volume } })
 }
 
 function soundDispose() {
@@ -1120,11 +1120,19 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
 const tui: TuiPlugin = async (api, options) => {
   if (options?.enabled === false) return;
   attention = api.attention
+  api.attention.soundboard.registerPack({
+    id: "wopal-space",
+    name: "WopalSpace",
+    sounds: {
+      permission: "./asset/charge.wav",
+      default: "./asset/pulse-a.wav",
+    },
+  })
+  api.attention.soundboard.activate("wopal-space")
   await api.theme.install("./ellamaka-theme.json");
   api.theme.set("ellamaka-theme");
   const theme = extractTheme(api.theme.current);
   api.slots.register(branding(theme, options?.label));
-  api.attention.notify({ sound: { name: "default", when: "blurred" } })
 };
 
 const plugin: TuiPluginModule & { id: string } = {
