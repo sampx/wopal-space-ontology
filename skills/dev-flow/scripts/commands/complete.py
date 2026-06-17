@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.logging import log_info, log_success, log_error, log_warn
+from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root
 from workflow import update_plan_status
 from workflow import guard_status, resolve_space_repo
@@ -30,9 +30,9 @@ from plan import (
     set_plan_field,
     get_plan_field,
 )
-from lib.git import is_repo_dirty, commit_paths
+from lib.git import is_repo_dirty, commit_paths, get_dirty_lines
 from plan import resolve_project_path
-from lib.worktree import resolve_active_plan, ResolveActivePlanError
+from lib.worktree import resolve_active_plan, parse_worktree_context, ResolveActivePlanError
 from validation import (
     ValidationError,
     check_acceptance_criteria,
@@ -128,6 +128,80 @@ def _build_plan_only_commit_msg(plan_issue: int | None, plan_name: str) -> str:
 
 
 # ============================================
+# Verification guidance helpers
+# ============================================
+
+
+def _get_git_porcelain(cwd: str) -> list[str]:
+    """Run git status --porcelain and return non-empty lines."""
+    return get_dirty_lines(cwd)
+
+
+def _print_standard_verification_guidance(wt_ctx, issue, workspace_root, plan_path) -> None:
+    """Print verification options for standard projects.
+
+    Shows both worktree-verify and branch-switch options with canonical path status.
+    """
+    from lib.worktree import WorktreeContext
+
+    assert isinstance(wt_ctx, WorktreeContext)
+
+    # Get repo_root from Plan metadata Project Path
+    project = get_plan_field(plan_path, "Target Project")
+    repo_path = resolve_project_path(plan_path, project, workspace_root)
+    repo_root = str(repo_path) if repo_path else ""
+
+    worktree_path = str(workspace_root / wt_ctx.path) if not Path(wt_ctx.path).is_absolute() else str(wt_ctx.path)
+
+    # Check canonical path dirty status
+    dirty_lines = _get_git_porcelain(repo_root)
+
+    print("")
+    log_step("Canonical path check")
+    if dirty_lines:
+        log_warn(f"Canonical path ({repo_root}) has {len(dirty_lines)} uncommitted files")
+    else:
+        log_info(f"Canonical path ({repo_root}) is clean")
+
+    print("")
+    print("### Verification Options")
+    print("")
+    print(f"  A) Verify in worktree: {worktree_path}")
+    print("     After verification, manually merge feature branch to integration.")
+    print("")
+    print(f"  B) Switch branch: flow.sh verify-switch {issue}")
+    print("     Run verify-switch to checkout feature branch at canonical path, then verify.")
+
+
+def _print_ontology_verification_guidance(wt_ctx, issue, workspace_root) -> None:
+    """Print verification options for ontology-worktree projects.
+
+    Only branch-switch is available; ellamaka loads runtime from .wopal/.
+    """
+    from lib.worktree import WorktreeContext
+
+    assert isinstance(wt_ctx, WorktreeContext)
+
+    wopal_path = str(workspace_root / ".wopal")
+
+    # Check .wopal/ dirty status
+    dirty_lines = _get_git_porcelain(wopal_path)
+
+    print("")
+    log_step("Ontology path check")
+    if dirty_lines:
+        log_warn(f".wopal/ has {len(dirty_lines)} uncommitted files")
+    else:
+        log_info(f".wopal/ is clean")
+
+    print("")
+    print("### Verification Option")
+    print("")
+    print(f"  flow.sh verify-switch {issue}")
+    print("  After verify-switch, restart ellamaka to verify ontology changes.")
+
+
+# ============================================
 # complete command
 # ============================================
 
@@ -203,8 +277,10 @@ def cmd_complete(args: argparse.Namespace) -> int:
         log_error(f"After completing, run: flow.sh complete {input_ref}")
         return 1
 
-    # 7. Dirty working tree check — block if uncommitted changes exist
-    if is_repo_dirty(str(active.commit_repo_root)):
+    # 7. Dirty working tree check — block if uncommitted implementation code exists.
+    # Plan file dirty is allowed here: AC checkbox marks are Plan-only changes
+    # that complete will commit together with the status transition.
+    if is_repo_dirty(str(active.commit_repo_root), ignore_paths=[str(active.active_plan_path)]):
         log_error("实施工作树有未提交的变更 — complete 不提交实施代码")
         log_error("")
         log_error("请先提交或储藏未提交的变更:")
@@ -283,6 +359,22 @@ def cmd_complete(args: argparse.Namespace) -> int:
             return 1
         log_success(f"Plan status updated: {target_status}")
 
+        # Store feature branch tip SHA for robust merge detection in verify --confirm.
+        # Using commit SHA allows ancestry check without depending on branch ref existence.
+        wt_meta = get_plan_worktree(plan_path)
+        if wt_meta and wt_meta.get("branch"):
+            sha_result = subprocess.run(
+                ["git", "rev-parse", wt_meta["branch"]],
+                cwd=str(active.commit_repo_root),
+                capture_output=True, text=True,
+            )
+            if sha_result.returncode == 0 and sha_result.stdout.strip():
+                set_plan_field(
+                    str(active.active_plan_path),
+                    "Verification Commit",
+                    sha_result.stdout.strip(),
+                )
+
         # Plan-only commit
         commit_msg = _build_plan_only_commit_msg(plan_issue, plan_name)
         if not commit_paths(str(active.commit_repo_root), [active.repo_relative_plan_path], commit_msg):
@@ -304,6 +396,17 @@ def cmd_complete(args: argparse.Namespace) -> int:
         if plan_issue:
             print("")
             print(f"Issue: #{plan_issue}")
+
+        # Verification guidance — print canonical path status and options
+        try:
+            wt_ctx = parse_worktree_context(plan_path)
+            project_type = get_plan_field(plan_path, "Project Type") or "standard"
+            if wt_ctx and project_type == "ontology-worktree":
+                _print_ontology_verification_guidance(wt_ctx, next_ref, workspace_root)
+            elif wt_ctx:
+                _print_standard_verification_guidance(wt_ctx, next_ref, workspace_root, plan_path)
+        except Exception as e:
+            log_warn(f"Failed to generate verification guidance: {e}")
 
     return 0
 

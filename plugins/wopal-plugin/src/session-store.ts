@@ -143,6 +143,7 @@ export class SessionStore {
     this.upsert(sessionID, (state) => {
       state.isCompacting = false;
       delete state.compactingSince;
+      delete state.lastTokens;
       // DO NOT delete compactingTrigger here — event-router reads it to distinguish Plugin-initiated
       state.needsAutoContinue = true;
 

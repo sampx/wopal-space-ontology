@@ -20,90 +20,28 @@ import type {
   TuiPluginModule,
   TuiSlotPlugin,
 } from "@opencode-ai/plugin/tui";
-import { join } from "node:path";
-
-type Color = RGBA;
-
-const LOGO_LEFT = [
-  "                 ",
-  "█▀▀▀ █   █   █▀▀█",
-  "█▀▀▀ █   █   █▀▀█",
-  "▀▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀",
-];
-
-const LOGO_RIGHT = [
-  "                    ",
-  "█▀▀▀█ █▀▀█ █  ▀ █▀▀█",
-  "█ ▀ █ █▀▀█ █▀▀  █▀▀█",
-  "▀ ▀ ▀ ▀  ▀ ▀  ▀ ▀  ▀",
-];
-
-const ASSET_DIR = import.meta.dir + "/asset";
-const PULSE_FILES = ["pulse-a.wav", "pulse-b.wav", "pulse-c.wav"];
-
-type ThemeLike = {
-  primary: Color;
-  background: Color;
-  text: Color;
-  textMuted: Color;
-};
-
-const ink = (
-  map: Record<string, unknown>,
-  name: string,
-  fallback: string,
-): Color => {
-  const value = map[name];
-  if (value instanceof RGBA) return value;
-  if (typeof value === "string") return RGBA.fromHex(value);
-  return RGBA.fromHex(fallback);
-};
-
-const extractTheme = (map: Record<string, unknown>): ThemeLike => ({
-  primary: ink(map, "primary", "#5E81AC"),
-  background: ink(map, "background", "#2E3440"),
-  text: ink(map, "text", "#ECEFF4"),
-  textMuted: ink(map, "textMuted", "#8B95A7"),
-});
 
 // ─── Sound ───────────────────────────────────────────────────────────
 
-let humProc: ReturnType<typeof Bun.spawn> | undefined;
-let shot = 0;
+// Sound effects now use api.attention for playback
+// instead of external audio processes. See tui() entry for initialization.
+
+let attention: { notify: (opts: { message?: string; notification?: false; sound?: { name?: string; when?: string; volume?: number } }) => Promise<unknown> } | undefined
 
 function soundStart() {
-  soundStop();
-  try {
-    humProc = Bun.spawn(["afplay", join(ASSET_DIR, "charge.wav")], {
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-  } catch {}
+  void attention?.notify({ message: "·", notification: false, sound: { name: "permission", when: "always" } })
 }
 
 function soundStop() {
-  if (humProc) {
-    try {
-      humProc.kill();
-    } catch {}
-    humProc = undefined;
-  }
+  // no-op: attention API manages its own lifecycle
 }
 
-function soundPulse(_scale = 1) {
-  const file = PULSE_FILES[shot++ % PULSE_FILES.length];
-  try {
-    Bun.spawn(["afplay", join(ASSET_DIR, file)], {
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-  } catch {}
+function soundPulse(volume = 1) {
+  void attention?.notify({ message: "·", notification: false, sound: { name: "default", when: "always", volume } })
 }
 
 function soundDispose() {
-  soundStop();
+  // no-op
 }
 
 // ─── Animation Constants ─────────────────────────────────────────────
@@ -274,6 +212,24 @@ function key(x: number, y: number) {
 
 // ─── Color Utilities ─────────────────────────────────────────────────
 
+type Color = RGBA
+
+type ThemeLike = {
+  primary: Color
+  background: Color
+  text: Color
+  textMuted: Color
+}
+
+function extractTheme(theme: { primary: RGBA; background: RGBA; text: RGBA; textMuted: RGBA }): ThemeLike {
+  return {
+    primary: theme.primary,
+    background: theme.background,
+    text: theme.text,
+    textMuted: theme.textMuted,
+  }
+}
+
 function tint(base: Color, overlay: Color, alpha: number): Color {
   const r = base.r + (overlay.r - base.r) * alpha;
   const g = base.g + (overlay.g - base.g) * alpha;
@@ -405,6 +361,20 @@ function build(shape: LogoShape): LogoContext {
   const SPAN = Math.hypot(FULL[0]?.length ?? 0, FULL.length * 2) * 0.94;
   return { LEFT, FULL, SPAN, MAP: mapGlyphs(FULL), shape };
 }
+
+const LOGO_LEFT = [
+  "                 ",
+  "█▀▀▀ █   █   █▀▀█",
+  "█▀▀▀ █   █   █▀▀█",
+  "▀▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀",
+];
+
+const LOGO_RIGHT = [
+  "                    ",
+  "█▀▀▀█ █▀▀█ █  ▀ █▀▀█",
+  "█ ▀ █ █▀▀█ █▀▀  █▀▀█",
+  "▀ ▀ ▀ ▀  ▀ ▀  ▀ ▀  ▀",
+];
 
 const CTX = build({ left: LOGO_LEFT, right: LOGO_RIGHT });
 
@@ -1149,6 +1119,16 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
 
 const tui: TuiPlugin = async (api, options) => {
   if (options?.enabled === false) return;
+  attention = api.attention
+  api.attention.soundboard.registerPack({
+    id: "wopal-space",
+    name: "WopalSpace",
+    sounds: {
+      permission: "./asset/charge.wav",
+      default: "./asset/pulse-a.wav",
+    },
+  })
+  api.attention.soundboard.activate("wopal-space")
   await api.theme.install("./ellamaka-theme.json");
   api.theme.set("ellamaka-theme");
   const theme = extractTheme(api.theme.current);

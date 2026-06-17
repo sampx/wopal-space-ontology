@@ -29,26 +29,17 @@ from lib.project import resolve_plan_location
 class WorktreeContext:
     """Structured worktree configuration stored in Plan metadata.
 
-    Fields:
-        enabled: Whether worktree isolation is active
-        project_type: "standard" or "ontology-worktree"
+    Minimal fields written by write_worktree_context:
         branch: Worktree branch name
         path: Worktree directory path (relative to workspace root)
-        repo_root: Git repo root for the worktree
-        base_branch: Branch the worktree was created from
-        merge_target: Target branch for merging (usually same as base_branch)
-        verify_mode: "direct" (standard) or "switch-runtime" (ontology-worktree)
-        cleanup_policy: "archive" (auto-cleanup) or "manual"
+        project_type: "standard" or "ontology-worktree" (from Plan metadata)
+
+    Other info read from Plan Metadata:
+        Project Path: repo root path (used instead of repo_root)
     """
-    enabled: bool
-    project_type: str  # "standard" | "ontology-worktree"
     branch: str
     path: Path
-    repo_root: Path
-    base_branch: str
-    merge_target: str
-    verify_mode: str  # "direct" | "switch-runtime"
-    cleanup_policy: str  # "archive" | "manual"
+    project_type: str = "standard"  # "standard" | "ontology-worktree"
 
 
 def _worktree_field_name(field: str) -> str:
@@ -78,44 +69,42 @@ def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
 
     content = path.read_text()
 
+    # Extract only the ## Metadata section to avoid matching
+    # Worktree placeholders in design/scope sections.
+    metadata_section = _extract_metadata_section(content)
+
     # Try new structured format first
-    ctx = _parse_structured_worktree(content)
+    ctx = _parse_structured_worktree(metadata_section)
     if ctx is not None:
+        # Read project_type from Plan metadata if not in WorktreeContext
         if ctx.project_type == 'standard':
-            meta_type = _read_plan_project_type(content)
+            meta_type = _read_plan_project_type(metadata_section)
             if meta_type and meta_type != 'standard':
-                ctx = WorktreeContext(
-                    enabled=ctx.enabled,
-                    project_type=meta_type,
-                    branch=ctx.branch,
-                    path=ctx.path,
-                    repo_root=ctx.repo_root,
-                    base_branch=ctx.base_branch,
-                    merge_target=ctx.merge_target,
-                    verify_mode=ctx.verify_mode,
-                    cleanup_policy=ctx.cleanup_policy,
-                )
+                ctx.project_type = meta_type
         return ctx
 
     # Fallback to legacy format: "- **Worktree**: branch | path"
-    ctx = _parse_legacy_worktree(content)
+    ctx = _parse_legacy_worktree(metadata_section)
     if ctx is not None:
-        meta_type = _read_plan_project_type(content)
+        # Read project_type from Plan metadata
+        meta_type = _read_plan_project_type(metadata_section)
         if meta_type:
-            ctx = WorktreeContext(
-                enabled=ctx.enabled,
-                project_type=meta_type,
-                branch=ctx.branch,
-                path=ctx.path,
-                repo_root=ctx.repo_root,
-                base_branch=ctx.base_branch,
-                merge_target=ctx.merge_target,
-                verify_mode=ctx.verify_mode,
-                cleanup_policy=ctx.cleanup_policy,
-            )
+            ctx.project_type = meta_type
         return ctx
 
     return None
+
+
+def _extract_metadata_section(content: str) -> str:
+    """Extract content between '## Metadata' and the next '## ' heading.
+
+    Falls back to full content if no Metadata heading is found.
+    """
+    pattern = r'^## Metadata\s*\n(.*?)(?=^## |\Z)'
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+    if match:
+        return match.group(1)
+    return content
 
 
 def _read_plan_project_type(content: str) -> str | None:
@@ -166,15 +155,9 @@ def _parse_structured_worktree(content: str) -> WorktreeContext | None:
     # Build WorktreeContext from parsed kv
     try:
         return WorktreeContext(
-            enabled=kv.get('enabled', 'false').lower() == 'true',
-            project_type=kv.get('project_type', 'standard'),
             branch=kv.get('branch', ''),
             path=Path(kv.get('path', '')),
-            repo_root=Path(kv.get('repo_root', '')),
-            base_branch=kv.get('base_branch', 'main'),
-            merge_target=kv.get('merge_target', kv.get('base_branch', 'main')),
-            verify_mode=kv.get('verify_mode', 'direct'),
-            cleanup_policy=kv.get('cleanup_policy', 'archive'),
+            project_type=kv.get('project_type', 'standard'),
         )
     except Exception:
         return None
@@ -199,15 +182,9 @@ def _parse_legacy_worktree(content: str) -> WorktreeContext | None:
         return None
 
     return WorktreeContext(
-        enabled=True,
-        project_type='standard',
         branch=branch,
         path=Path(wt_path),
-        repo_root=Path(''),
-        base_branch='main',
-        merge_target='main',
-        verify_mode='direct',
-        cleanup_policy='archive',
+        project_type='standard',
     )
 
 
@@ -386,25 +363,9 @@ def resolve_active_plan(
             branch_context="integration",
         )
 
-    # Step 4: verify + unmerged -> block
+    # Step 4: verify → return main Plan on integration branch.
+    # Merge detection is verify.py's sole responsibility (single source of truth).
     if command_phase == "verify":
-        # Check if the feature branch has been merged into the integration branch
-        # using git ancestry, not just current branch name
-        from lib.git import is_branch_merged as _is_merged, get_current_branch as _get_branch
-
-        current_branch = _get_branch(str(main_loc.repo_root))
-        if current_branch and current_branch == branch:
-            # Still on feature branch — definitely not merged
-            raise ResolveActivePlanError(
-                f"Feature branch '{branch}' has not been merged. "
-                f"Run verify-switch and merge manually before verify."
-            )
-        # Even on integration branch, verify feature is actually merged
-        if branch and not _is_merged(branch, current_branch or "HEAD", str(main_loc.repo_root)):
-            raise ResolveActivePlanError(
-                f"Feature branch '{branch}' has not been merged into '{current_branch}'. "
-                f"Run verify-switch and merge manually before verify."
-            )
         return ActivePlanInfo(
             active_plan_path=main_plan,
             commit_repo_root=main_loc.repo_root,

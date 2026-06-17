@@ -45,7 +45,7 @@ from lib.git import (
     is_repo_dirty,
     get_current_branch,
 )
-from lib.plan_commit import commit_and_push_plan
+from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 from lib.worktree import create_worktree, write_worktree_context
 
 
@@ -218,11 +218,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     project = get_plan_project(plan_path)
     
     # --- Preflight Check 1: Target Project dirty workspace ---
+    # Exclude Plan file itself from dirty check — approve will commit it as part of state transition
     project_path = resolve_project_path(plan_path, project, workspace_root) if project else None
     dirty_workspace = False
-    
+
     if project_path:
-        dirty_workspace = is_repo_dirty(str(project_path))
+        dirty_workspace = is_repo_dirty(str(project_path), ignore_paths=[plan_path])
     
     # --- Preflight: compute worktree parameters ---
     worktree_created = False
@@ -312,8 +313,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     log_success("Plan status updated to: executing")
     
     # Commit/push the Plan baseline (executing + Worktree metadata) on integration branch
-    if not commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve"):
-        log_error("Failed to commit/push Plan baseline")
+    result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve")
+    if result == RESULT_PUSH_FAILED:
+        log_error("Approve succeeded locally but push failed. See error above.")
+        return 1
+    if result != RESULT_OK:
+        log_error("Failed to commit Plan baseline")
         return 1
     
     # ============================================

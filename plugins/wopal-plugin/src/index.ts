@@ -20,12 +20,15 @@ import { registerManagerForCleanup } from "./lifecycle/process-cleanup.js";
 import { createWopalTools } from "./tools/index.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { setPluginDirectory } from "./memory/prompts.js";
+import { initRuntimeContext, getRuntimeContext } from "./runtime-context.js";
 
 
 
-function loadWopalEnv(rootDir: string): void {
-  const envPath = join(rootDir, ".wopal", ".env");
+/**
+ * Parse a single .env file, loading WOPAL_-prefixed variables.
+ * Keys in preExisting are skipped (already set before loadWopalEnv was called).
+ */
+function loadEnvFile(envPath: string, preExisting: Set<string>): void {
   if (!existsSync(envPath)) return;
 
   coreLogger.debug(`Loading env: ${envPath}`);
@@ -38,12 +41,37 @@ function loadWopalEnv(rootDir: string): void {
       if (eqIdx === -1) continue;
       const key = trimmed.slice(0, eqIdx).trim();
       const value = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
-      if (key.startsWith("WOPAL_") && !process.env[key]) {
+      if (key.startsWith("WOPAL_") && !preExisting.has(key)) {
         process.env[key] = value;
       }
     }
   } catch (err) {
     coreLogger.warn({ err }, "Failed to load .env");
+  }
+}
+
+/**
+ * Load environment variables in two layers:
+ * 1. User-level: WOPAL_HOME/.env
+ * 2. Space-level (if wopal-space): <spaceRoot>/.wopal/.env
+ *
+ * Priority: process.env pre-existing > space-level > user-level.
+ * Requires RuntimeContext to be initialized first.
+ */
+export function loadWopalEnv(): void {
+  const runtimeCtx = getRuntimeContext();
+
+  // Snapshot pre-existing WOPAL_ keys so we never overwrite them
+  const preExisting = new Set(
+    Object.keys(process.env).filter((k) => k.startsWith("WOPAL_"))
+  );
+
+  // Layer 1: user-level env
+  loadEnvFile(join(runtimeCtx.wopalHome, ".env"), preExisting);
+
+  // Layer 2: space-level env (overrides user-level if present)
+  if (runtimeCtx.isWopalSpace) {
+    loadEnvFile(join(runtimeCtx.spaceRoot!, ".wopal", ".env"), preExisting);
   }
 }
 
@@ -88,13 +116,23 @@ const openCodeRulesPlugin = async (pluginInput: PluginInput): Promise<Hooks> => 
   const { directory } = pluginInput;
 
   coreLogger.debug(`Loading plugin: ${directory}`);
-  loadWopalEnv(directory);
-  setPluginDirectory(directory);
+  const runtimeCtx = initRuntimeContext(directory);
+  coreLogger.info({
+    wopal_space: runtimeCtx.isWopalSpace,
+    ...(runtimeCtx.spaceRoot ? { space_root: runtimeCtx.spaceRoot } : {}),
+    wopal_home: runtimeCtx.wopalHome,
+  }, "Runtime context initialized");
+  loadWopalEnv();
 
   // Read switches after loadWopalEnv (ensure .env has taken effect)
   const rulesInjectionEnabled = process.env.WOPAL_RULES_INJECTION_ENABLED !== "false";
   const memoryEnabled = process.env.WOPAL_MEMORY_ENABLED !== "false";
   const memoryInjectionEnabled = process.env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
+  coreLogger.debug({
+    rules_injection: rulesInjectionEnabled,
+    memory: memoryEnabled,
+    memory_injection: memoryInjectionEnabled,
+  }, "Feature switches");
 
   // Rules module initialization
   let ruleFiles: DiscoveredRule[];

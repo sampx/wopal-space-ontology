@@ -387,3 +387,196 @@ describe("MonitorEngine registration", () => {
     expect(indexSource).toBe("index loaded");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Two-layer env loading
+// ---------------------------------------------------------------------------
+
+describe("Two-layer env loading", () => {
+  let envTestDir: string;
+  let wopalHomeDir: string;
+  let savedWopalHome: string | undefined;
+  let savedWopalSpaceRoot: string | undefined;
+  let savedInjectionEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    envTestDir = mkdtempSync(path.join(os.tmpdir(), "wopal-env-test-"));
+    wopalHomeDir = path.join(envTestDir, "wopal-home");
+    mkdirSync(path.join(wopalHomeDir, ".wopal"), { recursive: true });
+    mkdirSync(path.join(wopalHomeDir, "logs"), { recursive: true });
+
+    savedWopalHome = process.env.WOPAL_HOME;
+    savedWopalSpaceRoot = process.env.WOPAL_SPACE_ROOT;
+    savedInjectionEnv = {
+      WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
+      WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
+      WOPAL_MEMORY_ENABLED: process.env.WOPAL_MEMORY_ENABLED,
+    };
+    delete process.env.WOPAL_RULES_INJECTION_ENABLED;
+    delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
+    delete process.env.WOPAL_MEMORY_ENABLED;
+    delete process.env.WOPAL_HOME;
+    delete process.env.WOPAL_SPACE_ROOT;
+  });
+
+  afterEach(() => {
+    if (savedWopalHome !== undefined) {
+      process.env.WOPAL_HOME = savedWopalHome;
+    } else {
+      delete process.env.WOPAL_HOME;
+    }
+    if (savedWopalSpaceRoot !== undefined) {
+      process.env.WOPAL_SPACE_ROOT = savedWopalSpaceRoot;
+    } else {
+      delete process.env.WOPAL_SPACE_ROOT;
+    }
+    for (const [key, value] of Object.entries(savedInjectionEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
+    if (envTestDir) {
+      rmSync(envTestDir, { recursive: true, force: true });
+    }
+    resetSessionState();
+  });
+
+  it("loads user-level env from WOPAL_HOME/.env", async () => {
+    process.env.WOPAL_HOME = wopalHomeDir;
+
+    // Create user-level .env
+    writeFileSync(
+      path.join(wopalHomeDir, ".env"),
+      "WOPAL_LLM_MODEL=qwen-3-next\nWOPAL_TEST_VAR=hello\n",
+      "utf-8",
+    );
+
+    const { initRuntimeContext } = await import("./runtime-context.js");
+    const { loadWopalEnv } = await import("./index.js");
+
+    // Plain project without .wopal/
+    const plainDir = path.join(envTestDir, "plain-project");
+    mkdirSync(plainDir, { recursive: true });
+
+    initRuntimeContext(plainDir);
+    loadWopalEnv();
+
+    expect(process.env.WOPAL_LLM_MODEL).toBe("qwen-3-next");
+    expect(process.env.WOPAL_TEST_VAR).toBe("hello");
+
+    delete process.env.WOPAL_LLM_MODEL;
+    delete process.env.WOPAL_TEST_VAR;
+  });
+
+  it("loads space-level env that overrides user-level", async () => {
+    process.env.WOPAL_HOME = wopalHomeDir;
+
+    // Create user-level .env
+    writeFileSync(
+      path.join(wopalHomeDir, ".env"),
+      "WOPAL_LLM_MODEL=qwen-3-next\n",
+      "utf-8",
+    );
+
+    // Create a wopal-space workspace with .wopal/ directory
+    const spaceDir = path.join(envTestDir, "workspace");
+    mkdirSync(path.join(spaceDir, ".wopal"), { recursive: true });
+    process.env.WOPAL_SPACE_ROOT = spaceDir;
+
+    // Create space-level .env
+    writeFileSync(
+      path.join(spaceDir, ".wopal", ".env"),
+      "WOPAL_LLM_MODEL=deepseek-chat\nWOPAL_SPACE_ONLY=true\n",
+      "utf-8",
+    );
+
+    const { initRuntimeContext } = await import("./runtime-context.js");
+    const { loadWopalEnv } = await import("./index.js");
+
+    initRuntimeContext(spaceDir);
+    loadWopalEnv();
+
+    // Space-level overrides user-level
+    expect(process.env.WOPAL_LLM_MODEL).toBe("deepseek-chat");
+    expect(process.env.WOPAL_SPACE_ONLY).toBe("true");
+
+    delete process.env.WOPAL_LLM_MODEL;
+    delete process.env.WOPAL_SPACE_ONLY;
+  });
+
+  it("only loads user-level env outside wopal-space", async () => {
+    process.env.WOPAL_HOME = wopalHomeDir;
+
+    // Create user-level .env
+    writeFileSync(
+      path.join(wopalHomeDir, ".env"),
+      "WOPAL_LLM_MODEL=user-model\n",
+      "utf-8",
+    );
+
+    // Plain project without .wopal/
+    const plainDir = path.join(envTestDir, "plain-project");
+    mkdirSync(plainDir, { recursive: true });
+
+    const { initRuntimeContext } = await import("./runtime-context.js");
+    const { loadWopalEnv } = await import("./index.js");
+
+    initRuntimeContext(plainDir);
+    loadWopalEnv();
+
+    expect(process.env.WOPAL_LLM_MODEL).toBe("user-model");
+
+    delete process.env.WOPAL_LLM_MODEL;
+  });
+
+  it("does not override existing process.env values", async () => {
+    process.env.WOPAL_HOME = wopalHomeDir;
+    process.env.WOPAL_LLM_MODEL = "existing-model";
+
+    // Create user-level .env
+    writeFileSync(
+      path.join(wopalHomeDir, ".env"),
+      "WOPAL_LLM_MODEL=from-env-file\n",
+      "utf-8",
+    );
+
+    const { initRuntimeContext } = await import("./runtime-context.js");
+    const { loadWopalEnv } = await import("./index.js");
+
+    const plainDir = path.join(envTestDir, "plain-project");
+    mkdirSync(plainDir, { recursive: true });
+
+    initRuntimeContext(plainDir);
+    loadWopalEnv();
+
+    expect(process.env.WOPAL_LLM_MODEL).toBe("existing-model");
+
+    delete process.env.WOPAL_LLM_MODEL;
+  });
+
+  it("skips non-WOPAL_ prefixed variables", async () => {
+    process.env.WOPAL_HOME = wopalHomeDir;
+
+    writeFileSync(
+      path.join(wopalHomeDir, ".env"),
+      "WOPAL_LLM_MODEL=valid\nOTHER_VAR=ignored\n",
+      "utf-8",
+    );
+
+    const { initRuntimeContext } = await import("./runtime-context.js");
+    const { loadWopalEnv } = await import("./index.js");
+
+    const plainDir = path.join(envTestDir, "plain-project");
+    mkdirSync(plainDir, { recursive: true });
+
+    initRuntimeContext(plainDir);
+    loadWopalEnv();
+
+    expect(process.env.WOPAL_LLM_MODEL).toBe("valid");
+    expect(process.env.OTHER_VAR).toBeUndefined();
+
+    delete process.env.WOPAL_LLM_MODEL;
+  });
+});
