@@ -567,10 +567,10 @@ upstream/main → main → type/coding → space/<name>
 
 | 命令 | 方向 | 底层操作 | CLI 守卫 |
 |------|------|---------|---------|
-| `ontology status` | — | git log/diff 展示差异 | — |
+| `ontology status` | — | 下行/上行全链路 git log/diff 展示差异 + `git merge-tree` 预测 merge 结果 | — |
 | `ontology update` | 下行 | `git merge upstream/main → main` + `git merge main → type/coding` | 强制顺序，冲突即停 |
 | `ontology contribute` | 上行 | 创建临时分支 + squash merge + PR | fork 分支不被碰 |
-| `space status` | — | git log/diff 展示差异 | — |
+| `space status` | — | 当前 space 相关的完整链路 git log/diff 展示差异 + `git merge-tree` 预测 merge 结果 | — |
 | `space update` | 下行 | `git merge type/coding → space` | 前置检查 type 已更新 |
 | `space contribute` | 上行 | `git merge --squash space → type/coding` | 预览排除，不自动提交 |
 
