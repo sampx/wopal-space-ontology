@@ -77,7 +77,7 @@ BACKEND_PORT=4096
 BACKEND_PID_FILE="$BACKEND_STATE_DIR/emt-backend.pid"
 ELLAMAKA_LOG="${SPACE_LOG_DIR:-$GLOBAL_LOG_DIR}/ellamaka.log"
 
-NO_AUTO_APPROVE=false DEBUG_MODE=false ATTACH_MODE=false NO_WOPAL_SPACE=false
+NO_AUTO_APPROVE=false DEBUG_MODE=false ATTACH_MODE=false DISABLE_WOPALSPACE=false
 DEBUG_MODULES=""
 TRACE_MODE=false TRACE_MODULES=""
 COMMAND=""
@@ -115,7 +115,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h) OPENCODE_ARGS+=(--help); shift ;;
         --no-auto-approve) NO_AUTO_APPROVE=true; shift ;;
-        -ns) NO_WOPAL_SPACE=true; shift ;;
+        -ns) DISABLE_WOPALSPACE=true; shift ;;
 
         --trace)
             TRACE_MODE=true; DEBUG_MODE=true
@@ -160,8 +160,8 @@ fi
 # "all" = 不做模块过滤，留空让 logger 视为 null（不过滤）
 [[ "$LOG_MODULES" == "all" ]] && LOG_MODULES=""
 
-if [ "$NO_WOPAL_SPACE" = true ]; then
-    WOPAL_SPACE_ARGS=(--no-wopal-space)
+if [ "$DISABLE_WOPALSPACE" = true ]; then
+    WOPAL_SPACE_ARGS=(--disable-wopalspace)
 else
     WOPAL_SPACE_ARGS=()
 fi
