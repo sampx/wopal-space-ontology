@@ -263,6 +263,15 @@ function inferAgentScope(relativePath: string): string | undefined {
  * Finds all .md and .mdc files including nested subdirectories.
  * Direct subdirectories are interpreted as agent scopes (e.g., rules/fae/*.md → agentScope="fae").
  *
+ * Deduplication and override semantics:
+ * - Rules are keyed by relativePath (e.g. "typescript.md", "fae/astro.md").
+ * - Among global candidates, the first occurrence of a relativePath wins.
+ * - Project-local rules override global rules with the same relativePath,
+ *   so a workspace can定制 behavior without editing shared global rules.
+ * - This also deduplicates the wopal-space scenario where ~/.wopal/rules and
+ *   <project>/.wopal/rules resolve to the same physical directory (via symlink
+ *   or git worktree sharing one ontology repo), preventing double injection.
+ *
  * @param projectDir - Optional project directory for local rules discovery
  * @param rulesDebugLog - Debug log function for rules module (if omitted, no logs)
  */
@@ -270,9 +279,24 @@ export async function discoverRuleFiles(
   projectDir?: string,
   rulesDebugLog?: LoggerInstance,
 ): Promise<DiscoveredRule[]> {
-  const files: DiscoveredRule[] = [];
+  // Keyed by relativePath to deduplicate and to allow project-local override.
+  const ruleMap = new Map<string, DiscoveredRule>();
+  const overriddenKeys: string[] = [];
 
-  // Discover global rules from all candidate directories
+  const buildEntry = (
+    filePath: string,
+    relativePath: string,
+  ): DiscoveredRule => {
+    const entry: DiscoveredRule = { filePath, relativePath };
+    const agentScope = inferAgentScope(relativePath);
+    if (agentScope) {
+      entry.agentScope = agentScope;
+    }
+    return entry;
+  };
+
+  // Discover global rules from all candidate directories.
+  // Among global candidates, the first occurrence of a relativePath wins.
   const globalCandidates = getGlobalRulesDirCandidates();
   for (const globalRulesDir of globalCandidates) {
     const globalRules = await scanDirectoryRecursively(
@@ -280,22 +304,14 @@ export async function discoverRuleFiles(
       globalRulesDir,
     );
     for (const { filePath, relativePath } of globalRules) {
-      // Deduplicate by filePath (avoid duplicate entries if same path appears in multiple candidates)
-      if (!files.some((f) => f.filePath === filePath)) {
-        const agentScope = inferAgentScope(relativePath);
-        const entry: DiscoveredRule = {
-          filePath,
-          relativePath,
-        };
-        if (agentScope) {
-          entry.agentScope = agentScope;
-        }
-        files.push(entry);
+      if (!ruleMap.has(relativePath)) {
+        ruleMap.set(relativePath, buildEntry(filePath, relativePath));
       }
     }
   }
 
-  // Discover project-local rules (recursively) if project directory is provided
+  // Discover project-local rules. These override global rules with the same
+  // relativePath (project-local takes precedence).
   if (projectDir) {
     const projectRulesDir = path.join(projectDir, ".wopal", "rules");
     const projectRules = await scanDirectoryRecursively(
@@ -303,23 +319,26 @@ export async function discoverRuleFiles(
       projectRulesDir,
     );
     for (const { filePath, relativePath } of projectRules) {
-      const agentScope = inferAgentScope(relativePath);
-      const entry: DiscoveredRule = {
-        filePath,
-        relativePath,
-      };
-      if (agentScope) {
-        entry.agentScope = agentScope;
+      if (ruleMap.has(relativePath)) {
+        overriddenKeys.push(relativePath);
       }
-      files.push(entry);
+      ruleMap.set(relativePath, buildEntry(filePath, relativePath));
     }
   }
 
-  // Single-line summary log
-  if (rulesDebugLog && files.length > 0) {
-    rulesDebugLog.info(
-      `Discovered ${files.length} rule file(s): ${files.map((r) => r.relativePath).join(", ")}`,
-    );
+  const files = Array.from(ruleMap.values());
+
+  if (rulesDebugLog) {
+    if (overriddenKeys.length > 0) {
+      rulesDebugLog.debug(
+        `Project rules overriding global: ${overriddenKeys.join(", ")}`,
+      );
+    }
+    if (files.length > 0) {
+      rulesDebugLog.info(
+        `Discovered ${files.length} rule file(s): ${files.map((r) => r.relativePath).join(", ")}`,
+      );
+    }
   }
 
   return files;
