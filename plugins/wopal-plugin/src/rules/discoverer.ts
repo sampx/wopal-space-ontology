@@ -256,21 +256,20 @@ function inferAgentScope(relativePath: string): string | undefined {
 }
 
 /**
- * Discover markdown rule files from standard directories
- * Searches recursively in:
- * - ~/.wopal/rules/ (primary global, fallback: $XDG_CONFIG_HOME/wopal/rules/)
- * - .wopal/rules/ (in project directory if provided)
+ * Discover markdown rule files from standard directories.
+ * Searches recursively in (lowest → highest priority):
+ * 1. ~/.wopal/rules/ (global, fallback: $XDG_CONFIG_HOME/wopal/rules/)
+ * 2. <WOPAL_SPACE_ROOT>/.wopal/rules/ (space-level, when WOPAL_SPACE_ROOT is set)
+ * 3. <projectDir>/.wopal/rules/ (project-local, if provided)
  * Finds all .md and .mdc files including nested subdirectories.
  * Direct subdirectories are interpreted as agent scopes (e.g., rules/fae/*.md → agentScope="fae").
  *
  * Deduplication and override semantics:
  * - Rules are keyed by relativePath (e.g. "typescript.md", "fae/astro.md").
  * - Among global candidates, the first occurrence of a relativePath wins.
- * - Project-local rules override global rules with the same relativePath,
- *   so a workspace can定制 behavior without editing shared global rules.
- * - This also deduplicates the wopal-space scenario where ~/.wopal/rules and
- *   <project>/.wopal/rules resolve to the same physical directory (via symlink
- *   or git worktree sharing one ontology repo), preventing double injection.
+ * - Space-level rules override global rules with the same relativePath.
+ * - Project-local rules override both global and space-level rules.
+ * - When space rules dir equals project-local dir, only one scan is performed.
  *
  * @param projectDir - Optional project directory for local rules discovery
  * @param rulesDebugLog - Debug log function for rules module (if omitted, no logs)
@@ -310,8 +309,26 @@ export async function discoverRuleFiles(
     }
   }
 
-  // Discover project-local rules. These override global rules with the same
-  // relativePath (project-local takes precedence).
+  const spaceRoot = process.env.WOPAL_SPACE_ROOT;
+  if (spaceRoot) {
+    const spaceRulesDir = path.join(spaceRoot, ".wopal", "rules");
+    const projectRulesDir = projectDir
+      ? path.resolve(path.join(projectDir, ".wopal", "rules"))
+      : undefined;
+    if (path.resolve(spaceRulesDir) !== projectRulesDir) {
+      const spaceRules = await scanDirectoryRecursively(
+        spaceRulesDir,
+        spaceRulesDir,
+      );
+      for (const { filePath, relativePath } of spaceRules) {
+        if (ruleMap.has(relativePath)) {
+          overriddenKeys.push(relativePath);
+        }
+        ruleMap.set(relativePath, buildEntry(filePath, relativePath));
+      }
+    }
+  }
+
   if (projectDir) {
     const projectRulesDir = path.join(projectDir, ".wopal", "rules");
     const projectRules = await scanDirectoryRecursively(
