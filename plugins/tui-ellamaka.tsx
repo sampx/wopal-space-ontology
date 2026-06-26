@@ -1105,13 +1105,10 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
         </text>
       );
     },
-    session_prompt_right(ctx, value) {
+    session_prompt_right(ctx, _value) {
       const s = extractTheme(ctx.theme.current);
       return (
-        <text fg={s.textMuted}>
-          <span style={{ fg: s.primary }}>{label ?? "ELLAMAKA"}</span>:
-          {value.session_id.slice(0, 8)}
-        </text>
+        <text fg={s.primary}>{label ?? "ELLAMAKA"}</text>
       );
     },
   },
