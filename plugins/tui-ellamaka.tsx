@@ -743,7 +743,6 @@ function AnimatedLogo(props: {
     }
     if (!live) setRelease(undefined);
     if (live || hold() || release() || glowSig()) return;
-    if (props.idle) return;
     stop();
   };
 
@@ -761,7 +760,6 @@ function AnimatedLogo(props: {
   onMount(() => {
     if (!props.idle) return;
     setNow(performance.now());
-    start();
   });
 
   const hit = (x: number, y: number) => {
