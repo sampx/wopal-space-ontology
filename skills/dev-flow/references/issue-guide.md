@@ -44,6 +44,8 @@ flow.sh issue create --title "feat(scope): description" --project <name>
 - `fix(dev-flow): handle expired tokens`
 - `perf(sync): reduce issue body rewrite cost`
 
+**标题语言规则**：标题使用英文（遵循项目仓库规范）。body 内容使用用户偏好语言编写（与 Plan 文档一致）。
+
 ## Issue body 五段结构
 
 所有 Issue body 统一使用以下五段式结构（按顺序）：
