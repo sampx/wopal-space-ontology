@@ -672,6 +672,85 @@ async function triggerCapture() {
   );
 }
 
+// Silently capture cookie from the currently active opencode.ai tab without
+// reloading it. We first check if the webRequest listener has already stashed
+// a capture for this tab/workspace (from the page's normal traffic). If not,
+// we fall back to a single reload to trigger one request — same as
+// triggerCapture but only when necessary.
+async function captureFromActiveTab({ allowReload = false } = {}) {
+  const tab = await findOpenCodeTab();
+  if (!tab?.id) {
+    throw new Error("当前标签页不是 opencode.ai。请先在浏览器里打开 opencode.ai。");
+  }
+
+  const wsMatch = String(tab.url || "").match(/\/workspace\/(wrk_[A-Z0-9]+)/);
+  if (!wsMatch) {
+    let path = "/";
+    try { path = new URL(tab.url).pathname || "/"; } catch {}
+    if (path.startsWith("/auth")) {
+      throw new Error("请先完成 OpenCode 登录，登录成功后会自动跳转到 workspace 页面。");
+    }
+    throw new Error("当前不在 opencode.ai 的 workspace 页面。请切到 workspace 页面后再刷新登录状态。");
+  }
+  const workspaceId = wsMatch[1];
+
+  // Check if webRequest already captured a cookie for this tab/workspace.
+  // The webRequest listener runs passively on every opencode.ai request, so
+  // if the user has been browsing the workspace page, the session cache is
+  // usually already fresh. This path never reloads — popup stays open.
+  const existing = await getCaptured();
+  const cacheFresh =
+    existing?.cookie
+    && existing?.workspaceId === workspaceId
+    && hasAuthCookie(existing.cookie);
+  if (cacheFresh) {
+    return { captured: existing, tabId: tab.id, tabUrl: tab.url };
+  }
+
+  // Cache miss. Only reload when explicitly allowed (user clicked the
+  // "刷新登录状态" button — they accept the popup will close). Silent
+  // auto-checks (e.g. #refreshAll, switching to accounts tab) never reload.
+  if (!allowReload) {
+    throw new Error("NO_CACHE");
+  }
+
+  // If the tab URL carries _acct (opened by the extension's "open usage page"
+  // button), navigate to /auth instead of reloading. The _acct page uses a
+  // DNR-injected cookie for a different account than the browser's real login.
+  // Stripping _acct and reloading the same workspace URL would send the
+  // browser's real cookie to a workspace it doesn't own → redirect to login.
+  // Navigating to /auth lets opencode.ai auto-login with the browser's
+  // current session and redirect to the correct workspace, so the page works
+  // normally and webRequest captures the real cookie.
+  let reloadUrl = undefined;
+  try {
+    const u = new URL(tab.url);
+    if (u.searchParams.has("_acct")) {
+      reloadUrl = "https://opencode.ai/auth";
+    }
+  } catch {}
+
+  await clearCaptured();
+  const startedAt = Date.now();
+  if (reloadUrl) {
+    await chrome.tabs.update(tab.id, { url: reloadUrl });
+  } else {
+    await chrome.tabs.reload(tab.id, { bypassCache: true });
+  }
+  const deadline = Date.now() + CAPTURE_WAIT_MS;
+  let since = startedAt;
+  while (Date.now() < deadline) {
+    const captured = await waitForBestCapture(since, tab.id, deadline - Date.now());
+    if (!captured?.cookie) break;
+    if (!captured.workspaceId) {
+      since = captured.capturedAt + 1;
+      continue;
+    }
+    return { captured, tabId: tab.id, tabUrl: tab.url };
+  }
+  throw new Error("未能捕获登录状态，请确认已登录后重试。");
+}
+
 function setupWebRequestCapture() {
   // Capture Cookie header from any opencode.ai request (not just /_server).
   // The workspace HTML page also sends cookies, so we can capture even if
@@ -1109,6 +1188,32 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           });
           return;
         }
+        case "captureFromActiveTab": {
+          try {
+            const result = await captureFromActiveTab({
+              allowReload: !!message.allowReload,
+            });
+            sendResponse({
+              ok: true,
+              captured: capturedForResponse(result.captured),
+              capture: {
+                cookie: result.captured.cookie,
+                workspaceId: result.captured.workspaceId,
+                capturedAt: result.captured.capturedAt,
+              },
+              tabId: result.tabId,
+            });
+          } catch (e) {
+            // NO_CACHE means silent mode and no fresh cache. The popup treats
+            // this as "not captured yet" rather than an error.
+            if (e.message === "NO_CACHE") {
+              sendResponse({ ok: false, error: "NO_CACHE" });
+            } else {
+              sendResponse({ ok: false, error: e.message });
+            }
+          }
+          return;
+        }
         case "triggerCapture": {
           const result = await triggerCapture();
           sendResponse({
@@ -1129,15 +1234,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           return;
         }
         case "saveCurrentAccount": {
-          // If no cookie provided, auto-trigger capture first.
+          // If no cookie provided, try silent capture first (no reload).
           let cookie = message.cookie;
           let workspaceId = message.workspaceId;
           if (!cookie) {
-            const result = await triggerCapture();
-            const captured = result.captured;
-            if (captured) {
-              cookie = captured.cookie;
-              if (!workspaceId) workspaceId = captured.workspaceId;
+            try {
+              const result = await captureFromActiveTab();
+              const captured = result.captured;
+              if (captured) {
+                cookie = captured.cookie;
+                if (!workspaceId) workspaceId = captured.workspaceId;
+              }
+            } catch (e) {
+              sendResponse({
+                ok: false,
+                error: e.message || "无法获取登录状态。",
+              });
+              return;
             }
           }
           if (!cookie) {
