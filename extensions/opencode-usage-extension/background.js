@@ -1436,6 +1436,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           });
           return;
         }
+        case "getDiagnostics": {
+          const data = await chrome.storage.local.get(DIAG_KEY);
+          sendResponse({ ok: true, events: data[DIAG_KEY] || [] });
+          return;
+        }
         default:
           sendResponse({ ok: false, error: `Unknown message: ${message.type}` });
       }
@@ -1461,6 +1466,58 @@ async function bootstrap() {
 
 // Set up webRequest capture at module load (service worker restart safe).
 setupWebRequestCapture();
+
+// ============ Diagnostic: trace who creates/opens tabs ============
+const DIAG_KEY = "opencodeDiagnostics";
+const DIAG_MAX = 100;
+
+async function diagPersist(entry) {
+  try {
+    const data = await chrome.storage.local.get(DIAG_KEY);
+    const events = (data[DIAG_KEY] || []).slice(-(DIAG_MAX - 1));
+    events.push(entry);
+    await chrome.storage.local.set({ [DIAG_KEY]: events });
+  } catch {}
+}
+
+function diagLog(category, detail) {
+  const ts = new Date().toISOString();
+  console.log(`[diag] [${category}] ${ts}`, detail);
+  diagPersist({ ts, category, detail }).catch(() => {});
+}
+
+diagLog("sw.boot", {});
+
+// Wrap chrome.tabs.create — capture call stack so we know exactly
+// which code path created a tab.
+const _tabsCreate = chrome.tabs.create.bind(chrome.tabs);
+chrome.tabs.create = function (opts) {
+  const stack = new Error().stack?.split("\n").slice(1, 5).join("\n") || "(no stack)";
+  diagLog("tabs.create", { url: opts?.url, stack });
+  return _tabsCreate(opts);
+};
+
+// Wrap chrome.tabs.update — capture URL changes with call stack.
+const _tabsUpdate = chrome.tabs.update.bind(chrome.tabs);
+chrome.tabs.update = function (tabId, opts) {
+  if (opts?.url) {
+    const stack = new Error().stack?.split("\n").slice(1, 5).join("\n") || "(no stack)";
+    diagLog("tabs.update", { tabId, url: opts.url, stack });
+  }
+  return _tabsUpdate(tabId, opts);
+};
+
+// Monitor tab creation from ANY source (other extensions, Chrome itself, etc.)
+chrome.tabs.onCreated.addListener((tab) => {
+  const entry = {
+    tabId: tab.id, url: tab.url || "(empty)", openerTabId: tab.openerTabId ?? null,
+    windowId: tab.windowId, active: !!tab.active,
+  };
+  diagLog("onCreated", entry);
+  if (tab.url?.startsWith("https://opencode.ai/go?ref=")) {
+    diagLog("!!! REFERRAL", entry);
+  }
+});
 
 // Sync alarm on every service worker startup — onStartup only fires when the
 // browser starts, not when the SW wakes from idle. Module-level execution
