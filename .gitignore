@@ -51,6 +51,3 @@ config/settings.local.jsonc
 
 # tmp
 wsf-file-manifest.json
-
-# link
-plans

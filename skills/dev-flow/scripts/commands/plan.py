@@ -833,15 +833,8 @@ def _scan_local_plans(workspace_root: str | Path) -> list[dict]:
             continue
 
         parts = plans_dir.relative_to(ws).parts
-        if parts[0] == "projects" and len(parts) >= 3:
-            project_name = parts[1]
-        elif parts[0] == ".wopal":
-            project_name = "wopal-space-ontology"
-        elif parts[0] == "docs" and parts[1] == "projects":
-            if len(parts) >= 4:
-                project_name = parts[2]
-            else:
-                project_name = "plans"
+        if parts[0] == ".wopal-space" and parts[1] == "plans" and len(parts) >= 3:
+            project_name = parts[2]
         else:
             project_name = "unknown"
 
