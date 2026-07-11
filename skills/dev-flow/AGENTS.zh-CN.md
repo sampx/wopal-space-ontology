@@ -52,9 +52,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 ### Plan Directory Rules
 
 - `--project` 是 `plan` 命令必填参数
-- 标准项目：`projects/<project>/docs/plans/`
-- ontology-worktree：`.wopal/docs/plans/`
-- `docs/projects/<project>/plans/` 已废弃，禁止新写入
+- 所有项目：`.wopal-space/plans/<项目名>/`
 - Plan 文件必须通过 `flow.sh plan ...` 生成或定位，禁止手写创建
 
 ### Script Conventions

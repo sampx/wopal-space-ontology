@@ -119,6 +119,4 @@ flow.sh sync <issue> --body-only
 
 - 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件
 - `--project` 是必填参数，Plan 目录由其决定
-- **标准项目**：`projects/<project>/docs/plans/`
-- **ontology-worktree**：`.wopal/docs/plans/`
-- `docs/projects/<project>/plans/` 是 **DEPRECATED** 只读回退，禁止新写入
+- 所有项目统一存放在 `.wopal-space/plans/<项目名>/`

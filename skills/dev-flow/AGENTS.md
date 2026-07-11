@@ -52,9 +52,7 @@ Each command requires a prerequisite state; invalid transitions error out. New c
 ### Plan Directory Rules
 
 - `--project` is a required parameter for the `plan` command
-- Standard projects: `projects/<project>/docs/plans/`
-- ontology-worktree: `.wopal/docs/plans/`
-- `docs/projects/<project>/plans/` is deprecated; writing new plans there is forbidden
+- All projects: `.wopal-space/plans/<project>/`
 - Plan files must be created or located via `flow.sh plan ...`; manual file creation is forbidden
 
 ### Script Conventions

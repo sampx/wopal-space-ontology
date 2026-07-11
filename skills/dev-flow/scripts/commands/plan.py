@@ -181,7 +181,7 @@ def _resolve_plan_dir(project: str, workspace_root: Path) -> Path:
     """Resolve Plan directory path.
 
     Delegates to lib.project.resolve_plan_dir() for canonical path resolution.
-    New Plans are written to projects/<project>/docs/plans/ or .wopal/docs/plans/.
+    All Plans are written to .wopal-space/plans/<project>/.
     """
     return _project_resolver.resolve_plan_dir(project, workspace_root)
 
