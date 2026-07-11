@@ -49,6 +49,8 @@ Runtime dependencies: bash 3.x+, `gh` CLI, `jq`, Python 3
 
 Each command requires a prerequisite state; invalid transitions error out. New commands must declare their prerequisite and resulting states.
 
+`plan check` validates that a Plan's declared Status belongs to this state machine. When a User Validation section is present, the checker requires at least one scenario and a final confirmation checkbox; `verify` confirms that the user has checked it.
+
 ### Plan Directory Rules
 
 - `--project` is a required parameter for the `plan` command
