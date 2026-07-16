@@ -35,7 +35,7 @@ from plan import (
     get_plan_project_path,
     get_plan_worktree,
 )
-from lib.git import commit_paths, get_current_branch
+from lib.git import check_branch_merged, commit_paths, get_current_branch
 from lib.worktree import resolve_active_plan, ResolveActivePlanError
 from validation import (
     ValidationError,
@@ -166,9 +166,7 @@ def _get_plan_name(plan_path: str) -> str:
 def _check_feature_branch_merged(workspace_root: Path, plan_path: str) -> int:
     """Check that the feature branch has been merged to the integration branch.
 
-    Reads Plan Worktree metadata to get the feature branch name,
-    determines the integration branch based on project type, and runs
-    git branch --merged to verify.
+    Delegates to lib.git.check_branch_merged for the actual logic.
 
     Args:
         workspace_root: Workspace root path
@@ -177,118 +175,7 @@ def _check_feature_branch_merged(workspace_root: Path, plan_path: str) -> int:
     Returns:
         0 if merged (or no worktree metadata), 1 if not merged or on error
     """
-    from pathlib import Path as _Path
-
-    wt_meta = get_plan_worktree(plan_path)
-    if not wt_meta or not wt_meta.get("branch"):
-        return 0
-
-    feature_branch = wt_meta["branch"]
-
-    # Determine repo root for git operations
-    project_path = get_plan_project_path(plan_path)
-    if project_path:
-        repo_root = str(_Path(workspace_root) / project_path)
-    else:
-        repo_root = str(workspace_root)
-
-    # Determine integration branch based on project type
-    project_type = get_plan_field(plan_path, "Project Type")
-    if project_type == "ontology-worktree":
-        # .wopal/ worktree sits on the current space layer branch (space/<name>),
-        # detected at runtime — there is no fixed integration branch name.
-        integration_branch = get_current_branch(repo_root)
-    else:
-        integration_branch = "main"
-
-    # Prefer Verification Commit SHA — works even if branch ref is deleted
-    verification_commit = get_plan_field(plan_path, "Verification Commit")
-    if verification_commit:
-        try:
-            result = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", verification_commit, integration_branch],
-                cwd=repo_root,
-                capture_output=True,
-            )
-            if result.returncode == 0:
-                return 0
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-        # SHA not found in ancestry — not merged
-        log_error(
-            f"Feature branch '{feature_branch}' not yet merged to "
-            f"{integration_branch}. Please merge first."
-        )
-        return 1
-
-    # Run git branch --merged <integration> and check for feature branch
-    try:
-        result = subprocess.run(
-            ["git", "branch", "--merged", integration_branch],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        log_error(
-            f"Failed to check merge status for branch '{feature_branch}'"
-        )
-        return 1
-
-    if result.returncode != 0:
-        log_error(
-            f"Failed to check merge status for branch '{feature_branch}'"
-        )
-        return 1
-
-    # Parse merged branches: strip "* " / "+ " prefix, trim whitespace
-    merged_branches = [
-        b.strip().lstrip("*+ ") for b in result.stdout.strip().split("\n")
-        if b.strip()
-    ]
-
-    if feature_branch in merged_branches:
-        return 0
-
-    # Branch not found in local merged list.
-    # Fallback 1: check remote merged branches (branch may exist remotely)
-    try:
-        result2 = subprocess.run(
-            ["git", "branch", "-r", "--merged", integration_branch],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-        )
-        remote_branches = [
-            b.strip() for b in result2.stdout.strip().split("\n") if b.strip()
-        ]
-        for rb in remote_branches:
-            if rb.endswith(f"/{feature_branch}"):
-                return 0
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-
-    # Fallback 2: branch deleted everywhere, check if merge exists in history
-    # Works for both FF merge (branch name in commit messages) and
-    # non-FF merge ("Merge branch 'xxx'" commit)
-    try:
-        result3 = subprocess.run(
-            ["git", "log", "--oneline", integration_branch,
-             "--grep", feature_branch],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-        )
-        if result3.stdout.strip():
-            return 0
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-
-    log_error(
-        f"Feature branch '{feature_branch}' not yet merged to "
-        f"{integration_branch}. Please merge first."
-    )
-    return 1
+    return check_branch_merged(workspace_root, plan_path)
 
 
 # ============================================
