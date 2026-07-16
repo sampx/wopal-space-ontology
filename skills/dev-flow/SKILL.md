@@ -66,7 +66,7 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 | **Plan 文件** | 状态、checkbox、元数据 | `flow.sh` 脚本自动提交 | 状态推进时（submit/approve/complete/verify/archive） |
 | **实施代码** | 源码、测试、文档变更 | agent（Wopal 或 fae）手动提交 | rook PASS 后、`complete` 之前 |
 
-**铁律：脚本不操作项目代码，但管理自身基础设施。** `flow.sh` 命令不 add、commit、merge、push 任何实施代码——代码的 commit 和 feature → 集成分支的 merge 由 agent 负责，push 由用户独占。worktree 创建/清理和 feature 分支创建/删除属于 dev-flow 基础设施操作，由脚本管理生命周期，不在此限。
+**铁律：脚本不操作项目代码，但管理自身基础设施。** `flow.sh` 命令不 add、commit、merge、push 任何实施代码——代码的 commit 和 feature → 集成分支的 merge 由 agent 负责。worktree 创建/清理和 feature 分支创建/删除属于 dev-flow 基础设施操作，由脚本管理生命周期，不在此限。
 
 **实施产物 = 原子单元。** 实施代码变更 + Task Done checkbox + Agent Verification checkbox 是一个原子单元，同一次 commit 提交。禁止拆成多次 commit。
 
@@ -188,7 +188,7 @@ flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围�
 1. 委派 rook 审 Plan — prompt 契约见 agents-collab。fix 类型 Plan 默认跳过此步骤；若方案复杂需审查，提交前征求用户同意
 2. rook PASS → `flow.sh submit <issue>`（planning → reviewing）
 3. rook REVISE/BLOCK → 修订后重审（最多 3 轮）
-4. Plan 处于 `reviewing` 状态时可直接修订内容，无需 `flow.sh reset` 回退到 `planning`。修订后重新 `submit` 即可
+4. Plan 处于 `reviewing` 状态时可直接修订内容，无需 `flow.sh reset` 回退到 `planning`。修订完成后告知用户即可，无需重新 `submit`
 5. 等用户审批后：`flow.sh approve <issue> --confirm`（reviewing/planning → executing）
 
 ### C. Executing
