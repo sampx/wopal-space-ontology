@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn
-from lib.workspace import find_workspace_root
+from lib.workspace import find_workspace_root, get_ontology_main_repo
 from workflow import update_plan_status
 from workflow import guard_status, resolve_space_repo
 from plan import find_plan, find_plan_by_issue
@@ -344,6 +344,32 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_warn("Failed to commit Plan status=done in Plan's repo")
     else:
         log_success("Plan status=done committed to Plan's repo")
+
+    # 11.5. Ontology-worktree: detect stale worktree and branch (double-gate with archive)
+    project_type_str = get_plan_field(plan_path, "Project Type")
+    if project_type_str == "ontology-worktree":
+        wt = get_plan_worktree(plan_path)
+        if wt:
+            branch = wt['branch']
+            wt_path = wt['path']
+            wt_path_resolved = Path(wt_path)
+            if not wt_path_resolved.is_absolute():
+                wt_path_resolved = workspace_root / wt_path_resolved
+
+            if wt_path_resolved.exists():
+                log_warn(f"Worktree 目录残留: {wt_path_resolved}")
+                log_warn(f"  归档时将自动清理")
+
+            main_repo = get_ontology_main_repo(workspace_root)
+            if main_repo:
+                branch_result = subprocess.run(
+                    ['git', 'branch', '--list', branch],
+                    capture_output=True, text=True,
+                    cwd=str(main_repo),
+                )
+                if branch_result.stdout.strip():
+                    log_warn(f"分支残留: {branch}")
+                    log_warn(f"  归档时将自动删除")
 
     # 12. Sync Issue if exists
     if effective_issue and repo:

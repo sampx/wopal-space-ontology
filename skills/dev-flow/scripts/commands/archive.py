@@ -26,7 +26,7 @@ from pathlib import Path
 from datetime import date
 
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
-from lib.workspace import find_workspace_root
+from lib.workspace import find_workspace_root, get_ontology_main_repo
 from workflow import guard_status, resolve_space_repo
 from plan import find_plan
 from plan import (
@@ -540,6 +540,80 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
     if is_ontology_worktree:
         log_step("Ontology worktree project detected")
+
+        # Detect and clean up worktree + branch (same as standard projects)
+        wt = _detect_worktree(plan_path, project or "ontology", workspace_root)
+        if wt:
+            branch = wt['branch']
+            wt_path = wt['path']
+            wt_path_resolved = Path(wt_path)
+            if not wt_path_resolved.is_absolute():
+                wt_path_resolved = workspace_root / wt_path_resolved
+
+            if wt_path_resolved.exists():
+                log_warn(f"Worktree 目录残留: {wt_path_resolved}")
+            else:
+                log_info(f"Worktree 已清理: {wt_path_resolved}")
+
+            # Clean up via ontology main repo
+            main_repo = get_ontology_main_repo(workspace_root)
+            if main_repo:
+                # Check if branch still exists
+                branch_result = subprocess.run(
+                    ['git', 'branch', '--list', branch],
+                    capture_output=True, text=True,
+                    cwd=str(main_repo),
+                )
+                branch_exists = bool(branch_result.stdout.strip())
+
+                if branch_exists:
+                    log_warn(f"分支残留: {branch}")
+
+                # Remove worktree directory (use trash per REGULATIONS)
+                if wt_path_resolved.exists():
+                    trash_result = subprocess.run(
+                        ['trash', str(wt_path_resolved)],
+                        capture_output=True, text=True,
+                    )
+                    if trash_result.returncode == 0:
+                        log_success(f"Worktree 已删除: {wt_path_resolved}")
+                    else:
+                        log_warn(f"Worktree 删除失败: {trash_result.stderr.strip()}")
+
+                # Prune stale worktree references
+                subprocess.run(
+                    ['git', 'worktree', 'prune'],
+                    cwd=str(main_repo),
+                    capture_output=True,
+                )
+
+                # Delete feature branch
+                if branch_exists:
+                    del_result = subprocess.run(
+                        ['git', 'branch', '-d', branch],
+                        capture_output=True, text=True,
+                        cwd=str(main_repo),
+                    )
+                    if del_result.returncode == 0:
+                        log_success(f"分支已删除: {branch}")
+                    else:
+                        # Try force delete
+                        del_result = subprocess.run(
+                            ['git', 'branch', '-D', branch],
+                            capture_output=True, text=True,
+                            cwd=str(main_repo),
+                        )
+                        if del_result.returncode == 0:
+                            log_success(f"分支已强制删除: {branch}")
+                        else:
+                            log_warn(f"分支删除失败: {del_result.stderr.strip()}")
+
+                worktree_handled = True
+            else:
+                log_warn("无法解析 ontology 主仓库路径，跳过分支清理")
+        else:
+            log_info("无 worktree 元数据，跳过清理")
+
         log_warn("请手动 push .wopal/ 变更: cd .wopal && git push")
     elif project:
         project_path = resolve_project_path(plan_path, project, workspace_root)
