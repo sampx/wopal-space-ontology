@@ -91,6 +91,7 @@ Space projects are `standard` or `ontology-worktree`.
 - Project identity (name, path, branch) — see `STRUCTURE.md` `ontology-worktree` frontmatter field
 - Plugin submodules under `.wopal/` are not independent projects
 - Changes take effect at runtime, no install step needed
+- **Never modify the ontology main repo directly** (`~/.wopal/ontologies/`). All changes must go through the `.wopal/` worktree on the `space/<name>` branch, then use the ontology contribution workflow to push upstream
 
 ### Git Workflow Basics
 
