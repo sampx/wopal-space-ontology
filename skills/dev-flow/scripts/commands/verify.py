@@ -358,7 +358,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
             if wt_path_resolved.exists():
                 log_warn(f"Worktree 目录残留: {wt_path_resolved}")
-                log_warn(f"  归档时将自动清理")
+                log_warn(f"  请手动清理: trash {wt_path_resolved}")
 
             main_repo = get_ontology_main_repo(workspace_root)
             if main_repo:
@@ -369,7 +369,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
                 )
                 if branch_result.stdout.strip():
                     log_warn(f"分支残留: {branch}")
-                    log_warn(f"  归档时将自动删除")
+                    log_warn(f"  请手动删除: cd {main_repo} && git branch -d {branch}")
 
     # 12. Sync Issue if exists
     if effective_issue and repo:
