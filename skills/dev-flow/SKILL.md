@@ -1,9 +1,6 @@
 ---
 name: dev-flow
-description: |
-  Issue/Plan 驱动的开发工作流。⚠️ 任务需以 GitHub Issue 或 Plan 为执行载体。
-  🔴 Trigger: "#14"、"创建 issue"、"出个计划"、"实施 plan"、"执行计划"、"check plan"、"verify plan"、Plan 生命周期推进（approve/complete/verify/archive）、从 PRD 拆分 Issue。
-  ❌ Skip: spec 驱动流程、单纯研究/讨论/解释、不需 Issue/Plan 的临时小改动。
+description: Issue/Plan-driven development workflow. Tasks must be backed by a GitHub Issue or Plan. Trigger: issue references like "#14", creating issues, creating plans, implementing plans, executing plans, checking plans, verifying plans, Plan lifecycle transitions (approve/complete/verify/archive), decomposing PRDs into Issues. Skip: spec-driven workflows, research/discussion/explanation only, small ad-hoc changes that don't need an Issue or Plan.
 ---
 
 # dev-flow — Issue / Plan 驱动开发流程
@@ -362,6 +359,7 @@ flow.sh archive <issue>
 - **手动删除工作树** — 工作树由 `verify-switch` 或 `archive` 删除
 - **跳过 `complete` 直接邀用户验证** — 代码提交 + rook PASS 后必须先 `flow.sh complete` 推进到 `verifying`，然后才能进入用户验证。未达 `verifying` 前请求用户验收 = 严重失职
 - **归档时清理未声明的资源** — archive 只处理 Plan metadata 中声明的 Worktree/分支。看到名字相似不等于归属相同，必须确认。误删用户活跃分支 = 严重失职
+- **在 dev-flow 中加载 git-worktrees 技能** — dev-flow 的 worktree 创建/清理由 `flow.sh approve` 和 `flow.sh archive` 脚本内置管理，禁止加载 git-worktrees 技能或手动执行 worktree 命令
 
 ## 参考
 
