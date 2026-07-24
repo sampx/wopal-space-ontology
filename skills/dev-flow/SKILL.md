@@ -1,6 +1,13 @@
 ---
 name: dev-flow
-description: Issue/Plan-driven development workflow. Tasks must be backed by a GitHub Issue or Plan. Trigger: issue references like "#14", creating issues, creating plans, implementing plans, executing plans, checking plans, verifying plans, Plan lifecycle transitions (approve/complete/verify/archive), decomposing PRDs into Issues. Skip: spec-driven workflows, research/discussion/explanation only, small ad-hoc changes that don't need an Issue or Plan.
+description: >
+  Issue/Plan-driven development workflow. Tasks must be backed by a GitHub
+  Issue or Plan. Trigger: issue references like #14, creating issues,
+  creating plans, implementing plans, executing plans, checking plans,
+  verifying plans, Plan lifecycle transitions
+  (approve/complete/verify/archive), decomposing PRDs into Issues. Skip:
+  spec-driven workflows, research/discussion/explanation only, small
+  ad-hoc changes that don't need an Issue or Plan.
 ---
 
 # dev-flow — Issue / Plan 驱动开发流程
