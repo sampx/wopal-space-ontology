@@ -16,7 +16,7 @@ NC='\033[0m'
 
 # 脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SOURCE_HOOK="$SCRIPT_DIR/git-hooks/commit-msg"
 
 echo -e "${BLUE}=====================================${NC}"
