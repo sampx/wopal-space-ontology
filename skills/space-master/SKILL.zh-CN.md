@@ -11,13 +11,13 @@ description: |
 
 # space-master — 空间工作规范总纲
 
-本技能是 Wopal 的空间导航员。加载后，Wopal 应知道本空间有什么流程、场景到技能的路由规则、委派原则以及标准流畅的本体（Ontology）维护与 PR 贡献工作流。
+本技能定义 Wopal 空间流程选择、场景技能路由、Agent 委派原则以及标准本体（Ontology）维护与 PR 贡献操作指令。
 
 ---
 
 ## 空间工作体系
 
-本空间支持多种工作流程，按任务类型选择：
+本空间支持以下工作流程，按任务类型选择：
 
 | 流程 | 适用场景 | 加载技能 |
 |------|---------|---------|
@@ -28,7 +28,7 @@ dev-flow 是默认开发流程。
 
 ---
 
-## 场景→技能路由
+## 场景➔技能路由
 
 | 场景 | 加载技能 | 说明 |
 |------|---------|------|
@@ -40,37 +40,23 @@ dev-flow 是默认开发流程。
 
 ---
 
-## Ontology 维护与上游 PR 贡献标准流程
+## Ontology 维护与上游 PR 贡献指令规程
 
-Wopal 本体采用三层架构（`main` ➔ `type/<type>` ➔ `space/<name>`）。日常维护与上游 Pull Request 贡献遵循以下四个标准闭环阶段：
+处理本体仓库协作时，按以下顺序执行命令：
 
-```
-[空间层 space/*] 
-      │ 1. space contribute (--include 链式)
-      ▼
-[类型层 type/*] 
-      │ 2. ontology contribute (--include 链式) ➔ 自动在 Fork 远端创建 PR
-      ▼
-[官方上游 upstream] (GitHub 网页点击 Merge)
-      │ 3. ontology update (--confirm) ➔ 自动同步拓扑 + 自动擦除 Fork 远端临时分支
-      ▼
-[主干升维 promote] (--include 链式) ➔ 从 type/* 提炼通用能力回流 main 主干
-```
-
-### 1. 检查状态（Check First）
-在执行任何变更前，总是先运行预检：
+### 1. 检查状态
 ```bash
 WOPAL_HOME=~/.wopal wopal ontology status
 ```
 
-### 2. 空间上行合入类型（space contribute）
-把当前空间的修改增量 squash merge 到本地类型分支 `type/<type>`：
+### 2. 空间改动合入类型分支
+把当前空间的修改增量合入本地类型分支 `type/<type>`：
 ```bash
-WOPAL_HOME=~/.wopal wopal space contribute --message "feat(scope): short description" --confirm
+WOPAL_HOME=~/.wopal wopal space contribute --message "feat(scope): description" --confirm
 ```
 
-### 3. 创建上游 Pull Request（ontology contribute）
-通过链式 `--include` 精准白名单模式，按主题独立打包并自动在 GitHub Fork 远端创建 PR（零混入杂质/绝不误删框架）：
+### 3. 创建上游 Pull Request（分主题链式 `--include`）
+按主题使用链式 `--include` 标志独立打包并创建 PR：
 ```bash
 WOPAL_HOME=~/.wopal wopal ontology contribute \
   --type coding \
@@ -79,17 +65,15 @@ WOPAL_HOME=~/.wopal wopal ontology contribute \
   --message "feat(skills): update dev-flow and space-master skills" \
   --confirm
 ```
-* 💡 **链式 `--include` 特性**：支持多次传入 `--include` 标志，自动收集并严格只打包目标路径文件，其余不相干改动安全排除（`exclude`）。
 
-### 4. 网页合并与下行闭环（ontology update）
-当用户在 GitHub 网页上审核并合并 PR 后，在本地一键运行：
+### 4. 上游网页 PR 合并后收尾
+在 GitHub 上合并 PR 后，运行下行同步：
 ```bash
 WOPAL_HOME=~/.wopal wopal ontology update --confirm
 ```
-* 💡 **自动清理特性**：`ontology update` 会在完成拓扑平滑对齐后，**自动擦除**在 GitHub Fork 远端（`origin`）上为 PR 创建的陈旧 `contribute/*` 临时 Head 分支，保持远端仓库绝对干净。
 
-### 5. 主干提炼升维（ontology promote）
-将类型分支（如 `type/coding`）上验证通过的全局通用能力（如通用模板 `templates/`、通用文档 `docs/`、通用技能）提炼升级回 `main` 主干：
+### 5. 主干提炼升维（promote）
+将类型分支（如 `type/coding`）上的通用改进合并入 `main` 主干：
 ```bash
 WOPAL_HOME=~/.wopal wopal ontology promote \
   --from type/coding \
@@ -105,19 +89,16 @@ WOPAL_HOME=~/.wopal wopal ontology promote \
 ## Quick Commands 常用速查
 
 ```bash
-# 1. 状态查看
+# 状态查看
 WOPAL_HOME=~/.wopal wopal ontology status
 
-# 2. 本地直接提交（.wopal 是 git worktree）
-git -C .wopal add -A && git -C .wopal commit -m "feat(scope): description"
-
-# 3. 下行拉取与自动清理（合并 PR 后运行）
+# 下行拉取（合并 PR 后运行）
 WOPAL_HOME=~/.wopal wopal ontology update --confirm
 
-# 4. 空间合入类型
+# 空间合入类型
 WOPAL_HOME=~/.wopal wopal space contribute --message "..." --confirm
 
-# 5. 上游 PR 贡献（支持链式 --include）
+# 上游 PR 贡献（链式 --include）
 WOPAL_HOME=~/.wopal wopal ontology contribute \
   --type coding \
   --include "path1/**" \
@@ -125,7 +106,7 @@ WOPAL_HOME=~/.wopal wopal ontology contribute \
   --message "..." \
   --confirm
 
-# 6. 主干提炼升维（支持链式 --include）
+# 主干提炼升维（链式 --include）
 WOPAL_HOME=~/.wopal wopal ontology promote \
   --from type/coding \
   --include "templates/**" \
@@ -136,8 +117,8 @@ WOPAL_HOME=~/.wopal wopal ontology promote \
 
 ---
 
-## 核心铁律
+## 核心约束
 
-1. **链式 `--include` 白名单机制**：涉及 `ontology contribute` 与 `promote` 时，总是明确使用链式 `--include` 标志分主题打包，绝不盲目提交包含全量未审核差异的巨型 PR。
-2. **先状态后操作**：先执行 `wopal ontology status` 明确 Downstream / Upstream 拓扑后，再与用户确认构建命令。
-3. **闭环自动清理**：在 GitHub 网页上合并 PR 后，必定提醒或执行 `wopal ontology update --confirm` 完成基线对齐与 Fork 远端陈旧临时分支擦除。
+1. **使用链式 `--include`**：贡献或升维时必须传入链式 `--include` 明确白名单范围，禁止盲目提交全量差异。
+2. **先读取状态**：在构建并执行修改类命令前，必须先调用 `wopal ontology status` 确认当前 Downstream 与 Upstream 拓扑。
+3. **分主题贡献**：不同主题的改动必须拆分为独立 PR 分批贡献，禁止合并提交。
