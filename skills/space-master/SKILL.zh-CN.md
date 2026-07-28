@@ -1,12 +1,12 @@
 ---
 name: space-master
 description: |
-  空间工作规范总纲。⚠️ MUST LOAD FIRST — Wopal 不确定怎么做或任务意图不明确时，第一个加载本技能。
+  空间工作规范总纲。[MUST LOAD FIRST] — Wopal 不确定怎么做或任务意图不明确时，第一个加载本技能。
 
   Triggers: 任何意图不明确的任务、"用什么流程"、"该加载什么技能"、
   技能管理（安装/卸载/搜索）、空间运维（worktree/同步/上游/PR贡献）、多 Space 管理。
   
-  🔴 即使用户未明确说"上游同步"，只要涉及 ontology 仓库协作（update/sync/contribute/promote/PR），就必须加载本技能。
+  [CRITICAL] 即使用户未明确说"上游同步"，只要涉及 ontology 仓库协作（update/sync/contribute/promote/PR），就必须加载本技能。
 ---
 
 # space-master — 空间工作规范总纲

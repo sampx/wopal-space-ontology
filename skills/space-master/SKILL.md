@@ -1,12 +1,12 @@
 ---
 name: space-master
 description: |
-  Master specification for WopalSpace. ⚠️ MUST LOAD FIRST — Load this skill when Wopal is uncertain how to proceed, task intent is ambiguous, or performing ontology/space maintenance.
+  Master specification for WopalSpace. [MUST LOAD FIRST] — Load this skill when Wopal is uncertain how to proceed, task intent is ambiguous, or performing ontology/space maintenance.
 
   Triggers: Ambiguous task intent, "what workflow to use", "what skill to load",
   skill management (install/remove/search), space maintenance (worktrees, sync, PR contribution, promote), multi-space management.
   
-  🔴 MUST LOAD whenever interacting with ontology repo operations (update/sync/contribute/promote/PR), even if the user does not explicitly say "upstream sync".
+  [CRITICAL] MUST LOAD whenever interacting with ontology repo operations (update/sync/contribute/promote/PR), even if the user does not explicitly say "upstream sync".
 ---
 
 # space-master — 空间工作规范总纲
