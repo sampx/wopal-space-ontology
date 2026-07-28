@@ -9,116 +9,132 @@ description: |
   [CRITICAL] MUST LOAD whenever interacting with ontology repo operations (update/sync/contribute/promote/PR), even if the user does not explicitly say "upstream sync".
 ---
 
-# space-master — 空间工作规范总纲
+# space-master — Space Operation Specification Master
 
-本技能定义 Wopal 空间流程选择、场景技能路由、Agent 委派原则以及标准本体（Ontology）维护与 PR 贡献操作指令。
-
----
-
-## 空间工作体系
-
-本空间支持以下工作流程，按任务类型选择：
-
-| 流程 | 适用场景 | 加载技能 |
-|------|---------|---------|
-| **dev-flow** | 开发/修复/重构 GitHub Issue、Plan 驱动的小功能迭代 | dev-flow + agents-collab |
-| **无流程** | 单纯研究、讨论、解释、评审、临时小改动 | 无（Wopal 直接处理） |
-
-dev-flow 是默认开发流程。
+This skill defines Wopal space workflow selection, scene-to-skill routing rules, ontology development contracts, plugin configuration & diagnostic log locations, and standard ontology maintenance with PR contribution command procedures.
 
 ---
 
-## 场景➔技能路由
+## Section 1: Workflows & Scene Routing
 
-| 场景 | 加载技能 | 说明 |
-|------|---------|------|
-| 开发/修复/重构 Issue | dev-flow + agents-collab | 先加载 agents-collab，再走 dev-flow |
-| 委派任何子 Agent | agents-collab | 任何委派前必须加载 |
-| 空间与本体运维（技能安装/同步/上游PR/Promote） | 仅本技能 | 不加载 dev-flow 或 agents-collab |
-| 创建/修改技能 | skill-creator | 独立技能（修改/创建技能前必载） |
-| 配置 ellamaka | ellamaka-config | 独立技能 |
+### 1. Space Workflow System
 
----
+| Workflow | Use Case | Skills to Load |
+|----------|----------|----------------|
+| **dev-flow** | Development, bug fixes, or refactoring driven by GitHub Issues or Plans | dev-flow + agents-collab |
+| **No Workflow** | Pure research, discussions, explanations, code reviews, or minor ad-hoc tweaks | None (Wopal handles directly) |
 
-## Ontology 维护与上游 PR 贡献指令规程
+`dev-flow` is the default development workflow.
 
-处理本体仓库协作时，按以下顺序执行命令：
+### 2. Scene-to-Skill Routing Table
 
-### 1. 检查状态
-```bash
-WOPAL_HOME=~/.wopal wopal ontology status
-```
-
-### 2. 空间改动合入类型分支
-把当前空间的修改增量合入本地类型分支 `type/<type>`：
-```bash
-WOPAL_HOME=~/.wopal wopal space contribute --message "feat(scope): description" --confirm
-```
-
-### 3. 创建上游 Pull Request（分主题链式 `--include`）
-按主题使用链式 `--include` 标志独立打包并创建 PR：
-```bash
-WOPAL_HOME=~/.wopal wopal ontology contribute \
-  --type coding \
-  --include "skills/dev-flow/**" \
-  --include "skills/space-master/**" \
-  --message "feat(skills): update dev-flow and space-master skills" \
-  --confirm
-```
-
-### 4. 上游网页 PR 合并后收尾
-在 GitHub 上合并 PR 后，运行下行同步：
-```bash
-WOPAL_HOME=~/.wopal wopal ontology update --confirm
-```
-
-### 5. 主干提炼升维（promote）
-将类型分支（如 `type/coding`）上的通用改进合并入 `main` 主干：
-```bash
-WOPAL_HOME=~/.wopal wopal ontology promote \
-  --from type/coding \
-  --include "templates/**" \
-  --include "docs/**" \
-  --include "skills/space-master/**" \
-  --message "feat(ontology): promote generic templates and skills to main branch" \
-  --confirm
-```
+| Scene | Skills to Load | Description |
+|-------|----------------|-------------|
+| Dev / Fix / Refactor Issue | dev-flow + agents-collab | Load agents-collab first, then follow dev-flow |
+| Delegate any sub-agent | agents-collab | MANDATORY to load before any sub-agent delegation |
+| Space & Ontology Ops (Install/Sync/PR/Promote) | space-master only | Do NOT load dev-flow or agents-collab |
+| Create or modify skills | skill-creator | Independent skill (MUST load before creating/modifying skills) |
+| Configure ellamaka | ellamaka-config | Independent skill |
 
 ---
 
-## Quick Commands 常用速查
+## Section 2: Ontology Development Contract & dev-flow Specification
 
-```bash
-# 状态查看
-WOPAL_HOME=~/.wopal wopal ontology status
+When performing development, bug fixes, or refactoring on ontology capabilities or projects, adhere to the following official standard contracts:
 
-# 下行拉取（合并 PR 后运行）
-WOPAL_HOME=~/.wopal wopal ontology update --confirm
+### 1. Ontology Runtime Contract
+The `.wopal/` directory is the active runtime worktree bound to the current space (corresponding to the `space/<name>` branch). Edits made directly in `.wopal/` immediately affect running plugins and skills.
 
-# 空间合入类型
-WOPAL_HOME=~/.wopal wopal space contribute --message "..." --confirm
+### 2. Issue / Plan-Driven Development Contract (dev-flow)
+When a task involves development, bug fixes, refactoring, or minor feature iterations, **Agents MUST load and follow the `dev-flow` skill**:
+- Tasks MUST be backed by a GitHub Issue or Plan, driven through the official `flow.sh` state machine: `planning → reviewing → executing → verifying → done`.
+- Bypassing `dev-flow` to manually perform non-standard branch or isolation operations is STRICTLY FORBIDDEN.
 
-# 上游 PR 贡献（链式 --include）
-WOPAL_HOME=~/.wopal wopal ontology contribute \
-  --type coding \
-  --include "path1/**" \
-  --include "path2/**" \
-  --message "..." \
-  --confirm
-
-# 主干提炼升维（链式 --include）
-WOPAL_HOME=~/.wopal wopal ontology promote \
-  --from type/coding \
-  --include "templates/**" \
-  --include "docs/**" \
-  --message "..." \
-  --confirm
-```
+### 3. Infrastructure & Branch Management Iron Laws
+- **Infrastructure Exclusivity**: The lifecycle of worktrees and feature branches is exclusively managed by `dev-flow` scripts (`approve` / `verify-switch` / `archive`).
+- **Agent Branch Restrictions**: Agents MUST NOT manually create or delete any branches (FORBIDDEN: `git branch -d/-D`), and MUST NOT manually create or delete worktrees. The ONLY allowed git branch operation for agents is `git merge`.
 
 ---
 
-## 核心约束
+## Section 3: Plugin Configuration & Diagnostic Logs
 
-1. **使用链式 `--include`**：贡献或升维时必须传入链式 `--include` 明确白名单范围，禁止盲目提交全量差异。
-2. **先读取状态**：在构建并执行修改类命令前，必须先调用 `wopal ontology status` 确认当前 Downstream 与 Upstream 拓扑。
-3. **分主题贡献**：不同主题的改动必须拆分为独立 PR 分批贡献，禁止合并提交。
+### 1. Configuration Priority
+```
+3. System / Shell Environment Variables (Highest priority, not overridden by .env)
+2. Space-level .wopal/.env               (Applies to current space only)
+1. User-level <WOPAL_HOME>/.env         (Shared across spaces)
+```
+
+### 2. Diagnostic Log Locations
+- **In-space execution log**: `<workspace>/.wopal-space/logs/wopal-plugin.log`
+- **Out-of-space execution log**: `<WOPAL_HOME>/logs/wopal-plugin.log`
+When plugin errors or permission issues occur, inspect the above log files first to diagnose root causes.
+
+---
+
+## Section 4: Ontology Maintenance & Upstream PR Contribution
+
+### 1. Ontology Mode Contract (Clone vs Fork Mode)
+Before suggesting or executing any upstream operations, Agents MUST run `wopal ontology status` to check the active Mode:
+
+- **Clone Mode (`clone`)**: Default single-repo source mode. `origin` is the upstream repo; no separate Fork exists.
+  - **Capability Restrictions**: **`contribute` IS NOT SUPPORTED in Clone mode**. It is restricted to local usage and downstream sync (`update`).
+  - **Agent Behavior**: If the user requests an upstream PR contribution, the Agent MUST explain that Clone mode does not support `contribute` and guide the user to configure Fork mode first.
+- **Fork Mode (`fork`)**: Developer cross-repo mode. `origin` points to the user's Fork; `upstream` points to official upstream.
+  - **Capability Support**: Fully supports downstream sync (`update`) + upstream PR contributions (`contribute`) + main promotion (`promote`).
+
+### 2. Standard Maintenance Protocol (Fork Mode)
+
+```
+[Space Layer space/*] 
+      │ 1. space contribute (chained --include)
+      ▼
+[Type Layer type/*] 
+      │ 2. ontology contribute (chained --include) ➔ Auto-creates PR on GitHub origin
+      ▼
+[Upstream upstream] (Merge on GitHub UI)
+      │ 3. ontology update (--confirm) ➔ Downstream topology sync + Auto-clean stale origin branches
+      ▼
+[Main Promotion promote] (chained --include) ➔ Promote generic capabilities to main
+```
+
+- **Check Status & Mode (Pre-check)**: `wopal ontology status`
+- **Merge Space into Type**: `wopal space contribute --message "feat(scope): description" --confirm`
+- **Create Upstream PR (Fork Mode, Chained `--include`)**:
+  ```bash
+  wopal ontology contribute \
+    --type coding \
+    --include "skills/dev-flow/**" \
+    --include "skills/space-master/**" \
+    --message "feat(skills): update dev-flow and space-master skills" \
+    --confirm
+  ```
+- **Post-Merge Downstream Sync**: `wopal ontology update --confirm`
+- **Promote Generic to Main**:
+  ```bash
+  wopal ontology promote \
+    --from type/coding \
+    --include "templates/**" \
+    --include "docs/**" \
+    --message "feat(ontology): promote generic templates to main" \
+    --confirm
+  ```
+
+### 3. Verification & Self-Inspection Protocol
+Agents MUST perform verification after executing commands or modifying skills, and never assume success:
+- **Skill Modification Verification**: `ls -la .wopal/skills/<skill-name>/SKILL.md` and `wopal skills list`
+- **PR Contribution Verification**: `wopal ontology status` and `git diff --stat upstream/main origin/main`
+- **Plugin Modification Verification**: Inspect `<workspace>/.wopal-space/logs/wopal-plugin.log`
+
+### 4. Core Iron Laws
+- **Mode Enforcement**: NEVER construct or invoke `contribute` commands in Clone mode.
+- **Read Status First**: Always call `wopal ontology status` to inspect Mode and topology before building modifying commands.
+- **Chained `--include` Whitelist**: Always specify explicit whitelist paths using chained `--include` flags when contributing or promoting.
+- **Topic-Based Contributions**: Never combine unrelated changes into a single PR.
+
+---
+
+## Section 5: Deep Reference Entry
+
+* [ontology-maintenance.md](references/ontology-maintenance.md) — Three-layer capability architecture, Clone vs Fork mode contracts, status interpretation matrix, deletion-risk handling, and conflict resolution guide
+* [skills-maintenance.md](references/skills-maintenance.md) — Skill lifecycle management (find/download/scan/install), security protocols, and quality evaluation guide
