@@ -1,12 +1,12 @@
 ---
 name: space-master
 description: |
-  Master specification for WopalSpace. ⚠️ MUST LOAD FIRST — Load this skill when Wopal is uncertain how to proceed, task intent is ambiguous, or performing ontology/space maintenance.
+  空间工作规范总纲。⚠️ MUST LOAD FIRST — Wopal 不确定怎么做或任务意图不明确时，第一个加载本技能。
 
-  Triggers: Ambiguous task intent, "what workflow to use", "what skill to load",
-  skill management (install/remove/search), space maintenance (worktrees, sync, PR contribution, promote), multi-space management.
+  Triggers: 任何意图不明确的任务、"用什么流程"、"该加载什么技能"、
+  技能管理（安装/卸载/搜索）、空间运维（worktree/同步/上游/PR贡献）、多 Space 管理。
   
-  🔴 MUST LOAD whenever interacting with ontology repo operations (update/sync/contribute/promote/PR), even if the user does not explicitly say "upstream sync".
+  🔴 即使用户未明确说"上游同步"，只要涉及 ontology 仓库协作（update/sync/contribute/promote/PR），就必须加载本技能。
 ---
 
 # space-master — 空间工作规范总纲
@@ -17,7 +17,7 @@ description: |
 
 ## 空间工作体系
 
-本空间支持以下工作流程，按任务类型选择：
+本空间支持多种工作流程，按任务类型选择：
 
 | 流程 | 适用场景 | 加载技能 |
 |------|---------|---------|

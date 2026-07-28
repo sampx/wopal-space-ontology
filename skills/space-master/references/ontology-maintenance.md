@@ -84,61 +84,59 @@ wopal space update --confirm  # 执行合并
 **U1（space → type/coding）**：
 
 ```bash
-# 按主题分批贡献，每次一个 --include 模式
+# 按主题分批贡献，支持链式 --include 模式
 wopal space contribute \
-  --include 'skills/dev-flow/**' \
-  --message 'enhance(dev-flow): ...' \
+  --include "skills/dev-flow/**" \
+  --include "skills/space-master/**" \
+  --message "enhance(skills): update dev-flow and space-master skills" \
   --confirm
 ```
 
-`--include` 接受逗号分隔的 glob 模式。用 `--confirm` 前先 dry-run 验证过滤结果。
-
-建议按主题拆分（参考）：
-
-| 批次 | include 模式 | 说明 |
-|------|-------------|------|
-| 清理废弃文档 | `docs/references/**,docs/research/**` | 删除过时研究/参考 |
-| 技能改进 | `skills/dev-flow/**,skills/agents-collab/**` | 工作流和协作技能 |
-| 扩展更新 | `extensions/opencode-usage-extension/**` | 浏览器扩展 |
-| 模板/配置 | `templates/**,config/settings.jsonc` | 空间初始化和配置 |
-| 命令更新 | `commands/**` | CLI 命令改进 |
+链式 `--include` 自动收集并进行严格白名单过滤。在 `--confirm` 前可先运行 dry-run 验证。
 
 **U4/U5（origin → upstream）**：
 
 ```bash
-# 同样按主题分批，--include 模式
+# 按主题分批，链式 --include 模式
 wopal ontology contribute \
   --type coding \
-  --include 'skills/dev-flow/**' \
-  --message 'enhance(dev-flow): ...' \
+  --include "skills/dev-flow/**" \
+  --include "skills/space-master/**" \
+  --message "enhance(skills): update dev-flow and space-master" \
   --confirm
 ```
 
-每次执行后确认 PR 创建成功，等待用户合并后再做下一批。
+每次执行后确认 PR 创建成功，在 GitHub 上合并后，运行 `wopal ontology update --confirm` 完成基线对齐与 Fork 远端陈旧临时分支擦除。
 
 **Promote（type → main） + 贡献到上游**：
 
 ```bash
-# 1. 将 type 的 M/D 通用改进 promote 到 main
-wopal ontology promote --from type/coding --confirm
+# 1. 将 type 的通用改进 promote 提炼到 main（支持链式 --include）
+wopal ontology promote \
+  --from type/coding \
+  --include "templates/**" \
+  --include "docs/**" \
+  --include "skills/space-master/**" \
+  --message "feat(ontology): promote generic templates, docs, and skills to main" \
+  --confirm
 
-# 2. promote 后 origin/main 领先 upstream/main，需再贡献
+# 2. 将 main 上的通用改进单独向 upstream/main 发起 PR 贡献
 wopal ontology contribute \
-  --type common \
-  --include 'skills/dev-flow/**,~~' \
-  --message '...' \
+  --type main \
+  --include "templates/**" \
+  --include "docs/**" \
+  --message "feat(ontology): contribute main updates to upstream" \
   --confirm
 ```
 
-> promote 自动排除 A-status 文件（type 专属能力，如 WSF 技能、Agent 角色）。promote 后的 main 变更需要单独 PR 到 upstream。
+> promote 会自动排除 type 专属能力（如特有脚本与工作流）。promote 后的 main 变更独立 PR 贡献到 upstream。
 
-### PR 合并后的收尾
+### PR 合并后的闭环与自动清理
 
-每次上游 PR 合并后：
+每次上游 PR 在 GitHub 上合并后：
 
 ```bash
-wopal ontology update --confirm    # 同步上游到本地
-wopal space update --confirm       # 同步 type 到 space worktree
+wopal ontology update --confirm    # 1. 自动同步上游到本地 + 2. 自动擦除 origin 上已合并的 contribute/* 临时分支
 ```
 
 ---
