@@ -41,7 +41,18 @@ description: |
 
 命令：`wopal ontology status`
 
-### 2.2 两种贡献路径
+### 2.2 同步本体的含义
+
+"同步本体"包含两个方向，缺一不可：
+
+| 方向 | 含义 | 命令 |
+|------|------|------|
+| **下行** | 拉取上游最新变更到本地 | `wopal ontology update --confirm` |
+| **上行** | 将本地变更贡献回上游 | `wopal ontology contribute` / `wopal ontology promote` |
+
+Agent 听到"同步本体"时，必须先执行下行（update），再检查是否有待贡献的本地变更，有则执行上行（contribute/promote）。
+
+### 2.3 两种贡献路径
 
 不是所有变更都走同样的流程。Ontology 有三层架构（main → type/* → space/*），文件按状态分为两类：
 
@@ -85,7 +96,7 @@ space → type → upstream(type) → promote → upstream(main) → ✓ 完成
 
 **关键差异**：长路径比短路径多 3 步（promote → contribute main → update）。执行时容易在 promote 后忘记步骤 6。
 
-### 2.3 分主题分批 PR
+### 2.4 分主题分批 PR
 
 **一次 PR 只含一个主题。** 不同目录或功能区域的变更必须拆分为独立 PR。
 
@@ -132,7 +143,7 @@ wopal ontology contribute --type common \
 3. **批次顺序**：建议先贡献有依赖关系的 PR（如某个插件可能被其他变更依赖），同层级无依赖的可任意顺序
 4. **每批重复完整门禁**：每个 PR 都独立过同步分析门禁和飞前检查门禁
 
-### 2.4 同步门禁
+### 2.5 同步门禁
 
 每次同步操作（`contribute`、`update`、`promote`）必须依次通过两道门禁：
 
@@ -156,7 +167,7 @@ wopal ontology contribute --type common \
 
 > 不加 `--include` 会把分支上所有人的所有积累变更一次性全推出去。不可逆。
 
-### 2.5 本体规则
+### 2.6 本体规则
 
 1. **禁止自动同步。** 先分析后汇报用户，确认再执行。
 2. **必须链式 `--include`。** 多个叠加生效，每个 glob 对应一个目录。
