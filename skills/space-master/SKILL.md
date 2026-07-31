@@ -41,7 +41,18 @@ Before any ontology operation, check the mode:
 
 Command: `wopal ontology status`
 
-### 2.2 Two Contribution Paths
+### 2.2 What "Sync Ontology" Means
+
+"Sync ontology" covers both directions — neither is optional:
+
+| Direction | Meaning | Command |
+|-----------|---------|---------|
+| **Downstream** | Pull latest upstream changes to local | `wopal ontology update --confirm` |
+| **Upstream** | Contribute local changes back to upstream | `wopal ontology contribute` / `wopal ontology promote` |
+
+When the agent hears "sync ontology", it must first run downstream (update), then check for pending local changes and run upstream (contribute/promote) if any.
+
+### 2.3 Two Contribution Paths
 
 Not all changes follow the same pipeline. Ontology has a three-layer architecture (main → type/* → space/*), and files fall into two status categories:
 
@@ -85,7 +96,7 @@ space → type → upstream(type) → promote → upstream(main) → ✓ done
 
 **Key difference**: The long path has 3 extra steps (promote → contribute main → update). It's easy to forget step 6 after promote.
 
-### 2.3 Topic-Based PR Splitting
+### 2.4 Topic-Based PR Splitting
 
 **One PR, one topic.** Changes from different directories or feature areas must be split into separate PRs.
 
@@ -132,7 +143,7 @@ wopal ontology contribute --type common \
 3. **Batch order**: Contribute PRs with dependencies first (e.g., a plugin that other changes depend on); independent topics can be in any order
 4. **Repeat full gates for each batch**: Every PR goes through the sync analysis gate and pre-flight gate independently
 
-### 2.4 Sync Gates
+### 2.5 Sync Gates
 
 Every sync operation (`contribute`, `update`, `promote`) must pass through two gates in order:
 
