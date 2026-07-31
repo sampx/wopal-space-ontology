@@ -600,9 +600,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
                     else:
                         # Worktree directory present → check merge status
                         if has_uncommitted_changes(str(wt_path_resolved)):
-                            log_error(f"Worktree has uncommitted changes: {wt_path_resolved}")
-                            log_error("Commit changes in worktree first, then re-run archive")
-                            return 1
+                            if not args.force:
+                                log_warn(f"Worktree has uncommitted changes: {wt_path_resolved}")
+                                log_warn("Archive will proceed but uncommitted worktree changes may be lost when worktree is cleaned up")
 
                         # Check if feature branch has been merged
                         merge_status = check_branch_merged(workspace_root, plan_path)
@@ -625,9 +625,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
             else:
                 # No worktree — remind user to push project changes
                 if has_uncommitted_changes(str(project_path)):
-                    log_error(f"Project {project} has uncommitted changes — archive does not commit implementation code")
-                    log_error("Commit changes first, then re-run archive")
-                    return 1
+                    if not args.force:
+                        log_warn(f"Project {project} has uncommitted changes — these changes will NOT be committed by archive")
+                    # Continue — dirty working tree no longer blocks archive
                 log_warn(f"请手动 push 项目变更: cd {project_path} && git push")
 
     # 4. Cache Product/Phase metadata before Plan is moved
@@ -732,4 +732,9 @@ def register_archive_parser(subparsers: argparse._SubParsersAction) -> None:
         "target",
         nargs="?",
         help="Issue number or Plan name"
+    )
+    archive_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip dirty working tree warnings"
     )
