@@ -12,6 +12,7 @@
 | `dirty workspace` | 清理/提交 或使用 worktree 隔离 |
 | `PR not merged yet` | 等 merge 后再 `verify --confirm` |
 | `User Validation gate failed` | 让用户完成验证并勾选最终 checkbox |
+| `Feature branch not yet merged`（squash 后仍报错） | 确认合并方式：tree 相等判据已自动识别 squash/ff/--no-ff。若仍报错,检查 Plan `Verification Commit` 字段是否残留旧 SHA(错误 fill 或 stale),删掉该字段后重试 |
 
 ## 边缘场景
 
@@ -23,6 +24,12 @@
 6. PR 未 merge 时 `verify --confirm` — 等 merge
 7. 目标项目工作区不干净 — 清理或使用 worktree 隔离
 8. 参数选择：Issue 驱动传 issue number，无 Issue 传 plan-name
+9. **squash 合并后 verify 通过** — 默认支持。squash 的 feature tip 不是 main
+   祖先，但 tree 相等判据（L2）会识别已合并。合并后 feature 分支保留到
+   archive 才删除，verify 期间不要手动删分支
+10. **实施基线可追溯** — approve 记录 `Base Commit`（集成分支 HEAD），
+    verify 记录 `Final Commit`（合入后 HEAD）。两字段对照可确定 feature
+    影响范围，revert 时用 `git diff Base..Final` 查看完整变更
 
 ## PR 工作流（可选）
 

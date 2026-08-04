@@ -100,6 +100,27 @@ def get_remote_url(repo_path: str) -> str:
     return result.stdout.strip()
 
 
+def get_branch_head(repo_path: str, branch: str) -> str:
+    """Get HEAD commit SHA of a branch.
+
+    Args:
+        repo_path: Path to git repository root
+        branch: Branch name (e.g. "main", "space/wopal-workspace")
+
+    Returns:
+        Full commit SHA, or empty string if branch does not exist
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", branch],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
 def commit_all(repo_path: str, message: str) -> bool:
     """Commit all changes with given message.
 
@@ -548,12 +569,35 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
                 return 0
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
-        # SHA not found in ancestry — not merged
-        log_error(
-            f"Feature branch '{feature_branch}' not yet merged to "
-            f"{integration_branch}. Please merge first."
+        # SHA not in ancestry — do not fail yet. Squash merge 的 feature tip
+        # 永远不会成为 integration 祖先,继续内容级检测。
+
+    # Content-based detection: integration tree == feature tree.
+    # Squash merge 判据:main 上只有 feature 内容的副本提交,但 tree 与
+    # feature tip 字节级一致。对 --no-ff / fast-forward 同样成立(祖先
+    # 检测已提前返回),因此该判据对三种合并方式都安全。
+    try:
+        int_tree = subprocess.run(
+            ["git", "rev-parse", f"{integration_branch}^{{tree}}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
         )
-        return 1
+        feat_tree = subprocess.run(
+            ["git", "rev-parse", f"{feature_branch}^{{tree}}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if (
+            int_tree.returncode == 0
+            and feat_tree.returncode == 0
+            and int_tree.stdout.strip()
+            and int_tree.stdout.strip() == feat_tree.stdout.strip()
+        ):
+            return 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
 
     # Run git branch --merged <integration> and check for feature branch
     try:
