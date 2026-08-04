@@ -599,6 +599,53 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
 
+    # Changeset criterion: full-tree equality fails when the integration
+    # branch advanced after the feature branched (parallel commits on main
+    # make the trees differ even after a clean squash). Instead compare the
+    # paths the feature actually changed against the integration branch —
+    # if every changed path is byte-identical in both branches, the feature
+    # content is merged regardless of unrelated main progress.
+    try:
+        base_res = subprocess.run(
+            ["git", "merge-base", integration_branch, feature_branch],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if base_res.returncode == 0 and base_res.stdout.strip():
+            base_sha = base_res.stdout.strip()
+            changed_res = subprocess.run(
+                [
+                    "git", "diff", "--name-only",
+                    base_sha, feature_branch,
+                ],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+            )
+            if changed_res.returncode == 0 and changed_res.stdout.strip():
+                paths = [
+                    p for p in changed_res.stdout.split("\n") if p.strip()
+                ]
+                all_present = True
+                for p in paths:
+                    check = subprocess.run(
+                        [
+                            "git", "diff", "--quiet",
+                            integration_branch, feature_branch, "--", p,
+                        ],
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if check.returncode != 0:
+                        all_present = False
+                        break
+                if all_present:
+                    return 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
     # Run git branch --merged <integration> and check for feature branch
     try:
         result = subprocess.run(

@@ -1277,3 +1277,99 @@ class TestCheckBranchMerged:
             result = check_branch_merged(tmp_path, str(plan_path))
 
         assert result == 0
+
+    def test_squash_merged_after_integration_advanced_returns_zero(self, tmp_path):
+        """Squash merge where integration advanced after the feature branched:
+        full-tree equality fails (main carries parallel commits) but every
+        path the feature changed is present in integration. The changeset
+        criterion must recognize the merge. This is the exact scenario that
+        broke verification when wopal-cli main advanced (#185) while the
+        feature branch was in flight.
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(
+                    returncode=0,
+                    stdout="src/foo.ts\ntests/foo.test.ts\n",
+                )
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run) as mock_run:
+            result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 0
+        # The changeset criterion must have run: it computes the merge base
+        # and compares each changed path between integration and feature.
+        # The fixture changes two paths, so exactly two quiet diffs run.
+        quiet_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if "--quiet" in c.args[0]
+        ]
+        assert len(quiet_calls) == 2
+
+    def test_changeset_not_merged_returns_one(self, tmp_path):
+        """Squash candidate where integration advanced AND a changed path is
+        missing from integration: changeset criterion fails, returns 1."""
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(
+                    returncode=0,
+                    stdout="src/foo.ts\ntests/foo.test.ts\n",
+                )
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run):
+            with patch("lib.git.log_error") as mock_log:
+                result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 1
+        mock_log.assert_any_call(
+            "Feature branch 'feature/test-1-slug' not yet merged to main. "
+            "Please merge first."
+        )
