@@ -29,7 +29,6 @@ ontology 拥有的目标态能力组：
 | 运行时插件 | wopal-plugin 提供规则注入、任务委派、记忆系统、上下文管理四大能力，7 个 plugin tools | 仅限插件内部，不侵入技能/规则/命令 |
 | 模板体系 | 空间初始化模板（结构、守则、用户档案）+ 文档模板（PRD/DESIGN/phase/AGENTS） | 不持有空间运行态实例 |
 | 辅助脚本 | ontology 维护、git hooks 与辅助自动化脚本 | 仅承担辅助维护动作 |
-| 浏览器扩展 | 独立 Chrome 扩展（如 AI Usage Monitor），提供辅助工具能力，以独立项目分发 | 不侵入 ontology 核心模块，遵循 `.wopal/rules/chrome-extension.md` 规范 |
 
 ---
 
@@ -157,20 +156,6 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | 空间级（私有）| `.wopal/config/settings.local.jsonc` | 当前空间 | 否（git 忽略）| 覆盖公共默认值的本地配置 |
 
 空间级公共配置与全局配置合并生效，空间级私有配置覆盖前两者。详见 §6.8 配置隔离约定。
-
-### 4.9 浏览器扩展体系
-
-ontology 记录浏览器扩展的接入方式，但扩展本体是独立项目，不随 ontology 分发。
-
-| 扩展 | 职责 | 载体 |
-|------|------|------|
-| AI Usage Monitor | 多账号 AI 用量监控：自动捕获 Cookie、DNR 规则注入、Alarm 轮询、通知系统 | `projects/ai-usage-extension/`（见其 `docs/DESIGN.md`） |
-
-扩展特征：
-- **独立性**：每个扩展是独立的 Chrome MV3 项目，拥有自己的仓库、`manifest.json`、`AGENTS.md` 和开发规范
-- **分发方式**：通过独立 git 仓库分发，用户手动"加载已解压扩展"安装
-- **无构建工具链**：纯 JavaScript ES Modules，无需编译
-- **规则遵循**：所有扩展开发必须遵守 `.wopal/rules/chrome-extension.md` 中的 MV3 规范
 
 ---
 
@@ -670,4 +655,3 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 | `projects/wopal-cli/docs/DESIGN.md` | wopal-cli 子系统设计 — 统一操作入口 |
 | `.wopal/docs/DISTRIBUTION.md` | ontology 的 Git source、worktree、template handoff 与 runtime loading 契约 |
 | `.wopal/docs/BUSINESS_RULES.md` | 本体业务规则 |
-| `projects/ai-usage-extension/AGENTS.md` | AI Usage Monitor 浏览器扩展开发规范 |
