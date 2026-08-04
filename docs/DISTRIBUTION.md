@@ -111,12 +111,12 @@ $WOPAL_HOME/{agents,skills,commands,rules,plugins}  # base
 
 ### 浏览器扩展
 
-浏览器扩展位于 `.wopal/extensions/` 目录，**不纳入 Base Capability Source Contract**，不参与 symlink 物化。
+浏览器扩展是独立项目，不纳入 Base Capability Source Contract，不参与 symlink 物化，也不随 ontology 分发。
 
-分发方式：Git 仓库分发。用户 clone ontology 后，手动在浏览器中"加载已解压扩展"安装。更新时需重新加载扩展。
+分发方式：Git 仓库分发。用户 clone 扩展仓库后，手动在浏览器中"加载已解压扩展"安装。更新时需重新加载扩展。
 
 当前扩展：
-- `opencode-usage-extension` — OpenCode 多账号用量监控
+- `projects/ai-usage-extension/` — AI Usage Monitor 多账号 AI 用量监控（仓库 `wopal-cn/ai-usage-extension`）
 
 扩展遵循 `.wopal/rules/chrome-extension.md` 规范，Edge/Chrome 完全兼容，Firefox 需适配。
 
