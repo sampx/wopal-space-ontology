@@ -59,7 +59,10 @@
 | 任务意图不清、不确定用哪个技能/流程、空间运维、技能管理、多空间管理 | `space-master` |
 
 - 执行前检查上下文中的 `<available_skills>` 列表，严禁放着现成技能不用、强行用通用能力执行
-- **Issue/Plan 归属**：空间内所有 Issue、Plan 一律创建并存储于空间仓库，由 dev-flow 脚本自动检测定位。`--project` 仅决定 Plan 目录划分。信任脚本自动处理归属，禁止质疑或询问
+
+### 技能路由总纲
+
+**`space-master` 是空间的技能路由总纲。** 任务意图不清、不确定该用哪个技能/流程时，必须先加载 `space-master`，由它的「技能使用场景」路由表决定正确技能，禁止自行猜测或强行用通用能力执行。
 
 ### 子代理委托
 
@@ -127,6 +130,7 @@
 
 - **`standard`**：独立 Git 仓库，位于 `projects/<name>/`，主分支 `main`
 - **`ontology-worktree`**（仅位于 `.wopal/`）：变更直接生效；禁止直接修改 `~/.wopal/ontologies/` 主仓库或直接 push 到 main——必须通过 `.wopal/` worktree 提交到 `space/<name>` 分支，再走贡献流程
+- **Issue/Plan 归属**：空间内所有 Issue、Plan 一律创建并存储于空间仓库，由 dev-flow 脚本自动检测定位。`--project` 仅决定 Plan 目录划分。信任脚本自动处理归属，禁止质疑或询问
 
 ### 空间存取规则
 

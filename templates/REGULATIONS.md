@@ -59,7 +59,10 @@ The following tasks **must** load the corresponding skill before any operation. 
 | Ambiguous task intent, unsure which skill/flow to use, space maintenance, skill management, multi-space management | `space-master` |
 
 - Check the `<available_skills>` list in context before choosing an approach. Never force generic capability execution when a skill exists
-- **Issue/Plan ownership**: All Issues/Plans in a space are created/stored in the space repo, located automatically by the dev-flow script. `--project` only partitions Plan directories. Trust the script; do not question or ask about ownership
+
+### Skill Routing Master
+
+**`space-master` is the skill routing master of the space.** When task intent is ambiguous or you are unsure which skill/flow to use, load `space-master` first and let its Skill Usage Scenarios routing table decide the right skill. Never guess or force generic capability execution.
 
 ### Sub-agent Delegation
 
@@ -127,6 +130,7 @@ Memory only has value when actively retrieved. Proactive search is mandatory in 
 
 - **`standard`**: independent git repos under `projects/<name>/`, main branch `main`
 - **`ontology-worktree`** (only in `.wopal/`): changes take effect at runtime; never modify the `~/.wopal/ontologies/` main repo directly or push to `main` — commit through the `.wopal/` worktree on `space/<name>`, then follow the contribution flow
+- **Issue/Plan ownership**: All Issues/Plans in a space are created/stored in the space repo, located automatically by the dev-flow script. `--project` only partitions Plan directories. Trust the script; do not question or ask about ownership
 
 ### Space Access Rules
 
