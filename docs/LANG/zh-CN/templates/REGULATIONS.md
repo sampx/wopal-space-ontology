@@ -110,10 +110,6 @@
 
 `<type>(<scope>): <description>`：type 必选、scope 必选（对应项目或模块名）、description 英文祈使句 ≤55 chars、整体 ≤72 chars。Label 映射：feat/enhance → `type/feature`、fix → `type/bug`、refactor → `type/refactor`、docs → `type/docs`、test → `type/test`、chore → `type/chore`、perf 无 label。
 
-#### 项目工作流
-
-分层提交，先项目后空间；变更路径决定检查哪个仓库（`projects/*/` 的变更不检查空间根仓库）；开发前确保脱离 detached HEAD；在项目内完成 add → commit → push。
-
 ### Git 工作流
 
 #### 基本法
