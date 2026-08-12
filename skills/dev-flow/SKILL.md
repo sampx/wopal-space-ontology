@@ -113,7 +113,7 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 2. **人类授权门**：`approve --confirm` 和 `verify --confirm` 都需要用户明确授权，禁止未经授权执行。
 3. **脚本不操作项目代码**：`flow.sh` 命令不提交实施代码，但管理自身创建的基础设施（worktree、feature 分支）。`complete` 遇脏树报错退出。
 4. **Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。委派实施时给 fae 的 Plan 路径必须是空间仓库的绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
-5. **rook 门禁**：实施审查（complete 前）必须委派 rook，rook PASS 才能推进，最多 3 轮修订。Plan 审查（submit 前）默认委派 rook，但 fix 类型 Plan 可跳过——方案简单明确时无需审查；若方案复杂需审查，提交前征求用户同意。
+5. **rook 门禁**：实施审查（complete 前）必须委派 rook，rook PASS 才能推进，最多 3 轮修订。Plan 质量由 `flow.sh plan check` 脚本校验把关，submit 前不委派 rook 审 Plan。
 6. **Plan 语言与结构**：Plan 文档正文使用用户偏好语言编写，章节标题保持英文（与模板一致）。禁止混用中英文标题。
 
 ## Plan Task 字段要求
@@ -178,7 +178,7 @@ flow.sh plan new <issue>                              # Issue 驱动
 flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue
 ```
 
-完整命令链：`plan new → plan check → rook review → submit → approve --confirm → complete → verify --confirm → archive`。
+完整命令链：`plan new → plan check → submit → approve --confirm → complete → verify --confirm → archive`。
 
 **Plan 目录**：统一存放在 `.wopal-space/plans/<项目名>/`。
 
@@ -189,11 +189,10 @@ flow.sh plan check <name-or-path>   # 校验 Plan 质量（必走）
 flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围必须）
 ```
 
-1. 委派 rook 审 Plan — prompt 契约见 agents-collab。fix 类型 Plan 默认跳过此步骤；若方案复杂需审查，提交前征求用户同意
-2. rook PASS → `flow.sh submit <issue>`（planning → reviewing）
-3. rook REVISE/BLOCK → 修订后重审（最多 3 轮）
-4. Plan 处于 `reviewing` 状态时可直接修订内容，无需 `flow.sh reset` 回退到 `planning`。修订完成后告知用户即可，无需重新 `submit`
-5. 等用户审批后：`flow.sh approve <issue> --confirm`（reviewing/planning → executing）
+1. `flow.sh plan check <name-or-path>` 校验通过（Plan 质量由脚本把关，不委派 rook 审 Plan）
+2. `flow.sh submit <issue>`（planning → reviewing）
+3. Plan 处于 `reviewing` 状态时可直接修订内容，无需 `flow.sh reset` 回退到 `planning`。修订完成后告知用户即可，无需重新 `submit`
+4. 等用户审批后：`flow.sh approve <issue> --confirm`（reviewing/planning → executing）
 
 ### C. Executing
 
@@ -209,7 +208,7 @@ flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围�
 - 实施 → fae；审查 → rook
 - **上下文复用原则**：fae/rook 完成后，优先 `reply` 续审或修复，禁止 `finish` 后新开。前提：子任务上下文 < 50%
 - 复用链路：fae IDLE → reply rook 续审 → rook REVISE → reply fae 修复 → fae fix IDLE → reply rook 续审 → rook PASS → finish 两个 task
-- rook 契约格式见 agents-collab；rook 自行加载 df-plan-review / df-implement-review 技能
+- rook 契约格式见 agents-collab；rook 自行加载 df-implement-review 技能
 
 `complete` 硬门控：所有 Task Done ✓ + Agent Verification ✓ + rook PASS ✓ + 实施代码已提交。
 
@@ -324,7 +323,7 @@ flow.sh archive <issue>
 | `verify --confirm` | "验证通过"、"没问题"、"validation passed" |
 | `reset` | "重置"、"reset" |
 
-`submit` 不需要用户授权——Plan 审阅通过后 agent 可直接执行。`approve` 不带 `--confirm` 直接报错，提示使用 `submit`。
+`submit` 不需要用户授权——`plan check` 校验通过后 agent 可直接执行。`approve` 不带 `--confirm` 直接报错，提示使用 `submit`。
 
 ## 分支归属
 
@@ -358,8 +357,9 @@ flow.sh archive <issue>
 
 - **跳过 dev-flow 直接手动操作** — Issue/Plan 驱动的任务必须走 `flow.sh` 命令链
 - **直接调 `gh issue create` 绕过 flow.sh** — Issue 创建必须走 `flow.sh issue create`，脚本通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`。直接调 `gh` 会导致 Issue 创建到错误仓库 = 严重失职
-- **跳过 rook 审查直接 submit 或 complete** — Plan 审查和实施审查都是强制门禁（fix 类型 Plan 的 Plan 审查除外）
-- **rook BLOCK 后强行 submit 或 complete** — 必须修订后重审，最多 3 轮
+- **跳过 rook 审查直接 complete** — 实施审查是强制门禁，complete 前必须委派 rook
+- **跳过 `plan check` 直接 submit** — Plan 质量由脚本校验把关，submit 前必须通过 `flow.sh plan check`
+- **rook BLOCK 后强行 complete** — 必须修订后重审，最多 3 轮
 - **rook 复审新开 task** — rook 返回 REVISE/BLOCK → fae 修复后，必须 `wopal_task_reply` 续审原 rook task，禁止 `finish` 后新开。新开会话丢失审查上下文，浪费 token
 - **checkbox 与代码脱节** — 代码未提交就勾选 Done/AC checkbox，或勾选后代码被回退。代码在 feature 分支提交，checkbox 在空间仓库提交，两者独立但必须在 `complete` 前全部完成
 - **未实际验证就勾选 AC** — 必须运行命令、检查输出，凭记忆打勾 = 严重失职
