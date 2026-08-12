@@ -581,13 +581,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
                 # Always cleanup — clean_worktree is safe when the
                 # worktree directory is gone; it still deletes the
-                # feature branch.
-                _cleanup_worktree(
+                # feature branch. Cleanup failure aborts archive so
+                # residual directories are not silently left behind.
+                if not _cleanup_worktree(
                     str(project_path),
                     branch,
                     str(wt_path_resolved),
                     workspace_root,
-                )
+                ):
+                    log_error(
+                        "Worktree cleanup failed — residual directories may remain "
+                        "under .worktrees/. Fix the cause and re-run archive."
+                    )
+                    return 1
                 worktree_handled = True
             else:
                 # No worktree — check dirty on project
@@ -610,7 +616,12 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 if plan_issue and _is_pr_path(plan_path, plan_issue, repo):
                     # Has worktree + PR path → just cleanup worktree
                     log_info("PR path detected — skipping merge, cleaning up worktree")
-                    _cleanup_worktree(str(project_path), branch, wt_path, workspace_root)
+                    if not _cleanup_worktree(str(project_path), branch, wt_path, workspace_root):
+                        log_error(
+                            "Worktree cleanup failed — residual directories may remain "
+                            "under .worktrees/. Fix the cause and re-run archive."
+                        )
+                        return 1
                     worktree_handled = True
                 else:
                     # Has worktree + no PR
@@ -645,13 +656,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
                     # Always cleanup — clean_worktree is safe when the
                     # worktree directory is gone; it still deletes the
-                    # feature branch.
-                    _cleanup_worktree(
+                    # feature branch. Cleanup failure aborts archive so
+                    # residual directories are not silently left behind.
+                    if not _cleanup_worktree(
                         str(project_path),
                         branch,
                         str(wt_path_resolved),
                         workspace_root,
-                    )
+                    ):
+                        log_error(
+                            "Worktree cleanup failed — residual directories may remain "
+                            "under .worktrees/. Fix the cause and re-run archive."
+                        )
+                        return 1
                     worktree_handled = True
             else:
                 # No worktree — remind user to push project changes

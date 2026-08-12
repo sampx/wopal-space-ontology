@@ -583,6 +583,8 @@ class TestRemoveWorktreeForceFailure:
         worktree_base.mkdir()
         worktree_path = worktree_base / "project-feature-x"
         worktree_path.mkdir()
+        # Real file in the worktree — residual files cannot be auto-cleaned
+        (worktree_path / "locked-file.txt").write_text("held by a process")
 
         # Simulate: normal remove fails, --force also fails with stderr
         fail_result = MagicMock()
@@ -607,6 +609,7 @@ class TestRemoveWorktreeForceFailure:
         worktree_base.mkdir()
         worktree_path = worktree_base / "project-feature-x"
         worktree_path.mkdir()
+        (worktree_path / "locked-file.txt").write_text("held by a process")
 
         fail_result = MagicMock()
         fail_result.returncode = 1
@@ -633,6 +636,7 @@ class TestRemoveWorktreeForceFailure:
         worktree_base.mkdir()
         worktree_path = worktree_base / "project-feature-x"
         worktree_path.mkdir()
+        (worktree_path / "locked-file.txt").write_text("held by a process")
 
         fail_result = MagicMock()
         fail_result.returncode = 1
@@ -644,3 +648,63 @@ class TestRemoveWorktreeForceFailure:
 
             msg = str(exc_info.value)
             assert str(worktree_path) in msg
+
+
+class TestRemoveWorktreeResidualCleanup:
+    """remove_worktree: force failure must attempt residual-dir cleanup.
+
+    Regression: macOS keeps directory hierarchy alive while a process holds
+    the directory as cwd. git worktree remove --force deletes the files but
+    leaves the directory skeleton behind; git worktree prune clears the
+    registration, orphaning the leftover directory. Once the process exits,
+    the leftover dirs must be removed so they do not accumulate under
+    .worktrees/.
+    """
+
+    def test_removes_residual_dirs_after_force_failure(self, tmp_path):
+        """After --force fails, empty residual dirs under worktree_path
+        are removed and no exception is raised."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        worktree_path = worktree_base / "project-feature-x"
+        worktree_path.mkdir()
+        (worktree_path / "packages" / "app" / ".vite" / "deps").mkdir(parents=True)
+
+        # Normal remove fails, --force fails, prune succeeds
+        remove_fail = MagicMock()
+        remove_fail.returncode = 1
+        remove_fail.stderr = "fatal: cannot remove worktree\n"
+        prune_ok = MagicMock()
+        prune_ok.returncode = 0
+
+        with patch("lib.worktree.subprocess.run", side_effect=[remove_fail, remove_fail, prune_ok]):
+            remove_worktree(project_dir, "feature/x", worktree_base)
+
+        assert not worktree_path.exists(), "residual worktree dir must be cleaned"
+
+    def test_keeps_residual_dirs_when_non_empty(self, tmp_path):
+        """Non-empty residual dirs (real files) survive and error is raised."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        worktree_path = worktree_base / "project-feature-x"
+        worktree_path.mkdir()
+        residual_file = worktree_path / "important.txt"
+        residual_file.write_text("keep me")
+
+        remove_fail = MagicMock()
+        remove_fail.returncode = 1
+        remove_fail.stderr = "fatal: cannot remove worktree\n"
+
+        with patch("lib.worktree.subprocess.run", side_effect=[remove_fail, remove_fail]):
+            with pytest.raises(RuntimeError):
+                remove_worktree(project_dir, "feature/x", worktree_base)
+
+        assert residual_file.exists(), "non-empty residual files must not be deleted"

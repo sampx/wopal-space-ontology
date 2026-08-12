@@ -502,11 +502,38 @@ def list_worktrees(worktree_base: Path, project: str | None = None) -> list[str]
     return worktrees
 
 
+def _remove_empty_dirs(root: Path) -> bool:
+    """Remove an empty directory skeleton bottom-up.
+
+    macOS keeps directory hierarchy alive while a process holds the
+    directory as its cwd. git worktree remove --force deletes the files
+    but leaves the empty directories behind; once the process exits they
+    become orphaned skeletons. This removes empty directories only —
+    directories containing real files are left untouched.
+
+    Returns:
+        True if the whole skeleton is gone, False otherwise.
+    """
+    if not root.exists():
+        return True
+    if not root.is_dir():
+        return False
+
+    for dirpath, _, _ in os.walk(root, topdown=False):
+        try:
+            os.rmdir(dirpath)  # only succeeds on empty directories
+        except OSError:
+            pass
+
+    return not root.exists()
+
+
 def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None:
     """Remove a git worktree (equivalent to worktree.sh cmd_remove).
 
-    Tries git worktree remove, then --force on failure.
-    Always runs git worktree prune afterwards.
+    Tries git worktree remove, then --force on failure. When --force also
+    fails, attempts to clean up the residual empty directory skeleton
+    (see _remove_empty_dirs). Always runs git worktree prune afterwards.
 
     Args:
         project_dir: Path to the project's git root directory
@@ -514,7 +541,7 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
         worktree_base: Base directory where worktrees are stored
 
     Raises:
-        RuntimeError: If both normal and force remove fail
+        RuntimeError: If removal fails and residual files remain
     """
     project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
@@ -538,15 +565,20 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
                 text=True,
             )
             if result.returncode != 0:
-                stderr_text = result.stderr.strip()
-                raise RuntimeError(
-                    f"Failed to remove worktree {worktree_path}: {stderr_text}\n"
-                    f"Diagnostic hints:\n"
-                    f"  - Common causes: a process is holding the directory open, "
-                    f"or large untracked files (node_modules, dist, out) are present\n"
-                    f"  - Check for processes: lsof +D {worktree_path}\n"
-                    f"  - Manually remove: trash {worktree_path}"
-                )
+                # The worktree registration is typically already gone;
+                # only a residual empty directory skeleton may remain
+                # (e.g. a process held the directory as cwd). Clean the
+                # skeleton so .worktrees/ does not accumulate orphans.
+                if not _remove_empty_dirs(worktree_path):
+                    stderr_text = result.stderr.strip()
+                    raise RuntimeError(
+                        f"Failed to remove worktree {worktree_path}: {stderr_text}\n"
+                        f"Diagnostic hints:\n"
+                        f"  - Common causes: a process is holding the directory open, "
+                        f"or large untracked files (node_modules, dist, out) are present\n"
+                        f"  - Check for processes: lsof +D {worktree_path}\n"
+                        f"  - Manually remove: trash {worktree_path}"
+                    )
 
     # Always prune (whether remove succeeded or path didn't exist)
     subprocess.run(
