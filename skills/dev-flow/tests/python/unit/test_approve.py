@@ -170,6 +170,42 @@ class TestApproveRecordsBaseCommit(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+class TestApproveBranchDerivation(unittest.TestCase):
+    """Test branch derivation from Plan name: <project>-<plan-name>."""
+
+    def test_branch_derives_from_plan_name(self):
+        """Branch = <project>-<plan-name> for issue plans."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("ellamaka", "42-feature-cli-add-skills-remove-command"),
+            "ellamaka-42-feature-cli-add-skills-remove-command",
+        )
+
+    def test_branch_derives_for_no_issue_plan(self):
+        """Branch = <project>-<plan-name> for no-issue plans."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-site", "refactor-cli-optimize-commands"),
+            "wopal-site-refactor-cli-optimize-commands",
+        )
+
+    def test_branch_derives_for_hyphenated_scope(self):
+        """Branch handles hyphenated scope (no split ambiguity)."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-space-ontology", "42-feature-dev-flow-decouple-naming"),
+            "wopal-space-ontology-42-feature-dev-flow-decouple-naming",
+        )
+
+    def test_branch_derives_for_ontology_worktree(self):
+        """Branch = <project>-<plan-name> for ontology-worktree projects."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-space-ontology", "42-refactor-dev-flow-unify-naming"),
+            "wopal-space-ontology-42-refactor-dev-flow-unify-naming",
+        )
+
+
 class TestRegisterApproveParser(unittest.TestCase):
     """Test approve parser registration."""
 

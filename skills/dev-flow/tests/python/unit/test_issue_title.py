@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # test_issue_title.py - Test extract_scope and validate_issue_title functions
 #
-# Test Case U4: Issue title scope extraction and mandatory validation
+# Test Case U4: Issue title scope extraction and free-form validation
 #
 # Scenarios:
 #   1. extract_scope: title with scope -> returns scope string
 #   2. extract_scope: title without scope -> returns empty string
-#   3. validate_issue_title: valid format with scope -> passes
-#   4. validate_issue_title: missing scope -> fails with error
-#   5. validate_issue_title: description too long -> fails
-#   6. validate_issue_title: invalid type -> fails
+#   3. validate_issue_title: free-form title (no type prefix) -> passes
+#   4. validate_issue_title: title with type prefix -> passes
+#   5. validate_issue_title: title with type(scope): prefix -> passes
+#   6. validate_issue_title: invalid type prefix -> fails
+#   7. validate_issue_title: description too long -> fails
 #
-# Note: Tests the new mandatory scope requirement from #110
+# Note: Issue title is free-form. Scope is no longer mandatory.
 
 import unittest
 import sys
@@ -88,7 +89,18 @@ class TestExtractType(unittest.TestCase):
 
 
 class TestValidateIssueTitle(unittest.TestCase):
-    """Test validate_issue_title function"""
+    """Test validate_issue_title function (free-form title)"""
+
+    def test_free_form_title_passes(self):
+        """validate_issue_title: free-form title without type prefix passes"""
+        free_title = "add skills remove command"
+        # Should not raise exception
+        validate_issue_title(free_title)
+
+    def test_free_form_title_with_type_prefix_passes(self):
+        """validate_issue_title: title with type prefix passes"""
+        valid_title = "feat: add skills remove"
+        validate_issue_title(valid_title)
 
     def test_valid_format_with_scope_passes(self):
         """validate_issue_title: valid format with scope passes"""
@@ -131,16 +143,26 @@ class TestValidateIssueTitle(unittest.TestCase):
         valid_title = "chore(dev-flow): cleanup scripts"
         validate_issue_title(valid_title)
 
-    def test_missing_scope_fails(self):
-        """validate_issue_title: missing scope fails"""
-        no_scope_title = "refactor: unify plan status management"
+    def test_invalid_type_prefix_fails(self):
+        """validate_issue_title: invalid type prefix fails"""
+        invalid_type_title = "invalid(cli): some description"
         with self.assertRaises(ValidationError) as context:
-            validate_issue_title(no_scope_title)
-        # Error should mention scope
+            validate_issue_title(invalid_type_title)
         error_msg = str(context.exception)
         self.assertTrue(
-            "scope" in error_msg.lower() or "mandatory" in error_msg.lower(),
-            f"Error should mention scope requirement: {error_msg}"
+            "type" in error_msg.lower() or "invalid" in error_msg.lower(),
+            f"Error should mention invalid type: {error_msg}"
+        )
+
+    def test_invalid_type_prefix_no_scope_fails(self):
+        """validate_issue_title: invalid type prefix without scope fails"""
+        invalid_type_title = "invalid: some description"
+        with self.assertRaises(ValidationError) as context:
+            validate_issue_title(invalid_type_title)
+        error_msg = str(context.exception)
+        self.assertTrue(
+            "type" in error_msg.lower() or "invalid" in error_msg.lower(),
+            f"Error should mention invalid type: {error_msg}"
         )
 
     def test_description_too_long_fails(self):
@@ -152,17 +174,6 @@ class TestValidateIssueTitle(unittest.TestCase):
         self.assertTrue(
             "50" in error_msg or "long" in error_msg.lower() or "description" in error_msg.lower(),
             f"Error should mention description length: {error_msg}"
-        )
-
-    def test_invalid_type_fails(self):
-        """validate_issue_title: invalid type fails"""
-        invalid_type_title = "invalid(cli): some description"
-        with self.assertRaises(ValidationError) as context:
-            validate_issue_title(invalid_type_title)
-        error_msg = str(context.exception)
-        self.assertTrue(
-            "type" in error_msg.lower() or "invalid" in error_msg.lower(),
-            f"Error should mention invalid type: {error_msg}"
         )
 
     def test_title_too_long_fails(self):
@@ -187,17 +198,6 @@ class TestValidateIssueTitle(unittest.TestCase):
         self.assertTrue(
             "empty" in error_msg.lower() or "description" in error_msg.lower(),
             f"Error should mention empty description: {error_msg}"
-        )
-
-    def test_invalid_format_no_colon_fails(self):
-        """validate_issue_title: invalid format without colon fails"""
-        invalid_format = "feat(cli) add skills remove"
-        with self.assertRaises(ValidationError) as context:
-            validate_issue_title(invalid_format)
-        error_msg = str(context.exception)
-        self.assertTrue(
-            "format" in error_msg.lower() or "colon" in error_msg.lower(),
-            f"Error should mention format: {error_msg}"
         )
 
 

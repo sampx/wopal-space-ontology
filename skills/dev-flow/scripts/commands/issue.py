@@ -238,19 +238,14 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         log_error(str(e))
         return 1
     
-    # Determine type
+    # Determine type (explicit --type takes precedence; fall back to title prefix)
     inferred_type = infer_issue_type_from_title(title)
-    
+
     if args.type:
         try:
             plan_type = normalize_plan_type(args.type)
         except ValidationError as e:
             log_error(f"Invalid --type: {args.type}")
-            return 1
-        
-        # Check type mismatch
-        if inferred_type and plan_type != inferred_type:
-            log_error(f"Type mismatch: title implies '{inferred_type}' but --type is '{plan_type}'")
             return 1
     else:
         if not inferred_type:

@@ -521,9 +521,9 @@ class TestB01WorktreePathConsistency:
         branch = "issue/42-feature"
         actual_path = create_worktree(project_dir, branch, worktree_base)
 
-        # The actual worktree dir uses slug: "gesp-issue-42-feature"
+        # The actual worktree dir uses slug: "issue-42-feature" (dir = branch)
         assert actual_path.exists()
-        assert actual_path.name == "gesp-issue-42-feature"
+        assert actual_path.name == "issue-42-feature"
 
         # The wrong path (what the old code produced) would be:
         wrong_path = worktree_base / f"gesp-{branch}"

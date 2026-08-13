@@ -26,6 +26,7 @@ from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.git import get_current_branch
 from lib.project import resolve_plan_location, build_plan_blob_url
 from lib import project as _project_resolver
+from labels import normalize_plan_type
 
 
 # ============================================
@@ -354,16 +355,12 @@ class ValidationError(Exception):
     pass
 
 
-# Valid types for plan name
-_PLAN_VALID_TYPES = ['feature', 'enhance', 'fix', 'refactor', 'docs', 'chore', 'test']
-
-
 def validate_plan_name(name: str) -> None:
     """Validate Plan naming convention.
     
     Naming: <issue_number>-<type>-<scope>-<slug>.md OR <type>-<scope>-<slug>.md (no Issue)
     """
-    pattern = r'^([0-9]+)?-?(feature|enhance|fix|refactor|docs|chore|test)-([a-z0-9]+)-([a-z0-9-]+)$'
+    pattern = r'^([0-9]+)?-?(feature|enhance|fix|perf|refactor|docs|chore|test)-([a-z0-9]+)-([a-z0-9-]+)$'
     
     if not re.match(pattern, name):
         raise ValidationError(
@@ -373,7 +370,7 @@ def validate_plan_name(name: str) -> None:
             "  <issue_number>-<type>-<scope>-<slug>.md  (with Issue)\n"
             "  <type>-<scope>-<slug>.md                 (no Issue)\n"
             "\n"
-            "Types: feature, enhance, fix, refactor, docs, chore, test\n"
+            "Types: feature, enhance, fix, perf, refactor, docs, chore, test\n"
             "Scope: short lowercase identifier (e.g., cli, dev-flow, plugin)\n"
             "Slug: short lowercase with hyphens\n"
         )
@@ -385,37 +382,16 @@ def make_plan_name(
     scope: str,
     slug: str
 ) -> str:
-    """Generate plan name from components."""
-    normalized_type = _normalize_type(plan_type)
-    
+    """Generate plan name from components.
+
+    Type is normalized via labels.normalize_plan_type (single source of truth).
+    """
+    normalized_type = normalize_plan_type(plan_type)
+
     if issue_number:
         return f"{issue_number}-{normalized_type}-{scope}-{slug}"
     else:
         return f"{normalized_type}-{scope}-{slug}"
-
-
-def _normalize_type(raw_type: str) -> str:
-    """Normalize plan type to canonical value."""
-    raw = raw_type.lower()
-    
-    if raw in ('feat', 'feature'):
-        return 'feature'
-    elif raw in ('enhance', 'enhancement'):
-        return 'enhance'
-    elif raw in ('fix', 'bug'):
-        return 'fix'
-    elif raw in ('perf', 'performance'):
-        return 'perf'
-    elif raw == 'refactor':
-        return 'refactor'
-    elif raw in ('docs', 'doc', 'documentation'):
-        return 'docs'
-    elif raw in ('chore', 'ci'):
-        return 'chore'
-    elif raw == 'test':
-        return 'test'
-    else:
-        raise ValidationError(f"Invalid plan type: {raw_type}")
 
 
 # ============================================

@@ -424,7 +424,8 @@ def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path
     """
     project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
-    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+    # Worktree directory = branch (branch already contains the project prefix)
+    worktree_path = worktree_base / branch_slug
 
     # Ensure worktree_base exists
     worktree_base.mkdir(parents=True, exist_ok=True)
@@ -545,7 +546,8 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
     """
     project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
-    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+    # Worktree directory = branch (branch already contains the project prefix)
+    worktree_path = worktree_base / branch_slug
 
     if worktree_path.exists():
         # Try normal remove

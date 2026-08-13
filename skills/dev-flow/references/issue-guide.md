@@ -7,20 +7,24 @@ Issue 创建、编写、同步的详细指导。核心规则见 SKILL.md。
 **必须使用 `flow.sh issue create`**，禁止直接调 `gh issue create`。脚本通过 `detect_space_repo` 自动检测空间仓库，无需手动指定 `--repo`。
 
 ```bash
-flow.sh issue create --title "feat(scope): description" --project <name>
+flow.sh issue create --title "add skills remove command" --project <name> --type feat
 ```
 
 **创建错误的 Issue 必须彻底删除**（`gh issue delete`），不能只是 close。用户不喜欢仓库里留垃圾记录。
 
 ## Issue 标题格式
 
+Issue 标题是**自由文本**，不再强制 `type(scope): description` 格式。宽松 type 前缀（可选）用于 label 推断。
+
 ```text
-<type>(<scope>): <description>
+<自由描述>            # 推荐
+<type>: <描述>        # 可选 type 前缀
+<type>(<scope>): <描述>  # 兼容旧格式
 ```
 
 要求：
-- `type` 必须合法（见下表）
-- `scope` 必填
+- 宽松 type 前缀（若存在）必须合法（见下表）
+- `scope` 不再必填
 - `description` 使用英文祈使句
 - `description` ≤ 55 chars
 - 整体标题 ≤ 72 chars
@@ -29,7 +33,7 @@ flow.sh issue create --title "feat(scope): description" --project <name>
 
 | type | 用途 |
 |------|------|
-| `feat` | 新功能 |
+| `feature` | 新功能 |
 | `fix` | Bug 修复 |
 | `perf` | 性能优化 |
 | `refactor` | 重构 |
@@ -40,8 +44,8 @@ flow.sh issue create --title "feat(scope): description" --project <name>
 
 ### 示例
 
-- `feat(cli): add skills remove command`
-- `fix(dev-flow): handle expired tokens`
+- `add skills remove command`
+- `fix: handle expired tokens`
 - `perf(sync): reduce issue body rewrite cost`
 
 **标题语言规则**：标题使用英文（遵循项目仓库规范）。body 内容使用用户偏好语言编写（与 Plan 文档一致）。
@@ -94,13 +98,20 @@ flow.sh sync <issue> --body-only
 
 ## Plan 命名规范
 
+Plan name 是**权威标识**，type/scope/slug 由 Wopal 显式指定，**不从 Issue title 派生**。
+
 ### Issue 模式
 
 ```text
 <issue_number>-<type>-<scope>-<slug>
 ```
 
-示例：`110-feat-cli-add-skills-remove`
+创建命令（三项必填，全部显式指定）：
+```bash
+flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>
+```
+
+示例：`flow.sh plan new 110 --type feature --scope cli --slug add-skills-remove`
 
 ### 无 Issue 模式
 
@@ -111,9 +122,21 @@ flow.sh sync <issue> --body-only
 示例：`fix-dev-flow-handle-expired-tokens`
 
 规则：
-- `slug` 来自标题 description 部分
+- `type`/`scope`/`slug` 由 Wopal 显式指定（Issue 模式）或从 `--title` 宽松派生（无 Issue 模式）
 - 用 kebab-case
 - 无 Issue 模式下，后续命令统一传 `plan-name`
+
+## Branch 命名规范
+
+Branch 从最终确定的 Plan name 派生：
+
+```text
+<project>-<plan-name>
+```
+
+示例：`ellamaka-110-feature-cli-add-skills-remove`
+
+Worktree 目录直接 = branch（不再重复 project 前缀）。
 
 ## Plan 目录规则
 

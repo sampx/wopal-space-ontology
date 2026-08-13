@@ -55,36 +55,20 @@ from plan import set_plan_field
 # Helpers
 # ============================================
 
-def _extract_slug(plan_name: str) -> str:
-    """Extract slug from plan name.
-    
-    Plan name format: <issue>-<type>-<scope>-<slug> OR <type>-<scope>-<slug>
-    
+def _derive_branch(project: str, plan_name: str) -> str:
+    """Derive branch name from Plan name: <project>-<plan-name>.
+
+    The branch uses the full Plan name (including issue number/type/scope/slug),
+    so it strictly corresponds to the Plan and can be mapped back to it.
+
     Args:
+        project: Target project name
         plan_name: Plan name (without .md extension)
-        
+
     Returns:
-        Slug portion of plan name
+        Branch name string
     """
-    # Remove .md if present
-    name = plan_name.replace('.md', '')
-    
-    # Split by hyphens
-    parts = name.split('-')
-    
-    # If first part is digits (Issue number), skip it
-    if parts[0].isdigit():
-        parts = parts[1:]
-    
-    # Skip type (second or first part depending on Issue presence)
-    if len(parts) > 1:
-        parts = parts[1:]
-    
-    # Skip scope
-    if len(parts) > 1:
-        parts = parts[1:]
-    
-    return '-'.join(parts) if parts else name
+    return f"{project}-{plan_name}"
 
 
 def _has_unmerged_files(repo_path: str) -> bool:
@@ -142,8 +126,8 @@ def cmd_approve(args: argparse.Namespace) -> int:
     """Approve Plan and transition to executing phase (--confirm required).
     
     Modes:
-    1. approve <issue-or-plan> --confirm - preflight + status transition + Issue sync
-    2. approve <issue-or-plan> --confirm --no-worktree - skip worktree creation
+    1. approve <issue-or-name> --confirm - preflight + status transition + Issue sync
+    2. approve <issue-or-name> --confirm --no-worktree - skip worktree creation
     
     Returns:
         0 on success, 1 on error
@@ -154,7 +138,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
     
     if not input_ref:
         log_error("Issue number or Plan name required")
-        log_error("Usage: flow.sh approve <issue-or-plan> [--confirm] [--no-worktree]")
+        log_error("Usage: flow.sh approve <issue-or-name> [--confirm] [--no-worktree]")
         return 1
     
     workspace_root = find_workspace_root()
@@ -240,24 +224,19 @@ def cmd_approve(args: argparse.Namespace) -> int:
         # Read Project Type from Plan metadata
         project_type_str = get_plan_field(plan_path, "Project Type")
 
-        # Generate branch name
-        slug = _extract_slug(plan_name)
-        if issue_number:
-            branch = f"issue-{issue_number}-{slug}"
-        else:
-            branch = slug
+        # Generate branch name from full Plan name: <project>-<plan-name>
+        branch = _derive_branch(project, plan_name)
 
         # Determine planned worktree path (without creating it yet)
         if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
             worktrees_dir = workspace_root / ".worktrees"
-            worktree_name = f"ontology-{branch}"
+            worktree_name = branch
             worktree_path = worktrees_dir / worktree_name
         else:
-            # Standard: predict path using same slug logic as create_worktree
+            # Standard: worktree dir = branch (branch already has project prefix)
             worktree_base = workspace_root / ".worktrees"
-            project_name = project_path.name if project_path else project
             branch_slug = branch.replace("/", "-")
-            worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+            worktree_path = worktree_base / branch_slug
         
         # Block on unmerged files for standard projects
         if project_type_str != ProjectType.ONTOLOGY_WORKTREE.value:

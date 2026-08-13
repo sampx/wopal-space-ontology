@@ -163,7 +163,9 @@ def _detect_worktree(
 
     Priority:
     1. Plan Worktree field (set by approve --confirm --worktree)
-    2. Fallback: glob match .worktrees/<project>-issue-<N>-*
+    2. Fallback: derive from full Plan name (branch = <project>-<plan-name>,
+       worktree dir = branch). Does not depend on Issue number, so no-Issue
+       plans are also located.
 
     Plan metadata is returned even when the worktree directory has been
     cleaned up (e.g. by verify-switch). The branch recorded there still
@@ -184,25 +186,15 @@ def _detect_worktree(
     if wt:
         return wt
 
-    # Fallback: glob match (only when Plan metadata is absent)
-    plan_issue = get_plan_issue(plan_path)
-    if not plan_issue:
+    # Fallback: derive from full Plan name (no Issue number dependency)
+    plan_name = Path(plan_path).stem
+    branch = f"{project}-{plan_name}"
+    wt_path = workspace_root / ".worktrees" / branch
+
+    if not wt_path.exists():
         return None
 
-    pattern = str(workspace_root / ".worktrees" / f"{project}-issue-{plan_issue}-*")
-    matches = glob_mod.glob(pattern)
-
-    if not matches:
-        return None
-
-    wt_path = matches[0]
-    # Extract branch from directory name: <project>-issue-<N>-<slug> → issue-<N>-<slug>
-    dir_name = Path(wt_path).name
-    # Remove project prefix: "ontology-issue-115-slug" → "issue-115-slug"
-    parts = dir_name.split('-', 1)
-    branch = parts[1] if len(parts) > 1 else dir_name
-
-    return {'branch': branch, 'path': wt_path}
+    return {'branch': branch, 'path': str(wt_path)}
 
 
 def _is_pr_path(plan_path: str, issue_number: int, repo: str) -> bool:

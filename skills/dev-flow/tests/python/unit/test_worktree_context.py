@@ -19,6 +19,7 @@ from lib.worktree import (
     ResolveActivePlanError,
     resolve_active_plan,
     remove_worktree,
+    create_worktree,
 )
 
 
@@ -350,6 +351,66 @@ class TestParseOldFormatCompat:
 
 # -- Verify mode tests (WorktreeContext dataclass preserved) -------------------
 
+# -- Worktree path derivation (dir = branch, no project prefix) --------------
+
+class TestWorktreePathDerivation:
+    """Worktree directory must equal the branch name (no project prefix).
+
+    Branch already contains the project prefix (<project>-<plan-name>), so
+    the worktree directory must not repeat it.
+    """
+
+    def test_create_worktree_dir_equals_branch(self, tmp_path):
+        """create_worktree uses branch as the worktree dir name."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+
+        ok = MagicMock()
+        ok.returncode = 0
+
+        with patch("lib.worktree.subprocess.run", return_value=ok):
+            result = create_worktree(
+                project_dir, "ellamaka-42-feature-cli-add-skills", worktree_base,
+            )
+
+        # Worktree dir = branch (no project prefix repeated)
+        assert result == worktree_base / "ellamaka-42-feature-cli-add-skills"
+
+    def test_remove_worktree_dir_equals_branch(self, tmp_path):
+        """remove_worktree uses branch as the worktree dir name."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        wt_path = worktree_base / "ellamaka-42-feature-cli-add-skills"
+        wt_path.mkdir()
+
+        ok = MagicMock()
+        ok.returncode = 0
+
+        with patch("lib.worktree.subprocess.run", return_value=ok) as mock_run:
+            remove_worktree(
+                project_dir, "ellamaka-42-feature-cli-add-skills", worktree_base,
+            )
+
+        # Assert git was told to remove the branch-named dir (no repeated prefix)
+        expected_path = str(worktree_base / "ellamaka-42-feature-cli-add-skills")
+        remove_calls = [
+            c for c in mock_run.call_args_list
+            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+        ]
+        assert remove_calls, "expected a git worktree remove call"
+        assert expected_path in remove_calls[0].args[0], (
+            f"git worktree remove must target {expected_path}, got {remove_calls[0].args[0]}"
+        )
+
+
 # -- resolve_active_plan tests ------------------------------------------------
 
 class TestResolveActivePlanNoWorktree:
@@ -581,7 +642,7 @@ class TestRemoveWorktreeForceFailure:
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
         # Real file in the worktree — residual files cannot be auto-cleaned
         (worktree_path / "locked-file.txt").write_text("held by a process")
@@ -607,7 +668,7 @@ class TestRemoveWorktreeForceFailure:
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
         (worktree_path / "locked-file.txt").write_text("held by a process")
 
@@ -634,7 +695,7 @@ class TestRemoveWorktreeForceFailure:
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
         (worktree_path / "locked-file.txt").write_text("held by a process")
 
@@ -670,7 +731,7 @@ class TestRemoveWorktreeResidualCleanup:
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
         (worktree_path / "packages" / "app" / ".vite" / "deps").mkdir(parents=True)
 
@@ -694,7 +755,7 @@ class TestRemoveWorktreeResidualCleanup:
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
         residual_file = worktree_path / "important.txt"
         residual_file.write_text("keep me")

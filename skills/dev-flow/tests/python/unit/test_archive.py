@@ -268,6 +268,52 @@ class TestDetectWorktree(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @patch("commands.archive.get_plan_worktree")
+    def test_fallback_derives_from_full_plan_name(self, mock_gpw):
+        """Fallback derives worktree from full Plan name, not Issue number.
+
+        Branch = <project>-<plan-name>; worktree dir = branch. No Issue
+        number is required, so no-Issue plans can also be located.
+        """
+        mock_gpw.return_value = None
+        # Plan name: 42-feature-cli-add-skills-remove-command
+        plan_name = "42-feature-cli-add-skills-remove-command"
+        self.plan_path = self.plans_dir / f"{plan_name}.md"
+        self.plan_path.write_text(
+            f"# {plan_name}\n\n## Metadata\n\n- **Type**: feature\n"
+            f"- **Target Project**: wopal-cli\n- **Status**: done\n"
+        )
+
+        # Create the worktree dir: .worktrees/wopal-cli-42-feature-cli-add-skills-remove-command
+        wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-42-feature-cli-add-skills-remove-command"
+        wt_dir.mkdir(parents=True)
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["branch"], "wopal-cli-42-feature-cli-add-skills-remove-command")
+        self.assertEqual(result["path"], str(wt_dir))
+
+    @patch("commands.archive.get_plan_worktree")
+    def test_fallback_derives_for_no_issue_plan(self, mock_gpw):
+        """No-Issue plan fallback derives worktree from full Plan name."""
+        mock_gpw.return_value = None
+        plan_name = "refactor-cli-optimize-commands"
+        self.plan_path = self.plans_dir / f"{plan_name}.md"
+        self.plan_path.write_text(
+            f"# {plan_name}\n\n## Metadata\n\n- **Type**: refactor\n"
+            f"- **Target Project**: wopal-cli\n- **Status**: done\n"
+        )
+
+        wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-refactor-cli-optimize-commands"
+        wt_dir.mkdir(parents=True)
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["branch"], "wopal-cli-refactor-cli-optimize-commands")
+        self.assertEqual(result["path"], str(wt_dir))
+
 
 class TestArchiveMergeDetection(unittest.TestCase):
     """Tests for archive merge detection (Task 2, Issue #171).

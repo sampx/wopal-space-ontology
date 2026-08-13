@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 
 from lib.github import get_issue_labels
-from labels import plan_type_to_issue_label
+from labels import plan_type_to_issue_label, normalize_plan_type
 
 # Lazy imports for plan module to avoid circular dependency
 # plan.py imports build_repo_blob_url from this module
@@ -36,8 +36,8 @@ class ValidationError(Exception):
     pass
 
 
-# Valid types for Issue title
-VALID_TYPES = ['feat', 'fix', 'perf', 'refactor', 'docs', 'test', 'chore', 'enhance']
+# Valid types for Issue title (canonical values, aligned with labels.py)
+VALID_TYPES = ['feature', 'enhance', 'fix', 'perf', 'refactor', 'docs', 'test', 'chore']
 
 
 def extract_scope(title: str) -> str:
@@ -76,68 +76,50 @@ def extract_type(title: str) -> str:
 
 def validate_issue_title(title: str) -> None:
     """Validate Issue title format and length.
-    
-    Format: <type>(<scope>): <description>
-    
+
+    Issue title is free-form. A loose type prefix is optional and used for
+    label inference. Scope is no longer mandatory.
+
     Constraints:
-        - type must be valid (feat/fix/perf/refactor/docs/test/chore/enhance)
-        - scope is MANDATORY (must be present in parentheses)
+        - if a type prefix is present, it must be a valid type
         - description <= 50 chars
         - total title <= 72 chars
-        
+
     Args:
         title: Issue title string
-        
+
     Raises:
         ValidationError: If title is invalid
     """
-    # Check format: type(scope): description (scope is now mandatory)
-    if not re.match(r'^[a-z]+\([^)]+\):\s*.+$', title):
-        raise ValidationError(
-            "Invalid title format. Expected: <type>(<scope>): <description>\n"
-            "Scope is mandatory - must be enclosed in parentheses\n"
-            f"Example: feat(cli): add skills remove command\n"
-            f"Your title: {title}"
-        )
-    
-    # Extract type
+    # Extract type prefix (optional). If present, validate it.
     type_val = extract_type(title)
-    
-    # Validate type
-    if type_val not in VALID_TYPES:
-        raise ValidationError(
-            f"Invalid type: {type_val}\n"
-            f"Valid types: feat, fix, perf, refactor, docs, test, chore, enhance"
-        )
-    
-    # Extract scope
-    scope = extract_scope(title)
-    
-    # Scope is now mandatory
-    if not scope:
-        raise ValidationError(
-            "Scope is mandatory but not found in title\n"
-            "Expected format: <type>(<scope>): <description>"
-        )
-    
-    # Extract description (after type(scope): ), strip whitespace like Bash sed
-    match = re.match(r'^[a-z]+\([^)]+\):\s*(.*)$', title)
+    if type_val:
+        try:
+            normalize_plan_type(type_val)
+        except Exception:
+            raise ValidationError(
+                f"Invalid type: {type_val}\n"
+                f"Valid types: feature, enhance, fix, perf, refactor, docs, test, chore"
+            )
+
+    # Extract description: strip optional type(scope): or type: prefix
+    match = re.match(r'^[a-z]+(\([^)]+\))?:\s*(.*)$', title)
     if match:
-        description = match.group(1).strip()
+        description = match.group(2).strip()
     else:
-        description = ""
-    
+        description = title.strip()
+
     # Check description is not empty
     if not description:
         raise ValidationError("Description cannot be empty")
-    
+
     # Check description length (<= 50 chars)
     if len(description) > 50:
         raise ValidationError(
             f"Description too long: {len(description)} chars (max 50)\n"
             f"Description: {description}"
         )
-    
+
     # Check description is ASCII (English only)
     if not description.isascii():
         raise ValidationError(
@@ -145,7 +127,7 @@ def validate_issue_title(title: str) -> None:
             f"Per AGENTS.md Issue title convention: description should be English imperative sentence\n"
             f"Your description: {description}"
         )
-    
+
     # Check total title length (<= 72 chars)
     if len(title) > 72:
         raise ValidationError(

@@ -58,10 +58,10 @@
 ### issue create 参数速记
 
 ```bash
-# 最小创建（--body-file 为主路径）
-flow.sh issue create --title "feat(scope): desc" --project <name> --body-file body.md
+# 最小创建（--body-file 为主路径）；标题自由文本，type 由 --type 显式指定
+flow.sh issue create --title "add skills remove command" --project <name> --type feat --body-file body.md
 
-# --type 可选覆盖（默认从标题推断）
+# --type 可选覆盖（默认从标题宽松前缀推断）
 --type feat
 ```
 

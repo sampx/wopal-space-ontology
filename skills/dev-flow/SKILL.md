@@ -174,13 +174,15 @@ Agent 可以执行验证动作、展示结果，但必须等用户明确确认�
 ### A. Planning
 
 ```bash
-flow.sh plan new <issue>                              # Issue 驱动
+flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>  # Issue 驱动（三项必填，显式指定）
 flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue
 ```
 
 完整命令链：`plan new → plan check → submit → approve --confirm → complete → verify --confirm → archive`。
 
 **Plan 目录**：统一存放在 `.wopal-space/plans/<项目名>/`。
+
+**命名契约**：Issue title 自由文本（宽松 type 前缀可选）；Plan name 由 Wopal 显式指定（`<N>-<type>-<scope>-<slug>`）；Branch 从 Plan name 派生（`<project>-<plan-name>`）；worktree 目录 = branch。详见 `references/issue-guide.md`。
 
 ### B. Plan 审查与提交
 
