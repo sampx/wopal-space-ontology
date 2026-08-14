@@ -374,7 +374,7 @@ flow.sh archive <issue>
 - **`approve` 不带 `--confirm`** — 报错退出，使用 `submit` 提审
 - **verify-switch 前未先移除 worktree** — 脚本内已处理顺序（先 remove worktree 再 checkout），agent 不手动操作
 - **合并后手动删除 feature 分支** — 分支由 `archive` 自动删除。`verify --confirm` 通过 SHA 检测 merge 状态，分支删除不影响检测
-- **手动创建或删除分支** — 分支生命周期由脚本独占：`approve --confirm` 创建，`archive` 删除。Agent 唯一的分支操作是 merge
+- **手动创建或删除分支** — 分支生命周期由脚本独占：`approve --confirm` 创建，`archive` 删除。Agent 唯一的分支操作是 merge，且必须在用户明确授权之后执行
 - **手动删除工作树** — 工作树由 `verify-switch` 或 `archive` 删除
 - **跳过 `complete` 直接邀用户验证** — 代码提交 + rook PASS 后必须先 `flow.sh complete` 推进到 `verifying`，然后才能进入用户验证。未达 `verifying` 前请求用户验收 = 严重失职
 - **归档时清理未声明的资源** — archive 只处理 Plan metadata 中声明的 Worktree/分支。看到名字相似不等于归属相同，必须确认。误删用户活跃分支 = 严重失职
