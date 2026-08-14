@@ -602,9 +602,29 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
     # Changeset criterion: full-tree equality fails when the integration
     # branch advanced after the feature branched (parallel commits on main
     # make the trees differ even after a clean squash). Instead compare the
-    # paths the feature actually changed against the integration branch —
-    # if every changed path is byte-identical in both branches, the feature
-    # content is merged regardless of unrelated main progress.
+    # paths the feature actually changed against the integration branch.
+    #
+    # Two sub-criteria, tried per changed path:
+    #   1. Byte-identical: `git diff --quiet integration feature -- path`.
+    #      True when the path is unchanged in both branches.
+    #   2. Blob-presence fallback: when the byte check fails (main evolved
+    #      after the feature was squash-merged and later fixed the file), the
+    #      feature blob may still have entered integration history. Resolve
+    #      the feature blob with `git rev-parse <feature>:<path>` and ask
+    #      `git log <integration> --find-object=<blob> --oneline -- <path>`.
+    #      Non-empty output means the blob entered integration history, so the
+    #      feature content is merged regardless of later main edits.
+    #
+    # Deletion boundary: if `git rev-parse <feature>:<path>` fails, the path is
+    # absent in feature (deleted). Then `git cat-file -e <integration>:<path>`
+    # decides: if integration also lacks the path, the deletion was absorbed by
+    # the merge; if integration still has it, the deletion was not merged.
+    #
+    # Inherent false-positive boundary: if main independently evolves to a
+    # byte-identical blob (same content = same object), git content addressing
+    # cannot distinguish "introduced by merge" from "written independently".
+    # This coincidence is accepted in practice (verify is gated by user
+    # validation and the probability is negligible).
     try:
         base_res = subprocess.run(
             ["git", "merge-base", integration_branch, feature_branch],
@@ -638,9 +658,47 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
                         capture_output=True,
                         text=True,
                     )
-                    if check.returncode != 0:
+                    if check.returncode == 0:
+                        # Byte-identical: path merged.
+                        continue
+                    # Byte check failed: fall back to blob-presence.
+                    blob_res = subprocess.run(
+                        ["git", "rev-parse", f"{feature_branch}:{p}"],
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if blob_res.returncode == 0 and blob_res.stdout.strip():
+                        # Path exists in feature: check blob entered history.
+                        blob_sha = blob_res.stdout.strip()
+                        log_res = subprocess.run(
+                            [
+                                "git", "log", integration_branch,
+                                "--find-object=" + blob_sha,
+                                "--oneline", "--", p,
+                            ],
+                            cwd=repo_root,
+                            capture_output=True,
+                            text=True,
+                        )
+                        if log_res.returncode == 0 and log_res.stdout.strip():
+                            # Feature blob entered integration history.
+                            continue
                         all_present = False
                         break
+                    # Path absent in feature (deleted): check deletion absorbed.
+                    cat_res = subprocess.run(
+                        ["git", "cat-file", "-e", f"{integration_branch}:{p}"],
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if cat_res.returncode != 0:
+                        # Integration also lacks the path: deletion absorbed.
+                        continue
+                    # Integration still has the path: deletion not merged.
+                    all_present = False
+                    break
                 if all_present:
                     return 0
     except (subprocess.CalledProcessError, FileNotFoundError):

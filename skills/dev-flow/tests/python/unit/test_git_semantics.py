@@ -1373,3 +1373,201 @@ class TestCheckBranchMerged:
             "Feature branch 'feature/test-1-slug' not yet merged to main. "
             "Please merge first."
         )
+
+    def test_squash_merged_then_main_evolved_returns_zero(self, tmp_path):
+        """Squash merge where main evolved AFTER the feature was merged: the
+        changed files are no longer byte-identical (main carries later fixes),
+        but the feature blobs entered integration history. The L3 blob-presence
+        fallback must recognize the merge and return 0. This is the exact
+        scenario that broke verify --confirm (#207).
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(
+                    returncode=0,
+                    stdout="src/foo.ts\ntests/foo.test.ts\n",
+                )
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                # Byte check fails: main evolved after the squash merge.
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                # feature:<path> blob lookup succeeds for both changed paths.
+                return MagicMock(returncode=0, stdout="feature-blob-sha\n")
+            if cmd[0] == "git" and cmd[1] == "log" and any("--find-object" in c for c in cmd):
+                # Feature blob entered integration history (squash merged).
+                return MagicMock(returncode=0, stdout="abc123 squash merge\n")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run) as mock_run:
+            result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 0
+        # The blob-presence fallback must have run for both changed paths.
+        find_object_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if any("--find-object" in a for a in c.args[0])
+        ]
+        assert len(find_object_calls) == 2
+
+    def test_feature_blob_not_in_integration_history_returns_one(self, tmp_path):
+        """Squash candidate where main evolved AND the feature blob never
+        entered integration history: L3 blob-presence fallback finds nothing,
+        returns 1 (must not false-pass an unmerged branch).
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(
+                    returncode=0,
+                    stdout="src/foo.ts\ntests/foo.test.ts\n",
+                )
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                return MagicMock(returncode=0, stdout="feature-blob-sha\n")
+            if cmd[0] == "git" and cmd[1] == "log" and any("--find-object" in c for c in cmd):
+                # Feature blob never entered integration history.
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run):
+            with patch("lib.git.log_error") as mock_log:
+                result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 1
+        mock_log.assert_any_call(
+            "Feature branch 'feature/test-1-slug' not yet merged to main. "
+            "Please merge first."
+        )
+
+    def test_feature_deleted_file_and_integration_deleted_returns_zero(self, tmp_path):
+        """Feature deleted a file and integration also deleted it (deletion was
+        absorbed by the squash merge): L3 deletion boundary returns 0.
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(returncode=0, stdout="src/removed.ts\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                # feature:path fails: the path is absent in feature (deleted).
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "cat-file" and "-e" in cmd:
+                # integration:path also absent: deletion was absorbed.
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run):
+            result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 0
+
+    def test_feature_deleted_file_but_integration_keeps_it_returns_one(self, tmp_path):
+        """Feature deleted a file but integration still has it (deletion NOT
+        absorbed): L3 deletion boundary returns 1.
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main-advanced\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(returncode=0, stdout="src/removed.ts\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                # feature:path fails: the path is absent in feature (deleted).
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "cat-file" and "-e" in cmd:
+                # integration:path still exists: deletion NOT absorbed.
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run):
+            with patch("lib.git.log_error") as mock_log:
+                result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 1
+        mock_log.assert_any_call(
+            "Feature branch 'feature/test-1-slug' not yet merged to main. "
+            "Please merge first."
+        )
