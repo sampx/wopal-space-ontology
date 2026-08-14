@@ -99,8 +99,8 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 3. rook PASS                    → 触发下一步
 4. agent 勾选 AC checkbox       → 空间仓库提交 Plan 文件（checkbox 与代码分属两个仓库，各自提交）
 5. flow.sh complete             → 脚本自动提交 Plan status → verifying（feature 分支）
-6. verify-switch → 用户验证    → 用户操作，无脚本提交
-7. agent merge feature → 集成分支  → agent 操作（不删 feature 分支，留给 archive 清理）
+6. verify-switch → 用户验证    → 用户操作 + 用户授权，无脚本提交
+7. agent merge feature → 集成分支  → agent 操作（不删 feature 分支，留给 archive 清理）⚠️ 前置：用户已明确确认验证通过（或用户选择场景 3）
 8. flow.sh verify --confirm    → 脚本自动提交 Plan status → done（集成分支）
 9. flow.sh archive              → 脚本自动提交 Plan 归档（集成分支）
 ```
@@ -239,6 +239,9 @@ agent 必须将其完整传达给用户，由用户选择验证方式。Agent �
 条件：用户希望在集成分支直接验证，无需保留 feature 分支隔离。
 流程：merge → 用户在集成分支验证 → verify --confirm → archive。
 
+归属声明："先合并后验证"是用户可选的验证方式，agent 不得自行决定走场景 3；
+用户未表态时，默认等验证通过后再 merge。
+
 ##### 场景 4：无 worktree（`--no-worktree`）
 
 条件：`approve --confirm --no-worktree` 时全程在集成分支，无 feature 分支。
@@ -247,7 +250,7 @@ agent 必须将其完整传达给用户，由用户选择验证方式。Agent �
 #### 分支生命周期铁律
 
 - 分支创建：`approve --confirm`（脚本自动创建）；分支删除：`archive`（脚本自动删除）
-- **Agent 唯一的分支操作是 merge**：`git checkout <集成分支> && git merge <feature>`
+- **Agent 唯一的分支操作是 merge，且必须在用户明确授权之后执行**：`git checkout <集成分支> && git merge <feature>`
 - **合并策略**：默认优先 **squash 合并**（`git merge --squash <feature>`）——将 feature
   全部提交压成单个提交合入集成分支，避免验证过程的修复提交污染 main 历史。
   合并后需手动 `git commit` 一次。verify 的 tree 相等判据原生支持 squash。
@@ -376,6 +379,7 @@ flow.sh archive <issue>
 - **跳过 `complete` 直接邀用户验证** — 代码提交 + rook PASS 后必须先 `flow.sh complete` 推进到 `verifying`，然后才能进入用户验证。未达 `verifying` 前请求用户验收 = 严重失职
 - **归档时清理未声明的资源** — archive 只处理 Plan metadata 中声明的 Worktree/分支。看到名字相似不等于归属相同，必须确认。误删用户活跃分支 = 严重失职
 - **在 dev-flow 中加载 git-worktrees 技能** — dev-flow 的 worktree 创建/清理由 `flow.sh approve` 和 `flow.sh archive` 脚本内置管理，禁止加载 git-worktrees 技能或手动执行 worktree 命令
+- **把"提交吧"解读为"完成整个收尾流程"** — 每个状态机推进动作（merge/verify/archive）都需要独立明确指令，不能从一个"提交吧"推断出全部收尾授权
 
 ## 参考
 
