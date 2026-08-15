@@ -464,8 +464,14 @@ class TestVerificationGuidance:
         # Verify correct merge guidance (checkout current space branch, dynamically detected)
         assert "git checkout space/wopal-workspace" in output
         assert "git merge issue-10-slug" in output
-        # Verify merge is in the correct repo
-        assert "/home/.wopal/ontologies/wopal-space-ontology" in output
+        # Merge runs in .wopal/ worktree, NOT the main repo. The main repo
+        # hosts base capabilities other agents depend on; it must never
+        # switch branches. The worktree shares branch refs, so merging here
+        # updates space/<name> and restores the runtime path.
+        wopal_dir = str(ws_root / ".wopal")
+        assert f"cd {wopal_dir} && git checkout" in output
+        # Main repo path must NOT appear in merge guidance
+        assert "/home/.wopal/ontologies/wopal-space-ontology" not in output
 
     @patch("commands.verify_switch.commit_paths", return_value=True)
     @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))

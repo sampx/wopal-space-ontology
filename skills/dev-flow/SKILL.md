@@ -251,6 +251,11 @@ agent 必须将其完整传达给用户，由用户选择验证方式。Agent �
 
 - 分支创建：`approve --confirm`（脚本自动创建）；分支删除：`archive`（脚本自动删除）
 - **Agent 唯一的分支操作是 merge，且必须在用户明确授权之后执行**：`git checkout <集成分支> && git merge <feature>`
+- **ontology-worktree 的 merge 必须在 `.wopal` worktree 内执行，永远不在主仓库切换分支**：主仓库
+  `~/.wopal/ontologies/<name>` 承载其他 space 依赖的 base capabilities（agents/skills/commands/rules/plugins
+  的 symlink 源），必须始终停在 `main`。`.wopal` 与主仓库共享分支 ref，在 `.wopal` 内
+  `git checkout space/<name> && git merge <feature>` 同样更新集成分支，并让运行时路径回归
+  `space/<name>`，使 `archive` 能正常删除 feature 分支。verify-switch 输出的 merge 指引已按此执行。
 - **合并策略**：默认优先 **squash 合并**（`git merge --squash <feature>`）——将 feature
   全部提交压成单个提交合入集成分支，避免验证过程的修复提交污染 main 历史。
   合并后需手动 `git commit` 一次。verify 的 tree 相等判据原生支持 squash。
