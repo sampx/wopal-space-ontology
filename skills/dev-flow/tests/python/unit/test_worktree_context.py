@@ -394,7 +394,13 @@ class TestWorktreePathDerivation:
         ok = MagicMock()
         ok.returncode = 0
 
-        with patch("lib.worktree.subprocess.run", return_value=ok) as mock_run:
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
+                # Not registered: fall back to branch-derived dir.
+                return MagicMock(returncode=0, stdout="")
+            return ok
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
             remove_worktree(
                 project_dir, "ellamaka-42-feature-cli-add-skills", worktree_base,
             )
@@ -404,10 +410,98 @@ class TestWorktreePathDerivation:
         remove_calls = [
             c for c in mock_run.call_args_list
             if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+            and c.args[0][2] == "remove"
         ]
         assert remove_calls, "expected a git worktree remove call"
         assert expected_path in remove_calls[0].args[0], (
             f"git worktree remove must target {expected_path}, got {remove_calls[0].args[0]}"
+        )
+
+    def test_remove_worktree_locates_real_path_when_dir_differs_from_branch(
+        self, tmp_path
+    ):
+        """Legacy naming: worktree dir has a project prefix the branch lacks
+        (dir 'ellamaka-implement-workbench-chat-transcript' vs branch
+        'implement-workbench-chat-transcript'). remove_worktree must locate
+        the real registered path via `git worktree list --porcelain` instead
+        of deriving the dir from the branch name, otherwise archive silently
+        skips removal and reports false success.
+        """
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        real_wt = worktree_base / "ellamaka-implement-workbench-chat-transcript"
+        real_wt.mkdir()
+
+        porcelain_out = (
+            "worktree /main/path\n"
+            "HEAD abc\n"
+            "branch refs/heads/main\n"
+            "\n"
+            f"worktree {real_wt}\n"
+            "HEAD def\n"
+            "branch refs/heads/implement-workbench-chat-transcript\n"
+        )
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
+                return MagicMock(returncode=0, stdout=porcelain_out)
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
+            remove_worktree(
+                project_dir, "implement-workbench-chat-transcript", worktree_base,
+            )
+
+        remove_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+            and c.args[0][2] == "remove"
+        ]
+        assert remove_calls, "expected a git worktree remove call"
+        assert str(real_wt) in remove_calls[0], (
+            f"git worktree remove must target the registered path {real_wt}, "
+            f"got {remove_calls[0]}"
+        )
+
+    def test_remove_worktree_falls_back_to_derived_path_when_not_registered(
+        self, tmp_path
+    ):
+        """No matching branch in `git worktree list --porcelain` (e.g. the
+        registration is already gone): fall back to the branch-derived dir so
+        existing behavior is preserved.
+        """
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        derived = worktree_base / "feature-x"
+        derived.mkdir()
+
+        porcelain_out = "worktree /main/path\nHEAD abc\n\n"
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
+                return MagicMock(returncode=0, stdout=porcelain_out)
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
+            remove_worktree(project_dir, "feature-x", worktree_base)
+
+        remove_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+            and c.args[0][2] == "remove"
+        ]
+        assert remove_calls, "expected a git worktree remove call"
+        assert str(derived) in remove_calls[0], (
+            f"fallback must target the branch-derived dir {derived}, "
+            f"got {remove_calls[0]}"
         )
 
 
@@ -741,8 +835,11 @@ class TestRemoveWorktreeResidualCleanup:
         remove_fail.stderr = "fatal: cannot remove worktree\n"
         prune_ok = MagicMock()
         prune_ok.returncode = 0
+        porcelain_empty = MagicMock()
+        porcelain_empty.returncode = 0
+        porcelain_empty.stdout = ""
 
-        with patch("lib.worktree.subprocess.run", side_effect=[remove_fail, remove_fail, prune_ok]):
+        with patch("lib.worktree.subprocess.run", side_effect=[porcelain_empty, remove_fail, remove_fail, prune_ok]):
             remove_worktree(project_dir, "feature/x", worktree_base)
 
         assert not worktree_path.exists(), "residual worktree dir must be cleaned"
@@ -763,8 +860,11 @@ class TestRemoveWorktreeResidualCleanup:
         remove_fail = MagicMock()
         remove_fail.returncode = 1
         remove_fail.stderr = "fatal: cannot remove worktree\n"
+        porcelain_empty = MagicMock()
+        porcelain_empty.returncode = 0
+        porcelain_empty.stdout = ""
 
-        with patch("lib.worktree.subprocess.run", side_effect=[remove_fail, remove_fail]):
+        with patch("lib.worktree.subprocess.run", side_effect=[porcelain_empty, remove_fail, remove_fail]):
             with pytest.raises(RuntimeError):
                 remove_worktree(project_dir, "feature/x", worktree_base)
 

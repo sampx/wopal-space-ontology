@@ -529,6 +529,46 @@ def _remove_empty_dirs(root: Path) -> bool:
     return not root.exists()
 
 
+def _find_worktree_path_by_branch(project_dir: Path, branch: str) -> Path | None:
+    """Locate a worktree's real registered path via `git worktree list`.
+
+    The worktree directory name normally equals the branch, but legacy
+    worktrees may carry a project prefix the branch lacks (e.g. dir
+    'ellamaka-implement-workbench-chat-transcript' vs branch
+    'implement-workbench-chat-transcript'). The git registry is
+    authoritative; the branch-derived dir is only a fallback.
+
+    Args:
+        project_dir: Path to the project's git root directory
+        branch: Branch name to locate
+
+    Returns:
+        Registered worktree path, or None if the branch is not registered
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=str(project_dir),
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    current_path: Path | None = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = Path(line[len("worktree "):].strip())
+        elif line.startswith("branch "):
+            branch_ref = line[len("branch "):].strip()
+            if branch_ref == f"refs/heads/{branch}":
+                return current_path
+    return None
+
+
 def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None:
     """Remove a git worktree (equivalent to worktree.sh cmd_remove).
 
@@ -544,10 +584,14 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
     Raises:
         RuntimeError: If removal fails and residual files remain
     """
-    project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
-    # Worktree directory = branch (branch already contains the project prefix)
-    worktree_path = worktree_base / branch_slug
+    # Locate the real registered path first (git registry is authoritative;
+    # the dir name may not match the branch for legacy worktrees). Fall back
+    # to the branch-derived dir when the branch is not registered.
+    worktree_path = _find_worktree_path_by_branch(project_dir, branch)
+    if worktree_path is None:
+        # Worktree directory = branch (branch already contains the project prefix)
+        worktree_path = worktree_base / branch_slug
 
     if worktree_path.exists():
         # Try normal remove
