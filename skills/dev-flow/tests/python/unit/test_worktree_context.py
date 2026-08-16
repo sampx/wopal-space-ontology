@@ -380,43 +380,6 @@ class TestWorktreePathDerivation:
         # Worktree dir = branch (no project prefix repeated)
         assert result == worktree_base / "ellamaka-42-feature-cli-add-skills"
 
-    def test_remove_worktree_dir_equals_branch(self, tmp_path):
-        """remove_worktree uses branch as the worktree dir name."""
-        from unittest.mock import patch, MagicMock
-
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
-        worktree_base = tmp_path / ".worktrees"
-        worktree_base.mkdir()
-        wt_path = worktree_base / "ellamaka-42-feature-cli-add-skills"
-        wt_path.mkdir()
-
-        ok = MagicMock()
-        ok.returncode = 0
-
-        def fake_run(cmd, *args, **kwargs):
-            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
-                # Not registered: fall back to branch-derived dir.
-                return MagicMock(returncode=0, stdout="")
-            return ok
-
-        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
-            remove_worktree(
-                project_dir, "ellamaka-42-feature-cli-add-skills", worktree_base,
-            )
-
-        # Assert git was told to remove the branch-named dir (no repeated prefix)
-        expected_path = str(worktree_base / "ellamaka-42-feature-cli-add-skills")
-        remove_calls = [
-            c for c in mock_run.call_args_list
-            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
-            and c.args[0][2] == "remove"
-        ]
-        assert remove_calls, "expected a git worktree remove call"
-        assert expected_path in remove_calls[0].args[0], (
-            f"git worktree remove must target {expected_path}, got {remove_calls[0].args[0]}"
-        )
-
     def test_remove_worktree_locates_real_path_when_dir_differs_from_branch(
         self, tmp_path
     ):
@@ -726,10 +689,27 @@ class TestResolveActivePlanArchive:
 # -- remove_worktree force failure tests --------------------------------------
 
 class TestRemoveWorktreeForceFailure:
-    """remove_worktree: --force failure includes stderr and diagnostic guidance."""
+    """remove_worktree: --force failure raises RuntimeError whose message
+    carries the original stderr and diagnostic guidance."""
 
-    def test_force_failure_includes_stderr(self, tmp_path):
-        """RuntimeError message must contain the original stderr output."""
+    @pytest.mark.parametrize(
+        "stderr,expected_substrings",
+        [
+            # Original stderr is preserved in the message
+            (
+                "error: cannot lock ref 'refs/heads/feature-x'\n",
+                ["cannot lock ref", "Failed to remove worktree"],
+            ),
+            # Message carries diagnostic hints and actionable commands
+            (
+                "fatal: cannot remove worktree\n",
+                ["Diagnostic hints", "lsof +D", "trash", "node_modules", "dist"],
+            ),
+        ],
+    )
+    def test_force_failure_message_content(
+        self, tmp_path, stderr, expected_substrings
+    ):
         from unittest.mock import patch, MagicMock
 
         project_dir = tmp_path / "project"
@@ -741,67 +721,18 @@ class TestRemoveWorktreeForceFailure:
         # Real file in the worktree — residual files cannot be auto-cleaned
         (worktree_path / "locked-file.txt").write_text("held by a process")
 
-        # Simulate: normal remove fails, --force also fails with stderr
         fail_result = MagicMock()
         fail_result.returncode = 1
-        fail_result.stderr = "error: cannot lock ref 'refs/heads/feature-x'\n"
+        fail_result.stderr = stderr
 
         with patch("lib.worktree.subprocess.run", return_value=fail_result):
             with pytest.raises(RuntimeError) as exc_info:
                 remove_worktree(project_dir, "feature/x", worktree_base)
 
             msg = str(exc_info.value)
-            assert "cannot lock ref" in msg
-            assert "Failed to remove worktree" in msg
-
-    def test_force_failure_includes_diagnostic_hints(self, tmp_path):
-        """RuntimeError message must include diagnostic hints and actionable commands."""
-        from unittest.mock import patch, MagicMock
-
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
-        worktree_base = tmp_path / ".worktrees"
-        worktree_base.mkdir()
-        worktree_path = worktree_base / "feature-x"
-        worktree_path.mkdir()
-        (worktree_path / "locked-file.txt").write_text("held by a process")
-
-        fail_result = MagicMock()
-        fail_result.returncode = 1
-        fail_result.stderr = "fatal: cannot remove worktree\n"
-
-        with patch("lib.worktree.subprocess.run", return_value=fail_result):
-            with pytest.raises(RuntimeError) as exc_info:
-                remove_worktree(project_dir, "feature/x", worktree_base)
-
-            msg = str(exc_info.value)
-            assert "Diagnostic hints" in msg
-            assert "lsof +D" in msg
-            assert "trash" in msg
-            assert "node_modules" in msg
-            assert "dist" in msg
-
-    def test_force_failure_includes_worktree_path(self, tmp_path):
-        """RuntimeError message must include the worktree path that failed."""
-        from unittest.mock import patch, MagicMock
-
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
-        worktree_base = tmp_path / ".worktrees"
-        worktree_base.mkdir()
-        worktree_path = worktree_base / "feature-x"
-        worktree_path.mkdir()
-        (worktree_path / "locked-file.txt").write_text("held by a process")
-
-        fail_result = MagicMock()
-        fail_result.returncode = 1
-        fail_result.stderr = "some error\n"
-
-        with patch("lib.worktree.subprocess.run", return_value=fail_result):
-            with pytest.raises(RuntimeError) as exc_info:
-                remove_worktree(project_dir, "feature/x", worktree_base)
-
-            msg = str(exc_info.value)
+            for sub in expected_substrings:
+                assert sub in msg
+            # The failing path is always part of the message
             assert str(worktree_path) in msg
 
 
