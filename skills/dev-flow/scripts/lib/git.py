@@ -704,6 +704,46 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
 
+    # L4: three-way merge-tree criterion. The most general content check.
+    # `git merge-tree --write-tree <integration> <feature>` computes the
+    # three-way merge of base + integration + feature. When every feature
+    # change is already absorbed into the integration branch — regardless of
+    # how it got there (squash, manual port, or parallel edits fused into a
+    # new blob) — the merge result equals the integration tree itself:
+    # there is nothing left to merge.
+    #
+    # This covers the case L3 blob-presence cannot: main evolved the same
+    # file after the feature branched (parallel commit), the squash merge
+    # fused both sides into a blob that never existed in either branch, so
+    # the feature blob never entered integration history. Verified against
+    # the real ellamaka squash merge (sidebar.tsx + bun.lock).
+    #
+    # Conflict boundary: when integration and feature edits conflict,
+    # --write-tree exits non-zero and the criterion does not pass — the
+    # merged check falls through to branch-ref detection below (conservative).
+    try:
+        mt_res = subprocess.run(
+            ["git", "merge-tree", "--write-tree", integration_branch, feature_branch],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        int_res = subprocess.run(
+            ["git", "rev-parse", f"{integration_branch}^{{tree}}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if (
+            mt_res.returncode == 0
+            and int_res.returncode == 0
+            and mt_res.stdout.strip()
+            and mt_res.stdout.strip() == int_res.stdout.strip()
+        ):
+            return 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
     # Run git branch --merged <integration> and check for feature branch
     try:
         result = subprocess.run(

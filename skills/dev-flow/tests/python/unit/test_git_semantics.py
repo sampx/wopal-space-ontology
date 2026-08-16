@@ -1571,3 +1571,111 @@ class TestCheckBranchMerged:
             "Feature branch 'feature/test-1-slug' not yet merged to main. "
             "Please merge first."
         )
+
+    def test_fused_blob_parallel_main_edits_merge_tree_equal_returns_zero(
+        self, tmp_path
+    ):
+        """Real ellamaka squash-merge scenario: main evolved a file AFTER the
+        feature branched (parallel commit touched the same file). The squash
+        merge fused both sides into a new blob that never existed in either
+        branch, so L3 blob-presence cannot find the feature blob in
+        integration history. But the three-way merge-tree of integration +
+        feature equals the integration tree itself (nothing left to merge).
+        L4 must recognize the merge and return 0.
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "merge-tree":
+                # Three-way merge of main + feature == main tree: absorbed.
+                return MagicMock(returncode=0, stdout="tree-main\n")
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(returncode=0, stdout="src/foo.ts\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                # Byte check fails: parallel main edits fused with feature.
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                return MagicMock(returncode=0, stdout="feature-blob-sha\n")
+            if cmd[0] == "git" and cmd[1] == "log" and any("--find-object" in c for c in cmd):
+                # Fused-blob scenario: feature blob never entered main history.
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run) as mock_run:
+            result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 0
+        merge_tree_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if len(c.args[0]) >= 2 and c.args[0][1] == "merge-tree"
+        ]
+        assert len(merge_tree_calls) == 1
+
+    def test_merge_tree_differs_from_integration_returns_one(self, tmp_path):
+        """Feature has changes NOT absorbed into integration: the three-way
+        merge-tree produces a tree different from integration and L3
+        blob-presence finds nothing. L4 must not false-pass; returns 1.
+        """
+        from lib.git import check_branch_merged
+
+        plan_path = _write_plan_file(tmp_path, PLAN_STANDARD)
+        proj_dir = tmp_path / "projects" / "gesp"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / ".git").mkdir()
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "merge-tree":
+                # Merge result differs: feature changes still pending.
+                return MagicMock(returncode=0, stdout="tree-merged-differs\n")
+            if cmd[0] == "git" and cmd[1] == "branch" and "--merged" in cmd and "-r" not in cmd:
+                return MagicMock(returncode=0, stdout="  main\n")
+            if "rev-parse" in cmd and any("^{tree}" in c for c in cmd):
+                if any("main" in c for c in cmd):
+                    return MagicMock(returncode=0, stdout="tree-main\n")
+                return MagicMock(returncode=0, stdout="tree-feature\n")
+            if cmd[1] == "branch" and "-r" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base" and "--is-ancestor" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "merge-base":
+                return MagicMock(returncode=0, stdout="base-sha\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--name-only" in cmd:
+                return MagicMock(returncode=0, stdout="src/foo.ts\n")
+            if cmd[0] == "git" and cmd[1] == "diff" and "--quiet" in cmd:
+                return MagicMock(returncode=1, stdout="")
+            if cmd[0] == "git" and cmd[1] == "rev-parse" and any(":" in c for c in cmd):
+                return MagicMock(returncode=0, stdout="feature-blob-sha\n")
+            if cmd[0] == "git" and cmd[1] == "log" and any("--find-object" in c for c in cmd):
+                return MagicMock(returncode=0, stdout="")
+            if cmd[0] == "git" and cmd[1] == "log":
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.git.subprocess.run", side_effect=fake_run):
+            with patch("lib.git.log_error") as mock_log:
+                result = check_branch_merged(tmp_path, str(plan_path))
+
+        assert result == 1
+        mock_log.assert_any_call(
+            "Feature branch 'feature/test-1-slug' not yet merged to main. "
+            "Please merge first."
+        )
