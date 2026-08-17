@@ -284,7 +284,8 @@ class TestApproveExistingWorktree(unittest.TestCase):
         """--existing-worktree 传入不属于本项目的其他 Git 仓库时报错拒绝。"""
         from commands.approve import cmd_approve
         mocks = _make_approve_mocks(status="reviewing")
-        mocks["get_common_git_dir"] = MagicMock(side_effect=lambda p: "/ws/repo-a/.git" if "repo-a" in str(p) else "/ws/repo-b/.git")
+        mocks["get_current_branch"] = MagicMock(return_value="feature/other-branch")
+        mocks["get_common_git_dir"] = MagicMock(side_effect=lambda p: "/ws/target-project/.git" if "target-project" in str(p) or str(p) == str(mocks["resolve_project_path"].return_value) else "/ws/unrelated-repo/.git")
         with patch.multiple("commands.approve", **mocks):
             with patch("commands.approve.Path.exists", return_value=True), \
                  patch("commands.approve.Path.is_dir", return_value=True):

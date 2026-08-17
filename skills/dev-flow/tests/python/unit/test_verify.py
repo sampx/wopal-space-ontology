@@ -397,6 +397,9 @@ class TestCheckFeatureBranchMerged:
         from commands.verify import cmd_verify
 
         plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD, name="42-err.md")
+        # Ensure worktree directory exists on disk so it passes is_dir() check and tests get_branch_head failure
+        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
+        wt_dir.mkdir(parents=True)
 
         with patch("commands.verify.find_workspace_root", return_value=tmp_path):
             with patch("commands.verify.find_plan", return_value=str(plan_path)):
