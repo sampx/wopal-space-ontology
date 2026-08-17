@@ -196,10 +196,26 @@ flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围�
 3. Plan 处于 `reviewing` 状态时可直接修订内容，无需 `flow.sh reset` 回退到 `planning`。修订完成后告知用户即可，无需重新 `submit`
 4. 等用户审批后：`flow.sh approve <issue> --confirm`（reviewing/planning → executing）
 
-### C. Executing
+### C. Executing 与 Approve 模式选择
 
-1. `flow.sh approve <issue> --confirm`（默认创建 worktree）
-2. 委派 fae 实施（prompt 含 Plan 绝对路径 + Done checkbox 指令）
+用户评审通过 Plan 时，Agent 必须根据用户指令意图选择正确的 Approve 实施模式：
+
+| 模式 | 用户触发信号 | Approve 命令 | 实施位置与分支 | 收尾命令链 |
+|------|-------------|--------------|----------------|------------|
+| **模式 A：标准模式（默认）** | "可以开始" / "approved" / 无特殊修饰 | `flow.sh approve <plan> --confirm` | 从 main 新建独立分支与 worktree | 合入 main → `verify --confirm` → `archive` |
+| **模式 B：main 直实施模式** | "不建工作树" / "直接在 main 上" / "不用隔离" | `flow.sh approve <plan> --confirm --no-worktree` | 直接在 main 分支实施（无 worktree 无分支） | `verify --confirm` → `archive`（跳过 merge） |
+| **模式 C：独立分支演进模式** | "在之前那个 worktree 继续" / "保留工作树" / "基于分支 X 演进" / "POC 不发布" | `flow.sh approve <plan> --confirm --existing-worktree <path>` | 复用已有 worktree 目录与 feature 分支 | `verify --confirm --keep-worktree` → `archive --keep-worktree` |
+
+#### 模式 C（独立分支演进）执行铁律
+
+- ⚠️ **严禁使用 `--no-worktree` 代替 `--existing-worktree`**：`--no-worktree` 语义是 main 直修，会清除 Worktree 元数据并误导 Agent 在 main 主路径修改代码，造成极大污染；演进模式必须传入 `--existing-worktree <path>` 绑定已有工作树。
+- ⚠️ **收尾必须带 `--keep-worktree`**：演进模式不发布、不合入 main，`verify --confirm --keep-worktree` 会跳过合并检查并记录 feature 分支最新 HEAD 为 Final Commit；`archive --keep-worktree` 会保留工作树目录与分支供后续 Plan 演进。
+- ⚠️ **实施代码一律提交至工作树所在分支**：Base Commit 自动记录为工作树当前 HEAD（上一个 Plan 终点），所有改动堆叠在该 feature 分支。
+
+#### 流程执行
+
+1. `flow.sh approve <issue> --confirm [mode-flags]`（按上述模式判定）
+2. 委派 fae 实施（prompt 含 Plan 绝对路径 + Done checkbox 指令 + 目标工作路径）
 3. fae 完成 Task → Verify 通过 → 即时勾选 Done checkbox 并 git commit（每 Task 一次提交）
 4. 全部 Task 完成 → Wopal **逐项实证** Agent Verification AC
 5. AC 通过 → 勾选 checkbox，在空间仓库提交 Plan 文件
@@ -246,6 +262,11 @@ agent 必须将其完整传达给用户，由用户选择验证方式。Agent �
 
 条件：`approve --confirm --no-worktree` 时全程在集成分支，无 feature 分支。
 流程：用户直接在集成分支验证 → verify --confirm → archive。
+
+##### 场景 5：独立分支演进验证（`--keep-worktree`）
+
+条件：`approve --confirm --existing-worktree`（或首个 Plan 处于演进探索暂不发布）。
+流程：用户在保留的 worktree 路径验证 → `flow.sh verify <plan> --confirm --keep-worktree`（跳过 merge 检查） → `flow.sh archive <plan> --keep-worktree`（保留 worktree 与分支供后续 Plan 演进）。
 
 #### 分支生命周期铁律
 

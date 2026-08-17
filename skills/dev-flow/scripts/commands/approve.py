@@ -134,11 +134,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     """
     input_ref = args.target
     confirm = args.confirm
-    use_worktree = not args.no_worktree  # default: worktree enabled
+    existing_worktree = getattr(args, "existing_worktree", None)
+    use_worktree = (not args.no_worktree) and (not existing_worktree)  # default: worktree enabled unless --no-worktree or --existing-worktree
     
     if not input_ref:
         log_error("Issue number or Plan name required")
-        log_error("Usage: flow.sh approve <issue-or-name> [--confirm] [--no-worktree]")
+        log_error("Usage: flow.sh approve <issue-or-name> [--confirm] [--no-worktree] [--existing-worktree <path>]")
         return 1
     
     workspace_root = find_workspace_root()
@@ -216,7 +217,32 @@ def cmd_approve(args: argparse.Namespace) -> int:
     branch = ""
     worktree_path = None  # type: Path | None
 
-    if use_worktree:
+    if existing_worktree:
+        if not project:
+            log_error("Cannot bind existing worktree: no Target Project in plan")
+            return 1
+        # Resolve existing worktree path
+        wt_p = Path(existing_worktree)
+        if not wt_p.is_absolute():
+            wt_p = workspace_root / wt_p
+        if not wt_p.exists():
+            log_error(f"Specified existing worktree path does not exist: {wt_p}")
+            return 1
+
+        # Detect the checked-out branch in that worktree
+        branch = get_current_branch(wt_p)
+        if not branch:
+            log_error(f"Could not determine branch of existing worktree at: {wt_p}")
+            return 1
+
+        worktree_path = wt_p
+        wt_rel = existing_worktree
+        if write_worktree_context(plan_path, branch, wt_rel):
+            log_success(f"Plan Worktree metadata bound to existing worktree: {branch} ({wt_rel})")
+        else:
+            log_warn("Failed to write Worktree metadata to Plan")
+
+    elif use_worktree:
         if not project:
             log_error("Cannot create worktree: no Target Project in plan")
             return 1
@@ -384,17 +410,20 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # ============================================
     # Record Base Commit (implementation baseline)
     # ============================================
-    # 记录集成分支 HEAD 作为实施基线。fae 从该 commit 开始实施,
-    # squash 合并时用于对照 Final Commit 确定 feature 影响范围。
+    # 记录实施基线。对于独立分支是集成分支 HEAD；对于 --existing-worktree 演进模式，
+    # 记录该 worktree 当前分支的 HEAD（即上个 Plan 实施产物的终点）。
     base_commit = ""
     try:
-        project_type_str = get_plan_field(plan_path, "Project Type")
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo:
-                base_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
-        elif project_path:
-            base_commit = get_branch_head(str(project_path), "main")
+        if existing_worktree and worktree_path and branch:
+            base_commit = get_branch_head(str(worktree_path), branch)
+        else:
+            project_type_str = get_plan_field(plan_path, "Project Type")
+            if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
+                main_repo = get_ontology_main_repo(workspace_root)
+                if main_repo:
+                    base_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+            elif project_path:
+                base_commit = get_branch_head(str(project_path), "main")
     except (subprocess.CalledProcessError, FileNotFoundError):
         base_commit = ""
 
@@ -457,4 +486,10 @@ def register_approve_parser(subparsers: argparse._SubParsersAction) -> None:
         "--no-worktree",
         action="store_true",
         help="Skip worktree creation (worktree is created by default)"
+    )
+    approve_parser.add_argument(
+        "--existing-worktree",
+        type=str,
+        default=None,
+        help="Reuse an existing worktree directory/branch instead of creating a new one (evolution mode)"
     )

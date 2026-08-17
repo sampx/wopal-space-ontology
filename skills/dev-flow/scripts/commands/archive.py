@@ -525,12 +525,15 @@ def cmd_archive(args: argparse.Namespace) -> int:
     # 3. Detect worktree and handle cleanup
     #    Archive never commits or pushes implementation code.
     worktree_handled = False
+    keep_worktree = getattr(args, "keep_worktree", False)
 
     # Read Project Type from Plan metadata
     project_type_str = get_plan_field(plan_path, "Project Type")
     is_ontology_worktree = project_type_str == "ontology-worktree"
 
-    if is_ontology_worktree:
+    if keep_worktree:
+        log_info("Evolution mode (--keep-worktree): skipping worktree and branch cleanup")
+    elif is_ontology_worktree:
         log_step("Ontology worktree project detected")
 
         project_path = resolve_project_path(plan_path, project, workspace_root)
@@ -777,4 +780,10 @@ def register_archive_parser(subparsers: argparse._SubParsersAction) -> None:
         "--force",
         action="store_true",
         help="Skip dirty working tree warnings"
+    )
+    archive_parser.add_argument(
+        "--keep-worktree",
+        action="store_true",
+        default=False,
+        help="Retain worktree directory and branch for evolution mode (skip cleanup)"
     )

@@ -230,6 +230,55 @@ class TestRegisterApproveParser(unittest.TestCase):
         self.assertEqual(args.command, "approve")
         self.assertFalse(args.confirm)
 
+    def test_approve_parser_has_existing_worktree(self):
+        import argparse
+        from commands.approve import register_approve_parser
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        register_approve_parser(subparsers)
+        args = parser.parse_args(["approve", "42", "--confirm", "--existing-worktree", ".worktrees/my-wt"])
+        self.assertEqual(args.command, "approve")
+        self.assertEqual(args.target, "42")
+        self.assertTrue(args.confirm)
+        self.assertEqual(args.existing_worktree, ".worktrees/my-wt")
+
+
+class TestApproveExistingWorktree(unittest.TestCase):
+    """Test approve with --existing-worktree option (evolution mode)."""
+
+    def test_existing_worktree_binds_branch_and_records_worktree_head_as_base_commit(self):
+        """--existing-worktree 应绑定已有 worktree 分支，并将 Base Commit 记录为该分支 HEAD。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_plan_field"] = MagicMock(return_value="standard")
+        mocks["get_branch_head"] = MagicMock(return_value="wt_head_sha_999")
+        mocks["get_current_branch"] = MagicMock(return_value="existing-feature-branch")
+        mocks["_has_unmerged_files"] = MagicMock(return_value=False)
+
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/ellamaka-feature-existing",
+                )
+                result = cmd_approve(args)
+
+        self.assertEqual(result, 0)
+        # 应将已有分支与路径写入 Worktree 元数据
+        mocks["write_worktree_context"].assert_called_once_with(
+            "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
+            "existing-feature-branch",
+            ".worktrees/ellamaka-feature-existing",
+        )
+        # Base Commit 应记录为 worktree 分支的 HEAD (而非 main)
+        mocks["set_plan_field"].assert_any_call(
+            "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
+            "Base Commit",
+            "wt_head_sha_999",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -127,13 +127,31 @@ flow.sh submit <plan>       # planning → reviewing，提交人工审阅
 ### approve --confirm
 
 ```bash
-flow.sh approve <plan> --confirm              # 默认创建 worktree（接受 reviewing 或 planning）
-flow.sh approve <plan> --confirm --no-worktree # 跳过 worktree
+flow.sh approve <plan> --confirm                            # 默认创建 worktree
+flow.sh approve <plan> --confirm --no-worktree               # 跳过 worktree（main 直实施）
+flow.sh approve <plan> --confirm --existing-worktree <path> # 独立分支演进模式（复用已有 worktree）
 ```
 
 `approve` 不带 `--confirm` 时报错退出，提示使用 `submit`。`--confirm` 接受 `reviewing` 或 `planning`（快捷路径）→ `executing`。
 
-approve 还会记录 **Base Commit**（集成分支 HEAD）到 Plan metadata——实施基线，fae 从该 commit 开始实施，squash 合并时与 Final Commit 对照确定影响范围。
+**模式选择**：
+1. **默认模式**：创建独立 feature 分支与工作树（`.worktrees/<project>-<plan-name>`），记录集成分支 HEAD 为 Base Commit。
+2. **`--no-worktree`**：直接在集成分支（main）实施，不建分支不建工作树。
+3. **`--existing-worktree <path>`**：**独立分支演进模式**。复用已有工作树路径 `<path>`，自动绑定其检出的 feature 分支写入 Plan 元数据，并将 Base Commit 记录为该分支当前最新 HEAD（上一个 Plan 的实施产物终点）。
+
+### verify --confirm [--keep-worktree]
+
+```bash
+flow.sh verify <plan> --confirm                # 标准模式（要求已合并到集成分支）
+flow.sh verify <plan> --confirm --keep-worktree # 演进模式（跳过 merge 检查，记录 feature HEAD）
+```
+
+### archive [--keep-worktree]
+
+```bash
+flow.sh archive <plan>                # 标准模式（清理 worktree 与分支）
+flow.sh archive <plan> --keep-worktree # 演进模式（保留 worktree 与分支）
+```
 
 ### complete --pr
 

@@ -179,31 +179,46 @@ def _check_feature_branch_merged(workspace_root: Path, plan_path: str) -> int:
     return check_branch_merged(workspace_root, plan_path)
 
 
-def _record_final_commit(plan_path: str, workspace_root: Path) -> str:
-    """Record Final Commit — integration branch HEAD after merge.
+def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bool = False) -> str:
+    """Record Final Commit — integration branch HEAD after merge (or feature tip if keep_worktree).
 
     合入后集成分支 HEAD 即 feature 落地点(squash commit 或 merge commit),
     与 approve 时记录的 Base Commit 对照可确定 feature 影响范围。
+    在 --keep-worktree 模式下，未合并到集成分支，记录特性分支最新 HEAD。
 
     Args:
         plan_path: Path to the Plan file
         workspace_root: Workspace root path
+        keep_worktree: Whether evolution mode is active
 
     Returns:
         Recorded commit SHA, or empty string if not recorded
     """
     final_commit = ""
     try:
-        project_type_str = get_plan_field(plan_path, "Project Type")
-        if project_type_str == "ontology-worktree":
-            from lib.workspace import get_ontology_main_repo
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo:
-                final_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+        if keep_worktree:
+            wt_meta = get_plan_worktree(plan_path)
+            if wt_meta and wt_meta.get("path"):
+                wt_p = Path(wt_meta["path"])
+                if not wt_p.is_absolute():
+                    wt_p = workspace_root / wt_p
+                branch = wt_meta.get("branch", "HEAD")
+                final_commit = get_branch_head(str(wt_p), branch)
+            elif wt_meta and wt_meta.get("branch"):
+                project_path = get_plan_project_path(plan_path)
+                repo_p = str(Path(workspace_root) / project_path) if project_path else str(workspace_root)
+                final_commit = get_branch_head(repo_p, wt_meta["branch"])
         else:
-            project_path = get_plan_project_path(plan_path)
-            if project_path:
-                final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
+            project_type_str = get_plan_field(plan_path, "Project Type")
+            if project_type_str == "ontology-worktree":
+                from lib.workspace import get_ontology_main_repo
+                main_repo = get_ontology_main_repo(workspace_root)
+                if main_repo:
+                    final_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+            else:
+                project_path = get_plan_project_path(plan_path)
+                if project_path:
+                    final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
     except (subprocess.CalledProcessError, FileNotFoundError):
         final_commit = ""
 
@@ -318,18 +333,23 @@ def cmd_verify(args: argparse.Namespace) -> int:
         print("")
         print("After user verifies, run:")
         next_ref = plan_issue or plan_name
-        print(f"  flow.sh verify {next_ref} --confirm")
+        keep_flag = " --keep-worktree" if getattr(args, "keep_worktree", False) else ""
+        print(f"  flow.sh verify {next_ref} --confirm{keep_flag}")
         return 0
 
     # --confirm received: user authorization gate passed
 
-    # 7. Check feature branch merged to integration (D-03)
-    merge_check = _check_feature_branch_merged(workspace_root, plan_path)
-    if merge_check != 0:
-        return merge_check
+    # 7. Check feature branch merged to integration (D-03) (skipped if keep_worktree)
+    keep_worktree = getattr(args, "keep_worktree", False)
+    if not keep_worktree:
+        merge_check = _check_feature_branch_merged(workspace_root, plan_path)
+        if merge_check != 0:
+            return merge_check
+    else:
+        log_info("Evolution mode (--keep-worktree): skipping merge check")
 
-    # 7.5 Record Final Commit — integration branch HEAD after merge.
-    _record_final_commit(plan_path, workspace_root)
+    # 7.5 Record Final Commit — integration branch HEAD after merge (or feature tip).
+    _record_final_commit(plan_path, workspace_root, keep_worktree=keep_worktree)
 
     # 8. Resolve active Plan — enforce merged state (D-05)
     try:
@@ -464,4 +484,10 @@ def register_verify_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         default=False,
         help="Confirm user validation and transition to done"
+    )
+    verify_parser.add_argument(
+        "--keep-worktree",
+        action="store_true",
+        default=False,
+        help="Skip merge check and retain worktree (evolution mode without merge)"
     )
