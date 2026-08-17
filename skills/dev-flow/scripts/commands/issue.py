@@ -503,6 +503,57 @@ def cmd_issue_write(args: argparse.Namespace) -> int:
 
 
 # ============================================
+# issue list command
+# ============================================
+
+def cmd_issue_list(args: argparse.Namespace) -> int:
+    """List open Issues from the space repo with repo URL.
+
+    Auto-detects the space repository (no manual --repo needed).
+    """
+    workspace_root = find_workspace_root()
+    try:
+        repo = detect_space_repo(workspace_root)
+    except RuntimeError as e:
+        log_error(f"Failed to detect space repo: {e}")
+        return 1
+
+    result = subprocess.run(
+        ["gh", "issue", "list", "--repo", repo, "--state", "open",
+         "--limit", str(getattr(args, 'limit', 50)),
+         "--json", "number,title,labels,url",
+         "--jq", r'.[] | "\(.number)|\(.title)|\(.labels | map(.name) | join(","))|\(.url)"'],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        log_error(f"Failed to list issues in {repo}")
+        log_error(result.stderr)
+        return 1
+
+    output = result.stdout.strip()
+    if not output:
+        print(f"No open issues in {repo}.")
+        return 0
+
+    for line in output.split('\n'):
+        parts = line.split('|')
+        if len(parts) < 3:
+            continue
+        number, title, labels_str = parts[0], parts[1], parts[2]
+        label_str = " ".join(f"[{l}]" for l in labels_str.split(',') if l)
+        print(f"#{number}  {title}  {label_str}".rstrip())
+
+    # Show the repo the issues belong to
+    owner_repo = repo
+    if "/" in repo:
+        owner, name = repo.split("/", 1)
+        print(f"\nIssues in: https://github.com/{owner}/{name}")
+
+    return 0
+
+
+# ============================================
 # argparse registration
 # ============================================
 
@@ -544,6 +595,10 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     update_parser.add_argument("--reference", help="Update reference in Related Resources")
     update_parser.add_argument("--acceptance-criteria", help="Update acceptance criteria section")
     
+    # issue list
+    list_parser = issue_subparsers.add_parser("list", help="List open issues in space repo")
+    list_parser.add_argument("--limit", type=int, default=50, help="Max issues to list (default 50)")
+
     # issue write
     write_parser = issue_subparsers.add_parser("write", help="Write to issue body")
     write_parser.add_argument("issue_number", nargs="?", help="Issue number")
@@ -557,6 +612,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
         return cmd_issue_create(args)
     elif args.issue_cmd == "update":
         return cmd_issue_update(args)
+    elif args.issue_cmd == "list":
+        return cmd_issue_list(args)
     elif args.issue_cmd == "write":
         return cmd_issue_write(args)
     else:

@@ -90,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print("Available subcommands:")
         print("  issue create    Create a new GitHub Issue")
+        print("  issue list      List open Issues in the space repo (with repo URL)")
         print("  issue update    Update an existing GitHub Issue")
         print("  sync            Sync Plan to Issue (body + labels)")
         print("  sync --body-only    Sync only Issue body")

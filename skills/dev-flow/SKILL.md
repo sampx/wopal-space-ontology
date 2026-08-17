@@ -50,6 +50,7 @@ description: >
 | 命令 | 场景 | 说明 |
 |------|------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue | `--body-file` 为主路径 |
+| `issue list [--limit N]` | 列出空间仓库未完成 Issue | 自动检测仓库，显示 repo URL |
 | `issue write <issue> --body-file <path>` | 全量替换 Issue body | |
 | `sync <plan> [--body-only\|--labels-only]` | Plan → Issue 同步 | Plan 内容变更后必走 |
 
@@ -388,6 +389,7 @@ flow.sh archive <issue>
 
 - **跳过 dev-flow 直接手动操作** — Issue/Plan 驱动的任务必须走 `flow.sh` 命令链
 - **直接调 `gh issue create` 绕过 flow.sh** — Issue 创建必须走 `flow.sh issue create`，脚本通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`。直接调 `gh` 会导致 Issue 创建到错误仓库 = 严重失职
+- **手动 `gh issue list` 查询未完成 Issue** — 查询未完成 Issue 必须走 `flow.sh issue list`，脚本自动定位空间仓库并显示 repo URL，避免 Agent 因不知道仓库归属而查错仓库
 - **跳过 rook 审查直接 complete** — 实施审查是强制门禁，complete 前必须委派 rook
 - **跳过 `plan check` 直接 submit** — Plan 质量由脚本校验把关，submit 前必须通过 `flow.sh plan check`
 - **rook BLOCK 后强行 complete** — 必须修订后重审，最多 3 轮
