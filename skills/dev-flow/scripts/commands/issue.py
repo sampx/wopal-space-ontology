@@ -37,7 +37,7 @@ from plan import (
 )
 from lib.logging import log_info, log_warn, log_success, log_error
 from lib.workspace import find_workspace_root, detect_space_repo
-from lib.github import list_issues
+from lib.github import list_issues, STATUS_LABEL_MAP
 
 
 # ============================================
@@ -524,6 +524,22 @@ def cmd_issue_list(args: argparse.Namespace) -> int:
     statuses = list(getattr(args, 'status', None) or [])
     limit = getattr(args, 'limit', 50)
 
+    # Validate project names (same rule as issue create)
+    for p in projects:
+        if not re.match(r'^[a-z0-9-]+$', p):
+            log_error(f"Invalid project name: {p}")
+            log_error("Project name must be lowercase alphanumeric with hyphens")
+            return 1
+
+    # Validate status aliases (single authority in lib.github.STATUS_LABEL_MAP)
+    valid_statuses = set(STATUS_LABEL_MAP.keys())
+    for s in statuses:
+        if s.lower() not in valid_statuses:
+            log_error(
+                f"Invalid status: {s}. Allowed: {', '.join(sorted(valid_statuses))}"
+            )
+            return 1
+
     issues = list_issues(
         repo=repo,
         state="open",
@@ -602,7 +618,7 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     list_parser.add_argument("--project", action="append", dest="project",
                              help="Filter by project name (repeatable, OR-combined)")
     list_parser.add_argument("--status", action="append", dest="status",
-                             help="Filter by status (planning/executing/verifying/done, repeatable, OR-combined)")
+                             help="Filter by status (planning/executing/in-progress/verifying/done, repeatable, OR-combined)")
 
     # issue write
     write_parser = issue_subparsers.add_parser("write", help="Write to issue body")

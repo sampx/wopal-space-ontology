@@ -98,7 +98,7 @@ flow.sh issue list --project firecrawl --project wopal-cli --status planning --s
 **行为**：
 - 通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`
 - `--project`：按项目过滤，多次指定取 OR
-- `--status`：按状态过滤（`planning`/`executing`/`verifying`/`done`），多次指定取 OR；project 与 status 之间为 AND
+- `--status`：按状态过滤（`planning`/`executing`/`in-progress`/`verifying`/`done`，`executing` 与 `in-progress` 等价），多次指定取 OR；project 与 status 之间为 AND
 - 每行显示 `#<number>  <title>  [<label>...]`
 - 末尾显示 `Issues in: https://github.com/<owner>/<repo>`
 - 仓库检测失败或 `gh` 调用失败时报错退出（exit 1）

@@ -175,6 +175,9 @@ STATUS_LABEL_MAP = {
     "done": "status/done",
 }
 
+# User-facing status aliases accepted by --status.
+STATUS_ALIASES = sorted(STATUS_LABEL_MAP.keys())
+
 
 def build_issue_search_query(projects: list[str], statuses: list[str]) -> str:
     """Build a GitHub issue search query from project and status filters.
@@ -184,10 +187,14 @@ def build_issue_search_query(projects: list[str], statuses: list[str]) -> str:
 
     Args:
         projects: Project names (without 'project/' prefix).
-        statuses: User-facing status aliases (planning/executing/verifying/done).
+        statuses: User-facing status aliases (planning/executing/in-progress/verifying/done).
 
     Returns:
         Search query string, or "" when no filters are given.
+
+    Raises:
+        ValueError: When a status alias is not recognized (never silently dropped,
+            which would widen the result scope).
     """
     parts = []
     if projects:
@@ -198,11 +205,13 @@ def build_issue_search_query(projects: list[str], statuses: list[str]) -> str:
         status_terms = []
         for s in statuses:
             label = STATUS_LABEL_MAP.get(s.lower())
-            if label:
-                status_terms.append(f"label:{label}")
-        if status_terms:
-            statuses_clause = " OR ".join(status_terms)
-            parts.append(f"({statuses_clause})" if len(status_terms) > 1 else status_terms[0])
+            if label is None:
+                raise ValueError(
+                    f"Invalid status: {s}. Allowed: {', '.join(STATUS_ALIASES)}"
+                )
+            status_terms.append(f"label:{label}")
+        statuses_clause = " OR ".join(status_terms)
+        parts.append(f"({statuses_clause})" if len(status_terms) > 1 else status_terms[0])
     return " ".join(parts)
 
 
