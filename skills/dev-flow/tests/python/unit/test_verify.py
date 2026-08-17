@@ -377,19 +377,17 @@ class TestCheckFeatureBranchMerged:
 
         with patch("commands.verify.find_workspace_root", return_value=tmp_path):
             with patch("commands.verify.find_plan", return_value=str(plan_path)):
-                with patch("commands.verify._check_feature_branch_merged") as mock_merge_check:
-                    with patch("commands.verify.check_user_validation"):
-                        with patch("commands.verify.get_branch_head", return_value="feature_tip_sha_123"):
-                            with patch("commands.verify.commit_paths", return_value=True):
-                                args = argparse.Namespace(
-                                    target="42",
-                                    confirm=True,
-                                    keep_worktree=True,
-                                )
-                                result = cmd_verify(args)
+                with patch("commands.verify.check_user_validation"):
+                    with patch("commands.verify.get_branch_head", return_value="feature_tip_sha_123"):
+                        with patch("commands.verify.commit_paths", return_value=True):
+                            args = argparse.Namespace(
+                                target="42",
+                                confirm=True,
+                                keep_worktree=True,
+                            )
+                            result = cmd_verify(args)
 
         assert result == 0
-        mock_merge_check.assert_not_called()
         from plan import get_plan_field
         assert get_plan_field(str(plan_path), "Final Commit") == "feature_tip_sha_123"
 

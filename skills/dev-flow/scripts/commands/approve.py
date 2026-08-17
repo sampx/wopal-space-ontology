@@ -45,6 +45,7 @@ from lib.git import (
     is_repo_dirty,
     get_current_branch,
     get_branch_head,
+    get_common_git_dir,
 )
 from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 from lib.worktree import create_worktree, write_worktree_context
@@ -242,6 +243,16 @@ def cmd_approve(args: argparse.Namespace) -> int:
 
         if not repo_root or not repo_root.exists():
             log_error(f"Cannot resolve project repository root for: {project}")
+            return 1
+
+        # Verify wt_p and repo_root share the same common git dir
+        wt_common = get_common_git_dir(str(wt_p))
+        repo_common = get_common_git_dir(str(repo_root))
+        if not wt_common or not repo_common or wt_common != repo_common:
+            log_error(
+                f"Specified worktree '{wt_p}' does not belong to project '{project}' "
+                f"(git common dir mismatch: '{wt_common}' != '{repo_common}')"
+            )
             return 1
 
         # Reject pointing to the primary integration worktree (main checkout)

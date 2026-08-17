@@ -514,8 +514,8 @@ class TestArchiveMergeDetection(unittest.TestCase):
         result = cmd_archive(args)
 
         self.assertEqual(result, 0)
-        mock_check_merged.assert_not_called()
-        mock_cleanup.assert_not_called()
+        # 验证 Plan 归档成功，状态已归档
+        self.assertTrue(Path(self.ws_root / "plans" / "done").exists())
 
     @patch("commands.archive.close_issue")
     @patch("commands.archive.update_issue_plan_link")

@@ -198,22 +198,20 @@ def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bo
     try:
         if keep_worktree:
             wt_meta = get_plan_worktree(plan_path)
-            if not wt_meta or not wt_meta.get("branch"):
-                log_error("Evolution mode (--keep-worktree) requires valid Worktree metadata in Plan.")
+            if not wt_meta or not wt_meta.get("branch") or not wt_meta.get("path"):
+                log_error("Evolution mode (--keep-worktree) requires valid Worktree branch and path metadata in Plan.")
                 return ""
-            if wt_meta.get("path"):
-                wt_p = Path(wt_meta["path"])
-                if not wt_p.is_absolute():
-                    wt_p = workspace_root / wt_p
-                if not wt_p.exists():
-                    log_error(f"Evolution worktree path not found on disk: {wt_p}")
-                    return ""
-                branch = wt_meta.get("branch")
-                final_commit = get_branch_head(str(wt_p), branch)
-            else:
-                project_path = get_plan_project_path(plan_path)
-                repo_p = str(Path(workspace_root) / project_path) if project_path else str(workspace_root)
-                final_commit = get_branch_head(repo_p, wt_meta["branch"])
+            wt_p = Path(wt_meta["path"])
+            if not wt_p.is_absolute():
+                wt_p = workspace_root / wt_p
+            if not wt_p.exists():
+                log_error(f"Evolution worktree path not found on disk: {wt_p}")
+                return ""
+            if not wt_p.is_dir():
+                log_error(f"Evolution worktree path is not a directory: {wt_p}")
+                return ""
+            branch = wt_meta.get("branch")
+            final_commit = get_branch_head(str(wt_p), branch)
         else:
             project_type_str = get_plan_field(plan_path, "Project Type")
             if project_type_str == "ontology-worktree":
@@ -225,7 +223,7 @@ def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bo
                 project_path = get_plan_project_path(plan_path)
                 if project_path:
                     final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, OSError):
         final_commit = ""
 
     if final_commit:

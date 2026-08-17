@@ -253,6 +253,7 @@ class TestApproveExistingWorktree(unittest.TestCase):
         mocks["get_plan_field"] = MagicMock(return_value="standard")
         mocks["get_branch_head"] = MagicMock(return_value="wt_head_sha_999")
         mocks["get_current_branch"] = MagicMock(return_value="feature/existing-branch")
+        mocks["get_common_git_dir"] = MagicMock(return_value="/ws/.git")
         mocks["_has_unmerged_files"] = MagicMock(return_value=False)
 
         with patch.multiple("commands.approve", **mocks):
@@ -279,6 +280,23 @@ class TestApproveExistingWorktree(unittest.TestCase):
             "wt_head_sha_999",
         )
 
+    def test_existing_worktree_rejects_unrelated_repo(self):
+        """--existing-worktree 传入不属于本项目的其他 Git 仓库时报错拒绝。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_common_git_dir"] = MagicMock(side_effect=lambda p: "/ws/repo-a/.git" if "repo-a" in str(p) else "/ws/repo-b/.git")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/unrelated-repo-b",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
+
     def test_existing_worktree_rejects_non_directory_file(self):
         """--existing-worktree 传入文件时报错退出。"""
         from commands.approve import cmd_approve
@@ -299,6 +317,7 @@ class TestApproveExistingWorktree(unittest.TestCase):
         """--existing-worktree 绑定的 worktree 在 main 分支时报错拒绝。"""
         from commands.approve import cmd_approve
         mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_common_git_dir"] = MagicMock(return_value="/ws/.git")
         mocks["get_current_branch"] = MagicMock(return_value="main")
         with patch.multiple("commands.approve", **mocks):
             with patch("commands.approve.Path.exists", return_value=True), \
