@@ -228,6 +228,32 @@ def cmd_approve(args: argparse.Namespace) -> int:
         if not wt_p.exists():
             log_error(f"Specified existing worktree path does not exist: {wt_p}")
             return 1
+        if not wt_p.is_dir():
+            log_error(f"Specified existing worktree path is not a directory: {wt_p}")
+            return 1
+
+        # Resolve project repo root and verify that wt_p is a valid worktree of this project
+        project_type_str = get_plan_field(plan_path, "Project Type")
+        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
+            main_repo = get_ontology_main_repo(workspace_root)
+            repo_root = main_repo
+        else:
+            repo_root = Path(project_path) if project_path else None
+
+        if not repo_root or not repo_root.exists():
+            log_error(f"Cannot resolve project repository root for: {project}")
+            return 1
+
+        # Reject pointing to the primary integration worktree (main checkout)
+        try:
+            if wt_p.resolve() == repo_root.resolve():
+                log_error(
+                    f"Specified worktree path is the primary repository checkout ({repo_root}), "
+                    "not an isolated feature worktree. Use --no-worktree for direct main execution."
+                )
+                return 1
+        except Exception:
+            pass
 
         # Detect the checked-out branch in that worktree
         branch = get_current_branch(wt_p)
@@ -235,12 +261,21 @@ def cmd_approve(args: argparse.Namespace) -> int:
             log_error(f"Could not determine branch of existing worktree at: {wt_p}")
             return 1
 
+        # Reject integration branches (main, master, space/<name>) as evolution worktrees
+        if branch in ("main", "master") or branch.startswith("space/"):
+            log_error(
+                f"Existing worktree is on integration branch '{branch}'. "
+                "Evolution mode requires an isolated feature branch."
+            )
+            return 1
+
         worktree_path = wt_p
         wt_rel = existing_worktree
         if write_worktree_context(plan_path, branch, wt_rel):
             log_success(f"Plan Worktree metadata bound to existing worktree: {branch} ({wt_rel})")
         else:
-            log_warn("Failed to write Worktree metadata to Plan")
+            log_error("Failed to write Worktree metadata to Plan")
+            return 1
 
     elif use_worktree:
         if not project:

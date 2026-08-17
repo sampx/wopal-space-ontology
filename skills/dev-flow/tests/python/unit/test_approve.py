@@ -252,11 +252,13 @@ class TestApproveExistingWorktree(unittest.TestCase):
         mocks = _make_approve_mocks(status="reviewing")
         mocks["get_plan_field"] = MagicMock(return_value="standard")
         mocks["get_branch_head"] = MagicMock(return_value="wt_head_sha_999")
-        mocks["get_current_branch"] = MagicMock(return_value="existing-feature-branch")
+        mocks["get_current_branch"] = MagicMock(return_value="feature/existing-branch")
         mocks["_has_unmerged_files"] = MagicMock(return_value=False)
 
         with patch.multiple("commands.approve", **mocks):
-            with patch("commands.approve.Path.exists", return_value=True):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True), \
+                 patch("commands.approve.Path.resolve", side_effect=lambda p: p):
                 args = Namespace(
                     target="42",
                     confirm=True,
@@ -266,18 +268,49 @@ class TestApproveExistingWorktree(unittest.TestCase):
                 result = cmd_approve(args)
 
         self.assertEqual(result, 0)
-        # 应将已有分支与路径写入 Worktree 元数据
         mocks["write_worktree_context"].assert_called_once_with(
             "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
-            "existing-feature-branch",
+            "feature/existing-branch",
             ".worktrees/ellamaka-feature-existing",
         )
-        # Base Commit 应记录为 worktree 分支的 HEAD (而非 main)
         mocks["set_plan_field"].assert_any_call(
             "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
             "Base Commit",
             "wt_head_sha_999",
         )
+
+    def test_existing_worktree_rejects_non_directory_file(self):
+        """--existing-worktree 传入文件时报错退出。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=False):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/some-file.txt",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
+
+    def test_existing_worktree_rejects_integration_branch(self):
+        """--existing-worktree 绑定的 worktree 在 main 分支时报错拒绝。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_current_branch"] = MagicMock(return_value="main")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/primary-main",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
 
 
 if __name__ == "__main__":
