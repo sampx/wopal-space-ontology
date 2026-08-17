@@ -50,7 +50,7 @@ description: >
 | 命令 | 场景 | 说明 |
 |------|------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue | `--body-file` 为主路径 |
-| `issue list [--limit N]` | 列出空间仓库未完成 Issue | 自动检测仓库，显示 repo URL |
+| `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue | 自动检测仓库，显示 repo URL，可按 project/status 过滤 |
 | `issue write <issue> --body-file <path>` | 全量替换 Issue body | |
 | `sync <plan> [--body-only\|--labels-only]` | Plan → Issue 同步 | Plan 内容变更后必走 |
 

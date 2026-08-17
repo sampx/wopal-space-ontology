@@ -17,8 +17,10 @@ flow.sh issue create --title "add skills remove command" --project <name> --type
 **查询未完成 Issue 必须使用 `flow.sh issue list`**，禁止手动 `gh issue list`。脚本通过 `detect_space_repo` 自动定位空间仓库并显示 repo URL，避免 Agent 因不知道仓库归属而查错仓库（如误查已禁用 issues 的 ontology 仓库）。
 
 ```bash
-flow.sh issue list                 # 列出空间仓库所有未完成 Issue
-flow.sh issue list --limit 100     # 指定数量
+flow.sh issue list                          # 列出空间仓库所有未完成 Issue
+flow.sh issue list --project firecrawl      # 按 project 过滤
+flow.sh issue list --status planning        # 按 status 过滤
+flow.sh issue list --limit 100              # 指定数量
 ```
 
 ## Issue 标题格式

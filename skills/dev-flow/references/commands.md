@@ -28,7 +28,7 @@
 | 命令 | 说明 |
 |------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue（`--body-file` 为主路径） |
-| `issue list [--limit N]` | 列出空间仓库未完成 Issue（含 repo URL） |
+| `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue（含 repo URL，可按 project/status 过滤） |
 | `issue write <issue> --body-file <path>` | 全量替换 Issue body |
 | `issue write <issue> --append <path>` | 追加到 Issue body 末尾 |
 | `issue update <issue>` | ⚠️ **已废弃**，使用 `issue write` 替代 |
@@ -88,12 +88,17 @@ flow.sh issue write <issue> --append <path>       # 追加到 body 末尾
 列出空间仓库中所有未完成（open）Issue，并显示所在仓库 URL。
 
 ```bash
-flow.sh issue list                 # 列出未完成 Issue（默认 50 条）
-flow.sh issue list --limit 100     # 指定数量
+flow.sh issue list                          # 列出未完成 Issue（默认 50 条）
+flow.sh issue list --limit 100              # 指定数量
+flow.sh issue list --project firecrawl      # 按 project 过滤（可多次，OR）
+flow.sh issue list --status planning        # 按 status 过滤（可多次，OR）
+flow.sh issue list --project firecrawl --project wopal-cli --status planning --status verifying
 ```
 
 **行为**：
 - 通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`
+- `--project`：按项目过滤，多次指定取 OR
+- `--status`：按状态过滤（`planning`/`executing`/`verifying`/`done`），多次指定取 OR；project 与 status 之间为 AND
 - 每行显示 `#<number>  <title>  [<label>...]`
 - 末尾显示 `Issues in: https://github.com/<owner>/<repo>`
 - 仓库检测失败或 `gh` 调用失败时报错退出（exit 1）
