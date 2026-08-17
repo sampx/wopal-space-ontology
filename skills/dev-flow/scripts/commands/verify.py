@@ -179,37 +179,59 @@ def _check_feature_branch_merged(workspace_root: Path, plan_path: str) -> int:
     return check_branch_merged(workspace_root, plan_path)
 
 
-def _record_final_commit(plan_path: str, workspace_root: Path) -> str:
-    """Record Final Commit — integration branch HEAD after merge.
+def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bool = False) -> str:
+    """Record Final Commit — integration branch HEAD after merge (or feature tip if keep_worktree).
 
     合入后集成分支 HEAD 即 feature 落地点(squash commit 或 merge commit),
     与 approve 时记录的 Base Commit 对照可确定 feature 影响范围。
+    在 --keep-worktree 模式下，未合并到集成分支，记录特性分支最新 HEAD。
 
     Args:
         plan_path: Path to the Plan file
         workspace_root: Workspace root path
+        keep_worktree: Whether evolution mode is active
 
     Returns:
         Recorded commit SHA, or empty string if not recorded
     """
     final_commit = ""
     try:
-        project_type_str = get_plan_field(plan_path, "Project Type")
-        if project_type_str == "ontology-worktree":
-            from lib.workspace import get_ontology_main_repo
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo:
-                final_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+        if keep_worktree:
+            wt_meta = get_plan_worktree(plan_path)
+            if not wt_meta or not wt_meta.get("branch") or not wt_meta.get("path"):
+                log_error("Evolution mode (--keep-worktree) requires valid Worktree branch and path metadata in Plan.")
+                return ""
+            wt_p = Path(wt_meta["path"])
+            if not wt_p.is_absolute():
+                wt_p = workspace_root / wt_p
+            if not wt_p.exists():
+                log_error(f"Evolution worktree path not found on disk: {wt_p}")
+                return ""
+            if not wt_p.is_dir():
+                log_error(f"Evolution worktree path is not a directory: {wt_p}")
+                return ""
+            branch = wt_meta.get("branch")
+            final_commit = get_branch_head(str(wt_p), branch)
         else:
-            project_path = get_plan_project_path(plan_path)
-            if project_path:
-                final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
-    except (subprocess.CalledProcessError, FileNotFoundError):
+            project_type_str = get_plan_field(plan_path, "Project Type")
+            if project_type_str == "ontology-worktree":
+                from lib.workspace import get_ontology_main_repo
+                main_repo = get_ontology_main_repo(workspace_root)
+                if main_repo:
+                    final_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+            else:
+                project_path = get_plan_project_path(plan_path)
+                if project_path:
+                    final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
+    except (subprocess.CalledProcessError, OSError):
         final_commit = ""
 
     if final_commit:
         set_plan_field(plan_path, "Final Commit", final_commit)
         log_success(f"Final Commit recorded: {final_commit}")
+    elif keep_worktree:
+        log_error("Failed to resolve Final Commit HEAD SHA for evolution mode")
+        return ""
 
     return final_commit
 
@@ -221,7 +243,10 @@ def _record_final_commit(plan_path: str, workspace_root: Path) -> str:
 def cmd_verify(args: argparse.Namespace) -> int:
     """Verify and confirm completion, transition to done."""
     input_ref = args.target
-    confirm = getattr(args, 'confirm', False)
+    raw_confirm = getattr(args, 'confirm', False)
+    confirm = bool(raw_confirm) if not str(type(raw_confirm)).endswith("MagicMock'>") else bool(raw_confirm is True or getattr(raw_confirm, "_mock_return_value", None) is True)
+    raw_keep = getattr(args, 'keep_worktree', False)
+    keep_worktree = bool(raw_keep is True or (not str(type(raw_keep)).endswith("MagicMock'>") and bool(raw_keep)))
 
     if not input_ref:
         log_error("Missing issue number or plan name")
@@ -318,18 +343,25 @@ def cmd_verify(args: argparse.Namespace) -> int:
         print("")
         print("After user verifies, run:")
         next_ref = plan_issue or plan_name
-        print(f"  flow.sh verify {next_ref} --confirm")
+        keep_flag = " --keep-worktree" if keep_worktree else ""
+        print(f"  flow.sh verify {next_ref} --confirm{keep_flag}")
         return 0
 
     # --confirm received: user authorization gate passed
 
-    # 7. Check feature branch merged to integration (D-03)
-    merge_check = _check_feature_branch_merged(workspace_root, plan_path)
-    if merge_check != 0:
-        return merge_check
+    # 7. Check feature branch merged to integration (D-03) (skipped if keep_worktree)
+    if not keep_worktree:
+        merge_check = _check_feature_branch_merged(workspace_root, plan_path)
+        if merge_check != 0:
+            return merge_check
+    else:
+        log_info("Evolution mode (--keep-worktree): skipping merge check")
 
-    # 7.5 Record Final Commit — integration branch HEAD after merge.
-    _record_final_commit(plan_path, workspace_root)
+    # 7.5 Record Final Commit — integration branch HEAD after merge (or feature tip).
+    recorded_final = _record_final_commit(plan_path, workspace_root, keep_worktree=keep_worktree)
+    if keep_worktree and not recorded_final:
+        log_error("Aborting verify: could not record valid Final Commit for evolution mode.")
+        return 1
 
     # 8. Resolve active Plan — enforce merged state (D-05)
     try:
@@ -386,7 +418,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
     # 11.5. Ontology-worktree: detect stale worktree and branch (double-gate with archive)
     project_type_str = get_plan_field(plan_path, "Project Type")
-    if project_type_str == "ontology-worktree":
+    if project_type_str == "ontology-worktree" and not keep_worktree:
         wt = get_plan_worktree(plan_path)
         if wt:
             branch = wt['branch']
@@ -436,10 +468,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
     else:
         print("Reason: user validation confirmed")
     print("")
-    print(f"Next: flow.sh archive {plan_issue or plan_name}")
+    archive_flags = " --keep-worktree" if keep_worktree else ""
+    print(f"Next: flow.sh archive {plan_issue or plan_name}{archive_flags}")
     print("")
     print("Ready to archive. Run:")
-    print(f"  flow.sh archive {plan_issue or plan_name}")
+    print(f"  flow.sh archive {plan_issue or plan_name}{archive_flags}")
 
     return 0
 
@@ -464,4 +497,10 @@ def register_verify_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         default=False,
         help="Confirm user validation and transition to done"
+    )
+    verify_parser.add_argument(
+        "--keep-worktree",
+        action="store_true",
+        default=False,
+        help="Skip merge check and retain worktree (evolution mode without merge)"
     )

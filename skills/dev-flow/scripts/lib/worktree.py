@@ -424,7 +424,8 @@ def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path
     """
     project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
-    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+    # Worktree directory = branch (branch already contains the project prefix)
+    worktree_path = worktree_base / branch_slug
 
     # Ensure worktree_base exists
     worktree_base.mkdir(parents=True, exist_ok=True)
@@ -502,11 +503,78 @@ def list_worktrees(worktree_base: Path, project: str | None = None) -> list[str]
     return worktrees
 
 
+def _remove_empty_dirs(root: Path) -> bool:
+    """Remove an empty directory skeleton bottom-up.
+
+    macOS keeps directory hierarchy alive while a process holds the
+    directory as its cwd. git worktree remove --force deletes the files
+    but leaves the empty directories behind; once the process exits they
+    become orphaned skeletons. This removes empty directories only —
+    directories containing real files are left untouched.
+
+    Returns:
+        True if the whole skeleton is gone, False otherwise.
+    """
+    if not root.exists():
+        return True
+    if not root.is_dir():
+        return False
+
+    for dirpath, _, _ in os.walk(root, topdown=False):
+        try:
+            os.rmdir(dirpath)  # only succeeds on empty directories
+        except OSError:
+            pass
+
+    return not root.exists()
+
+
+def _find_worktree_path_by_branch(project_dir: Path, branch: str) -> Path | None:
+    """Locate a worktree's real registered path via `git worktree list`.
+
+    The worktree directory name normally equals the branch, but legacy
+    worktrees may carry a project prefix the branch lacks (e.g. dir
+    'ellamaka-implement-workbench-chat-transcript' vs branch
+    'implement-workbench-chat-transcript'). The git registry is
+    authoritative; the branch-derived dir is only a fallback.
+
+    Args:
+        project_dir: Path to the project's git root directory
+        branch: Branch name to locate
+
+    Returns:
+        Registered worktree path, or None if the branch is not registered
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=str(project_dir),
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    current_path: Path | None = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = Path(line[len("worktree "):].strip())
+        elif line.startswith("branch "):
+            branch_ref = line[len("branch "):].strip()
+            if branch_ref == f"refs/heads/{branch}":
+                return current_path
+    return None
+
+
 def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None:
     """Remove a git worktree (equivalent to worktree.sh cmd_remove).
 
-    Tries git worktree remove, then --force on failure.
-    Always runs git worktree prune afterwards.
+    Tries git worktree remove, then --force on failure. When --force also
+    fails, attempts to clean up the residual empty directory skeleton
+    (see _remove_empty_dirs). Always runs git worktree prune afterwards.
 
     Args:
         project_dir: Path to the project's git root directory
@@ -514,11 +582,16 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
         worktree_base: Base directory where worktrees are stored
 
     Raises:
-        RuntimeError: If both normal and force remove fail
+        RuntimeError: If removal fails and residual files remain
     """
-    project_name = project_dir.name
     branch_slug = branch.replace("/", "-")
-    worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+    # Locate the real registered path first (git registry is authoritative;
+    # the dir name may not match the branch for legacy worktrees). Fall back
+    # to the branch-derived dir when the branch is not registered.
+    worktree_path = _find_worktree_path_by_branch(project_dir, branch)
+    if worktree_path is None:
+        # Worktree directory = branch (branch already contains the project prefix)
+        worktree_path = worktree_base / branch_slug
 
     if worktree_path.exists():
         # Try normal remove
@@ -538,15 +611,20 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
                 text=True,
             )
             if result.returncode != 0:
-                stderr_text = result.stderr.strip()
-                raise RuntimeError(
-                    f"Failed to remove worktree {worktree_path}: {stderr_text}\n"
-                    f"Diagnostic hints:\n"
-                    f"  - Common causes: a process is holding the directory open, "
-                    f"or large untracked files (node_modules, dist, out) are present\n"
-                    f"  - Check for processes: lsof +D {worktree_path}\n"
-                    f"  - Manually remove: trash {worktree_path}"
-                )
+                # The worktree registration is typically already gone;
+                # only a residual empty directory skeleton may remain
+                # (e.g. a process held the directory as cwd). Clean the
+                # skeleton so .worktrees/ does not accumulate orphans.
+                if not _remove_empty_dirs(worktree_path):
+                    stderr_text = result.stderr.strip()
+                    raise RuntimeError(
+                        f"Failed to remove worktree {worktree_path}: {stderr_text}\n"
+                        f"Diagnostic hints:\n"
+                        f"  - Common causes: a process is holding the directory open, "
+                        f"or large untracked files (node_modules, dist, out) are present\n"
+                        f"  - Check for processes: lsof +D {worktree_path}\n"
+                        f"  - Manually remove: trash {worktree_path}"
+                    )
 
     # Always prune (whether remove succeeded or path didn't exist)
     subprocess.run(

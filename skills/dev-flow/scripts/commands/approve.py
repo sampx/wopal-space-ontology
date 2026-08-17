@@ -45,6 +45,7 @@ from lib.git import (
     is_repo_dirty,
     get_current_branch,
     get_branch_head,
+    get_common_git_dir,
 )
 from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 from lib.worktree import create_worktree, write_worktree_context
@@ -55,36 +56,20 @@ from plan import set_plan_field
 # Helpers
 # ============================================
 
-def _extract_slug(plan_name: str) -> str:
-    """Extract slug from plan name.
-    
-    Plan name format: <issue>-<type>-<scope>-<slug> OR <type>-<scope>-<slug>
-    
+def _derive_branch(project: str, plan_name: str) -> str:
+    """Derive branch name from Plan name: <project>-<plan-name>.
+
+    The branch uses the full Plan name (including issue number/type/scope/slug),
+    so it strictly corresponds to the Plan and can be mapped back to it.
+
     Args:
+        project: Target project name
         plan_name: Plan name (without .md extension)
-        
+
     Returns:
-        Slug portion of plan name
+        Branch name string
     """
-    # Remove .md if present
-    name = plan_name.replace('.md', '')
-    
-    # Split by hyphens
-    parts = name.split('-')
-    
-    # If first part is digits (Issue number), skip it
-    if parts[0].isdigit():
-        parts = parts[1:]
-    
-    # Skip type (second or first part depending on Issue presence)
-    if len(parts) > 1:
-        parts = parts[1:]
-    
-    # Skip scope
-    if len(parts) > 1:
-        parts = parts[1:]
-    
-    return '-'.join(parts) if parts else name
+    return f"{project}-{plan_name}"
 
 
 def _has_unmerged_files(repo_path: str) -> bool:
@@ -142,19 +127,20 @@ def cmd_approve(args: argparse.Namespace) -> int:
     """Approve Plan and transition to executing phase (--confirm required).
     
     Modes:
-    1. approve <issue-or-plan> --confirm - preflight + status transition + Issue sync
-    2. approve <issue-or-plan> --confirm --no-worktree - skip worktree creation
+    1. approve <issue-or-name> --confirm - preflight + status transition + Issue sync
+    2. approve <issue-or-name> --confirm --no-worktree - skip worktree creation
     
     Returns:
         0 on success, 1 on error
     """
     input_ref = args.target
     confirm = args.confirm
-    use_worktree = not args.no_worktree  # default: worktree enabled
+    existing_worktree = getattr(args, "existing_worktree", None)
+    use_worktree = (not args.no_worktree) and (not existing_worktree)  # default: worktree enabled unless --no-worktree or --existing-worktree
     
     if not input_ref:
         log_error("Issue number or Plan name required")
-        log_error("Usage: flow.sh approve <issue-or-plan> [--confirm] [--no-worktree]")
+        log_error("Usage: flow.sh approve <issue-or-name> [--confirm] [--no-worktree] [--existing-worktree <path>]")
         return 1
     
     workspace_root = find_workspace_root()
@@ -232,7 +218,77 @@ def cmd_approve(args: argparse.Namespace) -> int:
     branch = ""
     worktree_path = None  # type: Path | None
 
-    if use_worktree:
+    if existing_worktree:
+        if not project:
+            log_error("Cannot bind existing worktree: no Target Project in plan")
+            return 1
+        # Resolve existing worktree path
+        wt_p = Path(existing_worktree)
+        if not wt_p.is_absolute():
+            wt_p = workspace_root / wt_p
+        if not wt_p.exists():
+            log_error(f"Specified existing worktree path does not exist: {wt_p}")
+            return 1
+        if not wt_p.is_dir():
+            log_error(f"Specified existing worktree path is not a directory: {wt_p}")
+            return 1
+
+        # Resolve project repo root and verify that wt_p is a valid worktree of this project
+        project_type_str = get_plan_field(plan_path, "Project Type")
+        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
+            main_repo = get_ontology_main_repo(workspace_root)
+            repo_root = main_repo
+        else:
+            repo_root = Path(project_path) if project_path else None
+
+        if not repo_root or not repo_root.exists():
+            log_error(f"Cannot resolve project repository root for: {project}")
+            return 1
+
+        # Verify wt_p and repo_root share the same common git dir
+        wt_common = get_common_git_dir(str(wt_p))
+        repo_common = get_common_git_dir(str(repo_root))
+        if not wt_common or not repo_common or wt_common != repo_common:
+            log_error(
+                f"Specified worktree '{wt_p}' does not belong to project '{project}' "
+                f"(git common dir mismatch: '{wt_common}' != '{repo_common}')"
+            )
+            return 1
+
+        # Reject pointing to the primary integration worktree (main checkout)
+        try:
+            if wt_p.resolve() == repo_root.resolve():
+                log_error(
+                    f"Specified worktree path is the primary repository checkout ({repo_root}), "
+                    "not an isolated feature worktree. Use --no-worktree for direct main execution."
+                )
+                return 1
+        except Exception:
+            pass
+
+        # Detect the checked-out branch in that worktree
+        branch = get_current_branch(wt_p)
+        if not branch:
+            log_error(f"Could not determine branch of existing worktree at: {wt_p}")
+            return 1
+
+        # Reject integration branches (main, master, space/<name>) as evolution worktrees
+        if branch in ("main", "master") or branch.startswith("space/"):
+            log_error(
+                f"Existing worktree is on integration branch '{branch}'. "
+                "Evolution mode requires an isolated feature branch."
+            )
+            return 1
+
+        worktree_path = wt_p
+        wt_rel = existing_worktree
+        if write_worktree_context(plan_path, branch, wt_rel):
+            log_success(f"Plan Worktree metadata bound to existing worktree: {branch} ({wt_rel})")
+        else:
+            log_error("Failed to write Worktree metadata to Plan")
+            return 1
+
+    elif use_worktree:
         if not project:
             log_error("Cannot create worktree: no Target Project in plan")
             return 1
@@ -240,24 +296,19 @@ def cmd_approve(args: argparse.Namespace) -> int:
         # Read Project Type from Plan metadata
         project_type_str = get_plan_field(plan_path, "Project Type")
 
-        # Generate branch name
-        slug = _extract_slug(plan_name)
-        if issue_number:
-            branch = f"issue-{issue_number}-{slug}"
-        else:
-            branch = slug
+        # Generate branch name from full Plan name: <project>-<plan-name>
+        branch = _derive_branch(project, plan_name)
 
         # Determine planned worktree path (without creating it yet)
         if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
             worktrees_dir = workspace_root / ".worktrees"
-            worktree_name = f"ontology-{branch}"
+            worktree_name = branch
             worktree_path = worktrees_dir / worktree_name
         else:
-            # Standard: predict path using same slug logic as create_worktree
+            # Standard: worktree dir = branch (branch already has project prefix)
             worktree_base = workspace_root / ".worktrees"
-            project_name = project_path.name if project_path else project
             branch_slug = branch.replace("/", "-")
-            worktree_path = worktree_base / f"{project_name}-{branch_slug}"
+            worktree_path = worktree_base / branch_slug
         
         # Block on unmerged files for standard projects
         if project_type_str != ProjectType.ONTOLOGY_WORKTREE.value:
@@ -405,17 +456,20 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # ============================================
     # Record Base Commit (implementation baseline)
     # ============================================
-    # 记录集成分支 HEAD 作为实施基线。fae 从该 commit 开始实施,
-    # squash 合并时用于对照 Final Commit 确定 feature 影响范围。
+    # 记录实施基线。对于独立分支是集成分支 HEAD；对于 --existing-worktree 演进模式，
+    # 记录该 worktree 当前分支的 HEAD（即上个 Plan 实施产物的终点）。
     base_commit = ""
     try:
-        project_type_str = get_plan_field(plan_path, "Project Type")
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo:
-                base_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
-        elif project_path:
-            base_commit = get_branch_head(str(project_path), "main")
+        if existing_worktree and worktree_path and branch:
+            base_commit = get_branch_head(str(worktree_path), branch)
+        else:
+            project_type_str = get_plan_field(plan_path, "Project Type")
+            if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
+                main_repo = get_ontology_main_repo(workspace_root)
+                if main_repo:
+                    base_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
+            elif project_path:
+                base_commit = get_branch_head(str(project_path), "main")
     except (subprocess.CalledProcessError, FileNotFoundError):
         base_commit = ""
 
@@ -478,4 +532,10 @@ def register_approve_parser(subparsers: argparse._SubParsersAction) -> None:
         "--no-worktree",
         action="store_true",
         help="Skip worktree creation (worktree is created by default)"
+    )
+    approve_parser.add_argument(
+        "--existing-worktree",
+        type=str,
+        default=None,
+        help="Reuse an existing worktree directory/branch instead of creating a new one (evolution mode)"
     )

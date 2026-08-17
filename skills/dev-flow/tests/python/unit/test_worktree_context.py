@@ -19,6 +19,7 @@ from lib.worktree import (
     ResolveActivePlanError,
     resolve_active_plan,
     remove_worktree,
+    create_worktree,
 )
 
 
@@ -350,6 +351,123 @@ class TestParseOldFormatCompat:
 
 # -- Verify mode tests (WorktreeContext dataclass preserved) -------------------
 
+# -- Worktree path derivation (dir = branch, no project prefix) --------------
+
+class TestWorktreePathDerivation:
+    """Worktree directory must equal the branch name (no project prefix).
+
+    Branch already contains the project prefix (<project>-<plan-name>), so
+    the worktree directory must not repeat it.
+    """
+
+    def test_create_worktree_dir_equals_branch(self, tmp_path):
+        """create_worktree uses branch as the worktree dir name."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+
+        ok = MagicMock()
+        ok.returncode = 0
+
+        with patch("lib.worktree.subprocess.run", return_value=ok):
+            result = create_worktree(
+                project_dir, "ellamaka-42-feature-cli-add-skills", worktree_base,
+            )
+
+        # Worktree dir = branch (no project prefix repeated)
+        assert result == worktree_base / "ellamaka-42-feature-cli-add-skills"
+
+    def test_remove_worktree_locates_real_path_when_dir_differs_from_branch(
+        self, tmp_path
+    ):
+        """Legacy naming: worktree dir has a project prefix the branch lacks
+        (dir 'ellamaka-implement-workbench-chat-transcript' vs branch
+        'implement-workbench-chat-transcript'). remove_worktree must locate
+        the real registered path via `git worktree list --porcelain` instead
+        of deriving the dir from the branch name, otherwise archive silently
+        skips removal and reports false success.
+        """
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        real_wt = worktree_base / "ellamaka-implement-workbench-chat-transcript"
+        real_wt.mkdir()
+
+        porcelain_out = (
+            "worktree /main/path\n"
+            "HEAD abc\n"
+            "branch refs/heads/main\n"
+            "\n"
+            f"worktree {real_wt}\n"
+            "HEAD def\n"
+            "branch refs/heads/implement-workbench-chat-transcript\n"
+        )
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
+                return MagicMock(returncode=0, stdout=porcelain_out)
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
+            remove_worktree(
+                project_dir, "implement-workbench-chat-transcript", worktree_base,
+            )
+
+        remove_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+            and c.args[0][2] == "remove"
+        ]
+        assert remove_calls, "expected a git worktree remove call"
+        assert str(real_wt) in remove_calls[0], (
+            f"git worktree remove must target the registered path {real_wt}, "
+            f"got {remove_calls[0]}"
+        )
+
+    def test_remove_worktree_falls_back_to_derived_path_when_not_registered(
+        self, tmp_path
+    ):
+        """No matching branch in `git worktree list --porcelain` (e.g. the
+        registration is already gone): fall back to the branch-derived dir so
+        existing behavior is preserved.
+        """
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        derived = worktree_base / "feature-x"
+        derived.mkdir()
+
+        porcelain_out = "worktree /main/path\nHEAD abc\n\n"
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "git" and cmd[1] == "worktree" and cmd[2] == "list":
+                return MagicMock(returncode=0, stdout=porcelain_out)
+            return MagicMock(returncode=0, stdout="")
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run) as mock_run:
+            remove_worktree(project_dir, "feature-x", worktree_base)
+
+        remove_calls = [
+            c.args[0] for c in mock_run.call_args_list
+            if c.args and c.args[0][0] == "git" and c.args[0][1] == "worktree"
+            and c.args[0][2] == "remove"
+        ]
+        assert remove_calls, "expected a git worktree remove call"
+        assert str(derived) in remove_calls[0], (
+            f"fallback must target the branch-derived dir {derived}, "
+            f"got {remove_calls[0]}"
+        )
+
+
 # -- resolve_active_plan tests ------------------------------------------------
 
 class TestResolveActivePlanNoWorktree:
@@ -571,76 +689,114 @@ class TestResolveActivePlanArchive:
 # -- remove_worktree force failure tests --------------------------------------
 
 class TestRemoveWorktreeForceFailure:
-    """remove_worktree: --force failure includes stderr and diagnostic guidance."""
+    """remove_worktree: --force failure raises RuntimeError whose message
+    carries the original stderr and diagnostic guidance."""
 
-    def test_force_failure_includes_stderr(self, tmp_path):
-        """RuntimeError message must contain the original stderr output."""
+    @pytest.mark.parametrize(
+        "stderr,expected_substrings",
+        [
+            # Original stderr is preserved in the message
+            (
+                "error: cannot lock ref 'refs/heads/feature-x'\n",
+                ["cannot lock ref", "Failed to remove worktree"],
+            ),
+            # Message carries diagnostic hints and actionable commands
+            (
+                "fatal: cannot remove worktree\n",
+                ["Diagnostic hints", "lsof +D", "trash", "node_modules", "dist"],
+            ),
+        ],
+    )
+    def test_force_failure_message_content(
+        self, tmp_path, stderr, expected_substrings
+    ):
         from unittest.mock import patch, MagicMock
 
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         worktree_base = tmp_path / ".worktrees"
         worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
+        worktree_path = worktree_base / "feature-x"
         worktree_path.mkdir()
+        # Real file in the worktree — residual files cannot be auto-cleaned
+        (worktree_path / "locked-file.txt").write_text("held by a process")
 
-        # Simulate: normal remove fails, --force also fails with stderr
         fail_result = MagicMock()
         fail_result.returncode = 1
-        fail_result.stderr = "error: cannot lock ref 'refs/heads/feature-x'\n"
+        fail_result.stderr = stderr
 
         with patch("lib.worktree.subprocess.run", return_value=fail_result):
             with pytest.raises(RuntimeError) as exc_info:
                 remove_worktree(project_dir, "feature/x", worktree_base)
 
             msg = str(exc_info.value)
-            assert "cannot lock ref" in msg
-            assert "Failed to remove worktree" in msg
-
-    def test_force_failure_includes_diagnostic_hints(self, tmp_path):
-        """RuntimeError message must include diagnostic hints and actionable commands."""
-        from unittest.mock import patch, MagicMock
-
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
-        worktree_base = tmp_path / ".worktrees"
-        worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
-        worktree_path.mkdir()
-
-        fail_result = MagicMock()
-        fail_result.returncode = 1
-        fail_result.stderr = "fatal: cannot remove worktree\n"
-
-        with patch("lib.worktree.subprocess.run", return_value=fail_result):
-            with pytest.raises(RuntimeError) as exc_info:
-                remove_worktree(project_dir, "feature/x", worktree_base)
-
-            msg = str(exc_info.value)
-            assert "Diagnostic hints" in msg
-            assert "lsof +D" in msg
-            assert "trash" in msg
-            assert "node_modules" in msg
-            assert "dist" in msg
-
-    def test_force_failure_includes_worktree_path(self, tmp_path):
-        """RuntimeError message must include the worktree path that failed."""
-        from unittest.mock import patch, MagicMock
-
-        project_dir = tmp_path / "project"
-        project_dir.mkdir()
-        worktree_base = tmp_path / ".worktrees"
-        worktree_base.mkdir()
-        worktree_path = worktree_base / "project-feature-x"
-        worktree_path.mkdir()
-
-        fail_result = MagicMock()
-        fail_result.returncode = 1
-        fail_result.stderr = "some error\n"
-
-        with patch("lib.worktree.subprocess.run", return_value=fail_result):
-            with pytest.raises(RuntimeError) as exc_info:
-                remove_worktree(project_dir, "feature/x", worktree_base)
-
-            msg = str(exc_info.value)
+            for sub in expected_substrings:
+                assert sub in msg
+            # The failing path is always part of the message
             assert str(worktree_path) in msg
+
+
+class TestRemoveWorktreeResidualCleanup:
+    """remove_worktree: force failure must attempt residual-dir cleanup.
+
+    Regression: macOS keeps directory hierarchy alive while a process holds
+    the directory as cwd. git worktree remove --force deletes the files but
+    leaves the directory skeleton behind; git worktree prune clears the
+    registration, orphaning the leftover directory. Once the process exits,
+    the leftover dirs must be removed so they do not accumulate under
+    .worktrees/.
+    """
+
+    def test_removes_residual_dirs_after_force_failure(self, tmp_path):
+        """After --force fails, empty residual dirs under worktree_path
+        are removed and no exception is raised."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        worktree_path = worktree_base / "feature-x"
+        worktree_path.mkdir()
+        (worktree_path / "packages" / "app" / ".vite" / "deps").mkdir(parents=True)
+
+        # Normal remove fails, --force fails, prune succeeds
+        remove_fail = MagicMock()
+        remove_fail.returncode = 1
+        remove_fail.stderr = "fatal: cannot remove worktree\n"
+        prune_ok = MagicMock()
+        prune_ok.returncode = 0
+        porcelain_empty = MagicMock()
+        porcelain_empty.returncode = 0
+        porcelain_empty.stdout = ""
+
+        with patch("lib.worktree.subprocess.run", side_effect=[porcelain_empty, remove_fail, remove_fail, prune_ok]):
+            remove_worktree(project_dir, "feature/x", worktree_base)
+
+        assert not worktree_path.exists(), "residual worktree dir must be cleaned"
+
+    def test_keeps_residual_dirs_when_non_empty(self, tmp_path):
+        """Non-empty residual dirs (real files) survive and error is raised."""
+        from unittest.mock import patch, MagicMock
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        worktree_base = tmp_path / ".worktrees"
+        worktree_base.mkdir()
+        worktree_path = worktree_base / "feature-x"
+        worktree_path.mkdir()
+        residual_file = worktree_path / "important.txt"
+        residual_file.write_text("keep me")
+
+        remove_fail = MagicMock()
+        remove_fail.returncode = 1
+        remove_fail.stderr = "fatal: cannot remove worktree\n"
+        porcelain_empty = MagicMock()
+        porcelain_empty.returncode = 0
+        porcelain_empty.stdout = ""
+
+        with patch("lib.worktree.subprocess.run", side_effect=[porcelain_empty, remove_fail, remove_fail]):
+            with pytest.raises(RuntimeError):
+                remove_worktree(project_dir, "feature/x", worktree_base)
+
+        assert residual_file.exists(), "non-empty residual files must not be deleted"

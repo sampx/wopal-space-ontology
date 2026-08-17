@@ -189,9 +189,12 @@ def _switch_ontology(
     merge_target = get_current_branch(str(wopal_dir))
     wt_path = str(_resolve_wt_path(wt_ctx.path, workspace_root))
 
-    # Get repo_root from ontology main repo for guidance message
-    main_repo = get_ontology_main_repo(workspace_root)
-    repo_root = str(main_repo) if main_repo else str(wopal_dir)
+    # Merge happens in the .wopal/ worktree, NEVER in the ontology main repo.
+    # The main repo hosts base capabilities (agents/skills/commands/rules/
+    # plugins) that other spaces' agents depend on via symlinks; it must stay
+    # on main. The worktree shares the same branch refs, so merging here
+    # updates space/<name> and restores the runtime path for archive cleanup.
+    repo_root = str(wopal_dir)
 
     # 1. Check dirty on .wopal/
     dirty_files = _check_dirty(str(wopal_dir))

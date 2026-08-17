@@ -37,6 +37,7 @@ from plan import (
 )
 from lib.logging import log_info, log_warn, log_success, log_error
 from lib.workspace import find_workspace_root, detect_space_repo
+from lib.github import list_issues, STATUS_LABEL_MAP
 
 
 # ============================================
@@ -238,19 +239,14 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         log_error(str(e))
         return 1
     
-    # Determine type
+    # Determine type (explicit --type takes precedence; fall back to title prefix)
     inferred_type = infer_issue_type_from_title(title)
-    
+
     if args.type:
         try:
             plan_type = normalize_plan_type(args.type)
         except ValidationError as e:
             log_error(f"Invalid --type: {args.type}")
-            return 1
-        
-        # Check type mismatch
-        if inferred_type and plan_type != inferred_type:
-            log_error(f"Type mismatch: title implies '{inferred_type}' but --type is '{plan_type}'")
             return 1
     else:
         if not inferred_type:
@@ -508,6 +504,73 @@ def cmd_issue_write(args: argparse.Namespace) -> int:
 
 
 # ============================================
+# issue list command
+# ============================================
+
+def cmd_issue_list(args: argparse.Namespace) -> int:
+    """List open Issues from the space repo with repo URL.
+
+    Auto-detects the space repository (no manual --repo needed).
+    Supports --project and --status filtering.
+    """
+    workspace_root = find_workspace_root()
+    try:
+        repo = detect_space_repo(workspace_root)
+    except RuntimeError as e:
+        log_error(f"Failed to detect space repo: {e}")
+        return 1
+
+    projects = list(getattr(args, 'project', None) or [])
+    statuses = list(getattr(args, 'status', None) or [])
+    limit = getattr(args, 'limit', 50)
+
+    # Validate project names (same rule as issue create)
+    for p in projects:
+        if not re.match(r'^[a-z0-9-]+$', p):
+            log_error(f"Invalid project name: {p}")
+            log_error("Project name must be lowercase alphanumeric with hyphens")
+            return 1
+
+    # Validate status aliases (single authority in lib.github.STATUS_LABEL_MAP)
+    valid_statuses = set(STATUS_LABEL_MAP.keys())
+    for s in statuses:
+        if s.lower() not in valid_statuses:
+            log_error(
+                f"Invalid status: {s}. Allowed: {', '.join(sorted(valid_statuses))}"
+            )
+            return 1
+
+    issues = list_issues(
+        repo=repo,
+        state="open",
+        projects=projects,
+        statuses=statuses,
+        limit=limit,
+    )
+    if issues is None:
+        log_error(f"Failed to list issues in {repo}")
+        return 1
+
+    if not issues:
+        print(f"No open issues in {repo}.")
+        return 0
+
+    for issue in issues:
+        number = issue.get("number", "?")
+        title = issue.get("title", "")
+        label_names = [l.get("name", "") for l in issue.get("labels", []) if l.get("name")]
+        label_str = " ".join(f"[{l}]" for l in label_names)
+        print(f"#{number}  {title}  {label_str}".rstrip())
+
+    # Show the repo the issues belong to
+    if "/" in repo:
+        owner, name = repo.split("/", 1)
+        print(f"\nIssues in: https://github.com/{owner}/{name}")
+
+    return 0
+
+
+# ============================================
 # argparse registration
 # ============================================
 
@@ -549,6 +612,14 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     update_parser.add_argument("--reference", help="Update reference in Related Resources")
     update_parser.add_argument("--acceptance-criteria", help="Update acceptance criteria section")
     
+    # issue list
+    list_parser = issue_subparsers.add_parser("list", help="List open issues in space repo")
+    list_parser.add_argument("--limit", type=int, default=50, help="Max issues to list (default 50)")
+    list_parser.add_argument("--project", action="append", dest="project",
+                             help="Filter by project name (repeatable, OR-combined)")
+    list_parser.add_argument("--status", action="append", dest="status",
+                             help="Filter by status (planning/executing/in-progress/verifying/done, repeatable, OR-combined)")
+
     # issue write
     write_parser = issue_subparsers.add_parser("write", help="Write to issue body")
     write_parser.add_argument("issue_number", nargs="?", help="Issue number")
@@ -562,6 +633,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
         return cmd_issue_create(args)
     elif args.issue_cmd == "update":
         return cmd_issue_update(args)
+    elif args.issue_cmd == "list":
+        return cmd_issue_list(args)
     elif args.issue_cmd == "write":
         return cmd_issue_write(args)
     else:

@@ -163,7 +163,9 @@ def _detect_worktree(
 
     Priority:
     1. Plan Worktree field (set by approve --confirm --worktree)
-    2. Fallback: glob match .worktrees/<project>-issue-<N>-*
+    2. Fallback: derive from full Plan name (branch = <project>-<plan-name>,
+       worktree dir = branch). Does not depend on Issue number, so no-Issue
+       plans are also located.
 
     Plan metadata is returned even when the worktree directory has been
     cleaned up (e.g. by verify-switch). The branch recorded there still
@@ -184,25 +186,15 @@ def _detect_worktree(
     if wt:
         return wt
 
-    # Fallback: glob match (only when Plan metadata is absent)
-    plan_issue = get_plan_issue(plan_path)
-    if not plan_issue:
+    # Fallback: derive from full Plan name (no Issue number dependency)
+    plan_name = Path(plan_path).stem
+    branch = f"{project}-{plan_name}"
+    wt_path = workspace_root / ".worktrees" / branch
+
+    if not wt_path.exists():
         return None
 
-    pattern = str(workspace_root / ".worktrees" / f"{project}-issue-{plan_issue}-*")
-    matches = glob_mod.glob(pattern)
-
-    if not matches:
-        return None
-
-    wt_path = matches[0]
-    # Extract branch from directory name: <project>-issue-<N>-<slug> → issue-<N>-<slug>
-    dir_name = Path(wt_path).name
-    # Remove project prefix: "ontology-issue-115-slug" → "issue-115-slug"
-    parts = dir_name.split('-', 1)
-    branch = parts[1] if len(parts) > 1 else dir_name
-
-    return {'branch': branch, 'path': wt_path}
+    return {'branch': branch, 'path': str(wt_path)}
 
 
 def _is_pr_path(plan_path: str, issue_number: int, repo: str) -> bool:
@@ -533,12 +525,15 @@ def cmd_archive(args: argparse.Namespace) -> int:
     # 3. Detect worktree and handle cleanup
     #    Archive never commits or pushes implementation code.
     worktree_handled = False
+    keep_worktree = getattr(args, "keep_worktree", False)
 
     # Read Project Type from Plan metadata
     project_type_str = get_plan_field(plan_path, "Project Type")
     is_ontology_worktree = project_type_str == "ontology-worktree"
 
-    if is_ontology_worktree:
+    if keep_worktree:
+        log_info("Evolution mode (--keep-worktree): skipping worktree and branch cleanup")
+    elif is_ontology_worktree:
         log_step("Ontology worktree project detected")
 
         project_path = resolve_project_path(plan_path, project, workspace_root)
@@ -581,13 +576,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
                 # Always cleanup — clean_worktree is safe when the
                 # worktree directory is gone; it still deletes the
-                # feature branch.
-                _cleanup_worktree(
+                # feature branch. Cleanup failure aborts archive so
+                # residual directories are not silently left behind.
+                if not _cleanup_worktree(
                     str(project_path),
                     branch,
                     str(wt_path_resolved),
                     workspace_root,
-                )
+                ):
+                    log_error(
+                        "Worktree cleanup failed — residual directories may remain "
+                        "under .worktrees/. Fix the cause and re-run archive."
+                    )
+                    return 1
                 worktree_handled = True
             else:
                 # No worktree — check dirty on project
@@ -610,7 +611,12 @@ def cmd_archive(args: argparse.Namespace) -> int:
                 if plan_issue and _is_pr_path(plan_path, plan_issue, repo):
                     # Has worktree + PR path → just cleanup worktree
                     log_info("PR path detected — skipping merge, cleaning up worktree")
-                    _cleanup_worktree(str(project_path), branch, wt_path, workspace_root)
+                    if not _cleanup_worktree(str(project_path), branch, wt_path, workspace_root):
+                        log_error(
+                            "Worktree cleanup failed — residual directories may remain "
+                            "under .worktrees/. Fix the cause and re-run archive."
+                        )
+                        return 1
                     worktree_handled = True
                 else:
                     # Has worktree + no PR
@@ -645,13 +651,19 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
                     # Always cleanup — clean_worktree is safe when the
                     # worktree directory is gone; it still deletes the
-                    # feature branch.
-                    _cleanup_worktree(
+                    # feature branch. Cleanup failure aborts archive so
+                    # residual directories are not silently left behind.
+                    if not _cleanup_worktree(
                         str(project_path),
                         branch,
                         str(wt_path_resolved),
                         workspace_root,
-                    )
+                    ):
+                        log_error(
+                            "Worktree cleanup failed — residual directories may remain "
+                            "under .worktrees/. Fix the cause and re-run archive."
+                        )
+                        return 1
                     worktree_handled = True
             else:
                 # No worktree — remind user to push project changes
@@ -768,4 +780,10 @@ def register_archive_parser(subparsers: argparse._SubParsersAction) -> None:
         "--force",
         action="store_true",
         help="Skip dirty working tree warnings"
+    )
+    archive_parser.add_argument(
+        "--keep-worktree",
+        action="store_true",
+        default=False,
+        help="Retain worktree directory and branch for evolution mode (skip cleanup)"
     )

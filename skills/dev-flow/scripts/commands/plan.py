@@ -338,14 +338,29 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
     project = args.project
     plan_type_arg = args.type
     scope_arg = args.scope
+    slug_arg = getattr(args, 'slug', None)
 
     # Validate: either Issue number OR title required (early exit before
     # touching git, so missing args fail fast without RuntimeError).
     if not issue_number and not title:
         log_error("Either Issue number or --title required")
-        print("Usage: flow.sh plan new <issue>")
+        print("Usage: flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>")
         print("   or: flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>]")
         return 1
+
+    # Issue mode: type/scope/slug are explicitly specified by Wopal.
+    # Validate them before touching git (fail fast).
+    if issue_number:
+        if not plan_type_arg:
+            log_error("--type required in Issue mode")
+            log_error("Available types: feature, enhance, fix, perf, refactor, docs, chore, test")
+            return 1
+        if not scope_arg:
+            log_error("--scope required in Issue mode")
+            return 1
+        if not slug_arg:
+            log_error("--slug required in Issue mode")
+            return 1
 
     workspace_root = find_workspace_root()
     repo = detect_space_repo(workspace_root)
@@ -412,32 +427,29 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             log_error("Please add a 'project/<name>' label to the Issue")
             return 1
 
-        # Extract type and scope from title
-        raw_type = extract_type(title)
-        scope = extract_scope(title)
-
-        if not scope:
-            log_error(f"Issue title missing scope: {title}")
-            log_error("Expected format: <type>(<scope>): <description>")
+        # Issue mode: type/scope/slug are explicitly specified by Wopal.
+        # They are NOT derived from the Issue title (which is free-form).
+        if not plan_type_arg:
+            log_error("--type required in Issue mode")
+            log_error("Available types: feature, enhance, fix, perf, refactor, docs, chore, test")
             return 1
-
-        if not raw_type:
-            log_error(f"Issue title missing type: {title}")
+        if not scope_arg:
+            log_error("--scope required in Issue mode")
+            return 1
+        if not slug_arg:
+            log_error("--slug required in Issue mode")
             return 1
 
         # Normalize type
         try:
-            plan_type = normalize_plan_type(raw_type)
+            plan_type = normalize_plan_type(plan_type_arg)
         except LabelsValidationError as e:
             log_error(str(e))
             return 1
 
-        # Generate plan name
-        slug = _title_to_slug(title)
-        slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
-
+        # Generate plan name from explicitly specified components
         try:
-            plan_name = make_plan_name(issue_number, plan_type, scope, slug)
+            plan_name = make_plan_name(issue_number, plan_type, scope_arg, slug_arg)
         except NamingValidationError as e:
             log_error(str(e))
             return 1
@@ -592,17 +604,6 @@ def get_plan_metadata(plan_file: str) -> dict:
     return metadata
 
 
-def _extract_slug(plan_name: str) -> str:
-    """Extract slug from plan name (last segment).
-
-    With Issue: 42-fix-task-wait-bug -> task-wait-bug
-    Without Issue: refactor-optimize-files -> optimize-files
-    """
-    name = re.sub(r'^[0-9]+-', '', plan_name)
-    name = re.sub(r'^(feature|enhance|fix|refactor|docs|chore|test)-', '', name)
-    return name
-
-
 def _get_status_display_list(state: str) -> str:
     """Return state machine position display string."""
     markers = {s: ('>> ' + s + ' <<') if s == state else s for s in PLAN_STATES}
@@ -672,46 +673,35 @@ def _cmd_plan_status(input_ref: str) -> int:
     print(f"  Status: {status}")
     print(f"  Created: {created}")
 
-    if plan_issue_num:
-        # Read Worktree metadata from Plan (written by approve --confirm)
+    # Read Worktree metadata from Plan (written by approve --confirm)
+    try:
+        from plan import get_plan_worktree
+        wt_meta = get_plan_worktree(plan_file)
+    except Exception:
+        wt_meta = None
+
+    if wt_meta and wt_meta.get('path'):
+        worktree_path = str(workspace_root / wt_meta['path'])
+    else:
+        # Fallback: worktree dir = branch = <project>-<plan-name>
+        # (same naming as approve.py; no ontology- prefix, no repeated project prefix)
+        branch = f"{project}-{plan_name}"
+        worktree_path = str(workspace_root / ".worktrees" / branch)
+
+    if worktree_path and Path(worktree_path).is_dir():
+        print("")
+        print(f"Worktree: {worktree_path}")
         try:
-            from plan import get_plan_worktree
-            wt_meta = get_plan_worktree(plan_file)
+            result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=worktree_path,
+                capture_output=True,
+                text=True,
+            )
+            wt_branch = result.stdout.strip() or "detached"
+            print(f"  Branch: {wt_branch}")
         except Exception:
-            wt_meta = None
-
-        if wt_meta and wt_meta.get('path'):
-            worktree_path = str(workspace_root / wt_meta['path'])
-        else:
-            # Legacy fallback: reconstruct from slug (same naming as approve.py)
-            slug = _extract_slug(plan_name)
-            branch = f"issue-{plan_issue_num}-{slug}"
-            worktree_path = ""
-            if project:
-                try:
-                    from plan import ProjectType, resolve_project_type
-                    project_type_str = resolve_project_type(project, workspace_root).value
-                    if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-                        worktree_path = str(workspace_root / ".worktrees" / f"ontology-{branch}")
-                    else:
-                        worktree_path = str(workspace_root / ".worktrees" / f"{project}-{branch}")
-                except Exception:
-                    worktree_path = str(workspace_root / ".worktrees" / f"{project}-{branch}")
-
-        if worktree_path and Path(worktree_path).is_dir():
-            print("")
-            print(f"Worktree: {worktree_path}")
-            try:
-                result = subprocess.run(
-                    ["git", "branch", "--show-current"],
-                    cwd=worktree_path,
-                    capture_output=True,
-                    text=True,
-                )
-                wt_branch = result.stdout.strip() or "detached"
-                print(f"  Branch: {wt_branch}")
-            except Exception:
-                print("  Branch: (unknown)")
+            print("  Branch: (unknown)")
 
     print("")
     print(f"State Machine: {_get_status_display_list(status)}")
@@ -1008,7 +998,11 @@ def register_plan_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     new_parser.add_argument(
         "--scope",
-        help="Scope identifier (no-issue mode; auto-extracted from title pattern if omitted)",
+        help="Scope identifier (required in Issue mode; no-issue mode auto-extracted from title pattern if omitted)",
+    )
+    new_parser.add_argument(
+        "--slug",
+        help="Slug identifier (required in Issue mode; no-issue mode derived from title)",
     )
 
     # ---- plan status ----

@@ -103,9 +103,9 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 
 **Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent 负责。
 
-**活动 Plan 路径**：子代理 prompt 必须使用活动 Plan 的本地路径。worktree 隔离的 Plan 活动副本位于 feature 分支的 worktree 内。
+**Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
 
-权威细节见 `skills/dev-flow/SKILL.md` 的「Plan 分支归属」、「Wopal 编排规则」和「委派用活动 Plan 路径」章节。
+权威细节见 `skills/dev-flow/SKILL.md` 的「Plan 分支归属」、「Wopal 编排规则」和「委派用 Plan 路径」章节。
 
 ### Plugin
 

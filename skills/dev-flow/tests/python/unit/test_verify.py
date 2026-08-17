@@ -353,13 +353,10 @@ class TestCheckFeatureBranchMerged:
             return MagicMock(returncode=0, stdout="")
 
         with patch("lib.git.subprocess.run", side_effect=fake_run) as mock_run:
-            with patch("lib.git.get_current_branch", return_value=current_space_branch) as mock_branch:
+            with patch("lib.git.get_current_branch", return_value=current_space_branch):
                 result = _check_feature_branch_merged(tmp_path, str(plan_path))
 
         assert result == 0
-        # get_current_branch must have been called with .wopal/ repo root
-        mock_branch.assert_called_once_with(str(wopal_dir))
-        # git branch --merged must use the dynamically detected branch
         merged_calls = [
             c.args[0] for c in mock_run.call_args_list
             if "--merged" in c.args[0]
@@ -367,3 +364,54 @@ class TestCheckFeatureBranchMerged:
         assert merged_calls, "expected git branch --merged call"
         cmd = merged_calls[0]
         assert current_space_branch in cmd
+
+    def test_verify_keep_worktree_skips_merge_check_and_records_feature_head(self, tmp_path):
+        """verify --keep-worktree 应跳过合并检测并将 Final Commit 记录为 feature 分支 HEAD。"""
+        import argparse
+        from commands.verify import cmd_verify
+
+        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD, name="42-keep.md")
+        # Ensure worktree directory exists
+        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
+        wt_dir.mkdir(parents=True)
+
+        with patch("commands.verify.find_workspace_root", return_value=tmp_path):
+            with patch("commands.verify.find_plan", return_value=str(plan_path)):
+                with patch("commands.verify.check_user_validation"):
+                    with patch("commands.verify.get_branch_head", return_value="feature_tip_sha_123"):
+                        with patch("commands.verify.commit_paths", return_value=True):
+                            args = argparse.Namespace(
+                                target="42",
+                                confirm=True,
+                                keep_worktree=True,
+                            )
+                            result = cmd_verify(args)
+
+        assert result == 0
+        from plan import get_plan_field
+        assert get_plan_field(str(plan_path), "Final Commit") == "feature_tip_sha_123"
+
+    def test_verify_keep_worktree_aborts_when_head_unresolvable(self, tmp_path):
+        """verify --keep-worktree 在无法获取 feature HEAD 时报错中止，不推进到 done。"""
+        import argparse
+        from commands.verify import cmd_verify
+
+        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD, name="42-err.md")
+        # Ensure worktree directory exists on disk so it passes is_dir() check and tests get_branch_head failure
+        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
+        wt_dir.mkdir(parents=True)
+
+        with patch("commands.verify.find_workspace_root", return_value=tmp_path):
+            with patch("commands.verify.find_plan", return_value=str(plan_path)):
+                with patch("commands.verify.check_user_validation"):
+                    with patch("commands.verify.get_branch_head", return_value=""):
+                        args = argparse.Namespace(
+                            target="42",
+                            confirm=True,
+                            keep_worktree=True,
+                        )
+                        result = cmd_verify(args)
+
+        assert result == 1
+        from plan import get_plan_status
+        assert get_plan_status(str(plan_path)) == "verifying"

@@ -11,11 +11,12 @@ permission:
     "*": deny
     df-plan-review: allow
     df-implement-review: allow
-  doom_loop: deny
+  doom_loop: allow
   read:
     "*": allow
     "*.env": deny
     "*.env.example": allow
+  bash: allow
   question: deny
   plan_enter: allow
 ---

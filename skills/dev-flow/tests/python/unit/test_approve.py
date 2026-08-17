@@ -170,6 +170,42 @@ class TestApproveRecordsBaseCommit(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+class TestApproveBranchDerivation(unittest.TestCase):
+    """Test branch derivation from Plan name: <project>-<plan-name>."""
+
+    def test_branch_derives_from_plan_name(self):
+        """Branch = <project>-<plan-name> for issue plans."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("ellamaka", "42-feature-cli-add-skills-remove-command"),
+            "ellamaka-42-feature-cli-add-skills-remove-command",
+        )
+
+    def test_branch_derives_for_no_issue_plan(self):
+        """Branch = <project>-<plan-name> for no-issue plans."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-site", "refactor-cli-optimize-commands"),
+            "wopal-site-refactor-cli-optimize-commands",
+        )
+
+    def test_branch_derives_for_hyphenated_scope(self):
+        """Branch handles hyphenated scope (no split ambiguity)."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-space-ontology", "42-feature-dev-flow-decouple-naming"),
+            "wopal-space-ontology-42-feature-dev-flow-decouple-naming",
+        )
+
+    def test_branch_derives_for_ontology_worktree(self):
+        """Branch = <project>-<plan-name> for ontology-worktree projects."""
+        from commands.approve import _derive_branch
+        self.assertEqual(
+            _derive_branch("wopal-space-ontology", "42-refactor-dev-flow-unify-naming"),
+            "wopal-space-ontology-42-refactor-dev-flow-unify-naming",
+        )
+
+
 class TestRegisterApproveParser(unittest.TestCase):
     """Test approve parser registration."""
 
@@ -193,6 +229,108 @@ class TestRegisterApproveParser(unittest.TestCase):
         args = parser.parse_args(["approve", "42"])
         self.assertEqual(args.command, "approve")
         self.assertFalse(args.confirm)
+
+    def test_approve_parser_has_existing_worktree(self):
+        import argparse
+        from commands.approve import register_approve_parser
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        register_approve_parser(subparsers)
+        args = parser.parse_args(["approve", "42", "--confirm", "--existing-worktree", ".worktrees/my-wt"])
+        self.assertEqual(args.command, "approve")
+        self.assertEqual(args.target, "42")
+        self.assertTrue(args.confirm)
+        self.assertEqual(args.existing_worktree, ".worktrees/my-wt")
+
+
+class TestApproveExistingWorktree(unittest.TestCase):
+    """Test approve with --existing-worktree option (evolution mode)."""
+
+    def test_existing_worktree_binds_branch_and_records_worktree_head_as_base_commit(self):
+        """--existing-worktree 应绑定已有 worktree 分支，并将 Base Commit 记录为该分支 HEAD。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_plan_field"] = MagicMock(return_value="standard")
+        mocks["get_branch_head"] = MagicMock(return_value="wt_head_sha_999")
+        mocks["get_current_branch"] = MagicMock(return_value="feature/existing-branch")
+        mocks["get_common_git_dir"] = MagicMock(return_value="/ws/.git")
+        mocks["_has_unmerged_files"] = MagicMock(return_value=False)
+
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True), \
+                 patch("commands.approve.Path.resolve", side_effect=lambda p: p):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/ellamaka-feature-existing",
+                )
+                result = cmd_approve(args)
+
+        self.assertEqual(result, 0)
+        mocks["write_worktree_context"].assert_called_once_with(
+            "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
+            "feature/existing-branch",
+            ".worktrees/ellamaka-feature-existing",
+        )
+        mocks["set_plan_field"].assert_any_call(
+            "/ws/.wopal-space/plans/space-ontology/42-fix-test.md",
+            "Base Commit",
+            "wt_head_sha_999",
+        )
+
+    def test_existing_worktree_rejects_unrelated_repo(self):
+        """--existing-worktree 传入不属于本项目的其他 Git 仓库时报错拒绝。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_current_branch"] = MagicMock(return_value="feature/other-branch")
+        mocks["get_common_git_dir"] = MagicMock(side_effect=lambda p: "/ws/target-project/.git" if "target-project" in str(p) or str(p) == str(mocks["resolve_project_path"].return_value) else "/ws/unrelated-repo/.git")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/unrelated-repo-b",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
+
+    def test_existing_worktree_rejects_non_directory_file(self):
+        """--existing-worktree 传入文件时报错退出。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=False):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/some-file.txt",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
+
+    def test_existing_worktree_rejects_integration_branch(self):
+        """--existing-worktree 绑定的 worktree 在 main 分支时报错拒绝。"""
+        from commands.approve import cmd_approve
+        mocks = _make_approve_mocks(status="reviewing")
+        mocks["get_common_git_dir"] = MagicMock(return_value="/ws/.git")
+        mocks["get_current_branch"] = MagicMock(return_value="main")
+        with patch.multiple("commands.approve", **mocks):
+            with patch("commands.approve.Path.exists", return_value=True), \
+                 patch("commands.approve.Path.is_dir", return_value=True):
+                args = Namespace(
+                    target="42",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=".worktrees/primary-main",
+                )
+                result = cmd_approve(args)
+        self.assertEqual(result, 1)
 
 
 if __name__ == "__main__":

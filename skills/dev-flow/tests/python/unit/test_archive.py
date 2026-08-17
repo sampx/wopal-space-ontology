@@ -268,6 +268,52 @@ class TestDetectWorktree(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @patch("commands.archive.get_plan_worktree")
+    def test_fallback_derives_from_full_plan_name(self, mock_gpw):
+        """Fallback derives worktree from full Plan name, not Issue number.
+
+        Branch = <project>-<plan-name>; worktree dir = branch. No Issue
+        number is required, so no-Issue plans can also be located.
+        """
+        mock_gpw.return_value = None
+        # Plan name: 42-feature-cli-add-skills-remove-command
+        plan_name = "42-feature-cli-add-skills-remove-command"
+        self.plan_path = self.plans_dir / f"{plan_name}.md"
+        self.plan_path.write_text(
+            f"# {plan_name}\n\n## Metadata\n\n- **Type**: feature\n"
+            f"- **Target Project**: wopal-cli\n- **Status**: done\n"
+        )
+
+        # Create the worktree dir: .worktrees/wopal-cli-42-feature-cli-add-skills-remove-command
+        wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-42-feature-cli-add-skills-remove-command"
+        wt_dir.mkdir(parents=True)
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["branch"], "wopal-cli-42-feature-cli-add-skills-remove-command")
+        self.assertEqual(result["path"], str(wt_dir))
+
+    @patch("commands.archive.get_plan_worktree")
+    def test_fallback_derives_for_no_issue_plan(self, mock_gpw):
+        """No-Issue plan fallback derives worktree from full Plan name."""
+        mock_gpw.return_value = None
+        plan_name = "refactor-cli-optimize-commands"
+        self.plan_path = self.plans_dir / f"{plan_name}.md"
+        self.plan_path.write_text(
+            f"# {plan_name}\n\n## Metadata\n\n- **Type**: refactor\n"
+            f"- **Target Project**: wopal-cli\n- **Status**: done\n"
+        )
+
+        wt_dir = self.tmpdir / ".worktrees" / "wopal-cli-refactor-cli-optimize-commands"
+        wt_dir.mkdir(parents=True)
+
+        result = _detect_worktree(str(self.plan_path), "wopal-cli", self.ws_root)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["branch"], "wopal-cli-refactor-cli-optimize-commands")
+        self.assertEqual(result["path"], str(wt_dir))
+
 
 class TestArchiveMergeDetection(unittest.TestCase):
     """Tests for archive merge detection (Task 2, Issue #171).
@@ -401,6 +447,75 @@ class TestArchiveMergeDetection(unittest.TestCase):
         self.assertEqual(result, 0)
         mock_check_merged.assert_called_once_with(self.ws_root, str(self.plan_path))
         mock_cleanup.assert_called_once()
+
+    @patch("commands.archive.close_issue")
+    @patch("commands.archive.update_issue_plan_link")
+    @patch("commands.archive.commit_archived_plan")
+    @patch("commands.archive._update_phase_doc_plan_status")
+    @patch("commands.archive._cleanup_worktree")
+    @patch("commands.archive.check_branch_merged")
+    @patch("commands.archive.has_uncommitted_changes")
+    @patch("commands.archive._is_pr_path")
+    @patch("commands.archive._detect_worktree")
+    @patch("commands.archive.resolve_project_path")
+    @patch("commands.archive.get_plan_field")
+    @patch("commands.archive.ensure_issue_labels")
+    @patch("commands.archive.sync_status_label")
+    @patch("commands.archive.sync_plan_to_issue_body")
+    @patch("commands.archive.resolve_space_repo")
+    @patch("commands.archive.get_plan_issue")
+    @patch("commands.archive.get_plan_type")
+    @patch("commands.archive.get_plan_project")
+    @patch("commands.archive.guard_status")
+    @patch("commands.archive.parse_plan_status")
+    @patch("commands.archive.find_plan")
+    @patch("commands.archive.find_workspace_root")
+    def test_archive_keep_worktree_skips_cleanup(
+        self,
+        mock_find_ws,
+        mock_find_plan,
+        mock_parse_status,
+        mock_guard,
+        mock_get_project,
+        mock_get_type,
+        mock_get_issue,
+        mock_resolve_repo,
+        mock_sync_body,
+        mock_sync_label,
+        mock_ensure_labels,
+        mock_get_field,
+        mock_resolve_path,
+        mock_detect_wt,
+        mock_is_pr,
+        mock_has_uncommitted,
+        mock_check_merged,
+        mock_cleanup,
+        mock_update_phase,
+        mock_commit,
+        mock_update_link,
+        mock_close,
+    ):
+        """--keep-worktree 应跳过 _cleanup_worktree 并跳过 merge 检测，保留工作树与分支。"""
+        self._setup_common_mocks(
+            mock_find_ws, mock_find_plan, mock_parse_status, mock_guard,
+            mock_get_project, mock_get_type, mock_get_issue, mock_resolve_repo,
+            mock_get_field, mock_resolve_path, mock_update_phase,
+            mock_commit, mock_close,
+        )
+        mock_detect_wt.return_value = {
+            "branch": "feature/test-1",
+            "path": ".worktrees/test-project-issue-42",
+        }
+        mock_is_pr.return_value = False
+        mock_has_uncommitted.return_value = False
+        mock_check_merged.return_value = 1  # 即使未合并
+
+        args = argparse.Namespace(target="42", force=False, keep_worktree=True)
+        result = cmd_archive(args)
+
+        self.assertEqual(result, 0)
+        # 验证 Plan 归档成功，状态已归档
+        self.assertTrue(Path(self.ws_root / "plans" / "done").exists())
 
     @patch("commands.archive.close_issue")
     @patch("commands.archive.update_issue_plan_link")
@@ -603,6 +718,79 @@ class TestArchiveMergeDetection(unittest.TestCase):
 
         self.assertEqual(result, 0)
         mock_check_merged.assert_not_called()
+        mock_cleanup.assert_called_once()
+
+    @patch("commands.archive.close_issue")
+    @patch("commands.archive.update_issue_plan_link")
+    @patch("commands.archive.commit_archived_plan")
+    @patch("commands.archive._update_phase_doc_plan_status")
+    @patch("commands.archive._cleanup_worktree")
+    @patch("commands.archive.check_branch_merged")
+    @patch("commands.archive.has_uncommitted_changes")
+    @patch("commands.archive._is_pr_path")
+    @patch("commands.archive._detect_worktree")
+    @patch("commands.archive.resolve_project_path")
+    @patch("commands.archive.get_plan_field")
+    @patch("commands.archive.ensure_issue_labels")
+    @patch("commands.archive.sync_status_label")
+    @patch("commands.archive.sync_plan_to_issue_body")
+    @patch("commands.archive.resolve_space_repo")
+    @patch("commands.archive.get_plan_issue")
+    @patch("commands.archive.get_plan_type")
+    @patch("commands.archive.get_plan_project")
+    @patch("commands.archive.guard_status")
+    @patch("commands.archive.parse_plan_status")
+    @patch("commands.archive.find_plan")
+    @patch("commands.archive.find_workspace_root")
+    def test_cleanup_failure_aborts_archive(
+        self,
+        mock_find_ws,
+        mock_find_plan,
+        mock_parse_status,
+        mock_guard,
+        mock_get_project,
+        mock_get_type,
+        mock_get_issue,
+        mock_resolve_repo,
+        mock_sync_body,
+        mock_sync_label,
+        mock_ensure_labels,
+        mock_get_field,
+        mock_resolve_path,
+        mock_detect_wt,
+        mock_is_pr,
+        mock_has_uncommitted,
+        mock_check_merged,
+        mock_cleanup,
+        mock_update_phase,
+        mock_commit,
+        mock_update_link,
+        mock_close,
+    ):
+        """Worktree cleanup failure must abort archive with non-zero exit.
+
+        Regression: residual directories were silently left behind under
+        .worktrees/ because cleanup failure only logged a warning and
+        archive completed with exit code 0.
+        """
+        self._setup_common_mocks(
+            mock_find_ws, mock_find_plan, mock_parse_status, mock_guard,
+            mock_get_project, mock_get_type, mock_get_issue, mock_resolve_repo,
+            mock_get_field, mock_resolve_path, mock_update_phase,
+            mock_commit, mock_close,
+        )
+        mock_detect_wt.return_value = {
+            "branch": "feature/test-1",
+            "path": ".worktrees/test-project-issue-42",
+        }
+        mock_is_pr.return_value = False
+        mock_has_uncommitted.return_value = False
+        mock_check_merged.return_value = 0
+        mock_cleanup.return_value = False  # cleanup failed
+
+        result = cmd_archive(self._make_args())
+
+        self.assertEqual(result, 1)
         mock_cleanup.assert_called_once()
 
 

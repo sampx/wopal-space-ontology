@@ -28,6 +28,7 @@
 | 命令 | 说明 |
 |------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue（`--body-file` 为主路径） |
+| `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue（含 repo URL，可按 project/status 过滤） |
 | `issue write <issue> --body-file <path>` | 全量替换 Issue body |
 | `issue write <issue> --append <path>` | 追加到 Issue body 末尾 |
 | `issue update <issue>` | ⚠️ **已废弃**，使用 `issue write` 替代 |
@@ -58,10 +59,10 @@
 ### issue create 参数速记
 
 ```bash
-# 最小创建（--body-file 为主路径）
-flow.sh issue create --title "feat(scope): desc" --project <name> --body-file body.md
+# 最小创建（--body-file 为主路径）；标题自由文本，type 由 --type 显式指定
+flow.sh issue create --title "add skills remove command" --project <name> --type feat --body-file body.md
 
-# --type 可选覆盖（默认从标题推断）
+# --type 可选覆盖（默认从标题宽松前缀推断）
 --type feat
 ```
 
@@ -81,6 +82,28 @@ flow.sh issue write <issue> --append <path>       # 追加到 body 末尾
 - `--append`：在现有 body 末尾追加文件内容，用 `\n\n` 分隔
 - 空文件或文件不存在时报错退出（exit 1）
 - 文件不以 `#` 或 `-` 开头时输出 warning
+
+### issue list
+
+列出空间仓库中所有未完成（open）Issue，并显示所在仓库 URL。
+
+```bash
+flow.sh issue list                          # 列出未完成 Issue（默认 50 条）
+flow.sh issue list --limit 100              # 指定数量
+flow.sh issue list --project firecrawl      # 按 project 过滤（可多次，OR）
+flow.sh issue list --status planning        # 按 status 过滤（可多次，OR）
+flow.sh issue list --project firecrawl --project wopal-cli --status planning --status verifying
+```
+
+**行为**：
+- 通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`
+- `--project`：按项目过滤，多次指定取 OR
+- `--status`：按状态过滤（`planning`/`executing`/`in-progress`/`verifying`/`done`，`executing` 与 `in-progress` 等价），多次指定取 OR；project 与 status 之间为 AND
+- 每行显示 `#<number>  <title>  [<label>...]`
+- 末尾显示 `Issues in: https://github.com/<owner>/<repo>`
+- 仓库检测失败或 `gh` 调用失败时报错退出（exit 1）
+
+Agent 查询未完成 Issue 一律使用本命令，避免手动 `gh issue list` 查错仓库。
 
 ### issue update（已废弃）
 
@@ -102,7 +125,7 @@ flow.sh plan status <plan-id>           # 查看 Plan 完整状态
 flow.sh plan list                       # 列出本地活跃 Plan
 flow.sh plan list --issue               # 列出活跃 Plan + GitHub Issues
 
-# 校验
+# 校验（可选诊断；submit/approve 已自动校验）
 flow.sh plan check <plan-name-or-path>  # 校验 Plan 质量（Issue 号 / Plan 名 / 文件路径均可）
 ```
 
@@ -119,21 +142,39 @@ flow.sh sync <issue> --labels-only  # 仅 labels
 ### submit
 
 ```bash
-flow.sh submit <plan>       # planning → reviewing，提交人工审阅
+flow.sh submit <plan>       # planning → reviewing，提交人工审阅（自动运行 plan check 校验）
 ```
 
-提交 Plan 状态变更，commit/push 到集成分支。输出 "Next: flow.sh approve <plan> --confirm" 提示。
+提交 Plan 状态变更，commit/push 到集成分支。校验不合格会被拒绝。输出 "Next: flow.sh approve <plan> --confirm" 提示。
 
 ### approve --confirm
 
 ```bash
-flow.sh approve <plan> --confirm              # 默认创建 worktree（接受 reviewing 或 planning）
-flow.sh approve <plan> --confirm --no-worktree # 跳过 worktree
+flow.sh approve <plan> --confirm                            # 默认创建 worktree
+flow.sh approve <plan> --confirm --no-worktree               # 跳过 worktree（main 直实施）
+flow.sh approve <plan> --confirm --existing-worktree <path> # 独立分支演进模式（复用已有 worktree）
 ```
 
 `approve` 不带 `--confirm` 时报错退出，提示使用 `submit`。`--confirm` 接受 `reviewing` 或 `planning`（快捷路径）→ `executing`。
 
-approve 还会记录 **Base Commit**（集成分支 HEAD）到 Plan metadata——实施基线，fae 从该 commit 开始实施，squash 合并时与 Final Commit 对照确定影响范围。
+**模式选择**：
+1. **默认模式**：创建独立 feature 分支与工作树（`.worktrees/<project>-<plan-name>`），记录集成分支 HEAD 为 Base Commit。
+2. **`--no-worktree`**：直接在集成分支（main）实施，不建分支不建工作树。
+3. **`--existing-worktree <path>`**：**独立分支演进模式**。复用已有工作树路径 `<path>`，自动绑定其检出的 feature 分支写入 Plan 元数据，并将 Base Commit 记录为该分支当前最新 HEAD（上一个 Plan 的实施产物终点）。
+
+### verify --confirm [--keep-worktree]
+
+```bash
+flow.sh verify <plan> --confirm                # 标准模式（要求已合并到集成分支）
+flow.sh verify <plan> --confirm --keep-worktree # 演进模式（跳过 merge 检查，记录 feature HEAD）
+```
+
+### archive [--keep-worktree]
+
+```bash
+flow.sh archive <plan>                # 标准模式（清理 worktree 与分支）
+flow.sh archive <plan> --keep-worktree # 演进模式（保留 worktree 与分支）
+```
 
 ### complete --pr
 

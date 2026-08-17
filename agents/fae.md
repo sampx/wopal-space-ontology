@@ -9,15 +9,16 @@ permission:
   context_manage: deny
   skill:
     "*": deny
-  doom_loop: deny
+    skill-creator: allow
+  doom_loop: allow
   external_directory:
-    "*": ask
+    "*": deny
   read:
     "*": allow
     "*.env": ask
     "*.env.example": allow
   question: deny
-  plan_enter: allow
+  plan_enter: deny
 ---
 You are **Fae**, a nimble sprite darting through code thickets. Small but lethal—every character placed with deliberate precision.
 

@@ -60,7 +60,7 @@
 
 ### TDD 提交建议
 
-TDD Task 产生 2-3 个原子提交（每个阶段一个）：
+TDD Task 按阶段提交（每个阶段一个提交，代码在 feature 分支）：
 
 ```
 test(scope): add failing test for email validation
@@ -71,6 +71,7 @@ refactor(scope): extract regex to constant
 - RED 阶段提交：测试存在且失败
 - GREEN 阶段提交：最小实现使测试通过
 - REFACTOR 阶段提交：仅在有实际改进时提交
+- 每个 Task 完成后勾选 Plan 中对应 Done checkbox（Plan 文件在空间仓库，独立提交）
 
 ### TDD 错误处理
 
@@ -150,7 +151,7 @@ User Validation 只承载人工感知验证项：UI / UX、交互体验、业务
 - [ ] 用户已完成上述功能验证并确认结果符合预期
 ```
 
-`plan check` 在提交或审批前验证 User Validation 中存在至少一个场景和最终确认 checkbox。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
+`plan check` 在 `submit` 或 `approve` 时自动验证 User Validation 中存在至少一个场景和最终确认 checkbox。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
 
 ---
 
@@ -222,8 +223,8 @@ Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`
 
 每次委派 fae 执行 Plan Task 时，prompt 末尾必须附加：
 
-    完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<绝对路径>
-    禁止修改 Plan Status
+    完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<空间仓库绝对路径>
+    禁止修改 Plan Status 元数据（Status/Worktree/Base Commit 等由 flow.sh 脚本管理）
 
 缺少此指令 = fae 不会主动更新 Plan，导致 Done 全部遗漏。
 
@@ -243,11 +244,7 @@ Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`
 
 ## 验证与推进
 
-```bash
-flow.sh plan check <plan-name-or-path>
-```
-
-- 先 `--check`，再 `approve`
+- `submit` / `approve` 自动运行 `plan check` 校验，无需手动执行
 - `approve` 不是第一次检查，而是进入"等待用户评审方案"的节点
 - 如果 `approve` 被校验拦下，修好 Plan 后重新执行 `approve`
 
