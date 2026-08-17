@@ -125,7 +125,7 @@ flow.sh plan status <plan-id>           # 查看 Plan 完整状态
 flow.sh plan list                       # 列出本地活跃 Plan
 flow.sh plan list --issue               # 列出活跃 Plan + GitHub Issues
 
-# 校验
+# 校验（可选诊断；submit/approve 已自动校验）
 flow.sh plan check <plan-name-or-path>  # 校验 Plan 质量（Issue 号 / Plan 名 / 文件路径均可）
 ```
 
@@ -142,10 +142,10 @@ flow.sh sync <issue> --labels-only  # 仅 labels
 ### submit
 
 ```bash
-flow.sh submit <plan>       # planning → reviewing，提交人工审阅
+flow.sh submit <plan>       # planning → reviewing，提交人工审阅（自动运行 plan check 校验）
 ```
 
-提交 Plan 状态变更，commit/push 到集成分支。输出 "Next: flow.sh approve <plan> --confirm" 提示。
+提交 Plan 状态变更，commit/push 到集成分支。校验不合格会被拒绝。输出 "Next: flow.sh approve <plan> --confirm" 提示。
 
 ### approve --confirm
 

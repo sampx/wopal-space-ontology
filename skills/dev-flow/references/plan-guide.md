@@ -151,7 +151,7 @@ User Validation 只承载人工感知验证项：UI / UX、交互体验、业务
 - [ ] 用户已完成上述功能验证并确认结果符合预期
 ```
 
-`plan check` 在提交或审批前验证 User Validation 中存在至少一个场景和最终确认 checkbox。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
+`plan check` 在 `submit` 或 `approve` 时自动验证 User Validation 中存在至少一个场景和最终确认 checkbox。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
 
 ---
 
@@ -244,11 +244,7 @@ Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`
 
 ## 验证与推进
 
-```bash
-flow.sh plan check <plan-name-or-path>
-```
-
-- 先 `--check`，再 `approve`
+- `submit` / `approve` 自动运行 `plan check` 校验，无需手动执行
 - `approve` 不是第一次检查，而是进入"等待用户评审方案"的节点
 - 如果 `approve` 被校验拦下，修好 Plan 后重新执行 `approve`
 
