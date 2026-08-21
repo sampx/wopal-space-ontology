@@ -2,7 +2,17 @@
   "ellamaka": {
     "default_agent": "wopal",
     "autoupdate": true,
-    "plugin": [],
+    "plugin": [
+      [
+        "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
+        {
+          "tools": [
+            { "source": "grep", "target": "grep", "enable": true },
+            { "source": "glob", "target": "glob", "enable": true }
+          ]
+        }
+      ]
+    ],
     "permission": {
       "external_directory": {
         "*": "ask",
