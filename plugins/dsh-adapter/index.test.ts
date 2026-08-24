@@ -1,12 +1,13 @@
 /**
- * dsh-tool-adapter — experiment 2 tests (research §17, guesses S1–S6).
+ * dsh-tool-adapter — experiment 2 tests.
  *
- * Verifies the adapter plugin's pure projection logic:
+ * Verifies the adapter's projection logic:
  *  - `enable:false` suppresses a mapping (no tool registered for that slot)
  *  - `source->target` name mapping (rename) is honored
- *  - same-name mapping shadows the container tool under the target slot
  *  - absent container (no dsh engine) degrades to registering zero tools
  *  - an `enable:true` mapping for a container tool that does not exist is skipped
+ *  - execute passes a per-call agent with header.id/header.cwd only (no
+ *    container session is created)
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 
@@ -25,9 +26,19 @@ type AdapterOptions = {
   tools?: { source: string; target: string; enable: boolean }[]
 }
 
-const GS = globalThis as Record<string, unknown>
+type ToolCtx = {
+  sessionID: string
+  directory: string
+  callID?: string
+}
 
-function fakeContainer(overrides?: Partial<Container>): Container {
+type Projected = {
+  execute: (args: unknown, ctx: ToolCtx) => Promise<{ output: string; metadata: Record<string, unknown> }>
+}
+
+function fakeContainer(
+  overrides?: Partial<Container["get"] extends never ? never : ReturnType<Container["get"]>>,
+): Container {
   return {
     get(name) {
       if (name !== "tools") return undefined
@@ -106,11 +117,27 @@ describe("dsh-adapter projection", () => {
   test("execute closure propagates container output with dsh-container metadata", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
     const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
-    const tool = (out as { tool: Record<string, unknown> }).tool.grep as {
-      execute: (args: unknown, ctx: unknown) => Promise<{ output: string; metadata: Record<string, unknown> }>
-    }
-    const res = await tool.execute({}, {})
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    const res = await tool.execute({}, { sessionID: "ses-meta", directory: "/w" })
     expect(res.output).toBe("NEEDLE-here")
     expect(res.metadata.source).toBe("dsh-container")
+  })
+
+  test("execute passes a per-call agent with header id and cwd only", async () => {
+    let captured: unknown
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured = exec
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await tool.execute({}, { sessionID: "ses-abc", directory: "/ellamaka/ws" })
+    const exec = captured as {
+      agent?: { session?: { header?: { id?: string; cwd?: string } } }
+    }
+    expect(exec.agent?.session?.header?.id).toBe("ses-abc")
+    expect(exec.agent?.session?.header?.cwd).toBe("/ellamaka/ws")
   })
 })

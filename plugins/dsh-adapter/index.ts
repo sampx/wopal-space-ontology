@@ -1,11 +1,21 @@
 /**
- * dsh-tool-adapter — experiment 2 (research §17, guesses S1–S6).
+ * dsh-tool-adapter — experiment 2.
  *
- * An ellamaka server plugin that projects tools from the in-process dsh
- * container into ellamaka's ToolRegistry through the plugin.tool path. The
- * container is exposed by serve.ts (ELLAMAKA_DSH=1) on
- * globalThis.__ellamakaDshContainer after mounting fs-search on the
- * container's global layer.
+ * Projects tools from the in-process dsh container into ellamaka's
+ * ToolRegistry through the plugin.tool path. The container is exposed by
+ * serve.ts (ELLAMAKA_DSH=1) on globalThis.__ellamakaDshContainer.
+ *
+ * The container is mounted with `session-checkpoint-policy` disabled
+ * (ellamaka-tools profile patch layer): that plugin flushes the calling
+ * agent's live dsh session before every tools/execute — an agent-loop
+ * durability semantic. Without it, a lightweight per-call agent carrying
+ * the tool's actual consumption surface is enough:
+ *
+ *   - session.header.cwd — resolved workdir for spawns
+ *   - session.header.id  — spill ownership label
+ *
+ * No dsh session is ever created in the container, so the container state
+ * stays free of per-ellamaka-session records.
  *
  * Mappings come from plugin options:
  *
@@ -47,6 +57,13 @@ type ProjectedTool = {
   execute: (args: unknown, ctx: Record<string, unknown>) => Promise<{ output: string; title: string; metadata: Record<string, unknown> }>
 }
 
+type ToolContext = {
+  abort?: AbortSignal
+  sessionID: string
+  directory: string
+  callID?: string
+}
+
 function contentText(content: { type: string; text?: string }[] | undefined): string {
   return (content ?? [])
     .map((block) => (block.type === "text" ? (block.text ?? "") : ""))
@@ -73,12 +90,22 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
       description: schema.description,
       args: schema.parameters as Record<string, unknown>,
       execute: async (args, ctx) => {
-        const toolCtx = ctx as { abort?: AbortSignal; sessionID: string; callID?: string }
+        const toolCtx = ctx as ToolContext
+        // Per-call agent carrying only the surface the tools consume: header.cwd
+        // (spawn workdir) and header.id (spill owner). With
+        // session-checkpoint-policy disabled, the pipeline never demands a
+        // live dsh session, and no container state is created.
+        const agent = {
+          session: {
+            header: { id: toolCtx.sessionID, cwd: toolCtx.directory },
+          },
+        }
         const result = await tools.execute({
           callId: toolCtx.callID ?? `dsh-${source}-${Date.now()}`,
           name: source,
           arguments: args,
           signal: toolCtx.abort ?? new AbortController().signal,
+          agent,
         })
         const output = contentText(result.content)
         if (result.isError) {
