@@ -32,6 +32,7 @@
  * renamed target produces a new tool id.
  */
 import type { Hooks, PluginInput, PluginOptions } from "@opencode-ai/plugin"
+import { z } from "zod"
 
 type Container = {
   get(name: "tools"): {
@@ -42,18 +43,25 @@ type Container = {
       error?: { message?: string }
     }>
   } | undefined
+  logger(name: string): {
+    info(message: string, extra?: unknown): void
+    warn(message: string, extra?: unknown): void
+    error(message: string, extra?: unknown): void
+  }
 }
 
 export type DshAdapterOptions = {
   tools?: { source: string; target: string; enable: boolean }[]
 }
 
-// A projected container tool. args are a JSON Schema object (dsh ToolSchema.parameters);
-// the registry consumes them through the legacyJsonSchema path, so the zod-shape
-// ToolDefinition typing does not apply here. Cast to Hooks["tool"] at the boundary.
+// A projected container tool. args are a ZodRawShape (the plugin SDK
+// contract): the registry's fromPlugin path detects Zod types and generates
+// the correct flat JSON Schema. Passing the dsh JSON Schema document as-is
+// would make the registry treat its top-level keys (type/properties/required)
+// as property definitions, producing a nested schema the model cannot call.
 type ProjectedTool = {
   description: string
-  args: Record<string, unknown>
+  args: Record<string, z.ZodType>
   execute: (args: unknown, ctx: Record<string, unknown>) => Promise<{ output: string; title: string; metadata: Record<string, unknown> }>
 }
 
@@ -62,6 +70,58 @@ type ToolContext = {
   sessionID: string
   directory: string
   callID?: string
+}
+
+type JsonSchemaNode = {
+  type?: string
+  description?: string
+  properties?: Record<string, JsonSchemaNode>
+  required?: string[]
+  items?: JsonSchemaNode
+  enum?: unknown[]
+}
+
+/**
+ * Convert a dsh JSON Schema document into a ZodRawShape.
+ *
+ * The dsh tool registry exposes each tool's parameters as a full JSON Schema
+ * document (`{ type: "object", properties: {...}, required: [...] }`). The
+ * plugin SDK contract is a ZodRawShape — a map of property name to Zod type —
+ * so the document is unwrapped into its property definitions, each converted
+ * to the matching Zod type. Unsupported nodes degrade to `z.unknown()` so a
+ * future dsh schema extension can never break the projection.
+ */
+function jsonSchemaToZodShape(schema: unknown): Record<string, z.ZodType> {
+  const node = schema as JsonSchemaNode
+  const properties = node?.properties ?? {}
+  const required = new Set(node?.required ?? [])
+  const shape: Record<string, z.ZodType> = {}
+  for (const [name, property] of Object.entries(properties)) {
+    let type = jsonSchemaNodeToZod(property)
+    if (!required.has(name)) type = type.optional()
+    shape[name] = type
+  }
+  return shape
+}
+
+function jsonSchemaNodeToZod(node: JsonSchemaNode | undefined): z.ZodType {
+  if (!node || typeof node !== "object") return z.unknown()
+  switch (node.type) {
+    case "string":
+      return z.string()
+    case "number":
+      return z.number()
+    case "integer":
+      return z.number().int()
+    case "boolean":
+      return z.boolean()
+    case "array":
+      return z.array(node.items ? jsonSchemaNodeToZod(node.items) : z.unknown())
+    case "object":
+      return z.record(z.string(), z.unknown())
+    default:
+      return z.unknown()
+  }
 }
 
 function contentText(content: { type: string; text?: string }[] | undefined): string {
@@ -79,6 +139,7 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   if (!container) return {}
   const tools = container.get("tools")
   if (!tools) return {}
+  const log = container.logger("dsh-adapter")
 
   const available = new Map(tools.schemas().map((s) => [s.name, s]))
   const projected: Record<string, ProjectedTool> = {}
@@ -88,7 +149,7 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
     if (!schema) continue
     projected[target] = {
       description: schema.description,
-      args: schema.parameters as Record<string, unknown>,
+      args: jsonSchemaToZodShape(schema.parameters),
       execute: async (args, ctx) => {
         const toolCtx = ctx as ToolContext
         // Per-call agent carrying only the surface the tools consume: header.cwd
@@ -109,8 +170,11 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         })
         const output = contentText(result.content)
         if (result.isError) {
-          throw new Error(output || result.error?.message || `dsh tool "${source}" failed`)
+          const message = output || result.error?.message || `dsh tool "${source}" failed`
+          log.error("tool call failed", { tool: source, sessionID: toolCtx.sessionID, callID: toolCtx.callID, error: message })
+          throw new Error(message)
         }
+        log.info("tool call", { tool: source, sessionID: toolCtx.sessionID, callID: toolCtx.callID })
         return {
           output,
           title: source,

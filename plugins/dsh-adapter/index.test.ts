@@ -11,6 +11,12 @@
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 
+type ContainerLogger = {
+  info(message: string, extra?: unknown): void
+  warn(message: string, extra?: unknown): void
+  error(message: string, extra?: unknown): void
+}
+
 type Container = {
   get(name: "tools"): {
     schemas(): { name: string; description: string; parameters: unknown }[]
@@ -20,6 +26,7 @@ type Container = {
       error?: { message?: string }
     }>
   } | undefined
+  logger(name: string): ContainerLogger
 }
 
 type AdapterOptions = {
@@ -39,6 +46,7 @@ type Projected = {
 function fakeContainer(
   overrides?: Partial<Container["get"] extends never ? never : ReturnType<Container["get"]>>,
 ): Container {
+  const loggers = new Map<string, ContainerLogger>()
   return {
     get(name) {
       if (name !== "tools") return undefined
@@ -53,6 +61,14 @@ function fakeContainer(
         }),
         ...overrides,
       }
+    },
+    logger(name) {
+      let logger = loggers.get(name)
+      if (!logger) {
+        logger = { info: () => {}, warn: () => {}, error: () => {} }
+        loggers.set(name, logger)
+      }
+      return logger
     },
   }
 }
@@ -139,5 +155,67 @@ describe("dsh-adapter projection", () => {
     }
     expect(exec.agent?.session?.header?.id).toBe("ses-abc")
     expect(exec.agent?.session?.header?.cwd).toBe("/ellamaka/ws")
+  })
+
+  test("projects a dsh JSON Schema document into a ZodRawShape args map", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "grep",
+          description: "dsh grep (ripgrep-backed)",
+          parameters: {
+            type: "object",
+            properties: {
+              pattern: { type: "string", required: true, description: "Regular expression" },
+              path: { type: "string", description: "File or directory to search" },
+            },
+            required: ["pattern"],
+          },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as {
+      args: Record<string, unknown>
+    }
+    // The plugin SDK contract is a ZodRawShape: each property value is a Zod
+    // type. The registry's fromPlugin path detects this and generates the
+    // correct flat JSON Schema (not a nested document-as-properties schema).
+    expect(Object.keys(tool.args)).toEqual(["pattern", "path"])
+    expect("_zod" in (tool.args.pattern as object)).toBe(true)
+    expect("_zod" in (tool.args.path as object)).toBe(true)
+  })
+
+  test("execute logs the tool call through the container logger", async () => {
+    const logged: { level: string; message: string; extra?: unknown }[] = []
+    const container = fakeContainer()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = container
+    const logger = container.logger("dsh-adapter")
+    logger.info = (message, extra) => logged.push({ level: "info", message, extra })
+    logger.error = (message, extra) => logged.push({ level: "error", message, extra })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await tool.execute({ pattern: "needle" }, { sessionID: "ses-log", directory: "/w", callID: "call-1" })
+    expect(logged.length).toBe(1)
+    expect(logged[0].level).toBe("info")
+    expect(logged[0].message).toBe("tool call")
+    expect(logged[0].extra).toMatchObject({ tool: "grep", sessionID: "ses-log", callID: "call-1" })
+  })
+
+  test("execute logs tool errors through the container logger", async () => {
+    const logged: { level: string; message: string; extra?: unknown }[] = []
+    const container = fakeContainer({
+      execute: async () => ({ isError: true, error: { message: "boom" } }),
+    })
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = container
+    const logger = container.logger("dsh-adapter")
+    logger.error = (message, extra) => logged.push({ level: "error", message, extra })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await expect(tool.execute({ pattern: "needle" }, { sessionID: "ses-log", directory: "/w" })).rejects.toThrow("boom")
+    expect(logged.length).toBe(1)
+    expect(logged[0].level).toBe("error")
+    expect(logged[0].message).toBe("tool call failed")
+    expect(logged[0].extra).toMatchObject({ tool: "grep", sessionID: "ses-log" })
   })
 })
