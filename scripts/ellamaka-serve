@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# ellamaka-serve — manage headless ellamaka server (auto-incrementing port)
+# Usage: ellamaka-serve {start|stop|status|restart|logs[-f]}
+
+set -euo pipefail
+
+BIN="$HOME/.wopal/bin/ellamaka"
+HOST="0.0.0.0"
+BASE_PORT="${ELLAMAKA_SERVE_BASE_PORT:-4096}"
+MAX_PROBE=50
+PASSWORD='s.x+'
+PID_FILE="$HOME/.wopal/ellamaka-serve.pid"
+PORT_FILE="$HOME/.wopal/ellamaka-serve.port"
+LOG_DIR="$HOME/.wopal/logs"
+LOG_FILE="$LOG_DIR/ellamaka-serve.log"
+FW="/usr/libexec/ApplicationFirewall/socketfilterfw"
+
+say()  { printf '%s\n' "$*"; }
+die()  { say "error: $*" >&2; exit 1; }
+gpid() { cat "$PID_FILE" 2>/dev/null || true; }
+gport() {
+  [ -s "$PORT_FILE" ] && { cat "$PORT_FILE"; return; }
+  # No port file (legacy instance): derive from the running pid and persist it.
+  local p port
+  p="$(gpid)"
+  if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then
+    port="$(lsof -nP -a -p "$p" -iTCP -sTCP:LISTEN 2>/dev/null | grep -oE ':[0-9]+ \(LISTEN\)' | tr -dc '0-9' | head -1)"
+    if [ -n "$port" ]; then echo "$port" > "$PORT_FILE"; echo "$port"; fi
+  fi
+}
+
+port_in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+
+# Find the first free port starting at BASE_PORT.
+find_port() {
+  local p="$BASE_PORT" i
+  for ((i = 0; i < MAX_PROBE; i++)); do
+    if ! port_in_use "$p"; then echo "$p"; return 0; fi
+    p=$((p + 1))
+  done
+  return 1
+}
+
+# Live PID: pid file → port-file listener → scan BASE..MAX for an ellamaka LISTEN.
+live_pid() {
+  local p
+  p="$(gpid)"
+  if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "$p"; return; fi
+  local known_port
+  known_port="$(gport)"
+  if [ -n "$known_port" ] && port_in_use "$known_port"; then
+    lsof -nP -iTCP:"$known_port" -sTCP:LISTEN 2>/dev/null | awk '$1=="ellamaka" {print $2}' | head -1
+    return
+  fi
+  # Legacy adoption: no pid/port file, scan the probe range for an ellamaka listener.
+  local scan="$BASE_PORT" i
+  for ((i = 0; i < MAX_PROBE; i++)); do
+    if port_in_use "$scan"; then
+      lsof -nP -iTCP:"$scan" -sTCP:LISTEN 2>/dev/null | awk '$1=="ellamaka" {print $2}' | head -1
+      return
+    fi
+    scan=$((scan + 1))
+  done
+}
+
+running() { [ -n "$(live_pid)" ]; }
+
+ensure_firewall() {
+  if "$FW" --listapps 2>/dev/null | grep -qF "$BIN"; then
+    say "[fw] ellamaka already allowed"
+    return 0
+  fi
+  say "[fw] adding ellamaka to firewall allow list (needs sudo)"
+  if sudo -n true 2>/dev/null; then
+    sudo "$FW" --add "$BIN"
+    sudo "$FW" --unblock "$BIN"
+  else
+    say "[fw] sudo required for first run, add manually:"
+    say "     sudo $FW --add $BIN"
+    say "     sudo $FW --unblock $BIN"
+    return 0
+  fi
+}
+
+cmd_start() {
+  if running; then
+    say "[start] already running (pid $(live_pid), port $(gport))"
+    return 0
+  fi
+  ensure_firewall
+  mkdir -p "$LOG_DIR"
+  local port prev
+  port="$(find_port)" || die "no free port found in $BASE_PORT..$((BASE_PORT + MAX_PROBE - 1))"
+  prev=$((port - 1))
+  if [ "$port" -eq "$BASE_PORT" ]; then
+    say "[start] base port $BASE_PORT is free, using it"
+  else
+    say "[start] ports $BASE_PORT..$prev occupied, using $port"
+  fi
+  OPENCODE_SERVER_PASSWORD="$PASSWORD" nohup "$BIN" serve --hostname "$HOST" --port "$port" >>"$LOG_FILE" 2>&1 &
+  echo "$!" > "$PID_FILE"
+  sleep 2
+  local p
+  p="$(live_pid)"
+  if [ -n "$p" ] && kill -0 "$p" 2>/dev/null && port_in_use "$port"; then
+    echo "$port" > "$PORT_FILE"
+    say "[start] ok, pid=$p listening on http://$HOST:$port (log: $LOG_FILE)"
+    local code
+    code=$(curl -s --noproxy '*' -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/" 2>/dev/null || true)
+    case "$code" in
+      401) say "[start] probe: HTTP 401 = alive, auth required (expected)" ;;
+      200) say "[start] probe: HTTP 200 = alive, NO PASSWORD set (unsecured!)" ;;
+      *)   say "[start] probe: HTTP ${code:-000} = unexpected, check log" ;;
+    esac
+  else
+    rm -f "$PID_FILE"
+    die "start failed — check $LOG_FILE"
+  fi
+}
+
+cmd_stop() {
+  local p
+  p="$(live_pid)"
+  if [ -z "$p" ]; then
+    say "[stop] not running"
+    rm -f "$PID_FILE" "$PORT_FILE"
+    return 0
+  fi
+  say "[stop] stopping pid=$p (port $(gport))"
+  kill "$p" 2>/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    kill -0 "$p" 2>/dev/null || break
+    sleep 0.5
+  done
+  if kill -0 "$p" 2>/dev/null; then say "[stop] force killing"; kill -9 "$p" 2>/dev/null || true; fi
+  rm -f "$PID_FILE" "$PORT_FILE"
+  say "[stop] stopped"
+}
+
+cmd_restart() {
+  cmd_stop
+  sleep 1
+  cmd_start
+}
+
+cmd_status() {
+  say "=== ellamaka serve status ==="
+  if running; then
+    say "pid:       $(live_pid) (running)"
+    say "port:      $(gport)"
+  else
+    say "pid:       not running"
+    say "port:      none"
+  fi
+  local port
+  port="$(gport)"
+  if [ -n "$port" ]; then
+    say "listeners on :$port:"
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sed 's/^/  /' || true
+  fi
+  say "log:       $LOG_FILE"
+  [ -f "$LOG_FILE" ] && { say "last lines:"; tail -5 "$LOG_FILE" | sed 's/^/  /'; }
+}
+
+cmd_logs() {
+  [ -f "$LOG_FILE" ] || die "no log file yet ($LOG_FILE)"
+  if [ "${1:-}" = "-f" ]; then
+    tail -n 50 -f "$LOG_FILE"
+  else
+    tail -n 50 "$LOG_FILE"
+  fi
+}
+
+case "${1:-}" in
+  start)   cmd_start ;;
+  stop)    cmd_stop ;;
+  restart) cmd_restart ;;
+  status)  cmd_status ;;
+  logs)    cmd_logs "${2:-}" ;;
+  *)       die "usage: $(basename "$0") {start|stop|status|restart|logs[-f]}" ;;
+esac
