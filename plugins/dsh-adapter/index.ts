@@ -8,14 +8,15 @@
  * The container is mounted with `session-checkpoint-policy` disabled
  * (ellamaka-tools profile patch layer): that plugin flushes the calling
  * agent's live dsh session before every tools/execute — an agent-loop
- * durability semantic. Without it, a lightweight per-call agent carrying
- * the tool's actual consumption surface is enough:
+ * durability semantic. Without it, a cached session facade carrying the
+ * tool's actual consumption surface is enough:
  *
  *   - session.header.cwd — resolved workdir for spawns
  *   - session.header.id  — spill ownership label
+ *   - session.events     — sandbox-mode policy fold
  *
- * No dsh session is ever created in the container, so the container state
- * stays free of per-ellamaka-session records.
+ * No dsh session is created in the container, so the container state stays
+ * free of per-ellamaka-session records.
  *
  * Mappings come from plugin options:
  *
@@ -32,6 +33,7 @@
  * renamed target produces a new tool id.
  */
 import type { Hooks, PluginInput, PluginOptions } from "@opencode-ai/plugin"
+import path from "node:path"
 import { z } from "zod"
 
 type Container = {
@@ -52,6 +54,14 @@ type Container = {
 
 export type DshAdapterOptions = {
   tools?: { source: string; target: string; enable: boolean }[]
+  /**
+   * Space-level sandbox policy for the dsh tool container
+   * (`ellamaka.dsh.sandbox`). `enabled: true` selects the sandbox backend and
+   * injects a `sandbox/mode` event into each session facade; `mode` is
+   * `read-only` or `workspace-write` (default `workspace-write`). `enabled:
+   * false` selects the local fs/bash backend and injects no sandbox events.
+   */
+  sandbox?: { enabled: boolean; mode?: "read-only" | "workspace-write" }
 }
 
 // A projected container tool. args are a ZodRawShape (the plugin SDK
@@ -69,7 +79,14 @@ type ToolContext = {
   abort?: AbortSignal
   sessionID: string
   directory: string
+  worktree: string
   callID?: string
+  ask(input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }): Promise<void>
+}
+
+type DshSession = {
+  header: { id: string; cwd: string }
+  events: unknown[]
 }
 
 type JsonSchemaNode = {
@@ -130,6 +147,55 @@ function contentText(content: { type: string; text?: string }[] | undefined): st
     .join("\n")
 }
 
+function isInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target)
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
+}
+
+async function askToolPermission(source: string, args: unknown, ctx: ToolContext): Promise<void> {
+  if (source === "bash") {
+    const command = (args as { command?: unknown }).command
+    if (typeof command !== "string") return
+    await ctx.ask({
+      permission: "bash",
+      patterns: [command],
+      always: [command],
+      metadata: {},
+    })
+    return
+  }
+
+  const input = args as { file_path?: unknown; path?: unknown; command?: unknown }
+  const filePath = source === "str_replace_editor" ? input.path : input.file_path
+  if (typeof filePath !== "string") return
+  const permission = source === "read" || (source === "str_replace_editor" && input.command === "view")
+    ? "read"
+    : source === "write" || source === "edit" || source === "str_replace_editor"
+      ? "edit"
+      : undefined
+  if (!permission) return
+
+  const filepath = path.isAbsolute(filePath) ? path.normalize(filePath) : path.resolve(ctx.directory, filePath)
+  const isProjectPath = isInside(ctx.directory, filepath) || (ctx.worktree !== "/" && isInside(ctx.worktree, filepath))
+  if (!isProjectPath) {
+    const parentDir = path.dirname(filepath)
+    const pattern = path.join(parentDir, "*").replaceAll("\\", "/")
+    await ctx.ask({
+      permission: "external_directory",
+      patterns: [pattern],
+      always: [pattern],
+      metadata: { filepath, parentDir },
+    })
+  }
+
+  await ctx.ask({
+    permission,
+    patterns: [path.relative(ctx.worktree, filepath).replaceAll("\\", "/")],
+    always: ["*"],
+    metadata: {},
+  })
+}
+
 export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions): Promise<Hooks> {
   const options = (rawOptions ?? {}) as DshAdapterOptions
   const mappings = (options.tools ?? []).filter((m) => m.enable && m.source && m.target)
@@ -140,6 +206,16 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   const tools = container.get("tools")
   if (!tools) return {}
   const log = container.logger("dsh-adapter")
+  const sessions = new Map<string, DshSession>()
+
+  // Resolve the space-level sandbox policy once at mount. `enabled: true`
+  // selects the sandbox backend and injects a `sandbox/mode` event into every
+  // session facade; `enabled: false` (or absent) selects the local backend and
+  // injects no events. `mode` defaults to `workspace-write` (the dsh base
+  // profile default).
+  const sandboxEnabled = options.sandbox?.enabled === true
+  const sandboxMode = options.sandbox?.mode ?? "workspace-write"
+  const sandboxEvents = sandboxEnabled ? [{ type: "sandbox/mode", data: { mode: sandboxMode } }] : []
 
   const available = new Map(tools.schemas().map((s) => [s.name, s]))
   const projected: Record<string, ProjectedTool> = {}
@@ -152,14 +228,17 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
       args: jsonSchemaToZodShape(schema.parameters),
       execute: async (args, ctx) => {
         const toolCtx = ctx as ToolContext
-        // Per-call agent carrying only the surface the tools consume: header.cwd
-        // (spawn workdir) and header.id (spill owner). With
-        // session-checkpoint-policy disabled, the pipeline never demands a
-        // live dsh session, and no container state is created.
-        const agent = {
-          session: {
+        await askToolPermission(source, args, toolCtx)
+        let session = sessions.get(toolCtx.sessionID)
+        if (!session) {
+          session = {
             header: { id: toolCtx.sessionID, cwd: toolCtx.directory },
-          },
+            events: sandboxEvents,
+          }
+          sessions.set(toolCtx.sessionID, session)
+        }
+        const agent = {
+          session,
         }
         const result = await tools.execute({
           callId: toolCtx.callID ?? `dsh-${source}-${Date.now()}`,

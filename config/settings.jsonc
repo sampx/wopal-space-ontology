@@ -8,8 +8,14 @@
         {
           "tools": [
             { "source": "grep", "target": "grep", "enable": true },
-            { "source": "glob", "target": "glob", "enable": true }
-          ]
+            { "source": "glob", "target": "glob", "enable": true },
+            { "source": "read", "target": "read", "enable": true },
+            { "source": "write", "target": "write", "enable": true },
+            { "source": "edit", "target": "edit", "enable": true },
+            { "source": "str_replace_editor", "target": "str_replace_editor", "enable": true },
+            { "source": "bash", "target": "bash", "enable": true }
+          ],
+          "sandbox": { "enabled": true, "mode": "workspace-write" }
         }
       ]
     ],

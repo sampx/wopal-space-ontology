@@ -31,12 +31,15 @@ type Container = {
 
 type AdapterOptions = {
   tools?: { source: string; target: string; enable: boolean }[]
+  sandbox?: { enabled: boolean; mode?: string }
 }
 
 type ToolCtx = {
   sessionID: string
   directory: string
+  worktree: string
   callID?: string
+  ask(input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }): Promise<void>
 }
 
 type Projected = {
@@ -139,22 +142,156 @@ describe("dsh-adapter projection", () => {
     expect(res.metadata.source).toBe("dsh-container")
   })
 
-  test("execute passes a per-call agent with header id and cwd only", async () => {
-    let captured: unknown
+  test("execute passes a reusable session facade with header id, cwd, and events", async () => {
+    const captured: unknown[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured = exec
+        captured.push(exec)
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
     const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
     const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
-    await tool.execute({}, { sessionID: "ses-abc", directory: "/ellamaka/ws" })
-    const exec = captured as {
-      agent?: { session?: { header?: { id?: string; cwd?: string } } }
+    const ctx = {
+      sessionID: "ses-abc",
+      directory: "/ellamaka/ws",
+      worktree: "/ellamaka",
+      ask: async () => {},
     }
+    await tool.execute({}, ctx)
+    await tool.execute({}, ctx)
+    const exec = captured[0] as {
+      agent?: { session?: { header?: { id?: string; cwd?: string }; events?: unknown[] } }
+    }
+    const repeated = captured[1] as { agent?: { session?: object } }
     expect(exec.agent?.session?.header?.id).toBe("ses-abc")
     expect(exec.agent?.session?.header?.cwd).toBe("/ellamaka/ws")
+    expect(exec.agent?.session?.events).toEqual([])
+    expect(repeated.agent?.session).toBe(exec.agent?.session)
+  })
+
+  test("execute preserves ellamaka file and external-directory permission gates", async () => {
+    const asks: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        { name: "read", description: "dsh read", parameters: { properties: { file_path: { type: "string" } } } },
+        {
+          name: "write",
+          description: "dsh write",
+          parameters: { properties: { file_path: { type: "string" }, content: { type: "string" } } },
+        },
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } } },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [
+        { source: "read", target: "read", enable: true },
+        { source: "write", target: "write", enable: true },
+        { source: "edit", target: "edit", enable: true },
+      ],
+    })
+    const tools = (out as { tool: Record<string, unknown> }).tool
+    const ctx = {
+      sessionID: "ses-permission",
+      directory: "/workspace/app",
+      worktree: "/workspace",
+      ask: async (input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => {
+        asks.push(input)
+      },
+    }
+
+    await (tools.read as Projected).execute({ file_path: "src/file.ts" }, ctx)
+    await (tools.write as Projected).execute({ file_path: "/outside/file.ts", content: "next" }, ctx)
+    await (tools.edit as Projected).execute({ file_path: "src/file.ts", old_string: "before", new_string: "after" }, ctx)
+
+    expect(asks).toEqual([
+      { permission: "read", patterns: ["app/src/file.ts"], always: ["*"], metadata: {} },
+      {
+        permission: "external_directory",
+        patterns: ["/outside/*"],
+        always: ["/outside/*"],
+        metadata: { filepath: "/outside/file.ts", parentDir: "/outside" },
+      },
+      { permission: "edit", patterns: ["../outside/file.ts"], always: ["*"], metadata: {} },
+      { permission: "edit", patterns: ["app/src/file.ts"], always: ["*"], metadata: {} },
+    ])
+  })
+
+  test("str_replace_editor preserves read, edit, and external-directory gates by command", async () => {
+    const asks: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "str_replace_editor",
+          description: "dsh editor",
+          parameters: { properties: { command: { type: "string" }, path: { type: "string" } } },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "str_replace_editor", target: "str_replace_editor", enable: true }],
+    })
+    const editor = (out as { tool: Record<string, unknown> }).tool.str_replace_editor as Projected
+    const ctx = {
+      sessionID: "ses-editor-permission",
+      directory: "/workspace/app",
+      worktree: "/workspace",
+      ask: async (input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => {
+        asks.push(input)
+      },
+    }
+
+    await editor.execute({ command: "view", path: "/workspace/app/file.ts" }, ctx)
+    await editor.execute({ command: "create", path: "/outside/new.ts", file_text: "created" }, ctx)
+
+    expect(asks).toEqual([
+      { permission: "read", patterns: ["app/file.ts"], always: ["*"], metadata: {} },
+      {
+        permission: "external_directory",
+        patterns: ["/outside/*"],
+        always: ["/outside/*"],
+        metadata: { filepath: "/outside/new.ts", parentDir: "/outside" },
+      },
+      { permission: "edit", patterns: ["../outside/new.ts"], always: ["*"], metadata: {} },
+    ])
+  })
+
+  test("bash preserves ellamaka's command permission gate", async () => {
+    const asks: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "bash",
+          description: "dsh bash",
+          parameters: { properties: { command: { type: "string" }, description: { type: "string" } } },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "bash", target: "bash", enable: true }] })
+    const bash = (out as { tool: Record<string, unknown> }).tool.bash as Projected
+    const ctx = {
+      sessionID: "ses-bash-permission",
+      directory: "/workspace/app",
+      worktree: "/workspace",
+      ask: async (input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => {
+        asks.push(input)
+      },
+    }
+
+    await bash.execute({ command: "printf adapter-ok", description: "Print adapter proof" }, ctx)
+
+    expect(asks).toEqual([
+      {
+        permission: "bash",
+        patterns: ["printf adapter-ok"],
+        always: ["printf adapter-ok"],
+        metadata: {},
+      },
+    ])
   })
 
   test("projects a dsh JSON Schema document into a ZodRawShape args map", async () => {
@@ -184,6 +321,60 @@ describe("dsh-adapter projection", () => {
     expect(Object.keys(tool.args)).toEqual(["pattern", "path"])
     expect("_zod" in (tool.args.pattern as object)).toBe(true)
     expect("_zod" in (tool.args.path as object)).toBe(true)
+  })
+
+  test("sandbox enabled injects sandbox/mode event into session facade", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "read-only" },
+    })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await tool.execute({}, { sessionID: "ses-sandbox", directory: "/w", worktree: "/w", ask: async () => {} })
+    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
+    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "read-only" } }])
+  })
+
+  test("sandbox enabled without mode defaults to workspace-write", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true },
+    })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await tool.execute({}, { sessionID: "ses-default", directory: "/w", worktree: "/w", ask: async () => {} })
+    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
+    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "workspace-write" } }])
+  })
+
+  test("sandbox disabled leaves session facade events empty", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: false },
+    })
+    const tool = (out as { tool: Record<string, unknown> }).tool.grep as Projected
+    await tool.execute({}, { sessionID: "ses-nosandbox", directory: "/w", worktree: "/w", ask: async () => {} })
+    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
+    expect(exec.agent?.session?.events).toEqual([])
   })
 
   test("execute logs the tool call through the container logger", async () => {
