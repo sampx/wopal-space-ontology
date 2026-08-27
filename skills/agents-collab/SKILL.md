@@ -257,6 +257,31 @@ Before compacting, confirm there are no uncommitted changes, no blocking depende
 
 When multiple agents run in parallel, the file list returned by `output` may include work produced by other agents. Focus only on the expected artifacts for the current task, and use `git status` in the relevant project directory to verify them. Do not misclassify other agents' files as anomalies or delete them.
 
+### Workspace protection in parallel delegation (high-risk)
+
+When multiple agents run in parallel, the working tree is **shared**. One careless git operation by any agent can silently swallow another agent's uncommitted changes, and they cannot be recovered from git history (uncommitted = no record). **Wopal must explicitly include the following prohibition in every parallel-task prompt** (do not rely on the agent's judgment):
+
+```
+## Workspace protection (mandatory in parallel environments)
+- Forbidden: `git stash`, `git stash push/pop/apply`, `git checkout`, `git restore`,
+  `git reset`, `git clean`, `git switch`, `git merge`, `git rebase`, `git worktree`,
+  and any other command that could touch the shared working tree or other agents'
+  uncommitted changes.
+- To run tests or a baseline verification, NEVER use `git stash` to clean the working
+  tree. To get a clean baseline, either:
+  a) work in an isolated copy under /var/folders/.../T or .wopal-space/.tmp/; or
+  b) create temporary NEW files only inside the project (delete them when done), and
+     never touch existing uncommitted files; or
+  c) run directly against the current working tree and only check whether the files
+     YOU changed pass.
+- You may commit your own files, but you must NOT overwrite, revert, or clean any
+  uncommitted changes that do not belong to you.
+- If you hit a stash conflict, merge conflict, or working-tree anomaly: STOP, report
+  to wopal, and do not "resolve" it yourself.
+```
+
+Put this block at the **end** of every parallel-delegation prompt (after the "Out of scope" section) so the agent sees and obeys it.
+
 ---
 
 ## Prohibitions and limits

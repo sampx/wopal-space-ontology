@@ -257,6 +257,25 @@ ERR 通知到达
 
 多 Agent 并行时，`output` 返回的文件列表可能含其他 Agent 的工作成果。只关注当前任务的预期产出，通过 `git status` 在对应项目目录检查。不要误判为异常或删除其他 Agent 的文件。
 
+### 并行委派的工作区保护（高危）
+
+并行运行多个 Agent 时，工作区是**共享的**。任何 Agent 一个不经意的 git 操作都可能吞掉其他 Agent 的未提交改动，而且无法从 git 历史找回（未提交 = 无记录）。**Wopal 在编写每个并行任务的 prompt 时，必须显式写入以下禁令**（不要依赖 Agent 自觉）：
+
+```
+## 工作区保护（并行环境强制）
+- 禁止执行 `git stash`、`git stash push/pop/apply`、`git checkout`、`git restore`、
+  `git reset`、`git clean`、`git switch`、`git merge`、`git rebase`、`git worktree`
+  等任何可能触碰共享工作区或他人未提交变更的命令。
+- 运行测试/基线验证时，禁止用 `git stash` 清理工作区。需要干净基线时，应：
+  a) 在 `/var/folders/.../T` 或 `.wopal-space/.tmp/` 的隔离副本里操作；或
+  b) 只在项目内临时新建文件（改完删除），不要动既有未提交文件；或
+  c) 直接在当前工作区跑，只关注你改的文件是否通过。
+- 你可以提交自己的文件，但禁止覆盖、撤销、清理任何不属于你的未提交改动。
+- 若发现 stash 冲突、merge 冲突或工作区异常：停止，报告 wopal，不要自行"解决"。
+```
+
+这条禁令应放在每个并行委派 prompt 的**末尾**（Out of scope 之后），确保 Agent 看到并遵守。
+
 ---
 
 ## 禁止与限制
