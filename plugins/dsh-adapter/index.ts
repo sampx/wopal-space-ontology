@@ -1,9 +1,14 @@
 /**
- * dsh-tool-adapter — experiment 2.
+ * dsh-tool-adapter — experiment 2 (P3.5 dynamic provider).
  *
  * Projects tools from the in-process dsh container into ellamaka's
- * ToolRegistry through the plugin.tool path. The container is exposed by
- * serve.ts (ELLAMAKA_DSH=1) on globalThis.__ellamakaDshContainer.
+ * ToolRegistry through the dynamic `tool.provider` plugin hook. The container
+ * is exposed by serve.ts (ELLAMAKA_DSH=1) on globalThis.__ellamakaDshContainer.
+ *
+ * Unlike the earlier static `tool` table (snapshotted at mount time), the
+ * provider re-reads the container's live `tools.schemas()` on EVERY model
+ * request — so tools mounted/unmounted inside the dsh container take effect
+ * on the next request without a restart.
  *
  * The container is mounted with `session-checkpoint-policy` disabled
  * (ellamaka-tools profile patch layer): that plugin flushes the calling
@@ -29,10 +34,18 @@
  *
  * A mapping with enable:false is skipped. `source` is the container tool
  * name; `target` is the ellamaka slot it lands on — same-name shadows the
- * builtin (custom registers after builtin; same-name assignment wins), a
- * renamed target produces a new tool id.
+ * builtin (dynamic providers win on id collision), a renamed target produces
+ * a new tool id.
+ *
+ * Sandbox semantics (DESIGN §4.10): `enabled: true` (or mode set) selects the
+ * sandbox backend and injects a `sandbox/mode` event (`read-only` or
+ * `workspace-write`, default `workspace-write`) into each session facade.
+ * `enabled: false` (or absent) DISABLES the sandbox by injecting
+ * `danger-full-access` — dsh's one-shot full-access mode. It does NOT switch
+ * the local fs/bash backend; tools always run through the same dsh container
+ * and sandbox backend, only the effective mode is loosened.
  */
-import type { Hooks, PluginInput, PluginOptions } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput, PluginOptions, ToolDefinition } from "@opencode-ai/plugin"
 import path from "node:path"
 import { z } from "zod"
 
@@ -59,7 +72,9 @@ export type DshAdapterOptions = {
    * (`ellamaka.dsh.sandbox`). `enabled: true` selects the sandbox backend and
    * injects a `sandbox/mode` event into each session facade; `mode` is
    * `read-only` or `workspace-write` (default `workspace-write`). `enabled:
-   * false` selects the local fs/bash backend and injects no sandbox events.
+   * false` (or absent) DISABLES the sandbox by injecting
+   * `danger-full-access` — the dsh one-shot full-access mode. It never
+   * switches the local fs/bash backend.
    */
   sandbox?: { enabled: boolean; mode?: "read-only" | "workspace-write" }
 }
@@ -202,28 +217,30 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   if (mappings.length === 0) return {}
 
   const container = (globalThis as Record<string, unknown>).__ellamakaDshContainer as Container | undefined
-  if (!container) return {}
+  // Container missing -> the provider silently returns no tools (degraded).
+  if (!container) return { "tool.provider": async (_input, _output) => {} }
   const tools = container.get("tools")
-  if (!tools) return {}
+  if (!tools) return { "tool.provider": async (_input, _output) => {} }
+
   const log = container.logger("dsh-adapter")
   const sessions = new Map<string, DshSession>()
 
   // Resolve the space-level sandbox policy once at mount. `enabled: true`
   // selects the sandbox backend and injects a `sandbox/mode` event into every
-  // session facade; `enabled: false` (or absent) selects the local backend and
-  // injects no events. `mode` defaults to `workspace-write` (the dsh base
-  // profile default).
+  // session facade; `enabled: false` (or absent) DISABLES the sandbox by
+  // injecting `danger-full-access` — dsh's one-shot full-access mode. The
+  // container's sandbox backend is never switched; only the effective mode is
+  // loosened. `mode` defaults to `workspace-write` (the dsh base profile
+  // default) when the sandbox is enabled.
   const sandboxEnabled = options.sandbox?.enabled === true
-  const sandboxMode = options.sandbox?.mode ?? "workspace-write"
-  const sandboxEvents = sandboxEnabled ? [{ type: "sandbox/mode", data: { mode: sandboxMode } }] : []
+  const sandboxMode = sandboxEnabled ? (options.sandbox?.mode ?? "workspace-write") : "danger-full-access"
+  const sandboxEvents = [{ type: "sandbox/mode", data: { mode: sandboxMode } }]
 
-  const available = new Map(tools.schemas().map((s) => [s.name, s]))
-  const projected: Record<string, ProjectedTool> = {}
-
-  for (const { source, target } of mappings) {
-    const schema = available.get(source)
-    if (!schema) continue
-    projected[target] = {
+  // Project a single container tool onto its target slot. The execute closure
+  // is rebuilt per provider call but reuses the shared facade cache, logger,
+  // and permission-ask logic declared once at adapter scope (memory-level cost).
+  function project(source: string, target: string, schema: { description: string; parameters: unknown }): ProjectedTool {
+    return {
       description: schema.description,
       args: jsonSchemaToZodShape(schema.parameters),
       execute: async (args, ctx) => {
@@ -263,8 +280,18 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
     }
   }
 
-  const toolRecord = Object.keys(projected).length === 0 ? undefined : (projected as Hooks["tool"])
-  return toolRecord ? { tool: toolRecord } : {}
+  // Dynamic provider: re-reads the container's live schemas on every model
+  // request so mounts/unmounts take effect immediately.
+  return {
+    "tool.provider": async (_input, output) => {
+      const available = new Map(tools.schemas().map((s) => [s.name, s]))
+      for (const { source, target } of mappings) {
+        const schema = available.get(source)
+        if (!schema) continue
+        output.tools[target] = project(source, target, schema) as unknown as ToolDefinition
+      }
+    },
+  }
 }
 
 export default { id: "dsh-adapter", server: dshAdapter }
