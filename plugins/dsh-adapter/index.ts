@@ -37,15 +37,15 @@
  * builtin (dynamic providers win on id collision), a renamed target produces
  * a new tool id.
  *
- * Sandbox semantics (DESIGN §4.10): `enabled: true` (or mode set) selects the
- * sandbox backend and injects a `sandbox/mode` event (`read-only` or
+ * Sandbox semantics (DESIGN §4.10): `enabled: true` selects the sandbox
+ * backend and injects a `sandbox/mode` event (`read-only` or
  * `workspace-write`, default `workspace-write`) into each session facade.
  * `enabled: false` (or absent) DISABLES the sandbox by injecting
  * `danger-full-access` — dsh's one-shot full-access mode. It does NOT switch
  * the local fs/bash backend; tools always run through the same dsh container
  * and sandbox backend, only the effective mode is loosened.
  */
-import type { Hooks, PluginInput, PluginOptions, ToolDefinition } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput, PluginOptions, ToolContext as PluginToolContext, ToolDefinition, ToolResult } from "@opencode-ai/plugin"
 import path from "node:path"
 import { z } from "zod"
 
@@ -79,25 +79,17 @@ export type DshAdapterOptions = {
   sandbox?: { enabled: boolean; mode?: "read-only" | "workspace-write" }
 }
 
-// A projected container tool. args are a ZodRawShape (the plugin SDK
-// contract): the registry's fromPlugin path detects Zod types and generates
-// the correct flat JSON Schema. Passing the dsh JSON Schema document as-is
-// would make the registry treat its top-level keys (type/properties/required)
-// as property definitions, producing a nested schema the model cannot call.
-type ProjectedTool = {
-  description: string
-  args: Record<string, z.ZodType>
-  execute: (args: unknown, ctx: Record<string, unknown>) => Promise<{ output: string; title: string; metadata: Record<string, unknown> }>
-}
+// A projected container tool, shaped as an SDK `ToolDefinition`. args are a
+// ZodRawShape (the plugin SDK contract): the registry's fromPlugin path
+// detects Zod types and generates the correct flat JSON Schema. Passing the
+// dsh JSON Schema document as-is would make the registry treat its top-level
+// keys (type/properties/required) as property definitions, producing a nested
+// schema the model cannot call.
+type ProjectedTool = ToolDefinition
 
-type ToolContext = {
-  abort?: AbortSignal
-  sessionID: string
-  directory: string
-  worktree: string
-  callID?: string
-  ask(input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }): Promise<void>
-}
+// The SDK ToolContext surface this adapter consumes, plus the optional
+// callID the host Tool.Context carries at runtime.
+type ToolContext = PluginToolContext & { callID?: string }
 
 type DshSession = {
   header: { id: string; cwd: string }
@@ -243,34 +235,33 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
     return {
       description: schema.description,
       args: jsonSchemaToZodShape(schema.parameters),
-      execute: async (args, ctx) => {
-        const toolCtx = ctx as ToolContext
-        await askToolPermission(source, args, toolCtx)
-        let session = sessions.get(toolCtx.sessionID)
+      execute: async (args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> => {
+        await askToolPermission(source, args, ctx)
+        let session = sessions.get(ctx.sessionID)
         if (!session) {
           session = {
-            header: { id: toolCtx.sessionID, cwd: toolCtx.directory },
+            header: { id: ctx.sessionID, cwd: ctx.directory },
             events: sandboxEvents,
           }
-          sessions.set(toolCtx.sessionID, session)
+          sessions.set(ctx.sessionID, session)
         }
         const agent = {
           session,
         }
         const result = await tools.execute({
-          callId: toolCtx.callID ?? `dsh-${source}-${Date.now()}`,
+          callId: ctx.callID ?? `dsh-${source}-${Date.now()}`,
           name: source,
           arguments: args,
-          signal: toolCtx.abort ?? new AbortController().signal,
+          signal: ctx.abort ?? new AbortController().signal,
           agent,
         })
         const output = contentText(result.content)
         if (result.isError) {
           const message = output || result.error?.message || `dsh tool "${source}" failed`
-          log.error("tool call failed", { tool: source, sessionID: toolCtx.sessionID, callID: toolCtx.callID, error: message })
+          log.error("tool call failed", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID, error: message })
           throw new Error(message)
         }
-        log.info("tool call", { tool: source, sessionID: toolCtx.sessionID, callID: toolCtx.callID })
+        log.info("tool call", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID })
         return {
           output,
           title: source,
@@ -288,7 +279,7 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
       for (const { source, target } of mappings) {
         const schema = available.get(source)
         if (!schema) continue
-        output.tools[target] = project(source, target, schema) as unknown as ToolDefinition
+        output.tools[target] = project(source, target, schema)
       }
     },
   }
