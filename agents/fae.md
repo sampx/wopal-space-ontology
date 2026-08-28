@@ -10,7 +10,7 @@ permission:
   skill:
     "*": deny
     skill-creator: allow
-  doom_loop: allow
+  doom_loop: deny
   external_directory:
     "*": deny
   read:
