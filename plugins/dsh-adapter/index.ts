@@ -56,6 +56,7 @@ type Container = {
       isError: boolean
       content?: { type: string; text?: string }[]
       error?: { message?: string }
+      meta?: unknown
     }>
   } | undefined
   logger(name: string): {
@@ -106,6 +107,29 @@ type JsonSchemaNode = {
 }
 
 /**
+ * dsh tools use snake_case argument names; ellamaka's Workbench render layer
+ * reads camelCase. The adapter maps the model-facing schema to camelCase so
+ * the projected tool looks like a builtin, then maps back to snake_case
+ * before dispatching into the dsh container.
+ */
+const ARG_NAME_MAP: Record<string, string> = {
+  file_path: "filePath",
+  old_string: "oldString",
+  new_string: "newString",
+}
+
+function toCamelCase(name: string): string {
+  return ARG_NAME_MAP[name] ?? name
+}
+
+function toSnakeCase(name: string): string {
+  for (const [snake, camel] of Object.entries(ARG_NAME_MAP)) {
+    if (camel === name) return snake
+  }
+  return name
+}
+
+/**
  * Convert a dsh JSON Schema document into a ZodRawShape.
  *
  * The dsh tool registry exposes each tool's parameters as a full JSON Schema
@@ -123,7 +147,7 @@ function jsonSchemaToZodShape(schema: unknown): Record<string, z.ZodType> {
   for (const [name, property] of Object.entries(properties)) {
     let type = jsonSchemaNodeToZod(property)
     if (!required.has(name)) type = type.optional()
-    shape[name] = type
+    shape[toCamelCase(name)] = type
   }
   return shape
 }
@@ -152,6 +176,97 @@ function contentText(content: { type: string; text?: string }[] | undefined): st
   return (content ?? [])
     .map((block) => (block.type === "text" ? (block.text ?? "") : ""))
     .join("\n")
+}
+
+type DshDiff = { path: string; oldText: string | null; newText: string }
+
+/**
+ * Count added/removed lines between two texts using an order-sensitive,
+ * duplicate-preserving LCS diff. A line present on both sides is not a change;
+ * only lines unique to one side count toward the `+N/-N` badge, matching the
+ * builtin edit tool's per-change statistics. Repeated lines are handled
+ * correctly (e.g. `"same\nsame"` → `"same"` is `+0/-1`, not `+0/-0`).
+ *
+ * Uses a rolling LCS-length table (O(m) memory) instead of a full O(n*m) table,
+ * so large hunks cannot exhaust memory. Retained lines equal the LCS length,
+ * so deletions = n - LCS and additions = m - LCS. For very large hunks the
+ * O(n*m) comparison is bounded by a threshold: beyond it the function returns
+ * `null` so the caller omits the structured `filediff` entirely rather than
+ * showing a misleading badge.
+ */
+function countLineChanges(before: string, after: string): { additions: number; deletions: number } | null {
+  const beforeLines = before.split("\n")
+  const afterLines = after.split("\n")
+  const n = beforeLines.length
+  const m = afterLines.length
+  // Bound the O(n*m) LCS comparison. Beyond this, signal "too large to count
+  // precisely" so the caller drops the filediff instead of emitting a wrong
+  // badge.
+  const MAX_LCS_CELLS = 1_000_000
+  if (n * m > MAX_LCS_CELLS) {
+    return null
+  }
+  let prev = new Array<number>(m + 1).fill(0)
+  let curr = new Array<number>(m + 1).fill(0)
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      curr[j] = beforeLines[i] === afterLines[j]
+        ? prev[j + 1] + 1
+        : Math.max(prev[j], curr[j + 1])
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  const lcs = prev[0]
+  return { additions: m - lcs, deletions: n - lcs }
+}
+
+/**
+ * Extract an ellamaka `filediff` from dsh result `meta.diffs`.
+ *
+ * dsh's edit/write tools project `meta.diffs` (an array of `{path, oldText,
+ * newText}` hunks, one per applied change) via their `presentationMeta`. The
+ * Workbench render layer (`message-part.tsx`) consumes `filediff` with
+ * `file`/`before`/`after` and derives the diff itself when `patch` is absent.
+ *
+ * The adapter merges every hunk into a single `filediff`: `before`/`after`
+ * concatenate each hunk's old/new text, and the `+N/-N` badge sums the
+ * per-hunk line changes. This mirrors dsh's own DiffBlock, which draws each
+ * hunk's old side red and new side green without line numbers. Malformed or
+ * absent meta yields `undefined` so the projected tool degrades to plain text.
+ */
+function filediffFromMeta(meta: unknown): { file: string; before: string; after: string; additions: number; deletions: number } | undefined {
+  if (typeof meta !== "object" || meta === null || Array.isArray(meta)) return undefined
+  const diffs = (meta as Record<string, unknown>).diffs
+  if (!Array.isArray(diffs) || diffs.length === 0) return undefined
+  const file = (diffs[0] as Partial<DshDiff> | undefined)?.path
+  if (typeof file !== "string" || file.length === 0) return undefined
+  const beforeParts: string[] = []
+  const afterParts: string[] = []
+  let additions = 0
+  let deletions = 0
+  for (const raw of diffs) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined
+    const diff = raw as Partial<DshDiff>
+    if (typeof diff.path !== "string" || typeof diff.newText !== "string") return undefined
+    if (diff.oldText !== null && typeof diff.oldText !== "string") return undefined
+    const before = diff.oldText ?? ""
+    const after = diff.newText
+    beforeParts.push(before)
+    afterParts.push(after)
+    const counts = countLineChanges(before, after)
+    // A null count means the hunk is too large to count precisely; omit the
+    // structured filediff rather than show a misleading badge.
+    if (counts === null) return undefined
+    additions += counts.additions
+    deletions += counts.deletions
+  }
+  return {
+    file,
+    before: beforeParts.join("\n"),
+    after: afterParts.join("\n"),
+    additions,
+    deletions,
+  }
 }
 
 function isInside(root: string, target: string): boolean {
@@ -236,7 +351,14 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
       description: schema.description,
       args: jsonSchemaToZodShape(schema.parameters),
       execute: async (args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> => {
-        await askToolPermission(source, args, ctx)
+        // Map the model-facing camelCase args back to dsh snake_case before
+        // permission checks and dispatch, so both read the same snake_case
+        // surface the container expects.
+        const dispatchArgs: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(args)) {
+          dispatchArgs[toSnakeCase(key)] = value
+        }
+        await askToolPermission(source, dispatchArgs, ctx)
         let session = sessions.get(ctx.sessionID)
         if (!session) {
           session = {
@@ -251,7 +373,7 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         const result = await tools.execute({
           callId: ctx.callID ?? `dsh-${source}-${Date.now()}`,
           name: source,
-          arguments: args,
+          arguments: dispatchArgs,
           signal: ctx.abort ?? new AbortController().signal,
           agent,
         })
@@ -262,10 +384,13 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
           throw new Error(message)
         }
         log.info("tool call", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID })
+        const metadata: Record<string, unknown> = { source: "dsh-container", containerTool: source }
+        const filediff = filediffFromMeta(result.meta)
+        if (filediff) metadata.filediff = filediff
         return {
           output,
           title: source,
-          metadata: { source: "dsh-container", containerTool: source },
+          metadata,
         }
       },
     }

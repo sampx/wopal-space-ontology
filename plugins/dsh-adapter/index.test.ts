@@ -30,6 +30,7 @@ type Container = {
       isError: boolean
       content?: { type: string; text?: string }[]
       error?: { message?: string }
+      meta?: unknown
     }>
   } | undefined
   logger(name: string): ContainerLogger
@@ -58,6 +59,7 @@ type ToolsService = {
     isError: boolean
     content?: { type: string; text?: string }[]
     error?: { message?: string }
+    meta?: unknown
   }>
 }
 
@@ -262,9 +264,9 @@ describe("dsh-adapter projection", () => {
       },
     }
 
-    await (tools.read as Projected).execute({ file_path: "src/file.ts" }, ctx)
-    await (tools.write as Projected).execute({ file_path: "/outside/file.ts", content: "next" }, ctx)
-    await (tools.edit as Projected).execute({ file_path: "src/file.ts", old_string: "before", new_string: "after" }, ctx)
+    await (tools.read as Projected).execute({ filePath: "src/file.ts" }, ctx)
+    await (tools.write as Projected).execute({ filePath: "/outside/file.ts", content: "next" }, ctx)
+    await (tools.edit as Projected).execute({ filePath: "src/file.ts", oldString: "before", newString: "after" }, ctx)
 
     expect(asks).toEqual([
       { permission: "read", patterns: ["app/src/file.ts"], always: ["*"], metadata: {} },
@@ -488,5 +490,297 @@ describe("dsh-adapter projection", () => {
     expect(logged[0].level).toBe("error")
     expect(logged[0].message).toBe("tool call failed")
     expect(logged[0].extra).toMatchObject({ tool: "grep", sessionID: "ses-log" })
+  })
+
+  test("execute projects dsh meta.diffs into ellamaka filediff metadata", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        meta: {
+          diffs: [
+            { path: "/workspace/app/src/file.ts", oldText: "unchanged\nold\n", newText: "unchanged\nnew\n" },
+          ],
+        },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/workspace/app/src/file.ts", oldString: "old", newString: "new" },
+      { sessionID: "ses-diff", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    const filediff = res.metadata.filediff as {
+      file: string
+      before: string
+      after: string
+      additions: number
+      deletions: number
+    }
+    expect(filediff.file).toBe("/workspace/app/src/file.ts")
+    expect(filediff.before).toBe("unchanged\nold\n")
+    expect(filediff.after).toBe("unchanged\nnew\n")
+    // Only the changed line counts; the shared context line is not a change.
+    expect(filediff.additions).toBe(1)
+    expect(filediff.deletions).toBe(1)
+  })
+
+  test("execute maps dsh snake_case args to ellamaka camelCase before dispatch", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } } },
+        },
+      ],
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    await tool.execute(
+      { filePath: "/workspace/app/src/file.ts", oldString: "before", newString: "after" },
+      { sessionID: "ses-map", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    const exec = captured[0] as { arguments?: Record<string, unknown> }
+    expect(exec.arguments).toEqual({
+      file_path: "/workspace/app/src/file.ts",
+      old_string: "before",
+      new_string: "after",
+    })
+  })
+
+  test("execute preserves unmapped args unchanged when dispatching", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "write",
+          description: "dsh write",
+          parameters: { properties: { file_path: { type: "string" }, content: { type: "string" } } },
+        },
+      ],
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.write as Projected
+    await tool.execute(
+      { filePath: "/workspace/app/src/file.ts", content: "hello" },
+      { sessionID: "ses-unmapped", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    const exec = captured[0] as { arguments?: Record<string, unknown> }
+    expect(exec.arguments).toEqual({
+      file_path: "/workspace/app/src/file.ts",
+      content: "hello",
+    })
+  })
+
+  test("filediffFromMeta degrades to undefined on malformed meta", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: { diffs: [{ path: "x", newText: null }] },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/workspace/app/src/file.ts" },
+      { sessionID: "ses-malformed", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    expect(res.metadata.filediff).toBeUndefined()
+  })
+
+  test("filediffFromMeta counts repeated-line changes correctly", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: { diffs: [{ path: "/w/f.ts", oldText: "same\nsame\n", newText: "same\n" }] },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-repeat", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    const filediff = res.metadata.filediff as { additions: number; deletions: number }
+    // One repeated line removed; the surviving "same" line is not a change.
+    expect(filediff.additions).toBe(0)
+    expect(filediff.deletions).toBe(1)
+  })
+
+  test("filediffFromMeta counts pure insertion with no deletions", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "write",
+          description: "dsh write",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: { diffs: [{ path: "/w/f.ts", oldText: null, newText: "new\nline\n" }] },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.write as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-insert", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    const filediff = res.metadata.filediff as { additions: number; deletions: number }
+    expect(filediff.additions).toBe(2)
+    expect(filediff.deletions).toBe(0)
+  })
+
+  test("filediffFromMeta merges multiple hunks into one filediff", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: {
+          diffs: [
+            { path: "/w/f.ts", oldText: "old1\n", newText: "new1\n" },
+            { path: "/w/f.ts", oldText: "old2\n", newText: "new2\n" },
+          ],
+        },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-multi", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    const filediff = res.metadata.filediff as { file: string; before: string; after: string; additions: number; deletions: number }
+    expect(filediff.file).toBe("/w/f.ts")
+    expect(filediff.before).toBe("old1\n\nold2\n")
+    expect(filediff.after).toBe("new1\n\nnew2\n")
+    expect(filediff.additions).toBe(2)
+    expect(filediff.deletions).toBe(2)
+  })
+
+  test("filediffFromMeta degrades to undefined when a later hunk is null", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: {
+          diffs: [
+            { path: "/w/f.ts", oldText: "old\n", newText: "new\n" },
+            null,
+          ],
+        },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-nullhunk", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    expect(res.metadata.filediff).toBeUndefined()
+  })
+
+  test("filediffFromMeta omits filediff for oversized hunks", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "write",
+          description: "dsh write",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        meta: {
+          diffs: [
+            { path: "/w/f.ts", oldText: "x\n".repeat(2000), newText: "y\n".repeat(2000) },
+          ],
+        },
+      }),
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.write as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-oversize", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    // 2000*2000 = 4M cells > 1M threshold; the filediff is omitted rather than
+    // showing a misleading badge.
+    expect(res.metadata.filediff).toBeUndefined()
+  })
+
+  test("projected args expose camelCase filePath for read/edit/write", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "read",
+          description: "dsh read",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "read", target: "read", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.read as { args: Record<string, unknown> }
+    expect(Object.keys(tool.args)).toEqual(["filePath"])
   })
 })
