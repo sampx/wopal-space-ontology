@@ -59,6 +59,7 @@ type ToolCtx = {
   directory: string
   worktree: string
   callID?: string
+  extra?: { sandboxMode?: string }
   ask(input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }): Promise<void>
 }
 
@@ -636,6 +637,111 @@ describe("dsh-adapter projection", () => {
     await tool.execute({}, { sessionID: "ses-noopt", directory: "/w", worktree: "/w", ask: async () => {} })
     expect(captured[0]?.eventsAtDispatch).toEqual([
       { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+    ])
+  })
+
+  test("extra.sandboxMode read-only overrides a full-access space default", async () => {
+    const captured: { eventsAtDispatch: unknown[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute(
+      {},
+      { sessionID: "ses-override", directory: "/w", worktree: "/w", extra: { sandboxMode: "read-only" }, ask: async () => {} },
+    )
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+    ])
+  })
+
+  test("extra.sandboxMode full-access overrides a workspace-write space default", async () => {
+    const captured: { eventsAtDispatch: unknown[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "workspace-write" },
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute(
+      {},
+      { sessionID: "ses-loosen", directory: "/w", worktree: "/w", extra: { sandboxMode: "full-access" }, ask: async () => {} },
+    )
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+    ])
+  })
+
+  test("extra.sandboxMode matching the space default appends no duplicate event", async () => {
+    const captured: { eventsAtDispatch: unknown[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "read-only" },
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute(
+      {},
+      { sessionID: "ses-same", directory: "/w", worktree: "/w", extra: { sandboxMode: "read-only" }, ask: async () => {} },
+    )
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+    ])
+  })
+
+  test("mode override is per-session: another session keeps the space default", async () => {
+    const captured: { eventsAtDispatch: unknown[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "read-only" },
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute(
+      {},
+      { sessionID: "ses-a", directory: "/w", worktree: "/w", extra: { sandboxMode: "workspace-write" }, ask: async () => {} },
+    )
+    await tool.execute({}, { sessionID: "ses-b", directory: "/w", worktree: "/w", ask: async () => {} })
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "turn/start", data: {} },
+    ])
+    expect(captured[1]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "read-only" } },
       { type: "turn/start", data: {} },
     ])
   })

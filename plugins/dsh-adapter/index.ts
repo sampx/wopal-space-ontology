@@ -160,6 +160,10 @@ type ProjectedTool = ToolDefinition
 // callID the host Tool.Context carries at runtime.
 type ToolContext = PluginToolContext & { callID?: string }
 
+// Per-message sandbox mode selected in the composer. Carried on Tool.Context
+// extra by the host; absent falls back to the space-level default.
+type SandboxMode = "read-only" | "workspace-write" | "full-access"
+
 // A session facade shaped for dsh consumers (approval plugin, sandbox fold).
 // `events` is PRIVATE to this ellamaka session: seeded with a fresh copy of
 // the sandbox-mode event so `append` (turn pairs, approval audit) can never
@@ -464,13 +468,22 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   // container's sandbox backend is never switched; only the effective mode is
   // loosened. `mode` defaults to `workspace-write` (the dsh base profile
   // default) when the sandbox is enabled.
+  // Space-level default (mount-time fallback). The per-message mode from
+  // Tool.Context.extra takes precedence; this only applies when the caller
+  // did not select a mode (TUI sessions, queue follow-ups without a choice).
   const sandboxEnabled = options.sandbox?.enabled === true
-  const sandboxMode = sandboxEnabled ? (options.sandbox?.mode ?? "workspace-write") : "danger-full-access"
-  // Per-facade seed: the sandbox mode fold + (never policy) the approval
-  // policy override dsh's ApprovalService folds via effectiveApprovalPolicy.
-  // Copied per session so appends never leak across facades.
+  const defaultMode: SandboxMode = sandboxEnabled
+    ? (options.sandbox?.mode === "read-only" ? "read-only" : "workspace-write")
+    : "full-access"
+  // Per-facade seed: the space-default sandbox mode fold + (never policy) the
+  // approval policy override dsh's ApprovalService folds via
+  // effectiveApprovalPolicy. Copied per session so appends never leak across
+  // facades. Per-message overrides append at execute time (LAST-wins fold).
+  // dsh event-log vocabulary: the composer's full-access preset folds to the
+  // one-shot danger-full-access mode (never a space-level config value).
+  const seedMode = defaultMode === "full-access" ? "danger-full-access" : defaultMode
   const sandboxEvents: { type: string; data: unknown }[] = [
-    { type: "sandbox/mode", data: { mode: sandboxMode } },
+    { type: "sandbox/mode", data: { mode: seedMode } },
     ...escalationPolicyEvents,
   ]
 
@@ -490,6 +503,12 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
       sessions.set(sessionID, facade)
     }
     return facade
+  }
+
+  // dsh event-log vocabulary for the composer's full-access preset: the
+  // one-shot danger-full-access fold. Never a space-level config value.
+  function modeEventValue(mode: SandboxMode): string {
+    return mode === "full-access" ? "danger-full-access" : mode
   }
 
   // Reference-counted turn boundary around one tools.execute() call. Concurrent
@@ -523,6 +542,14 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         }
         await askToolPermission(source, dispatchArgs, ctx)
         const session = facadeFor(ctx.sessionID, ctx.directory)
+        // Per-message sandbox override: the composer selector rides on
+        // Tool.Context.extra. Appending a fresh sandbox/mode event (LAST-wins
+        // fold) switches the effective mode mid-session; absence keeps the
+        // space-level default seeded at facade creation.
+        const requestedMode = (ctx.extra as { sandboxMode?: SandboxMode } | undefined)?.sandboxMode
+        if (requestedMode && requestedMode !== defaultMode) {
+          session.append("sandbox/mode", { mode: modeEventValue(requestedMode) })
+        }
         // Register this call's ask closure for the escalation answerer: dsh
         // routes `approval/request` back through
         // `req.agent.session.header.id` (= ctx.sessionID), and the closure
