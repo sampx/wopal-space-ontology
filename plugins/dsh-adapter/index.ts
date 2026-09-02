@@ -18,7 +18,13 @@
  *
  *   - session.header.cwd — resolved workdir for spawns
  *   - session.header.id  — spill ownership label
- *   - session.events     — sandbox-mode policy fold
+ *   - session.events     — sandbox-mode policy fold + turn/approval audit
+ *   - session.append     — audit-pair sink (approval/asked, approval/decided)
+ *
+ * Every tools.execute() dispatch is wrapped in a reference-counted turn
+ * boundary (`turn/start` → dispatch → `turn/end`, finally-closed) so the dsh
+ * approval plugin's open-turn precondition (`hasOpenTurn`) holds during
+ * escalation audit.
  *
  * No dsh session is created in the container, so the container state stays
  * free of per-ellamaka-session records.
@@ -92,9 +98,18 @@ type ProjectedTool = ToolDefinition
 // callID the host Tool.Context carries at runtime.
 type ToolContext = PluginToolContext & { callID?: string }
 
-type DshSession = {
+// A session facade shaped for dsh consumers (approval plugin, sandbox fold).
+// `events` is PRIVATE to this ellamaka session: seeded with a fresh copy of
+// the sandbox-mode event so `append` (turn pairs, approval audit) can never
+// leak into another session's log. `turnDepth` reference-counts concurrent
+// tools.execute() calls so nested/concurrent dispatches emit exactly one
+// turn/start — turn/end pair, closed only at the outermost level (the shape
+// dsh's hasOpenTurn reverse-scan expects).
+type FacadeSession = {
   header: { id: string; cwd: string }
-  events: unknown[]
+  events: { type: string; data: unknown }[]
+  append(type: string, data: unknown): void
+  turnDepth: number
 }
 
 type JsonSchemaNode = {
@@ -330,7 +345,7 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   if (!tools) return { "tool.provider": async (_input, _output) => {} }
 
   const log = container.logger("dsh-adapter")
-  const sessions = new Map<string, DshSession>()
+  const sessions = new Map<string, FacadeSession>()
 
   // Resolve the space-level sandbox policy once at mount. `enabled: true`
   // selects the sandbox backend and injects a `sandbox/mode` event into every
@@ -341,7 +356,39 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   // default) when the sandbox is enabled.
   const sandboxEnabled = options.sandbox?.enabled === true
   const sandboxMode = sandboxEnabled ? (options.sandbox?.mode ?? "workspace-write") : "danger-full-access"
-  const sandboxEvents = [{ type: "sandbox/mode", data: { mode: sandboxMode } }]
+  const sandboxEvents: { type: string; data: unknown }[] = [{ type: "sandbox/mode", data: { mode: sandboxMode } }]
+
+  // Per-session facade factory. Seeding copies `sandboxEvents` so each
+  // session's log is independently appendable.
+  function facadeFor(sessionID: string, directory: string): FacadeSession {
+    let facade = sessions.get(sessionID)
+    if (!facade) {
+      facade = {
+        header: { id: sessionID, cwd: directory },
+        events: [...sandboxEvents],
+        append(type, data) {
+          this.events.push({ type, data })
+        },
+        turnDepth: 0,
+      }
+      sessions.set(sessionID, facade)
+    }
+    return facade
+  }
+
+  // Reference-counted turn boundary around one tools.execute() call. Concurrent
+  // calls on the same session share a single open turn: the pair is emitted
+  // only at the outermost nesting level, matching dsh's hasOpenTurn semantics.
+  async function executeInTurn<T>(facade: FacadeSession, run: () => Promise<T>): Promise<T> {
+    facade.turnDepth += 1
+    if (facade.turnDepth === 1) facade.append("turn/start", {})
+    try {
+      return await run()
+    } finally {
+      facade.turnDepth -= 1
+      if (facade.turnDepth === 0) facade.append("turn/end", {})
+    }
+  }
 
   // Project a single container tool onto its target slot. The execute closure
   // is rebuilt per provider call but reuses the shared facade cache, logger,
@@ -359,39 +406,34 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
           dispatchArgs[toSnakeCase(key)] = value
         }
         await askToolPermission(source, dispatchArgs, ctx)
-        let session = sessions.get(ctx.sessionID)
-        if (!session) {
-          session = {
-            header: { id: ctx.sessionID, cwd: ctx.directory },
-            events: sandboxEvents,
-          }
-          sessions.set(ctx.sessionID, session)
-        }
+        const session = facadeFor(ctx.sessionID, ctx.directory)
         const agent = {
           session,
         }
-        const result = await tools.execute({
-          callId: ctx.callID ?? `dsh-${source}-${Date.now()}`,
-          name: source,
-          arguments: dispatchArgs,
-          signal: ctx.abort ?? new AbortController().signal,
-          agent,
+        return executeInTurn(session, async () => {
+          const result = await tools.execute({
+            callId: ctx.callID ?? `dsh-${source}-${Date.now()}`,
+            name: source,
+            arguments: dispatchArgs,
+            signal: ctx.abort ?? new AbortController().signal,
+            agent,
+          })
+          const output = contentText(result.content)
+          if (result.isError) {
+            const message = output || result.error?.message || `dsh tool "${source}" failed`
+            log.error("tool call failed", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID, error: message })
+            throw new Error(message)
+          }
+          log.info("tool call", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID })
+          const metadata: Record<string, unknown> = { source: "dsh-container", containerTool: source }
+          const filediff = filediffFromMeta(result.meta)
+          if (filediff) metadata.filediff = filediff
+          return {
+            output,
+            title: source,
+            metadata,
+          }
         })
-        const output = contentText(result.content)
-        if (result.isError) {
-          const message = output || result.error?.message || `dsh tool "${source}" failed`
-          log.error("tool call failed", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID, error: message })
-          throw new Error(message)
-        }
-        log.info("tool call", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID })
-        const metadata: Record<string, unknown> = { source: "dsh-container", containerTool: source }
-        const filediff = filediffFromMeta(result.meta)
-        if (filediff) metadata.filediff = filediff
-        return {
-          output,
-          title: source,
-          metadata,
-        }
       },
     }
   }

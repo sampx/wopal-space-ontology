@@ -14,6 +14,12 @@
  *    `sandbox/mode` event; `sandbox.enabled:true` injects the configured mode
  *  - execute passes a per-call agent with header.id/header.cwd only (no
  *    container session is created)
+ *  - the session facade owns a private events array (deep-copied sandbox
+ *    seed) and exposes `append(type, data)` for audit pairs
+ *  - every tools.execute() is wrapped in a turn boundary: `turn/start` before
+ *    dispatch, `turn/end` in a finally (closed even when the tool throws),
+ *    reference-counted so concurrent calls on the same session emit exactly
+ *    one start/end pair at the outermost nesting level
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 
@@ -201,10 +207,11 @@ describe("dsh-adapter projection", () => {
   })
 
   test("execute passes a reusable session facade with header id, cwd, and events", async () => {
-    const captured: unknown[] = []
+    const captured: { exec: unknown; eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push(exec)
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ exec, eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
@@ -219,15 +226,135 @@ describe("dsh-adapter projection", () => {
     }
     await tool.execute({}, ctx)
     await tool.execute({}, ctx)
-    const exec = captured[0] as {
+    const first = captured[0]
+    const repeated = captured[1] as { exec: { agent?: { session?: object } } }
+    const exec = first.exec as {
       agent?: { session?: { header?: { id?: string; cwd?: string }; events?: unknown[] } }
     }
-    const repeated = captured[1] as { agent?: { session?: object } }
     expect(exec.agent?.session?.header?.id).toBe("ses-abc")
     expect(exec.agent?.session?.header?.cwd).toBe("/ellamaka/ws")
-    // Sandbox option absent -> adapter injects danger-full-access (P3.5).
-    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "danger-full-access" } }])
-    expect(repeated.agent?.session).toBe(exec.agent?.session)
+    // Sandbox option absent -> adapter injects danger-full-access (P3.5); the
+    // dispatch happens inside an open turn (snapshot taken before the
+    // finally-closed turn/end is appended).
+    expect(first.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+    ])
+    expect(repeated.exec.agent?.session).toBe(exec.agent?.session)
+  })
+
+  test("session facade owns a private events array per session", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const ctxA = { sessionID: "ses-a", directory: "/w", worktree: "/w", ask: async () => {} }
+    const ctxB = { sessionID: "ses-b", directory: "/w", worktree: "/w", ask: async () => {} }
+    await tool.execute({}, ctxA)
+    await tool.execute({}, ctxB)
+    const execA = captured[0] as { agent?: { session?: { events?: unknown[] } } }
+    const execB = captured[1] as { agent?: { session?: { events?: unknown[] } } }
+    const eventsA = execA.agent?.session?.events
+    const eventsB = execB.agent?.session?.events
+    // Per-session arrays: appending turn events for session A must not leak
+    // into session B's log (the shared sandboxEvents array would break this).
+    expect(eventsA).not.toBe(eventsB)
+    expect(eventsB).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+      { type: "turn/end", data: {} },
+    ])
+  })
+
+  test("facade append pushes typed events onto the session events array", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const ctx = { sessionID: "ses-append", directory: "/w", worktree: "/w", ask: async () => {} }
+    await tool.execute({}, ctx)
+    await tool.execute({}, ctx)
+    // Both dispatches run inside the SAME session facade (cached by
+    // sessionID). The live events array ends with two closed turn pairs —
+    // the append surface approval/asked will use between them.
+    const exec = captured[1] as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }
+    expect(exec.agent?.session?.events).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+      { type: "turn/end", data: {} },
+      { type: "turn/start", data: {} },
+      { type: "turn/end", data: {} },
+    ])
+  })
+
+  test("execute closes the turn when the tool throws", async () => {
+    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        // Capture the live events array reference: the facade's finally block
+        // appends to this same array after the tool throws.
+        captured.push({
+          events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+        })
+        throw new Error("boom")
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await expect(
+      tool.execute({}, { sessionID: "ses-throw", directory: "/w", worktree: "/w", ask: async () => {} }),
+    ).rejects.toThrow("boom")
+    // finally-closed: hasOpenTurn's reverse scan must see turn/end after the
+    // matching turn/start, or the approval precondition breaks on the next call.
+    const events = captured[0]?.events ?? []
+    expect(events[events.length - 1].type).toBe("turn/end")
+  })
+
+  test("concurrent executes share one outermost turn pair (reference counting)", async () => {
+    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push({
+          events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+        })
+        await gate
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const ctx = { sessionID: "ses-concurrent", directory: "/w", worktree: "/w", ask: async () => {} }
+    // Two calls dispatched in parallel on the same session; both block inside
+    // the container until `release`.
+    const first = tool.execute({}, ctx)
+    const second = tool.execute({}, ctx)
+    release()
+    await Promise.all([first, second])
+    const events = captured[0]?.events ?? []
+    const types = events.map((event) => event.type)
+    expect(types.filter((type) => type === "turn/start")).toHaveLength(1)
+    expect(types.filter((type) => type === "turn/end")).toHaveLength(1)
+    expect(types[0]).toBe("sandbox/mode")
+    expect(types[1]).toBe("turn/start")
+    expect(types[types.length - 1]).toBe("turn/end")
   })
 
   test("execute preserves ellamaka file and external-directory permission gates", async () => {
@@ -385,10 +512,11 @@ describe("dsh-adapter projection", () => {
   })
 
   test("sandbox enabled injects sandbox/mode event into session facade", async () => {
-    const captured: unknown[] = []
+    const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push(exec)
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
@@ -399,15 +527,18 @@ describe("dsh-adapter projection", () => {
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, { sessionID: "ses-sandbox", directory: "/w", worktree: "/w", ask: async () => {} })
-    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
-    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "read-only" } }])
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+    ])
   })
 
   test("sandbox enabled without mode defaults to workspace-write", async () => {
-    const captured: unknown[] = []
+    const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push(exec)
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
@@ -418,15 +549,18 @@ describe("dsh-adapter projection", () => {
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, { sessionID: "ses-default", directory: "/w", worktree: "/w", ask: async () => {} })
-    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
-    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "workspace-write" } }])
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "turn/start", data: {} },
+    ])
   })
 
   test("sandbox disabled injects danger-full-access mode event", async () => {
-    const captured: unknown[] = []
+    const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push(exec)
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
@@ -437,15 +571,18 @@ describe("dsh-adapter projection", () => {
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, { sessionID: "ses-nosandbox", directory: "/w", worktree: "/w", ask: async () => {} })
-    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
-    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "danger-full-access" } }])
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+    ])
   })
 
   test("sandbox config absent injects danger-full-access mode event", async () => {
-    const captured: unknown[] = []
+    const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push(exec)
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
@@ -453,8 +590,10 @@ describe("dsh-adapter projection", () => {
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, { sessionID: "ses-noopt", directory: "/w", worktree: "/w", ask: async () => {} })
-    const exec = captured[0] as { agent?: { session?: { events?: unknown[] } } }
-    expect(exec.agent?.session?.events).toEqual([{ type: "sandbox/mode", data: { mode: "danger-full-access" } }])
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "turn/start", data: {} },
+    ])
   })
 
   test("execute logs the tool call through the container logger", async () => {
