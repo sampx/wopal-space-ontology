@@ -26,6 +26,18 @@
  * approval plugin's open-turn precondition (`hasOpenTurn`) holds during
  * escalation audit.
  *
+ * Escalation approval (Plan D-03/D-04/D-05): the adapter registers an
+ * `approval/request` answerer on the container's cordis ctx. It routes each
+ * dsh ask by session id to the calling turn's `ToolContext.ask` closure
+ * (held in a per-session registry), asks ellamaka's Permission under
+ * `sandbox_escalation` (patterns = the escalation target mode parsed from
+ * the dsh reason, metadata = tool/callID/justification), and maps the
+ * outcome — resolve → `allowed-once`, RejectedError/CorrectedError →
+ * `rejected`, registry miss → `next()` (waterfall fail-closed). The
+ * `escalation: "never"` option seeds an `approval/policy` event into every
+ * facade so dsh's ApprovalService rejects deterministically before any
+ * answerer dispatch.
+ *
  * No dsh session is created in the container, so the container state stays
  * free of per-ellamaka-session records.
  *
@@ -70,6 +82,47 @@ type Container = {
     warn(message: string, extra?: unknown): void
     error(message: string, extra?: unknown): void
   }
+  /**
+   * The cordis event surface. The adapter registers its `approval/request`
+   * answerer through it so dsh's ApprovalService waterfall can reach the
+   * ellamaka Permission ask closure for the requesting session.
+   */
+  on(event: "approval/request", handler: (req: DshApprovalRequest, next: () => unknown) => unknown): unknown
+}
+
+/**
+ * The dsh `approval/request` waterfall payload (structural subset: the
+ * adapter only consumes the routing id and the prompt-text fields).
+ */
+type DshApprovalRequest = {
+  agent?: { session?: { header?: { id?: string } } }
+  toolName?: string
+  callId?: string
+  reason?: string
+}
+
+/**
+ * The SDK ToolContext.ask input shape the escalation answerer builds
+ * (Omit<Permission.Request, "id" | "sessionID" | "tool">).
+ */
+type AskInput = {
+  permission: string
+  patterns: string[]
+  always: string[]
+  metadata: Record<string, unknown>
+}
+
+type AskFn = (input: AskInput) => Promise<void>
+
+/**
+ * Extract the escalation target mode from a dsh approval reason. The dsh
+ * escalation choreography (`approveEscalation`) formats every ask reason as
+ * `escalate sandbox to ${mode}: ${justification}` — the mode is parsed back
+ * out so the ellamaka ask advertises the exact target pattern.
+ */
+function targetModeFromReason(reason: string): string | undefined {
+  const match = /^escalate sandbox to ([a-z-]+):/.exec(reason)
+  return match?.[1]
 }
 
 export type DshAdapterOptions = {
@@ -84,6 +137,15 @@ export type DshAdapterOptions = {
    * switches the local fs/bash backend.
    */
   sandbox?: { enabled: boolean; mode?: "read-only" | "workspace-write" }
+  /**
+   * Sandbox escalation approval policy (`ellamaka.dsh.sandbox.escalation`).
+   * `ask` (the default) bridges dsh `approval/request` asks to ellamaka's
+   * Permission (Workbench approval card); `never` seeds an `approval/policy`
+   * event into every session facade so dsh's ApprovalService rejects every
+   * escalation deterministically before any answerer dispatch (headless
+   * stance, no UI prompt).
+   */
+  escalation?: "ask" | "never"
 }
 
 // A projected container tool, shaped as an SDK `ToolDefinition`. args are a
@@ -347,6 +409,54 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   const log = container.logger("dsh-adapter")
   const sessions = new Map<string, FacadeSession>()
 
+  // Resolve the space-level escalation policy once at mount. `ask` (the
+  // default) bridges dsh approval asks to ellamaka Permission; `never` seeds
+  // an `approval/policy` override into every session facade so dsh's
+  // ApprovalService rejects deterministically before any answerer dispatch.
+  const escalation = options.escalation ?? "ask"
+  const escalationPolicyEvents: { type: string; data: unknown }[] =
+    escalation === "never" ? [{ type: "approval/policy", data: { policy: "never" } }] : []
+
+  // Per-session ask closures for the escalation answerer. Registered on every
+  // tools.execute() (the plugin SDK hands each call its own ToolContext.ask
+  // bound to the live permission table); keyed by the ellamaka sessionID the
+  // dsh request routes back through (req.agent.session.header.id).
+  const askRegistry = new Map<string, AskFn>()
+
+  // Escalation answerer bridge (Plan D-03/D-04): dsh's ApprovalService
+  // waterfall asks THIS listener before falling through to fail-closed.
+  // The ask closure is looked up by the requesting session's id; a hit asks
+  // ellamaka Permission (`sandbox_escalation`) and maps the reply to the dsh
+  // outcome vocabulary — resolve → `allowed-once`, RejectedError /
+  // CorrectedError → `rejected`; a miss delegates via next() so the chain
+  // ends at the service's own `unavailable` (fail closed). A container
+  // without the cordis event surface (degraded container) skips the bridge:
+  // asks then fall through to the service's own fail-closed `unavailable`.
+  container.on?.("approval/request", (req, next) => {
+    const sessionID = req.agent?.session?.header?.id
+    const ask = sessionID !== undefined ? askRegistry.get(sessionID) : undefined
+    if (!ask) return next()
+    const targetMode = req.reason !== undefined ? targetModeFromReason(req.reason) : undefined
+    return ask({
+      permission: "sandbox_escalation",
+      patterns: [targetMode ?? "escalation"],
+      always: [targetMode ?? "escalation"],
+      metadata: {
+        tool: req.toolName,
+        callID: req.callId,
+        justification: req.reason,
+        targetMode,
+      },
+    }).then(
+      () => "allowed-once",
+      (error: unknown) => {
+        const name = (error as { name?: string } | undefined)?.name
+        if (name === "PermissionRejectedError" || name === "PermissionCorrectedError") return "rejected"
+        throw error
+      },
+    )
+  })
+
   // Resolve the space-level sandbox policy once at mount. `enabled: true`
   // selects the sandbox backend and injects a `sandbox/mode` event into every
   // session facade; `enabled: false` (or absent) DISABLES the sandbox by
@@ -356,7 +466,13 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
   // default) when the sandbox is enabled.
   const sandboxEnabled = options.sandbox?.enabled === true
   const sandboxMode = sandboxEnabled ? (options.sandbox?.mode ?? "workspace-write") : "danger-full-access"
-  const sandboxEvents: { type: string; data: unknown }[] = [{ type: "sandbox/mode", data: { mode: sandboxMode } }]
+  // Per-facade seed: the sandbox mode fold + (never policy) the approval
+  // policy override dsh's ApprovalService folds via effectiveApprovalPolicy.
+  // Copied per session so appends never leak across facades.
+  const sandboxEvents: { type: string; data: unknown }[] = [
+    { type: "sandbox/mode", data: { mode: sandboxMode } },
+    ...escalationPolicyEvents,
+  ]
 
   // Per-session facade factory. Seeding copies `sandboxEvents` so each
   // session's log is independently appendable.
@@ -407,6 +523,11 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         }
         await askToolPermission(source, dispatchArgs, ctx)
         const session = facadeFor(ctx.sessionID, ctx.directory)
+        // Register this call's ask closure for the escalation answerer: dsh
+        // routes `approval/request` back through
+        // `req.agent.session.header.id` (= ctx.sessionID), and the closure
+        // carries the live ellamaka permission table of the calling turn.
+        askRegistry.set(ctx.sessionID, ctx.ask)
         const agent = {
           session,
         }

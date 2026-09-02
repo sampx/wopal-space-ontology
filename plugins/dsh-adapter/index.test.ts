@@ -29,6 +29,10 @@ type ContainerLogger = {
   error(message: string, extra?: unknown): void
 }
 
+// An approval/request waterfall listener: dsh dispatches (req, next); the
+// listener either answers with an ApprovalOutcome or delegates via next().
+type ApprovalAnswerer = (req: unknown, next: () => unknown) => unknown
+
 type Container = {
   get(name: "tools"): {
     schemas(): { name: string; description: string; parameters: unknown }[]
@@ -40,11 +44,14 @@ type Container = {
     }>
   } | undefined
   logger(name: string): ContainerLogger
+  /** Optional: the real cordis ctx exposes on(); fakes may capture listeners. */
+  on?(event: string, handler: ApprovalAnswerer): unknown
 }
 
 type AdapterOptions = {
   tools?: { source: string; target: string; enable: boolean }[]
   sandbox?: { enabled: boolean; mode?: string }
+  escalation?: "ask" | "never"
 }
 
 type ToolCtx = {
@@ -98,6 +105,43 @@ function fakeContainer(
       return logger
     },
     ...overrides,
+  }
+}
+
+/**
+ * A fake cordis container ctx that records `on` listeners and can dispatch
+ * the `approval/request` waterfall, while still serving `tools`/`logger`
+ * like the real container. Used in answerer tests: the adapter registers its
+ * answerer via `container.on`, so tests exercise the mapping by dispatching
+ * a captured listener.
+ */
+function fakeContainerCtx(
+  tools?: Partial<ToolsService>,
+): {
+  get(name: "tools"): ToolsService | undefined
+  logger(name: string): ContainerLogger
+  on(event: string, handler: ApprovalAnswerer): unknown
+  dispatchApprovalRequest(req: unknown): unknown
+} {
+  const inner = fakeContainer(tools)
+  const listeners = new Map<string, ApprovalAnswerer[]>()
+  return {
+    get: (name) => inner.get(name),
+    logger: (name) => inner.logger(name),
+    on(event, handler) {
+      const list = listeners.get(event) ?? []
+      list.push(handler)
+      listeners.set(event, list)
+    },
+    dispatchApprovalRequest(req: unknown) {
+      // Mirror cordis waterfall: outermost listener composes around next().
+      let chain: ApprovalAnswerer = () => "unavailable"
+      for (const handler of [...(listeners.get("approval/request") ?? [])].reverse()) {
+        const innerNext = chain
+        chain = (req2: unknown) => handler(req2, () => innerNext(req2))
+      }
+      return chain(req)
+    },
   }
 }
 
@@ -921,5 +965,224 @@ describe("dsh-adapter projection", () => {
     const tools = await invokeProvider(out)
     const tool = tools.read as { args: Record<string, unknown> }
     expect(Object.keys(tool.args)).toEqual(["filePath"])
+  })
+})
+
+describe("dsh-adapter escalation answerer bridge", () => {
+  /** The dsh escalation reason shape: `escalate sandbox to ${mode}: ${justification}`. */
+  const escalationRequest = (overrides?: Partial<Record<string, unknown>>) => ({
+    agent: { session: { header: { id: "ses-esc" } } },
+    toolName: "bash",
+    callId: "call-esc-1",
+    reason: "escalate sandbox to danger-full-access: need to write outside the workspace",
+    ...overrides,
+  })
+
+  test("registers an approval/request answerer on the container ctx", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    expect(Object.keys(out)).toEqual(["tool.provider"])
+    const tools = await invokeProvider(out)
+    expect(Object.keys(tools)).toEqual(["grep"])
+    // Run one execute so the ask closure registers for ses-esc...
+    const tool = tools.grep as Projected
+    await tool.execute({}, {
+      sessionID: "ses-esc",
+      directory: "/w",
+      worktree: "/w",
+      ask: async () => {},
+    })
+    // ...then the answerer must be present and route the request.
+    const outcome = await containerCtx.dispatchApprovalRequest(escalationRequest())
+    expect(outcome).toBe("allowed-once")
+  })
+
+  test("no container ctx.on (legacy fake) degrades: provider still works", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    expect(Object.keys(tools)).toEqual(["grep"])
+  })
+
+  test("ask resolve maps to allowed-once with sandbox_escalation ask params", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const asks: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }[] = []
+    const tool = tools.grep as Projected
+    await tool.execute({}, {
+      sessionID: "ses-esc",
+      directory: "/w",
+      worktree: "/w",
+      ask: async (input) => {
+        asks.push(input)
+      },
+    })
+    const outcome = await containerCtx.dispatchApprovalRequest(escalationRequest())
+    expect(outcome).toBe("allowed-once")
+    expect(asks).toEqual([
+      {
+        permission: "sandbox_escalation",
+        patterns: ["danger-full-access"],
+        always: ["danger-full-access"],
+        metadata: {
+          tool: "bash",
+          callID: "call-esc-1",
+          justification: "escalate sandbox to danger-full-access: need to write outside the workspace",
+          targetMode: "danger-full-access",
+        },
+      },
+    ])
+  })
+
+  test("ask RejectedError maps to rejected", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const rejected = Object.assign(new Error("The user rejected permission to use this specific tool call."), { name: "PermissionRejectedError" })
+    await tool.execute({}, {
+      sessionID: "ses-esc",
+      directory: "/w",
+      worktree: "/w",
+      ask: async () => {
+        throw rejected
+      },
+    })
+    const outcome = await containerCtx.dispatchApprovalRequest(escalationRequest())
+    expect(outcome).toBe("rejected")
+  })
+
+  test("ask CorrectedError maps to rejected", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const corrected = Object.assign(new Error("rejected with feedback: no"), { name: "PermissionCorrectedError", feedback: "no" })
+    await tool.execute({}, {
+      sessionID: "ses-esc",
+      directory: "/w",
+      worktree: "/w",
+      ask: async () => {
+        throw corrected
+      },
+    })
+    const outcome = await containerCtx.dispatchApprovalRequest(escalationRequest())
+    expect(outcome).toBe("rejected")
+  })
+
+  test("unknown session (askRegistry miss) delegates via next() and yields unavailable", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute({}, {
+      sessionID: "ses-known",
+      directory: "/w",
+      worktree: "/w",
+      ask: async () => {},
+    })
+    // The request routes to an unregistered session: fail-closed waterfall.
+    const outcome = await containerCtx.dispatchApprovalRequest(escalationRequest({
+      agent: { session: { header: { id: "ses-stranger" } } },
+    }))
+    expect(outcome).toBe("unavailable")
+  })
+
+  test("escalation: never seeds an approval/policy event into every session facade", async () => {
+    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = {
+      ...containerCtx,
+      get(name: "tools") {
+        if (name !== "tools") return undefined
+        return {
+          schemas: () => [
+            { name: "grep", description: "dsh grep (ripgrep-backed)", parameters: {} },
+            { name: "glob", description: "dsh glob", parameters: {} },
+          ],
+          execute: async (exec: unknown) => {
+            captured.push({
+              events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+            })
+            return { isError: false, content: [{ type: "text", text: "ok" }] }
+          },
+        }
+      },
+    }
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "workspace-write" },
+      escalation: "never",
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute({}, { sessionID: "ses-never", directory: "/w", worktree: "/w", ask: async () => {} })
+    // The policy fold rides the seeded log; dsh's ApprovalService decides
+    // 'never' before any answerer dispatch (deterministic rejection).
+    expect(captured[0]?.events?.[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
+    expect(captured[0]?.events?.[1]).toEqual({ type: "approval/policy", data: { policy: "never" } })
+    expect(captured[0]?.events?.[2]).toEqual({ type: "turn/start", data: {} })
+  })
+
+  test("escalation: never never invokes the ellamaka ask closure", async () => {
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      escalation: "never",
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    let asked = 0
+    await tool.execute({}, {
+      sessionID: "ses-never",
+      directory: "/w",
+      worktree: "/w",
+      ask: async () => {
+        asked += 1
+      },
+    })
+    await containerCtx.dispatchApprovalRequest(escalationRequest())
+    // dsh service-level short-circuit; the answerer must not reach ask() as a
+    // live UI prompt. (The bridge itself never runs for 'never'.)
+    expect(asked).toBe(0)
+  })
+
+  test("escalation: ask (default) registers no approval/policy override", async () => {
+    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    const containerCtx = fakeContainerCtx()
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = {
+      ...containerCtx,
+      get(name: "tools") {
+        if (name !== "tools") return undefined
+        return {
+          schemas: () => [
+            { name: "grep", description: "dsh grep (ripgrep-backed)", parameters: {} },
+            { name: "glob", description: "dsh glob", parameters: {} },
+          ],
+          execute: async (exec: unknown) => {
+            captured.push({
+              events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+            })
+            return { isError: false, content: [{ type: "text", text: "ok" }] }
+          },
+        }
+      },
+    }
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "workspace-write" },
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute({}, { sessionID: "ses-ask-default", directory: "/w", worktree: "/w", ask: async () => {} })
+    const types = (captured[0]?.events ?? []).map((event) => event.type)
+    expect(types).not.toContain("approval/policy")
   })
 })
