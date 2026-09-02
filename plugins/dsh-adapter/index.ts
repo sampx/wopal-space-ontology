@@ -544,10 +544,14 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         const session = facadeFor(ctx.sessionID, ctx.directory)
         // Per-message sandbox override: the composer selector rides on
         // Tool.Context.extra. Appending a fresh sandbox/mode event (LAST-wins
-        // fold) switches the effective mode mid-session; absence keeps the
-        // space-level default seeded at facade creation.
+        // fold) switches the effective mode mid-session. Every explicit
+        // choice appends — including one equal to the space default — because
+        // the facade may already carry an earlier per-message choice (e.g.
+        // read-only from a previous turn); skipping same-as-default values
+        // would leave that stale override in force. Absence keeps whatever
+        // the facade currently folds to.
         const requestedMode = (ctx.extra as { sandboxMode?: SandboxMode } | undefined)?.sandboxMode
-        if (requestedMode && requestedMode !== defaultMode) {
+        if (requestedMode) {
           session.append("sandbox/mode", { mode: modeEventValue(requestedMode) })
         }
         // Register this call's ask closure for the escalation answerer: dsh

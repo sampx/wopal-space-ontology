@@ -690,7 +690,7 @@ describe("dsh-adapter projection", () => {
     ])
   })
 
-  test("extra.sandboxMode matching the space default appends no duplicate event", async () => {
+  test("extra.sandboxMode equal to the space default appends a fresh event (idempotent fold)", async () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
@@ -709,8 +709,58 @@ describe("dsh-adapter projection", () => {
       {},
       { sessionID: "ses-same", directory: "/w", worktree: "/w", extra: { sandboxMode: "read-only" }, ask: async () => {} },
     )
+    // Explicit choices always append. Folding the same value again is
+    // harmless and keeps the rule uniform: any per-message choice wins over
+    // whatever the facade carried before.
     expect(captured[0]?.eventsAtDispatch).toEqual([
       { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+    ])
+  })
+
+  test("extra.sandboxMode matching the space default still overrides a previous per-message choice", async () => {
+    const captured: { eventsAtDispatch: unknown[] }[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        captured.push({ eventsAtDispatch: [...events] })
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, {
+      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "workspace-write" },
+    })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    // Turn 1: user chose read-only — appended, effective mode is read-only.
+    await tool.execute(
+      {},
+      { sessionID: "ses-switch-back", directory: "/w", worktree: "/w", extra: { sandboxMode: "read-only" }, ask: async () => {} },
+    )
+    // Turn 2: user switches back to the space default (workspace-write). The
+    // facade still carries the read-only event from turn 1, so the adapter
+    // MUST append a fresh event — LAST-wins is the only way to restore the
+    // default. Skipping the append because the value equals the space default
+    // left the session stuck in read-only.
+    await tool.execute(
+      {},
+      { sessionID: "ses-switch-back", directory: "/w", worktree: "/w", extra: { sandboxMode: "workspace-write" }, ask: async () => {} },
+    )
+    expect(captured[0]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+    ])
+    // Turn 2 sees turn 1's closed boundary (turn/end) still in the log, then
+    // the fresh workspace-write append restores the default via LAST-wins.
+    expect(captured[1]?.eventsAtDispatch).toEqual([
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+      { type: "turn/start", data: {} },
+      { type: "turn/end", data: {} },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
       { type: "turn/start", data: {} },
     ])
   })
