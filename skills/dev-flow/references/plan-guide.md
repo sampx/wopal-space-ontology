@@ -250,6 +250,67 @@ Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`
 
 ---
 
+## Plan 命名规范
+
+Plan name 是权威标识，用于派生 feature 分支。命名必须精简——Issue title 可以自由书写，但 Plan name 和分支名必须短。
+
+### 命名结构
+
+```
+<issue_number>-<type>-<slug>
+```
+
+无 Issue 模式：
+
+```
+<type>-<slug>
+```
+
+- `type` 使用标准值（feature/fix/enhance/refactor/docs/test/chore/perf），保持全拼
+- 不设 `scope` 段——scope 信息已体现在 `--project` 和 slug 中，独立成段只会拉长名称
+
+### slug 精简规则
+
+slug 是命名的核心，质量取决于生成时的克制：
+
+- slug = **1-2 个核心名词**，kebab-case，**≤ 20 chars**
+- 去掉动词短语（`implement`/`add`/`support`/`handle` 等）和冠词，只留名词核心
+- 超长时必须截断或改写，禁止照搬 issue title 或描述
+
+| 啰嗦（禁止） | 精简（目标） |
+|--------------|--------------|
+| `implement-multi-space-chat-projector-sync` | `chat-projector-sync` |
+| `add-skills-remove-command` | `skills-remove` |
+| `support-handling-expired-tokens` | `token-expiry` |
+
+### 示例
+
+`flow.sh plan new 110 --type feature --slug chat-projector-sync` → `110-feature-chat-projector-sync`
+
+### Plan 目录规则
+
+- 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件
+- `--project` 是必填参数，Plan 目录由其决定
+- 所有项目统一存放在 `.wopal-space/plans/<项目名>/`
+
+## 分支命名规范
+
+feature 分支从最终确定的 Plan name 派生，必须**有界**——禁止无长度上限的拼接：
+
+```
+<project>-<issue>-<type>-<slug截断>
+```
+
+总长超过 55 chars 时，截断 slug 并追加 4-char 哈希兜底唯一性（仍可逆映射回 Plan）：
+
+```
+<project>-<issue>-<type>-<slug-head>-<hash4>
+```
+
+Worktree 目录 = branch。分支名承载"唯一且可映射回 Plan"的职责，不是 Plan name 的全文复刻。
+
+---
+
 ## 分支归属详细说明
 
 Plan 在不同阶段归属于不同分支。

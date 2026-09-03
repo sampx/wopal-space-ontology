@@ -175,7 +175,7 @@ Agent 可以执行验证动作、展示结果，但必须等用户明确确认�
 ### A. Planning
 
 ```bash
-flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>  # Issue 驱动（三项必填，显式指定）
+flow.sh plan new <issue> --type <type> --slug <slug>  # Issue 驱动（三项必填，显式指定）
 flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue
 ```
 
@@ -183,7 +183,7 @@ flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue
 
 **Plan 目录**：统一存放在 `.wopal-space/plans/<项目名>/`。
 
-**命名契约**：Issue title 自由文本（宽松 type 前缀可选）；Plan name 由 Wopal 显式指定（`<N>-<type>-<scope>-<slug>`）；Branch 从 Plan name 派生（`<project>-<plan-name>`）；worktree 目录 = branch。详见 `references/issue-guide.md`。
+**命名契约**：Issue title 自由文本（宽松 type 前缀可选，不限制长度）；Plan name 由 Wopal 显式指定（`<N>-<type>-<slug>`，slug 须精简 ≤ 20 chars，仅核心名词）；Branch 从 Plan name 派生且有界（`<project>-<plan-name>`，总长超 55 chars 时截断 slug 并加 4-char 哈希）；worktree 目录 = branch。详见 `references/plan-guide.md`。
 
 ### B. Plan 审查与提交
 
@@ -417,6 +417,6 @@ flow.sh archive <issue>
 | 文件 | 用途 |
 |------|------|
 | `references/commands.md` | 命令完整参数与使用模式 |
-| `references/plan-guide.md` | Plan 编写详细指导：TDD、AV/UV 规则、Metadata、委派 prompt、分支归属 |
-| `references/issue-guide.md` | Issue 编写指南：标题格式、body 结构、同步规则、Plan 命名 |
+| `references/plan-guide.md` | Plan 编写详细指导：TDD、AV/UV 规则、Metadata、委派 prompt、命名规范、分支归属 |
+| `references/issue-guide.md` | Issue 编写指南：标题格式、body 结构、同步规则 |
 | `references/troubleshooting.md` | 错误处理、边缘场景 |
