@@ -141,13 +141,15 @@ After a clean mount-validation, ask the user to start a session on the new prese
 
 ## Native product subagents
 
-Codex and Claude Code providers are independent optional Profile Bundles. Install only the products a Profile needs, then restart the Profile so its Host registers those providers:
+Codex and Claude Code providers are independent optional Profile Bundles. Install only the products a Profile needs, then restart the Profile so its Host registers those providers.
+
+In this deployment you manage plugins with the Ellamaka CLI, not the official `dsh` CLI: whenever official documentation shows `dsh plugin ...` or `dsh --dump-config`, run the equivalent as `ellamaka dsh ...` — running the bare official command against the live home would pollute the state directory:
 
 ```sh
-dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex
-dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-claude-code
-dsh plugin --profile <name> remove @deepseek-ai/dsh-subagent-codex
-dsh plugin --profile <name> remove @deepseek-ai/dsh-subagent-claude-code
+ellamaka dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex
+ellamaka dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-claude-code
+ellamaka dsh plugin --profile <name> remove @deepseek-ai/dsh-subagent-codex
+ellamaka dsh plugin --profile <name> remove @deepseek-ai/dsh-subagent-claude-code
 ```
 
 Each Bundle owns its Host availability; the preset separately grants one Agent its ordinary delegation tool. Never move a product provider into the preset and never add a product-specific settings field. Removing one package withdraws only that provider on the next Profile start.
