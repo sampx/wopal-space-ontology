@@ -261,11 +261,12 @@
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
 
-# ── 创造模式核心：cordis 自引用工具集（继承创造模式）────────────────────
-# 运行时检查、插件实验、preset 创作指导——wopal 作为全能编排者保留此能力，
-# 可读改写自己运行的运行时（组合即 cordis.yml，agent preset 即一个挂载文件）。
-- id: tool-cordis
-  name: '@deepseek-ai/dsh-tool-cordis'
+# ── 创造模式核心：cordis 自引用工具集 ─────────────────────────────────────
+# 注意：wopal 预设【不再】自带 tool-cordis。dsh 0.1.1-rc.2 的 cordisInspect
+# 注册表是进程级单例且按 manifest id 去重抛错，同一引擎内第二个含
+# tool-cordis 的 preset 挂载必然失败（"inspect provider 'Service' is already
+# registered"）。官方 shipped `cordis`（创造模式）预设常驻双根，已提供
+# tool-cordis 能力；wopal 挂载时继承其组合即可，勿重复声明此行（v3 决策）。
 
 # ── plan mode（wopal 规划）──────────────────────────────────────────────
 - id: planning
