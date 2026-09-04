@@ -6,11 +6,22 @@
 
 ## 装了哪些工具（为什么）
 
-| 工具组 | 对应权限 | 说明 |
+**基座 = 官方 `cordis`（创造模式）预设全能力**，叠加 wopal 团队定制：
+
+| 能力域 | 来源 | 说明 |
 |---|---|---|
-| 文件 + shell + 技能(全) + ask + todo + plan + 委派 + goal | 近乎全开 | wopal 权限几乎无 deny，dsh 给最全工具集，作为编排者 |
+| shell + filesystem（tool-bash/pwsh/fs/fs-search） | cordis | 文件与命令执行 |
+| **tool-jobs（后台任务）** | cordis | job_output / job_list / job_kill / 取消 / 完成通知 |
+| skills 全开 + tool-skill | cordis + wopal | `customSkillDirs` 指向本空间技能根（29 技能全可见） |
+| **tool-cordis（创造模式核心）** | cordis | 运行时检查、插件实验、preset 创作指导（自引用工具集） |
+| planning / compaction | cordis | plan mode + 压缩（tool-result-pruner） |
+| delegation（subagent/workflow/ralph） | cordis + wopal | 通用委派 + **fae/rook 专用队员**（带灵魂与武器白名单） |
+| tool-ask-user / tool-todo / tool-goal / tool-web | cordis | 询问 / 待办 / 目标 / web 搜索 |
+| tool-subagent-codex / claude-code | cordis | 可选 provider，默认 disabled（安装 Bundle 后启用） |
 
 fae 是它的执行者、rook 是它的审查者——wopal 通过委派组把工作发出去，自己只规划与验证（见 persona Phase 3/4）。
+
+> **继承方式**：以 `cordis` preset（`@deepseek-ai/dsh/config/agent-presets/cordis/agent.cordis.yml`）为基座逐项对齐，wopal 独有项仅 fae/rook 两个团队子代理。对齐检查：`comm -23 <(cordis ids) <(wopal ids)` 应为空。
 
 ## persona 裁剪点
 

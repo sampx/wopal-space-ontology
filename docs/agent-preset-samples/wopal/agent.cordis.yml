@@ -243,6 +243,12 @@
   config:
     sampleOverCapGlobResults: false
 
+# ── background jobs（后台任务，继承创造模式）────────────────────────────
+# 任务注册表在宿主层（tool-bash 的 run_in_background 经 ctx.get 解析它），
+# 这里只给模型面控制工具：job_output / job_list / job_kill / 取消 / 完成通知。
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
 # ── skills（wopal 全开：指向本空间技能根）────────────────────────────────
 # 本空间安装实例：绝对路径按空间实例化（将来预设生成器按空间生成此行）。
 # 全开 = 该目录下 29 个技能全部可见（agents-collab/space-master/dev-flow 等）。
@@ -254,6 +260,12 @@
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
+
+# ── 创造模式核心：cordis 自引用工具集（继承创造模式）────────────────────
+# 运行时检查、插件实验、preset 创作指导——wopal 作为全能编排者保留此能力，
+# 可读改写自己运行的运行时（组合即 cordis.yml，agent preset 即一个挂载文件）。
+- id: tool-cordis
+  name: '@deepseek-ai/dsh-tool-cordis'
 
 # ── plan mode（wopal 规划）──────────────────────────────────────────────
 - id: planning
@@ -278,6 +290,9 @@
   isolate:
     workflowEngine: true
   config:
+    - id: tool-subagent-control
+      name: '@deepseek-ai/dsh-tool-subagent-control'
+
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
@@ -430,6 +445,26 @@
     - id: tool-subagent-list-agents
       name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 
+    # 可选 provider：生产 dsh 不装这两个 Bundle；安装后复制本预设并去掉
+    # 对应行的 disabled 才可用（宿主可用性不自动授予工具）。
+    - id: tool-subagent-codex
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: codex
+        toolName: subagent_codex
+        backgroundMode: one-shot
+        maxDepth: provider-managed
+
+    - id: tool-subagent-claude-code
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: claude-code
+        toolName: subagent_claude_code
+        backgroundMode: one-shot
+        maxDepth: provider-managed
+
     - id: workflow-worker-thread
       name: '@deepseek-ai/dsh-workflow-worker-thread'
       config:
@@ -437,6 +472,12 @@
 
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
+
+    - id: tool-ralph
+      name: '@deepseek-ai/dsh-tool-ralph'
+      config:
+        subagentProvider: spawn
+        maxRounds: 64
 
 # ── question / ask（wopal 可询问）────────────────────────────────────────
 - id: tool-ask-user
@@ -446,6 +487,14 @@
   name: '@deepseek-ai/dsh-tool-todo'
   config:
     allowParallelInProgress: true
+
+# ── web（web 搜索，继承创造模式）────────────────────────────────────────
+# web 服务与搜索 provider 留在宿主组合；这里只有模型面工具（fetch 关闭）。
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
 
 # ── goal（wopal 长期目标）────────────────────────────────────────────────
 - id: tool-goal
