@@ -67,6 +67,21 @@ type Projected = {
   execute: (args: unknown, ctx: ToolCtx) => Promise<{ output: string; metadata: Record<string, unknown> }>
 }
 
+/**
+ * Read the facade's event log through the rc.1 Session contract
+ * (`snapshotEvents()`), flattening to the plain {type, data} shape the
+ * assertions compare against; the `seq`/`time` fields the log also carries
+ * stay out of the projection so fold assertions keep their original shape.
+ */
+function eventsOf(exec: unknown): { type: string; data: unknown }[] {
+  const session = (exec as { agent?: { session?: { snapshotEvents?: (from?: number, to?: number) => unknown[] } } })
+    .agent?.session
+  return (session?.snapshotEvents?.() ?? []).map((event) => {
+    const e = event as { type: string; data: unknown }
+    return { type: e.type, data: e.data }
+  })
+}
+
 type ToolsService = {
   schemas(): { name: string; description: string; parameters: unknown }[]
   execute(exec: unknown): Promise<{
@@ -255,7 +270,7 @@ describe("dsh-adapter projection", () => {
     const captured: { exec: unknown; eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ exec, eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -303,10 +318,10 @@ describe("dsh-adapter projection", () => {
     const ctxB = { sessionID: "ses-b", directory: "/w", worktree: "/w", ask: async () => {} }
     await tool.execute({}, ctxA)
     await tool.execute({}, ctxB)
-    const execA = captured[0] as { agent?: { session?: { events?: unknown[] } } }
-    const execB = captured[1] as { agent?: { session?: { events?: unknown[] } } }
-    const eventsA = execA.agent?.session?.events
-    const eventsB = execB.agent?.session?.events
+    const execA = captured[0] as { agent?: { session?: unknown } }
+    const execB = captured[1] as { agent?: { session?: unknown } }
+    const eventsA = eventsOf(execA)
+    const eventsB = eventsOf(execB)
     // Per-session arrays: appending turn events for session A must not leak
     // into session B's log (the shared sandboxEvents array would break this).
     expect(eventsA).not.toBe(eventsB)
@@ -334,8 +349,8 @@ describe("dsh-adapter projection", () => {
     // Both dispatches run inside the SAME session facade (cached by
     // sessionID). The live events array ends with two closed turn pairs —
     // the append surface approval/asked will use between them.
-    const exec = captured[1] as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }
-    expect(exec.agent?.session?.events).toEqual([
+    const exec = captured[1] as { agent?: { session?: unknown } }
+    expect(eventsOf(exec)).toEqual([
       { type: "sandbox/mode", data: { mode: "danger-full-access" } },
       { type: "turn/start", data: {} },
       { type: "turn/end", data: {} },
@@ -345,14 +360,13 @@ describe("dsh-adapter projection", () => {
   })
 
   test("execute closes the turn when the tool throws", async () => {
-    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    const captured: { session?: unknown }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        // Capture the live events array reference: the facade's finally block
-        // appends to this same array after the tool throws.
-        captured.push({
-          events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
-        })
+        // Capture the live session reference: the facade's finally block
+        // appends the closing turn/end to this same seq-numbered log after
+        // the tool throws.
+        captured.push({ session: (exec as { agent?: { session?: unknown } }).agent?.session })
         throw new Error("boom")
       },
     })
@@ -364,21 +378,20 @@ describe("dsh-adapter projection", () => {
     ).rejects.toThrow("boom")
     // finally-closed: hasOpenTurn's reverse scan must see turn/end after the
     // matching turn/start, or the approval precondition breaks on the next call.
-    const events = captured[0]?.events ?? []
+    const session = captured[0]?.session as { snapshotEvents(): { type: string }[] }
+    const events = session.snapshotEvents()
     expect(events[events.length - 1].type).toBe("turn/end")
   })
 
   test("concurrent executes share one outermost turn pair (reference counting)", async () => {
-    const captured: { events?: { type: string; data: unknown }[] }[] = []
+    const captured: { session?: unknown }[] = []
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        captured.push({
-          events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
-        })
+        captured.push({ session: (exec as { agent?: { session?: unknown } }).agent?.session })
         await gate
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -393,7 +406,7 @@ describe("dsh-adapter projection", () => {
     const second = tool.execute({}, ctx)
     release()
     await Promise.all([first, second])
-    const events = captured[0]?.events ?? []
+    const events = (captured[0]?.session as { snapshotEvents(): { type: string }[] }).snapshotEvents()
     const types = events.map((event) => event.type)
     expect(types.filter((type) => type === "turn/start")).toHaveLength(1)
     expect(types.filter((type) => type === "turn/end")).toHaveLength(1)
@@ -560,7 +573,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -582,7 +595,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -604,7 +617,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -626,7 +639,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -645,7 +658,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -668,7 +681,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -694,7 +707,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -723,7 +736,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -769,7 +782,7 @@ describe("dsh-adapter projection", () => {
     const captured: { eventsAtDispatch: unknown[] }[] = []
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       execute: async (exec: unknown) => {
-        const events = (exec as { agent?: { session?: { events?: unknown[] } } }).agent?.session?.events ?? []
+        const events = eventsOf(exec)
         captured.push({ eventsAtDispatch: [...events] })
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
@@ -1264,7 +1277,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
           ],
           execute: async (exec: unknown) => {
             captured.push({
-              events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+              events: eventsOf(exec),
             })
             return { isError: false, content: [{ type: "text", text: "ok" }] }
           },
@@ -1324,7 +1337,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
           ],
           execute: async (exec: unknown) => {
             captured.push({
-              events: (exec as { agent?: { session?: { events?: { type: string; data: unknown }[] } } }).agent?.session?.events,
+              events: eventsOf(exec),
             })
             return { isError: false, content: [{ type: "text", text: "ok" }] }
           },
@@ -1340,5 +1353,131 @@ describe("dsh-adapter escalation answerer bridge", () => {
     await tool.execute({}, { sessionID: "ses-ask-default", directory: "/w", worktree: "/w", ask: async () => {} })
     const types = (captured[0]?.events ?? []).map((event) => event.type)
     expect(types).not.toContain("approval/policy")
+  })
+})
+
+/**
+ * rc.1 Session contract conformance (DESIGN-dsh-poc §4.5 fold invariant
+ * carried on a seq-numbered log). The container's read-side consumers
+ * (session-projection cells, sandbox-policy fold, user-approval
+ * hasOpenTurn reverse scan) require the facade to expose the same
+ * seq/eventAt/snapshotEvents surface as the official dsh Session:
+ *   - seq is always the log length (contiguity contract)
+ *   - eventAt(seq) returns exactly the event stored at that position
+ *   - snapshotEvents() is a frozen half-open-range snapshot
+ *   - append returns the frozen committed event (with seq + time)
+ *   - appended data is snapshotted (later caller mutation never lands)
+ */
+describe("facade rc.1 session contract", () => {
+  test("snapshotEvents exposes the seq-numbered log and append assigns contiguous seqs", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const ctx = { sessionID: "ses-seq", directory: "/w", worktree: "/w", ask: async () => {} }
+    await tool.execute({}, ctx)
+    const session = (captured[0] as { agent?: { session?: unknown } }).agent?.session as {
+      seq: number
+      eventAt(seq: number): { type: string; seq: number } | undefined
+      snapshotEvents(from?: number, to?: number): readonly unknown[]
+      append(type: string, data: unknown): { type: string; seq: number; time: number; data: unknown }
+      inheritedEventCount: number
+    }
+    // After the first dispatch the log holds: sandbox seed + turn/start +
+    // turn/end (the execute closure has returned).
+    expect(session.seq).toBe(3)
+    expect(session.inheritedEventCount).toBe(0)
+    // Contiguity: eventAt(seq) is exactly the event stored at that position.
+    const appended = session.append("approval/asked", { id: "apr-1" })
+    expect(appended.seq).toBe(3)
+    expect(appended.type).toBe("approval/asked")
+    expect(typeof appended.time).toBe("number")
+    expect(session.seq).toBe(4)
+    expect(session.eventAt(3)?.type).toBe("approval/asked")
+    expect(session.eventAt(4)).toBeUndefined()
+    // Half-open snapshot ranges, frozen.
+    const full = session.snapshotEvents()
+    expect(Object.isFrozen(full)).toBe(true)
+    expect(full.map((event) => (event as { type: string }).type)).toEqual([
+      "sandbox/mode",
+      "turn/start",
+      "turn/end",
+      "approval/asked",
+    ])
+    const slice = session.snapshotEvents(1, 3)
+    expect(Object.isFrozen(slice)).toBe(true)
+    expect(slice.map((event) => (event as { type: string }).type)).toEqual(["turn/start", "turn/end"])
+  })
+
+  test("appended data is snapshotted: caller mutation never lands in the log", async () => {
+    const captured: unknown[] = []
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push(exec)
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    await tool.execute({}, { sessionID: "ses-snap", directory: "/w", worktree: "/w", ask: async () => {} })
+    const session = (captured[0] as { agent?: { session?: unknown } }).agent?.session as {
+      append(type: string, data: unknown): { data: { id: string } }
+      eventAt(seq: number): { data: { id: string } } | undefined
+      seq: number
+    }
+    const payload = { id: "apr-original" }
+    const committed = session.append("approval/asked", payload)
+    payload.id = "apr-mutated"
+    expect(committed.data.id).toBe("apr-original")
+    expect(session.eventAt(session.seq - 1)?.data.id).toBe("apr-original")
+  })
+
+  test("hasOpenTurn-compatible reverse scan: open turn visible mid-dispatch, closed after", async () => {
+    const captured: { session?: unknown }[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      execute: async (exec: unknown) => {
+        captured.push({ session: (exec as { agent?: { session?: unknown } }).agent?.session })
+        await gate
+        return { isError: false, content: [{ type: "text", text: "ok" }] }
+      },
+    })
+    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const tools = await invokeProvider(out)
+    const tool = tools.grep as Projected
+    const ctx = { sessionID: "ses-open", directory: "/w", worktree: "/w", ask: async () => {} }
+    const pending = tool.execute({}, ctx)
+    // Let the dispatch reach the gated container execute (permission ask +
+    // facade creation resolve on microtasks before the gate opens).
+    await Promise.resolve()
+    await Promise.resolve()
+    // Mirror dsh-user-approval's hasOpenTurn reverse scan while the dispatch
+    // is inside its open turn.
+    const session = captured[0]?.session as {
+      seq: number
+      eventAt(seq: number): { type: string } | undefined
+    }
+    let open = false
+    for (let seq = session.seq - 1; seq >= 0; seq -= 1) {
+      const type = session.eventAt(seq)?.type
+      if (type === "turn/start") {
+        open = true
+        break
+      }
+      if (type === "turn/end") break
+    }
+    expect(open).toBe(true)
+    release()
+    await pending
   })
 })

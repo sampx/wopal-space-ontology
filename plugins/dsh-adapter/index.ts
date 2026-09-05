@@ -18,8 +18,11 @@
  *
  *   - session.header.cwd — resolved workdir for spawns
  *   - session.header.id  — spill ownership label
- *   - session.events     — sandbox-mode policy fold + turn/approval audit
- *   - session.append     — audit-pair sink (approval/asked, approval/decided)
+ *   - session.seq / session.eventAt(seq) / session.snapshotEvents(from, to)
+ *     — the rc.1 seq-numbered read surface: sandbox-policy folds and the
+ *     approval open-turn scan read through it (contiguity: seq === log length)
+ *   - session.append     — audit-pair sink (approval/asked, approval/decided),
+ *     committing frozen seq+time-stamped events
  *
  * Every tools.execute() dispatch is wrapped in a reference-counted turn
  * boundary (`turn/start` → dispatch → `turn/end`, finally-closed) so the dsh
@@ -164,17 +167,41 @@ type ToolContext = PluginToolContext & { callID?: string }
 // extra by the host; absent falls back to the space-level default.
 type SandboxMode = "read-only" | "workspace-write" | "full-access"
 
-// A session facade shaped for dsh consumers (approval plugin, sandbox fold).
-// `events` is PRIVATE to this ellamaka session: seeded with a fresh copy of
-// the sandbox-mode event so `append` (turn pairs, approval audit) can never
-// leak into another session's log. `turnDepth` reference-counts concurrent
-// tools.execute() calls so nested/concurrent dispatches emit exactly one
-// turn/start — turn/end pair, closed only at the outermost level (the shape
-// dsh's hasOpenTurn reverse-scan expects).
+// A session facade shaped for dsh consumers. The shape mirrors the official
+// dsh rc.1 `Session` read surface (seq-numbered append-only log): the
+// container's read-side consumers — session-projection cells, the
+// sandbox-policy fold, and user-approval's hasOpenTurn reverse scan — read
+// `seq` / `eventAt(seq)` / `snapshotEvents(from, to)` and require the same
+// contiguity contract as the real session (`seq === log length`, `eventAt`
+// returning exactly the event stored at that position). Events are deep
+// frozen; `append` stores a JSON snapshot of `data` so later caller mutation
+// never lands in the log, mirroring the official append's snapshot semantics.
+// The log is process-memory only: no persistence plugin writes it (the tools
+// profile disables session persistence by design), so nothing here is a
+// durable record — exactly the lightweight per-call semantics the adapter
+// documents. `turnDepth` reference-counts concurrent tools.execute() calls so
+// nested/concurrent dispatches emit exactly one turn/start — turn/end pair,
+// closed only at the outermost level (the shape dsh's hasOpenTurn reverse-scan
+// expects).
+type FacadeEvent = {
+  readonly type: string
+  readonly seq: number
+  readonly time: number
+  readonly data: unknown
+}
+
 type FacadeSession = {
   header: { id: string; cwd: string }
-  events: { type: string; data: unknown }[]
-  append(type: string, data: unknown): void
+  /** The next event's sequence number — always the log length. */
+  readonly seq: number
+  /** Fork-inherited prefix length; the facade is never a fork child, so 0. */
+  readonly inheritedEventCount: number
+  /** Immutable half-open-range snapshot; a frozen array of frozen events. */
+  snapshotEvents(from?: number, to?: number): readonly FacadeEvent[]
+  /** The frozen event stored at one exact position, or undefined. */
+  eventAt(seq: number): FacadeEvent | undefined
+  /** Commit one event: assigns seq + time and returns the frozen entry. */
+  append(type: string, data: unknown): FacadeEvent
   turnDepth: number
 }
 
@@ -487,16 +514,44 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
     ...escalationPolicyEvents,
   ]
 
-  // Per-session facade factory. Seeding copies `sandboxEvents` so each
-  // session's log is independently appendable.
+  // Per-session facade factory. Seeding appends a fresh copy of the
+  // sandbox-mode (and optional approval-policy) events into the session's
+  // own log, so each session's seq numbering and folds are independent.
+  // The rc.1 contract lives on a private `log` array: `seq` is its length,
+  // `eventAt` indexes it, `snapshotEvents` freezes a range slice, and
+  // `append` commits a JSON-snapshotted, deep-frozen event — the same
+  // contiguity and immutability semantics the official Session grants.
   function facadeFor(sessionID: string, directory: string): FacadeSession {
     let facade = sessions.get(sessionID)
     if (!facade) {
+      const log: FacadeEvent[] = []
+      const freezeEvent = (type: string, seq: number, data: unknown): FacadeEvent =>
+        Object.freeze({
+          type,
+          seq,
+          time: Date.now(),
+          data: structuredClone(data),
+        })
+      const seed = (type: string, data: unknown) => {
+        log.push(Object.freeze({ type, seq: log.length, time: Date.now(), data: structuredClone(data) }))
+      }
+      for (const event of sandboxEvents) seed(event.type, event.data)
       facade = {
         header: { id: sessionID, cwd: directory },
-        events: [...sandboxEvents],
+        get seq() {
+          return log.length
+        },
+        inheritedEventCount: 0,
+        snapshotEvents(from = 0, to = log.length) {
+          return Object.freeze(log.slice(from, to))
+        },
+        eventAt(seq) {
+          return log[seq]
+        },
         append(type, data) {
-          this.events.push({ type, data })
+          const event = freezeEvent(type, log.length, data)
+          log.push(event)
+          return event
         },
         turnDepth: 0,
       }
