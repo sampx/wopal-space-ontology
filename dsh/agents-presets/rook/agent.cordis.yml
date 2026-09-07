@@ -1,4 +1,4 @@
-# `rook` agent preset sample — 评审用样例（not yet installed）
+# `rook` agent preset — wopal 守鸦（运行时经软链加载）
 #
 # 对应 AGENT-TOOL-MAP.review.md 第 4.3 节：rook = 只读审查者。
 # persona 完整复刻 .wopal/agents/rook.md 的灵魂正文（英文 runtime 源，忠实搬运）。
@@ -7,8 +7,8 @@
 # READ_ONLY_BOUNDARY（禁写）在 dsh 落地于 fs 沙箱 read-only 模式，不在本 preset 删工具；
 # 见 AGENT-TOOL-MAP.review.md「待定边界」第 2 点。
 #
-# 注意：本文件是评审附件。真正运行需安装到 $DSH_HOME/.agent-presets/rook/，
-# 且需把 df-plan-review + df-implement-review 两技能就位到本 preset 的 skills/ 目录（见 README）。
+# 分发：本目录是版本管理源，运行时 ~/.wopal/dsh/home/.agent-presets/rook/ 软链指向此处。
+# rook 不单独声明技能目录，继承 wopal 的技能范围（见 README「技能范围」）。
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
@@ -110,13 +110,9 @@
   config:
     sampleOverCapGlobResults: false
 
-# ── skills（只放两个 review 技能目录）───────────────────────────────────
-# 需在本 preset 目录下建 skills/ 子目录并放入 df-plan-review + df-implement-review
-- id: skill-filesystem
-  name: '@deepseek-ai/dsh-skill-filesystem'
-  config:
-    customSkillDirs:
-      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
+# ── skills（继承 wopal 技能范围，无需单独指定）─────────────────────────
+# rook 作为 wopal 子代理继承父组成，技能范围随 wopal 的 skill-filesystem；
+# 本 preset 不单独声明技能目录。今后需要收紧时再引入独立技能根。
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'

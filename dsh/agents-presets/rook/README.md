@@ -8,7 +8,7 @@
 
 | 工具组 | 对应权限 | 说明 |
 |---|---|---|
-| 文件(读) + shell(读输出取证) + 技能(两 review 独) + todo | read 全开、bash 开、question=deny、task=deny | rook 只读审查 |
+| 文件(读) + shell(读输出取证) + 技能(继承 wopal) + todo | read 全开、bash 开、question=deny、task=deny | rook 只读审查 |
 | ❌ tool-ask-user | question: deny | rook 不询问（审查发现的歧义写进报告 Requirement Questions） |
 | ❌ delegation 组 | task: deny | rook 不委派 |
 
@@ -20,6 +20,10 @@
 
 原灵魂正文的 `<READ_ONLY_BOUNDARY>` 已完整复刻进 persona。真正"禁写"在 dsh 靠 **fs 沙箱 read-only 模式**（评审文档「待定边界」第 2 点），不在 preset 层删文件工具——因为 dsh 的文件工具读写合一，删了就什么都做不了。
 
-## 安装要点
+## 技能范围
 
-评审通过后装到 `~/.wopal/dsh/home/.agent-presets/rook/`，并把 `skills/` 子目录只放 df-plan-review + df-implement-review 两个技能副本。
+rook 不单独声明技能目录，作为 wopal 子代理继承父组成的技能范围（随 wopal 的 `skill-filesystem`）。今后需要收紧 rook 可见技能时，再为本 preset 引入独立技能根或 toolFilter 收敛。
+
+## 安装位置
+
+本 preset 由运行时 `~/.wopal/dsh/home/.agent-presets/rook/` 软链指向本版本管理源 `.wopal/dsh/agents-presets/rook/`。在此编辑，改动经软链直接生效于运行时。
