@@ -473,8 +473,11 @@
       config:
         provider: spawn
 
+    # 关闭：PTC 展示模式下经 run_code 编排，不发布第二个编排工具
+    #（与官方 shipped ptc preset 镜像，见下方 tool-presentation 段）。
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
+      disabled: true
 
     - id: tool-ralph
       name: '@deepseek-ai/dsh-tool-ralph'
@@ -491,15 +494,20 @@
   config:
     allowParallelInProgress: true
 
-# ── web（web 搜索，继承创造模式）────────────────────────────────────────
-# web 服务与搜索 provider 留在宿主组合；这里只有模型面工具（fetch 关闭）。
+# ── web（web 搜索 + 抓取，继承创造模式）────────────────────────────────
+# web 服务与搜索 provider 留在宿主组合；这里只有模型面工具（fetch 开）。
 - id: tool-web
   name: '@deepseek-ai/dsh-tool-web'
   config:
-    fetch: false
+    fetch: true
     searchTimeoutMs: 60000
 
-# ── goal（wopal 长期目标）────────────────────────────────────────────────
+# ── goal（wopal 长期目标 + goal 命令）──────────────────────────────────
+# goal 服务与会话驱动在宿主层（Gateway 可解析）；人类命令与模型面工具
+# 注册进本预设作用域层。
+- id: command-goal
+  name: '@deepseek-ai/dsh-command-goal'
+
 - id: tool-goal
   name: '@deepseek-ai/dsh-tool-goal'
 
@@ -513,6 +521,9 @@
   config:
     - id: compaction-basic
       name: '@deepseek-ai/dsh-compaction-basic'
+      config:
+        summarizationProvider: wopal-ai
+        summarizationModel: gemini-3.6-flash-high
     - id: command-compact
       name: '@deepseek-ai/dsh-command-compact'
     - id: tool-result-pruner
@@ -521,3 +532,12 @@
         thresholdChars: 8192
         headChars: 4096
         tailChars: 1024
+
+# ── presentation（PTC 纯代码面，继承实验 preset）────────────────────────
+# 只暴露 run_code 传输 + 生成的 SDK，无原生工具 schema。模型把每个工具
+# 都编排进一个 TypeScript 程序（PTC 模式）。PTC 复用部署宿主 codeRuntime
+#（由 web patch 挂载）；若部署未组合 runtime，挂载会失败并点名此 id。
+- id: tool-presentation
+  name: '@deepseek-ai/dsh-agent-tool-presentation'
+  config:
+    mode: ptc
