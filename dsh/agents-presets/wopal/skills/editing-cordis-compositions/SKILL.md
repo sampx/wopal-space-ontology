@@ -11,19 +11,17 @@ Every capability in this harness is a plugin row in a `cordis.yml`. There is no 
 
 This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — not as a standalone official dsh install. The constraints below are binding for THIS deployment and override any official dsh CLI convention the rest of this body may suggest.
 
-- Unique home: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh). There is no `~/.dsh`. Split it three ways:
-  - `closures/<fingerprint>/` — immutable official dependency tree; never edit, never write anything inside it.
-  - `profiles/` — bundle templates plus healed plugin symlinks.
-  - `state/` — runtime data only: settings.yaml, sessions/, storages/, attachments/, .agent-presets/.
-- Never set or use `DSH_HOME`, and never treat `state/` as a CLI home — a sentinel README.md sits in `state/` stating exactly this. To experiment with the official `dsh` CLI, use a throwaway home: `DSH_HOME=$(mktemp -d) dsh ...`.
-- Agent preset dual roots:
+- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home` (= /Users/sam/.wopal/dsh/home). The host sets this at process launch (B-class env resolution). It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh`.
+- Territory root: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh) is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), `plugins/`, `locks/`, and `staging/`. `recovery-scripts/` also lives here.
+- `$DSH_HOME` is a real, official dsh home: the official dsh CLI pointed at it interoperates with the engine. When a task calls for official dsh commands against the live engine, prefer the Ellamaka CLI equivalent (`ellamaka dsh ...`) so writes go through the engine's own install path rather than a bare binary racing the running engine.
+- Agent preset roots:
   - Official presets live inside the closure at `closures/<fp>/node_modules/@deepseek-ai/dsh/config/agent-presets/`. They are immutable: read and copy them, never edit them in place.
-  - User presets live at `/Users/sam/.wopal/dsh/home/.agent-presets/<id>/`. They are auto-discovered and are the only place to customize a preset.
+  - User presets live at `$DSH_HOME/.agent-presets/<id>/` (= /Users/sam/.wopal/dsh/home/.agent-presets/<id>/). Here this directory is a symlink to the versioned source at `<space>/.wopal/dsh/agents-presets/`, so edit the source in that git worktree and let the symlink carry the change to the runtime. They are auto-discovered and are the only place to customize a preset.
   - On duplicate ids the earlier root wins. Customizing an official preset therefore means copying it into the user root under a NEW id, never editing the closure copy.
 - Mount semantics: a preset mounts when its session is created. Your edits affect new sessions only, never live ones — finish and validate the edit, then let a fresh session pick it up.
 - The full deployment design lives at /Volumes/U500G/coding/wopal-workspace/.worktrees/poc-ellamaka-cordis/docs/DESIGN-dsh-poc.md, sections 「Bun 宿主 HMR 与闭包升级」 and 「空间 × Agent 配置体系」. Keep this skill self-contained: act on the constraints above without opening it.
 
-Every "where do presets live" and "which root is writable" statement later in this body resolves against these two roots, not `${DSH_HOME:-$HOME/.dsh}/.agent-presets/` or any official install path.
+Every "where do presets live" and "which root is writable" statement later in this body resolves against these roots — the official preset set in the closure and the user preset set under `$DSH_HOME/.agent-presets/`.
 
 ## Off-limits
 
@@ -143,7 +141,7 @@ After a clean mount-validation, ask the user to start a session on the new prese
 
 Codex and Claude Code providers are independent optional Profile Bundles. Install only the products a Profile needs, then restart the Profile so its Host registers those providers.
 
-In this deployment you manage plugins with the Ellamaka CLI, not the official `dsh` CLI: whenever official documentation shows `dsh plugin ...` or `dsh --dump-config`, run the equivalent as `ellamaka dsh ...` — running the bare official command against the live home would pollute the state directory:
+In this deployment you manage plugins with the Ellamaka CLI, not the bare official `dsh` CLI: whenever official documentation shows `dsh plugin ...` or `dsh --dump-config`, run the equivalent as `ellamaka dsh ...` — running the bare official binary against the shared live home would write into engine-owned `$DSH_HOME/profiles/` and `package.json` and race the running engine's own composition replay:
 
 ```sh
 ellamaka dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex

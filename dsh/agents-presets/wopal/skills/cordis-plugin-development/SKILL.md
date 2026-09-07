@@ -11,16 +11,13 @@ First determine whether a capability belongs on Host or Client, then query the r
 
 This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — not as a standalone official dsh install. The constraints below are binding for THIS deployment and override any official dsh CLI convention you might otherwise follow.
 
-- Unique home: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh). There is no `~/.dsh`. Split it three ways:
-  - `closures/<fingerprint>/` — immutable official dependency tree; never edit, never write anything inside it.
-  - `profiles/` — bundle templates plus healed plugin symlinks.
-  - `state/` — runtime data only: settings.yaml, sessions/, storages/, attachments/, .agent-presets/.
-- Never set or use `DSH_HOME`, and never treat `state/` as a CLI home — a sentinel README.md sits in `state/` stating exactly this. To experiment with the official `dsh` CLI, use a throwaway home: `DSH_HOME=$(mktemp -d) dsh ...`.
+- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home` (= /Users/sam/.wopal/dsh/home). The host sets this at process launch (B-class env resolution). It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh`.
+- Territory root: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh) is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), `plugins/`, `locks/`, and `staging/`. `recovery-scripts/` also lives here.
 - Bun host: release `ellamaka serve` is a single Bun process. Server-side plugins must not require Node's private module loader or `--expose-internals`; incompatible installs are rejected with `DshPluginBunIncompatible`.
-- Install area: server-side plugin packages that ship with the deployment are installed into `profiles/`, never into `closures/<fp>/` — the closure tree is frozen and serves as read-only reference material only.
-- Agent preset dual roots:
+- Install area: server-side plugin packages that ship with the deployment are installed into `$DSH_HOME/profiles/`, never into `closures/<fp>/` — the closure tree is frozen and serves as read-only reference material only.
+- Agent preset roots:
   - Official presets sit in the closure at `closures/<fp>/node_modules/@deepseek-ai/dsh/config/agent-presets/`; they are immutable — copy, never edit.
-  - User presets live at `/Users/sam/.wopal/dsh/home/.agent-presets/<id>/`; they are auto-discovered and are the place to customize.
+  - User presets live at `$DSH_HOME/.agent-presets/<id>/` (= /Users/sam/.wopal/dsh/home/.agent-presets/<id>/). Here this directory is a symlink to the versioned source at `<space>/.wopal/dsh/agents-presets/`, so edit the source in that git worktree and let the symlink carry the change to the runtime. They are auto-discovered and are the place to customize.
   - On duplicate ids the earlier root wins. Customize an official preset by copying it into the user root under a NEW id, never by editing the closure copy.
 - Mount semantics: a preset mounts when its session is created. Your edits affect new sessions only, never live ones.
 - The full deployment design lives at /Volumes/U500G/coding/wopal-workspace/.worktrees/poc-ellamaka-cordis/docs/DESIGN-dsh-poc.md, sections 「Bun 宿主 HMR 与闭包升级」 and 「空间 × Agent 配置体系」. Keep this skill self-contained: act on the constraints above without opening it.

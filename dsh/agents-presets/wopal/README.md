@@ -20,4 +20,4 @@ fae 是它的执行者、rook 是它的审查者——wopal 通过委派组把�
 
 评审通过后装到 `~/.wopal/dsh/home/.agent-presets/wopal/`。wopal 技能全开，需把 `customSkillDirs` 指向空间技能根（含 agents-collab / space-master 等）——当前样例留空，需按安装时技能根实际路径补 `skill-filesystem.config.customSkillDirs`。
 
-> **skills/ 目录说明**：`skills/` 现保存随 wopal preset 发售的两个技能（editing-cordis-compositions、cordis-plugin-development）的**工作区源副本**（truth source），每份在正文开头新增「dsh in ellamaka (WopalSpace deployment constraints)」约束节，纠正其原文中不适用于本部署的官方 dsh CLI 约定（DSH_HOME、~/.dsh、官方 preset 安装路径等）。同步方向为**工作区 → 已安装 preset**（`$WOPAL_HOME/dsh/home/.agent-presets/wopal/skills/`），由 wopal 执行同步；不要反向覆盖工作区源副本。
+> **skills/ 目录说明**：`skills/` 保存随 wopal preset 发售的两个技能（editing-cordis-compositions、cordis-plugin-development）。每个技能正文开头有「dsh in ellamaka (WopalSpace deployment constraints)」约束节，记录本部署对官方 dsh CLI 约定的覆盖（DSH_HOME、~/.dsh、官方 preset 安装路径等）。运行时 `$DSH_HOME/.agent-presets/`（= `$WOPAL_HOME/dsh/home/.agent-presets/`）是软链，指向本版本管理源 `.wopal/dsh/agents-presets/`——在此编辑，改动经软链直接生效于运行时；本目录由 git 版本管理，勿在运行时侧反向改写。
