@@ -1,0 +1,6 @@
+# Self-insert: register this plugin as a loader plugin so the container
+# activates it (the client-modules registry only scans LOADER entries for
+# dsh.client declarations — a bundle with no insert rows never surfaces).
+- insert:
+    - id: hello-dsh-plugin
+      name: hello-dsh-plugin
