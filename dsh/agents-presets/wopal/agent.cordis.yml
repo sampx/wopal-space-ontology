@@ -16,6 +16,10 @@
 #   - 子代理 persona 为运行时干净版（评审样例中的 [CSS-x] 标注已剥离）：
 #     fae CSS-1（Task 工具→文件搜索工具）与 CSS-2（WebFetch 句删除）已应用
 #
+# v4 变更（技能根可分发化）:
+#   - 弃用 customSkillDirs 绝对路径（不可分发）。<projectRoot>/.dsh/skills 软链
+#     指向 .wopal/skills，经官方 project-dsh root（rank100）自动扫描，零绝对路径。
+#
 # 安装位置: $WOPAL_HOME/dsh/home/.agent-presets/wopal/（用户根，trust=user）
 
 - id: persona
@@ -249,14 +253,12 @@
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
 
-# ── skills（wopal 全开：指向本空间技能根）────────────────────────────────
-# 本空间安装实例：绝对路径按空间实例化（将来预设生成器按空间生成此行）。
+# ── skills（wopal 全开：经官方 project-dsh root 自动扫描空间技能根）──────
+# <projectRoot>/.dsh/skills 软链指向 .wopal/skills（project-dsh rank100，可分发、
+# 零绝对路径），skill-filesystem 用官方默认扫描即可，无需 customSkillDirs。
 # 全开 = 该目录下 29 个技能全部可见（agents-collab/space-master/dev-flow 等）。
 - id: skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
-  config:
-    customSkillDirs:
-      - /Volumes/U500G/coding/wopal-workspace/.wopal/skills
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
