@@ -1,4 +1,4 @@
-# dsh-sandbox-roots: the stock sandbox rows are disabled and this bundle's
+# @wopal/dsh-sandbox-roots: the stock sandbox rows are disabled and this bundle's
 # replacements are inserted under their own ids — dsh skips an override row
 # whose `name` differs from the standing row, so the swap is disable + insert.
 # The service registrations (ctx.sandboxPolicy / ctx.sandbox / ctx.fs) come
@@ -14,11 +14,11 @@
 
 - insert:
     - id: sandbox-roots-policy
-      name: dsh-sandbox-roots
+      name: '@wopal/dsh-sandbox-roots'
       config:
         mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
         workspaceRoot: !!js process.cwd()
     - id: sandbox-roots-sandbox
-      name: dsh-sandbox-roots/sandbox
+      name: '@wopal/dsh-sandbox-roots/sandbox'
     - id: sandbox-roots-fs
-      name: dsh-sandbox-roots/fs
+      name: '@wopal/dsh-sandbox-roots/fs'
