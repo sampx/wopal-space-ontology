@@ -1,4 +1,4 @@
-# `wopal` agent preset — 评审通过样例（v3：自带 fae/rook 团队）
+# `wopal` agent preset — 全能编排者（v5：自带 fae/rook 团队 + preset 内置创作技能）
 #
 # 来源契约: docs/AGENT-TOOL-MAP.review.md（已评审通过）+ 附录 A 裁剪清单
 # 灵魂复刻: .wopal/agents/wopal.md 全文（CSS-1 已按评审裁决改写）
@@ -17,8 +17,18 @@
 #     fae CSS-1（Task 工具→文件搜索工具）与 CSS-2（WebFetch 句删除）已应用
 #
 # v4 变更（技能根可分发化）:
-#   - 弃用 customSkillDirs 绝对路径（不可分发）。<projectRoot>/.dsh/skills 软链
+#   - 空间技能根弃用 customSkillDirs 绝对路径。<projectRoot>/.dsh/skills 软链
 #     指向 .wopal/skills，经官方 project-dsh root（rank100）自动扫描，零绝对路径。
+#   - ⚠ 但 customSkillDirs 仍保留用于【预设自带 skills/ 目录】——它指向预设
+#     目录的 baseUrl 相对路径（可分发），让 editing-cordis-compositions 与
+#     cordis-plugin-development 两个内置创作技能对 agent 可见。两者缺一不可。
+#
+# v5 变更（修复 preset 自带技能装载）:
+#   - 恢复 skill-filesystem.customSkillDirs（baseUrl 相对，与 shipped cordis 一致），
+#     指向预设自带 skills/。此前 v4 只留 project-dsh root，导致 preset 内置的两个
+#     Cordis 创作技能（editing-cordis-compositions / cordis-plugin-development）
+#     不被 skill-filesystem 扫描而不可见。现在 project-dsh root（rank100 空间技能）
+#     与 customSkillDirs（rank300 预设自带技能）并存。
 #
 # 安装位置: $WOPAL_HOME/dsh/home/.agent-presets/wopal/（用户根，trust=user）
 
@@ -253,12 +263,18 @@
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
 
-# ── skills（wopal 全开：经官方 project-dsh root 自动扫描空间技能根）──────
-# <projectRoot>/.dsh/skills 软链指向 .wopal/skills（project-dsh rank100，可分发、
-# 零绝对路径），skill-filesystem 用官方默认扫描即可，无需 customSkillDirs。
-# 全开 = 该目录下 29 个技能全部可见（agents-collab/space-master/dev-flow 等）。
+# ── skills（wopal 全开：空间技能根 + preset 自带创作技能）──────────────
+# 两个装载源（rank 100 与 rank 300 并存，winner 按 rank 升序取先）：
+#   1) project-dsh root（rank100）：<projectRoot>/.dsh/skills 软链 → .wopal/skills，
+#      自动扫描该目录下 29 个空间技能（agents-collab/space-master/dev-flow 等）。
+#   2) customSkillDirs（rank300）：预设自带 skills/ 目录（editing-cordis-compositions
+#      / cordis-plugin-development），经 baseUrl 相对解析，可分发、零绝对路径。
+# 缺一不可：去掉 customSkillDirs 会让预设内置的两个 Cordis 创作技能不可见。
 - id: skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'

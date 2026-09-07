@@ -1,6 +1,6 @@
 ---
 name: cordis-plugin-development
-description: Create, modify, debug, or extend dynamic Cordis Plugins, including Host Services and Events, Client Slot and theme UI, Package-private Client-to-Host calls, dynamic Tools, version updates, approval failures, and runtime diagnostics. Use this Skill to route a user request to the correct platform and Inspect Provider, then define, run, repair, or roll back the Plugin.
+description: Create, modify, debug, or extend Cordis Plugins — dynamic ones (Host Services and Events, Client Slot and theme UI, Package-private Client-to-Host calls, dynamic Tools, version updates, approval, runtime diagnostics) and durable ones you ship as a distributable dsh bundle (dsh.bundle.patch self-patch, choosing a resolvable package scope). Use this Skill to route a request to the correct platform and Inspect Provider, then define, run, repair, roll back, or package the Plugin.
 ---
 
 # Develop Dynamic Cordis Plugins
@@ -9,18 +9,17 @@ First determine whether a capability belongs on Host or Client, then query the r
 
 ## dsh in ellamaka (WopalSpace deployment constraints)
 
-This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — not as a standalone official dsh install. The constraints below are binding for THIS deployment and override any official dsh CLI convention you might otherwise follow.
+This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — an official-layout dsh home managed by the Ellamaka engine rather than a standalone official dsh install. The constraints below describe that deployment shape; where they differ from official dsh CLI conventions, they win.
 
-- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home` (= /Users/sam/.wopal/dsh/home). The host sets this at process launch (B-class env resolution). It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh`.
-- Territory root: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh) is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), `plugins/`, `locks/`, and `staging/`. `recovery-scripts/` also lives here.
+- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home`. The host sets this at process launch. It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh` in this deployment.
+- Territory root: `$WOPAL_HOME/dsh` is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), plus `locks/` and `recovery-scripts/`.
 - Bun host: release `ellamaka serve` is a single Bun process. Server-side plugins must not require Node's private module loader or `--expose-internals`; incompatible installs are rejected with `DshPluginBunIncompatible`.
 - Install area: server-side plugin packages that ship with the deployment are installed into `$DSH_HOME/profiles/`, never into `closures/<fp>/` — the closure tree is frozen and serves as read-only reference material only.
 - Agent preset roots:
   - Official presets sit in the closure at `closures/<fp>/node_modules/@deepseek-ai/dsh/config/agent-presets/`; they are immutable — copy, never edit.
-  - User presets live at `$DSH_HOME/.agent-presets/<id>/` (= /Users/sam/.wopal/dsh/home/.agent-presets/<id>/). Here this directory is a symlink to the versioned source at `<space>/.wopal/dsh/agents-presets/`, so edit the source in that git worktree and let the symlink carry the change to the runtime. They are auto-discovered and are the place to customize.
+  - User presets live one directory per preset under `$DSH_HOME/.agent-presets/<id>/`. In the WopalSpace ontology layout that directory is a symlink to the version-controlled source under the space's own `.wopal/dsh/agents-presets/<id>/`, so edit the source there and the symlink carries the change to the runtime. A preset is auto-discovered from any root the deployment configures — read the real path from the roster's `list()` or `resolve()` rather than assuming the layout.
   - On duplicate ids the earlier root wins. Customize an official preset by copying it into the user root under a NEW id, never by editing the closure copy.
-- Mount semantics: a preset mounts when its session is created. Your edits affect new sessions only, never live ones.
-- The full deployment design lives at /Volumes/U500G/coding/wopal-workspace/.worktrees/poc-ellamaka-cordis/docs/DESIGN-dsh-poc.md, sections 「Bun 宿主 HMR 与闭包升级」 and 「空间 × Agent 配置体系」. Keep this skill self-contained: act on the constraints above without opening it.
+- Mount semantics: a preset mounts when a session is created and is hot-reloaded from its composition file on change (profile `patchReload: live`). An edit is picked up without a host restart, but the changed rows reach a session's tool/prompt catalog when that session is (re)created — validate, then open a fresh session to confirm.
 
 ## Standard workflow
 
@@ -421,6 +420,20 @@ Modify it as follows:
 4. Use the returned `packageId`; when current exists, activate the new version with `update` in the usual case.
 
 If the reference is unavailable, explain that the Plugin was removed, belongs to another Session, or was lost on process restart. Do not create a same-named replacement.
+
+## Ship a capability as a distributable dsh bundle
+
+A dynamic plugin you define through `cordis_define` is process-local and disappears on restart — it is for probing a capability, never for shipping it. A capability that should persist and reach other sessions or users must be authored as a package with a `dsh.bundle.patch` and installed through the plugin CLI. Two decisions decide whether that package loads:
+
+**Choose the scope.** In the dsh-in-ellamaka deployment the `@deepseek-ai/*` scope is treated as the official closure set — the installer skips downloading it, composition resolution leaves its bare names untouched against the closure, and no fallback link is made for it. A package that borrows that scope without living in the official closure cannot be resolved from a profile (the row fails to import, the replay keeps the last good state). Author under a scope you control — `@<org>/*` or no scope for a plain bundle — never `@deepseek-ai/*` for something you distribute.
+
+**Declare the self-patch.** Give the package a `dsh` field naming a bundled patch file:
+
+```json
+"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+```
+
+The bundled `cordis.patch.yml` carries the mount shape. When the plugin replaces stock rows, disable the stock row and insert your own under a distinct id (a patch may not change a row's `name`); when it publishes a new provider, insert a row naming the package. Both the official loader and the ellamaka loader honour this `dsh.bundle.patch` self-patch, so one package installs identically across the two environments. Install with the CLI that owns the target home — the official CLI `dsh plugin --profile <name> add <dir-or-package>` against an official home, or the ellamaka CLI `ellamaka dsh plugin --profile <name> add <dir-or-package>` against a running engine's home (same verb order, so either reads naturally; ellamaka copies the directory and heals a fallback link, the official CLI links it). Do not run the bare official `dsh` against a live ellamaka home, and do not use `ellamaka dsh` against an official standalone home. Keep the source directory layout and the built `lib/` beside the `cordis.patch.yml` — that is the unit a preset or a space distributes.
 
 ## Common failure checks
 

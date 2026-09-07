@@ -1,6 +1,6 @@
 ---
 name: editing-cordis-compositions
-description: Use when creating, changing, or validating a Cordis composition for this harness — writing or editing an agent preset, adding or removing a plugin row, deciding whether something belongs to the host composition or to one session, checking whether a preset you authored actually mounts, or diagnosing a row that mounted but contributed nothing.
+description: Use when creating, changing, or validating a Cordis composition for this harness — writing or editing an agent preset or plugin row, deciding whether something belongs to the host composition or to one session, making a preset's own skills/ directory visible (skill-filesystem customSkillDirs), choosing the package scope a preset row names, checking whether a preset you authored actually mounts, or diagnosing a row that mounted but contributed nothing.
 ---
 
 # Editing Cordis compositions
@@ -9,18 +9,16 @@ Every capability in this harness is a plugin row in a `cordis.yml`. There is no 
 
 ## dsh in ellamaka (WopalSpace deployment constraints)
 
-This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — not as a standalone official dsh install. The constraints below are binding for THIS deployment and override any official dsh CLI convention the rest of this body may suggest.
+This skill reaches you inside the WopalSpace `wopal` agent preset, where dsh runs as "dsh in ellamaka" — an official-layout dsh home managed by the Ellamaka engine rather than a standalone official dsh install. The constraints below describe that deployment shape; where they differ from official dsh CLI conventions, they win.
 
-- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home` (= /Users/sam/.wopal/dsh/home). The host sets this at process launch (B-class env resolution). It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh`.
-- Territory root: `$WOPAL_HOME/dsh` (= /Users/sam/.wopal/dsh) is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), `plugins/`, `locks/`, and `staging/`. `recovery-scripts/` also lives here.
+- DSH home: `$DSH_HOME` = `$WOPAL_HOME/dsh/home`. The host sets this at process launch. It is a 100% official-layout harness home and holds `profiles/`, `.agent-presets/`, `sessions/`, `settings.yaml`, `storages/`, and `attachments/`. There is no `~/.dsh` in this deployment.
+- Territory root: `$WOPAL_HOME/dsh` is the Ellamaka territory root, NOT the DSH home. It is engine-owned and holds `closures/<fingerprint>/` (immutable official dependency tree — never edit or write inside it), plus `locks/` and `recovery-scripts/`.
 - `$DSH_HOME` is a real, official dsh home: the official dsh CLI pointed at it interoperates with the engine. When a task calls for official dsh commands against the live engine, prefer the Ellamaka CLI equivalent (`ellamaka dsh ...`) so writes go through the engine's own install path rather than a bare binary racing the running engine.
 - Agent preset roots:
   - Official presets live inside the closure at `closures/<fp>/node_modules/@deepseek-ai/dsh/config/agent-presets/`. They are immutable: read and copy them, never edit them in place.
-  - User presets live at `$DSH_HOME/.agent-presets/<id>/` (= /Users/sam/.wopal/dsh/home/.agent-presets/<id>/). Here this directory is a symlink to the versioned source at `<space>/.wopal/dsh/agents-presets/`, so edit the source in that git worktree and let the symlink carry the change to the runtime. They are auto-discovered and are the only place to customize a preset.
+  - User presets live one directory per preset under `$DSH_HOME/.agent-presets/<id>/`. In the WopalSpace ontology layout that directory is a symlink to the version-controlled source under the space's own `.wopal/dsh/agents-presets/<id>/`, so edit the source there and the symlink carries the change to the runtime. A preset is auto-discovered from any root the deployment configures — read the real path from the roster's `list()` or `resolve()` rather than assuming the layout.
   - On duplicate ids the earlier root wins. Customizing an official preset therefore means copying it into the user root under a NEW id, never editing the closure copy.
-- Mount semantics: a preset mounts when its session is created. Your edits affect new sessions only, never live ones — finish and validate the edit, then let a fresh session pick it up.
-- The full deployment design lives at /Volumes/U500G/coding/wopal-workspace/.worktrees/poc-ellamaka-cordis/docs/DESIGN-dsh-poc.md, sections 「Bun 宿主 HMR 与闭包升级」 and 「空间 × Agent 配置体系」. Keep this skill self-contained: act on the constraints above without opening it.
-
+- Mount semantics: a preset mounts when a session is created and is hot-reloaded from its composition file on change (profile `patchReload: live`). An edit is picked up without a host restart, but the changed rows reach a session's tool/prompt catalog when that session is (re)created — validate the edit, then open a fresh session to confirm the tool list.
 Every "where do presets live" and "which root is writable" statement later in this body resolves against these roots — the official preset set in the closure and the user preset set under `$DSH_HOME/.agent-presets/`.
 
 ## Off-limits
@@ -89,6 +87,30 @@ Unmount the plugin with `cordis_unmount` when you are done; it is a probe, not a
 
 A composition written from scratch usually forgets a group realm or a consumer row; a copy starts loadable.
 
+## Skills a preset ships: make its own directory visible
+
+A preset directory may carry a `skills/` subdirectory (one subdirectory per skill, each holding `SKILL.md`). These are the preset's own bundled skills — for example the composition-authoring skills that ride along with the `cordis` preset. They are NOT discovered automatically: `ctx.skills` scans project roots, user roots, and whatever `customSkillDirs` the preset's `skill-filesystem` row declares — never a preset's own directory by itself.
+
+The recurring bug is a preset that keeps `skills/` beside its composition yet the agent cannot see those skills. The fix is to point the preset's `skill-filesystem` row at that directory with a `customSkillDirs` entry. Resolve it from the preset's own location so it stays relocatable — the loader rewrites `baseUrl` to the preset's composition directory, so the standard, copy-safe shape is:
+
+```yaml
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
+```
+
+This is the exact row the shipped `cordis` preset uses to make its two authoring skills visible. A preset that also wants the deployment's shared project skills keeps both sources: the default project root (rank 100, e.g. `<projectRoot>/.dsh/skills`) plus this `customSkillDirs` entry (rank 300) for the preset's own directory. Dropping the `customSkillDirs` entry silences the bundled skills even though their files sit right there — verify after a change that the skill actually appears in a fresh session, not just that the directory exists.
+
+## Choosing the package name a preset row names
+
+A row's `name` is what the loader resolves and imports, so the scope you give a package decides whether that row can ever mount. This bites hardest for locally authored plugins that travel with a preset or a space.
+
+In the dsh-in-ellamaka deployment the `@deepseek-ai/*` scope is treated as the official closure set: the installer skips downloading it, composition resolution leaves its bare names untouched against the closure, and no fallback link is made for it. A package that borrows that scope without actually living in the official closure therefore cannot be resolved from a profile — the row fails to import (`Cannot find module … from …/cordis-plugin-loader/…`) and the replay keeps the last good state.
+
+Author a self-owned plugin under a scope you control — `@wopal/*`, `@<org>/*`, or no scope for a plain bundle — never `@deepseek-ai/*` for something you distribute. Give it a `dsh.bundle.patch` pointing at a bundled `cordis.patch.yml` when it replaces stock rows (disable the stock row, insert your own under a distinct id); both the official loader and the ellamaka loader honour that `dsh.bundle.patch` self-patch shape, so one package installs identically across the two environments.
+
 ## The rule that catches people
 
 **A row that publishes a service may not sit loose in a preset.** Registering a service without an isolate realm puts it in the process-global realm, so the second session mounting that preset collides with the first. The mount rejects it rather than letting the collision surface later.
@@ -141,7 +163,12 @@ After a clean mount-validation, ask the user to start a session on the new prese
 
 Codex and Claude Code providers are independent optional Profile Bundles. Install only the products a Profile needs, then restart the Profile so its Host registers those providers.
 
-In this deployment you manage plugins with the Ellamaka CLI, not the bare official `dsh` CLI: whenever official documentation shows `dsh plugin ...` or `dsh --dump-config`, run the equivalent as `ellamaka dsh ...` — running the bare official binary against the shared live home would write into engine-owned `$DSH_HOME/profiles/` and `package.json` and race the running engine's own composition replay:
+Pick the CLI by which home the profile lives under — the two are official-layout dsh homes but are owned and operated differently:
+
+- **Official dsh home** (a standalone install such as `~/.dsh`, no engine running): use the official CLI `dsh plugin --profile <name> add <package>` directly.
+- **Ellamaka home** (`$DSH_HOME` under a running engine): use `ellamaka dsh plugin --profile <name> add <package>` — the ellamaka CLI clones the official `dsh plugin` verb order, and it alone should touch a live engine's home. Running the bare official `dsh` against a running engine would write into engine-owned `$DSH_HOME/profiles/` and `package.json` and race the engine's own composition replay.
+
+This skill's own deployment is `dsh in ellamaka`, so unless you are pointed at an explicit official home the commands below target the ellamaka home:
 
 ```sh
 ellamaka dsh plugin --profile <name> add @deepseek-ai/dsh-subagent-codex
