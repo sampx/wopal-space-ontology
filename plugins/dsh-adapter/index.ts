@@ -609,6 +609,28 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
         if (requestedMode) {
           session.append("sandbox/mode", { mode: modeEventValue(requestedMode) })
         }
+        // Same-mode escalation guard: the model does not see the session's
+        // effective mode, so it may retry a denied command with a
+        // `sandbox_permissions` equal to the mode this call already runs
+        // under. dsh's approveEscalation rejects that as "not strictly
+        // wider" — a throw, not an approval — so the call fails with a
+        // confusing error instead of just running. Strip the escalation
+        // fields when the requested mode equals the effective mode of THIS
+        // call: the command can already run as-is, so there is nothing to
+        // approve. Only genuinely wider requests reach dsh's approval.
+        // The effective mode is this call's message mode when the user made
+        // an explicit choice, else the space-level default. The composer
+        // linkage keeps them strictly aligned: approval cards that widen the
+        // session update the selector, so the next user message carries the
+        // wider mode — there is no hidden-wider-than-selector state.
+        const requestedEscalation = dispatchArgs.sandbox_permissions
+        if (typeof requestedEscalation === "string") {
+          const effective = modeEventValue(requestedMode ?? defaultMode)
+          if (requestedEscalation === effective) {
+            delete dispatchArgs.sandbox_permissions
+            delete dispatchArgs.justification
+          }
+        }
         // Register this call's ask closure for the escalation answerer: dsh
         // routes `approval/request` back through
         // `req.agent.session.header.id` (= ctx.sessionID), and the closure
