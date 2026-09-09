@@ -99,6 +99,15 @@ macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应
 | `ontologies/wopal-space-ontology/commands/` | `commands/` |
 | `ontologies/wopal-space-ontology/rules/` | `rules/` |
 | `ontologies/wopal-space-ontology/plugins/` | `plugins/` |
+| `ontologies/wopal-space-ontology/dsh/agents-presets/` | `dsh/agents-presets/` |
+
+### DSH Profiles 物化契约
+
+DSH Profile（`web` 与 `ellamaka-tools`）的基准声明属于本体能力基因，但其执行环境必须位于本地运行态：
+
+1. **基准源**：`ontologies/wopal-space-ontology/dsh/profiles/<profile>/` 仅受版本控制维护 `package.json`（bundles 依赖）与 `cordis.patch.yml`（参数与规则补丁）。
+2. **确定性物化**：`wopal setup` / `space init` 将基准源文件物理复制（Copy）到 `$WOPAL_HOME/dsh/home/profiles/<profile>/`，支持增量合并（bundles 去重合并、用户自定义 patch 保护）。
+3. **运行时闭环**：物理文件就位后，由 `ellamaka dsh init` 执行闭包依赖解析、本地 `node_modules` 安装及 fallback 符号链接自愈，并在启动时动态生成 `cordis.yml` 锚点。禁止对 profiles 根目录进行跨文件系统软链接。
 
 ### Space Overlay
 
