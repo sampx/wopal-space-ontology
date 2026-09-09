@@ -1,0 +1,5 @@
+# dsh web profile — 用户补丁层（user patch layer）
+# 层序：bundles（dsh.profile.bundles 逐包）→ 本文件 → --patch overlays → home 层。
+# 本文件是 enable/disable 面：支持 disable 行、按 id 覆盖 config、insert 插入新行。
+
+[]
