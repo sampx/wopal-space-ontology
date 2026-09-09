@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SimpleTaskManager } from "./simple-task-manager.js"
 import { sessionIDToTaskID } from "./task-launcher.js"
 import { ConcurrencyManager } from "./concurrency-manager.js"
+import { createSessionStore } from "../session-store.js"
 import type { LoggerInstance } from "../logger.js"
 
 function createDeferred<T>() {
@@ -348,7 +349,7 @@ describe("SimpleTaskManager", () => {
 
       expect(result).toEqual({
         ok: true,
-        message: "Task finished successfully. Session deleted from OpenCode.",
+        message: "Task finished successfully. Session deleted from Ellamaka.",
       })
       expect(mockClient.session.delete).toHaveBeenCalledWith({
         path: { id: "ses_recovered-delete" },
@@ -590,7 +591,7 @@ describe("SimpleTaskManager", () => {
       const finishResult = await manager.finishTask(result.taskId, "parent-1")
 
       expect(finishResult.ok).toBe(true)
-      expect(finishResult.message).toContain("finished successfully")
+      expect(finishResult.message).toBe("Task finished successfully. Session deleted from Ellamaka.")
       expect(mockClient.session.delete).toHaveBeenCalled()
       expect(manager.getTask(result.taskId)).toBeUndefined()
     })
@@ -653,6 +654,51 @@ describe("SimpleTaskManager", () => {
 
       expect(finishResult.ok).toBe(false)
       expect(finishResult.message).toContain("not found or not owned")
+    })
+  })
+
+  describe("listTasksForParent", () => {
+    it("includes model from sessionStore and null when unavailable", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const store = manager.getSessionStore()
+      store.upsert("ses_child-session-1", (state) => {
+        state.providerID = "deepseek"
+        state.modelID = "deepseek-chat"
+      })
+
+      const tasks = manager.listTasksForParent("parent-1")
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0]).toMatchObject({
+        taskID: result.taskId,
+        model: "deepseek/deepseek-chat",
+      })
+
+      // Second task without store entry → null
+      const otherStore = createSessionStore()
+      const managerNoStore = new SimpleTaskManager(mockClient, mockClient, "/test/dir", undefined, otherStore, mockDebugLog)
+      const result2 = await managerNoStore.launch({
+        description: "Other task",
+        prompt: "Do something else",
+        agent: "general",
+        parentSessionID: "parent-2",
+      })
+      if (!result2.ok) throw new Error("expected successful launch")
+
+      const tasks2 = managerNoStore.listTasksForParent("parent-2")
+      expect(tasks2).toHaveLength(1)
+      expect(tasks2[0]).toMatchObject({
+        taskID: result2.taskId,
+        model: null,
+      })
+      managerNoStore.dispose()
     })
   })
 

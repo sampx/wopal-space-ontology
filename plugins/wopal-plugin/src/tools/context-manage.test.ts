@@ -226,8 +226,44 @@ describe('context_manage: handleStatus', () => {
       status: 'idle',
       description: 'Test task',
       agent: 'fae',
+      model: null,
     });
     expect(mockTaskManager.listTasksForParent).toHaveBeenCalledWith('ses_main_session');
+  });
+
+  it('S4b: status tasks carry model resolved from sessionStore', async () => {
+    const statusSessionStore = new SessionStore();
+    statusSessionStore.upsert('ses_abc123', (state) => {
+      state.providerID = 'deepseek';
+      state.modelID = 'deepseek-chat';
+    });
+    // ses_def456 has no store entry → model must be null, not throw
+
+    const mockTaskManager = {
+      findBySession: vi.fn().mockReturnValue(undefined),
+      listTasksForParent: vi.fn().mockReturnValue([
+        { taskID: 'task-abc123', sessionID: 'ses_abc123', status: 'idle', description: 'Test task', agent: 'fae' },
+        { taskID: 'task-def456', sessionID: 'ses_def456', status: 'running', description: 'Another task', agent: 'fae' },
+      ]),
+    };
+
+    const tool = createContextManageTool(summaryClient, undefined, undefined, undefined, undefined, undefined, statusSessionStore, mockTaskManager as unknown as import('../tasks/simple-task-manager.js').SimpleTaskManager);
+    const execute = getExecute(tool);
+    const result = await execute(
+      { action: 'status' },
+      { sessionID: 'ses_main_session', sessionStore: statusSessionStore },
+    );
+
+    const parsed = JSON.parse(result);
+    expect(parsed.tasks).toHaveLength(2);
+    expect(parsed.tasks[0]).toMatchObject({
+      taskID: 'task-abc123',
+      model: 'deepseek/deepseek-chat',
+    });
+    expect(parsed.tasks[1]).toMatchObject({
+      taskID: 'task-def456',
+      model: null,
+    });
   });
 
   it('S5: child session does not include tasks array', async () => {

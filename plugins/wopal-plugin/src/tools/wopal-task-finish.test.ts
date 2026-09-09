@@ -48,7 +48,7 @@ function createMockTaskManager(
         }
       }
       
-      return { ok: true, message: "Task finished successfully. Session deleted from OpenCode." }
+      return { ok: true, message: "Task finished successfully. Session deleted from Ellamaka." }
     }),
   }
 }
@@ -118,7 +118,7 @@ describe("wopal_task_finish", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+    expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     expect(mockClient.session.delete).toHaveBeenCalledWith({
       path: { id: idleTask.sessionID },
     })
@@ -135,7 +135,7 @@ describe("wopal_task_finish", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+    expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     expect(mockClient.session.delete).toHaveBeenCalled()
   })
 

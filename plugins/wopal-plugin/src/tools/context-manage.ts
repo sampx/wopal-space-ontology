@@ -96,7 +96,7 @@ Actions:
           return "Failed: no session ID available for status.";
         }
         const target = await resolveSessionTarget(rawSessionID, client as OpenCodeClient, taskManager);
-        return handleStatus(target.sessionID, activeStore, target.isTask, taskManager);
+        return await handleStatus(target.sessionID, activeStore, target.isTask, taskManager, client as OpenCodeClient);
       }
 
       // === DUMP action ===

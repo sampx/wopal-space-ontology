@@ -14,6 +14,8 @@ import type { TaskSessionInspector } from "../session-runtime-info.js"
 import { contextLogger, formatSessionID } from "../logger.js"
 import { writeContextDump, findActualKey } from "./dump-formatter.js"
 import { fetchContextPercent } from "../session-runtime-info.js"
+import { resolveChildModelString } from "../tasks/task-notifier.js"
+import { taskLogger } from "../logger.js"
 
 export interface StatusPayload {
   sessionID: string
@@ -85,12 +87,13 @@ function buildStatsPayload(state?: SessionState): StatsFromState {
 /**
  * Handle status action - return session context usage stats.
  */
-export function handleStatus(
+export async function handleStatus(
   sessionID: string,
   sessionStore: SessionStore,
   isChildSession: boolean,
   taskManager?: SimpleTaskManager,
-): string {
+  client?: OpenCodeClient,
+): Promise<string> {
   const state = sessionStore.get(sessionID)
   const stats = buildStatsPayload(state)
   const payload: StatusPayload = {
@@ -100,7 +103,24 @@ export function handleStatus(
 
   // Add tasks array only for main sessions (not child sessions)
   if (!isChildSession && taskManager) {
-    const tasks = taskManager.listTasksForParent(sessionID)
+    const taskItems = taskManager.listTasksForParent(sessionID)
+    const tasks = []
+    for (const item of taskItems) {
+      let model = item.model
+      if (!model && item.sessionID) {
+        try {
+          model = client
+            ? await resolveChildModelString(
+                { client, debugLog: taskLogger, sessionStore },
+                item.sessionID,
+              )
+          : null
+        } catch {
+          model = null
+        }
+      }
+      tasks.push({ ...item, model })
+    }
     return JSON.stringify(
       {
         ...payload,

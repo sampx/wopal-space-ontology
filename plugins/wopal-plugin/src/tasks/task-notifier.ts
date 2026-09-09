@@ -8,6 +8,12 @@ import { toErrorMessage } from "./utils.js"
 import { CONTEXT_WARN_THRESHOLD } from "./task-monitor.js"
 import { extractMessages } from "./session-messages.js"
 import {
+  fetchSessionModelInfo,
+  extractContextFromStore,
+  extractModelFromMessages,
+  type SessionModelInfo,
+} from "../session-runtime-info.js"
+import {
   formatElapsedRuntime,
   extractToolCallSummary,
   formatToolCallSummary,
@@ -21,6 +27,47 @@ export interface TaskNotifierDeps {
   client: OpenCodeClient
   debugLog: LoggerInstance
   sessionStore?: SessionStore
+}
+
+/**
+ * Resolve the child session's model as "provider/model".
+ * Prefers sessionStore (written by message-token-handler on step-finish),
+ * falls back to a single messages API lookup. Returns null when neither
+ * source yields model info — callers omit the Model line silently.
+ */
+export async function resolveChildModelString(
+  deps: TaskNotifierDeps,
+  sessionID: string,
+): Promise<string | null> {
+  const state = deps.sessionStore?.get(sessionID)
+  if (state?.providerID && state?.modelID) {
+    return `${state.providerID}/${state.modelID}`
+  }
+
+  let modelInfo: SessionModelInfo | null = null
+  try {
+    modelInfo = await fetchSessionModelInfo(deps.client, sessionID, deps.debugLog)
+  } catch (err) {
+    deps.debugLog.debug(`[resolveChildModel] fallback failed: ${toErrorMessage(err)}`)
+  }
+  if (modelInfo?.providerID && modelInfo?.modelID) {
+    return `${modelInfo.providerID}/${modelInfo.modelID}`
+  }
+  return null
+}
+
+/**
+ * Format the child session's context usage line for IDLE notifications.
+ * Store-only (lastTokens + contextLimit); returns '' when unavailable.
+ */
+export function formatChildContextLine(
+  sessionStore: SessionStore | undefined,
+  sessionID: string,
+): string {
+  if (!sessionStore) return ''
+  const info = extractContextFromStore(sessionStore, sessionID)
+  if (!info) return ''
+  return `\n**Context:** ${info.pct}% used`
 }
 
 const TRIGGER_LABELS: Record<ProgressNotifyTrigger, string> = {
@@ -85,12 +132,19 @@ export async function sendProgressNotification(
     ? `\n**Todos:** ${todoSummaryStr} (${formatTodoPercentage(todoSummary)})`
     : ''
 
+  // Child session model (store first, messages API fallback; omitted when unknown)
+  let modelLine = ''
+  if (task.sessionID) {
+    const model = await resolveChildModelString(deps, task.sessionID)
+    if (model) modelLine = `\n**Model:** ${model}`
+  }
+
   const notification = `<system-reminder>
 [WOPAL TASK PROGRESS]
 **ID:** \`${task.id}\`
 **Agent:** ${task.agent}
 **Description:** ${task.description}${elapsedStr}
-**Progress:** ${messageCount} messages${contextLine}${toolLine}${triggerLine}${todoLine}${outputLine}
+**Progress:** ${messageCount} messages${contextLine}${modelLine}${toolLine}${triggerLine}${todoLine}${outputLine}
 
 Task is still running. Use \`wopal_task_output(task_id="${task.id}")\` for details.
 </system-reminder>`
@@ -146,7 +200,12 @@ export async function notifyParent(
 
   // For IDLE notifications, return full assistant output to avoid re-query
   let resultBlock = ''
+  let contextLine = ''
+  let idleMessages: SessionMessage[] | null = null
   if (task.status === 'idle' && !task.error) {
+    // IDLE-only context usage from store (no extra polling)
+    contextLine = formatChildContextLine(deps.sessionStore, task.sessionID)
+
     let messages: SessionMessage[] = []
     try {
       if (client.session?.messages) {
@@ -156,6 +215,7 @@ export async function notifyParent(
     } catch (err) {
       debugLog.debug(`[notifyParent] failed to fetch messages: ${toErrorMessage(err)}`)
     }
+    idleMessages = messages
 
     const todoSummary = extractTodoSummary(messages)
     const todoSummaryStr = formatTodoSummary(todoSummary)
@@ -173,6 +233,26 @@ export async function notifyParent(
     resultBlock = `${todoLine}${outputLine}`
   }
 
+  // Child session model (store first; IDLE reuses already-fetched messages,
+  // other statuses fall back to one messages API lookup). Omitted when unknown.
+  let modelLine = ''
+  try {
+    const state = deps.sessionStore?.get(task.sessionID)
+    let model: string | null = null
+    if (state?.providerID && state?.modelID) {
+      model = `${state.providerID}/${state.modelID}`
+    } else if (idleMessages !== null) {
+      // IDLE: messages already fetched above — never issue a second request
+      const info = extractModelFromMessages(idleMessages, debugLog)
+      model = info ? `${info.providerID}/${info.modelID}` : null
+    } else if (!task.error) {
+      model = await resolveChildModelString(deps, task.sessionID)
+    }
+    if (model) modelLine = `\n**Model:** ${model}`
+  } catch (err) {
+    debugLog.debug(`[notifyParent] model resolution failed: ${toErrorMessage(err)}`)
+  }
+
   let footerLine = ''
   if (task.status === 'stuck') {
     footerLine = `\n\nTask stopped after assistant activity, but no new assistant text was produced this round. Use \`wopal_task_output(task_id="${task.id}")\` to check content, \`wopal_task_reply(task_id="${task.id}")\` to continue, or \`wopal_task_finish(task_id="${task.id}")\` to clean up.`
@@ -188,7 +268,7 @@ export async function notifyParent(
 [WOPAL TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Agent:** ${task.agent}
-**Description:** ${task.description}${errorLine}${resultBlock}${footerLine}
+**Description:** ${task.description}${errorLine}${modelLine}${contextLine}${resultBlock}${footerLine}
 </system-reminder>`
 
   const success = await sendNotification(deps, task.parentSessionID, notification)

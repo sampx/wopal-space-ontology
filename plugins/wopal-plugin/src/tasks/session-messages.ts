@@ -195,9 +195,46 @@ function formatToolStatus(status: string | undefined, exitCode?: number, hasCont
 }
 
 /**
+ * Find the most recent assistant message containing a part of the requested type.
+ * Multi-tool steps leave the last assistant message as a pure tool-call message;
+ * falling back to the newest message with the requested part avoids reading empty.
+ */
+function findLastAssistantMessageWithPart(
+  messages: SessionMessage[],
+  partType: "text" | "reasoning"
+): SessionMessage | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.info?.role !== "assistant") continue
+    if (!msg.parts) continue
+    for (const part of msg.parts) {
+      if (part.type === partType && part.text) return msg
+    }
+  }
+  return undefined
+}
+
+/**
+ * Collect parts of the requested type from a single assistant message.
+ */
+function collectPartsFromMessage(
+  message: SessionMessage,
+  partType: "text" | "reasoning"
+): string[] {
+  const texts: string[] = []
+  if (!message.parts) return texts
+  for (const part of message.parts) {
+    if (part.type === partType && part.text) {
+      texts.push(part.text)
+    }
+  }
+  return texts.filter((t) => t.length > 0)
+}
+
+/**
  * Extract messages filtered by section type.
- * tools section: outputs tool name + status (completed/error), no full content.
- * text/reasoning section: default last message, multiple messages truncated to maxLength=4000.
+ * tools section: outputs tool name + status (completed/error), no full content; lastN truncates to the last N entries.
+ * text/reasoning section: default most recent assistant message containing the requested part type, multiple messages truncated to maxLength=4000.
  */
 export function extractBySection(
   messages: SessionMessage[],
@@ -206,44 +243,27 @@ export function extractBySection(
 ): string {
   if (!messages || messages.length === 0) return ""
 
-  // text/reasoning section: 默认返回最后一条 assistant 消息
+  // text/reasoning section: 默认返回最近一条含所请求 part 类型的 assistant 消息
   if (section === "text" || section === "reasoning") {
     const lastN = options?.lastN ?? 1
-    
-    // 单条消息：直接获取最后一条 assistant 消息内容（无截断）
+
+    // 单条消息：回退查找最近含该 part 类型的 assistant 消息（无截断）
     if (lastN === 1) {
-      const lastMsg = getLastAssistantMessage(messages)
-      if (!lastMsg || !lastMsg.parts) return ""
-      
-      const texts: string[] = []
-      for (const part of lastMsg.parts) {
-        if (section === "text" && part.type === "text" && part.text) {
-          texts.push(part.text)
-        } else if (section === "reasoning" && part.type === "reasoning" && part.text) {
-          texts.push(part.text)
-        }
-      }
-      return texts.filter(t => t.length > 0).join("\n\n")
+      const targetMsg = findLastAssistantMessageWithPart(messages, section)
+      if (!targetMsg) return ""
+      return collectPartsFromMessage(targetMsg, section).join("\n\n")
     }
-    
+
     // 多条消息：聚合并截断至 maxLength=4000
     const maxLength = options?.maxLength ?? 4000
     const relevantMessages = messages.slice(-lastN)
     const extracted: string[] = []
-    
+
     for (const msg of relevantMessages) {
       if (msg.info?.role !== "assistant") continue
-      if (!msg.parts) continue
-      
-      for (const part of msg.parts) {
-        if (section === "text" && part.type === "text" && part.text) {
-          extracted.push(part.text)
-        } else if (section === "reasoning" && part.type === "reasoning" && part.text) {
-          extracted.push(part.text)
-        }
-      }
+      extracted.push(...collectPartsFromMessage(msg, section))
     }
-    
+
     let result = extracted.filter(t => t.length > 0).join("\n\n")
     if (result.length > maxLength) {
       result = result.slice(-maxLength) + "\n[...earlier content truncated]"
@@ -251,10 +271,12 @@ export function extractBySection(
     return result
   }
 
-  // tools section: 输出工具名+状态（Task 2 已重构）
+  // tools section: 输出工具名+状态，lastN 截断至最近 N 条条目
+  const lastN = options?.lastN
+  const window = lastN != null ? messages.slice(-lastN) : messages
   const extracted: string[] = []
 
-  for (const msg of messages) {
+  for (const msg of window) {
     if (msg.info?.role !== "assistant" && msg.info?.role !== "tool") continue
     if (!msg.parts) continue
 
@@ -271,13 +293,13 @@ export function extractBySection(
         const state = hasToolState(part) ? part.state : undefined
         const status = state?.status
         const exitCode = state?.metadata?.exit
-        
+
         // MCP fallback: check content for error keywords
         const contentStr = typeof part.content === "string"
           ? part.content
           : part.content?.map(c => c.text).filter(Boolean).join("\n") ?? ""
         const hasContentError = detectErrorFromContent(contentStr)
-        
+
         const formattedStatus = formatToolStatus(status, exitCode, hasContentError)
         extracted.push(`[result]: ${formattedStatus}`)
       }

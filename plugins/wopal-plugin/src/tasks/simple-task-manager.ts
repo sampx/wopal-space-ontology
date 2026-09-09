@@ -30,6 +30,9 @@ import { sessionIDToTaskID } from "../session-ref.js"
 import { getDisplayStatus, isResumableTask, canDeleteTask } from "./task-phase.js"
 import { isSessionDeleteResult } from "../types.js"
 
+/** Runtime product display name used in user-facing task messages. */
+const RUNTIME_DISPLAY_NAME = "Ellamaka"
+
 export class SimpleTaskManager {
   private tasks = new Map<string, WopalTask>()
   private taskSessions = new Set<string>()
@@ -130,6 +133,7 @@ export class SimpleTaskManager {
     status: string
     description: string
     agent: string
+    model: string | null
   }> {
     const result: Array<{
       taskID: string
@@ -137,17 +141,23 @@ export class SimpleTaskManager {
       status: string
       description: string
       agent: string
+      model: string | null
     }> = []
 
     for (const task of this.tasks.values()) {
       if (task.parentSessionID === parentSessionID) {
         const effectiveStatus = getDisplayStatus(task)
+        const state = task.sessionID ? this.sessionStore.get(task.sessionID) : undefined
+        const model = state?.providerID && state?.modelID
+          ? `${state.providerID}/${state.modelID}`
+          : null
         result.push({
           taskID: task.id,
           sessionID: task.sessionID ?? '',
           status: effectiveStatus,
           description: task.description,
           agent: task.agent,
+          model,
         })
       }
     }
@@ -213,7 +223,7 @@ export class SimpleTaskManager {
     releaseConcurrencySlot(task)
 
     debugLog.info({ task_id: formatSessionID(task.sessionID, true) }, "[finishTask] Task finished")
-    return { ok: true, message: "Task finished successfully. Session deleted from OpenCode." }
+    return { ok: true, message: `Task finished successfully. Session deleted from ${RUNTIME_DISPLAY_NAME}.` }
   }
 
   async notifyParent(taskId: string): Promise<void> {

@@ -193,6 +193,24 @@ describe("extractBySection", () => {
       expect(extractBySection(messages, "text")).toBe("")
     })
 
+    it("falls back to most recent assistant message containing text when last one is tool-call only", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "Earlier real answer" }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "tool", tool: "read", state: { status: "completed" } }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "tool", tool: "bash", state: { status: "completed" } }],
+        },
+      ]
+      expect(extractBySection(messages, "text")).toBe("Earlier real answer")
+    })
+
     it("filters empty text parts in single message", () => {
       const messages: SessionMessage[] = [
         {
@@ -247,6 +265,34 @@ describe("extractBySection", () => {
         },
       ]
       expect(extractBySection(messages, "reasoning")).toBe("")
+    })
+
+    it("falls back to most recent assistant message containing reasoning when last one is tool-call only", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "reasoning", text: "Earlier thinking" }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "tool", tool: "grep", state: { status: "completed" } }],
+        },
+      ]
+      expect(extractBySection(messages, "reasoning")).toBe("Earlier thinking")
+    })
+
+    it("prefers last assistant message reasoning even when an earlier message has text", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "reasoning", text: "Earlier reasoning" }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "reasoning", text: "Last reasoning" }],
+        },
+      ]
+      expect(extractBySection(messages, "reasoning")).toBe("Last reasoning")
     })
   })
 
@@ -372,6 +418,87 @@ describe("extractBySection", () => {
       expect(result).toContain("[tool: bash] (error, exit:127)")
       expect(result).toContain("[result]: (completed)")
       expect(result).toContain("[result]: (error)")
+    })
+
+    it("last_n=1 keeps only the last tool entry", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "read", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "grep", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "bash", state: { status: "completed" } },
+          ],
+        },
+      ]
+      const result = extractBySection(messages, "tools", { lastN: 1 })
+      expect(result).toBe("[tool: bash] (completed)")
+      expect(result).not.toContain("read")
+      expect(result).not.toContain("grep")
+    })
+
+    it("last_n=2 keeps the last two tool entries", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "read", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "grep", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "bash", state: { status: "completed" } },
+          ],
+        },
+      ]
+      const result = extractBySection(messages, "tools", { lastN: 2 })
+      expect(result).toContain("[tool: grep] (completed)")
+      expect(result).toContain("[tool: bash] (completed)")
+      expect(result).not.toContain("[tool: read]")
+    })
+
+    it("without last_n outputs all tool entries (default unchanged)", () => {
+      const messages: SessionMessage[] = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "read", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "grep", state: { status: "completed" } },
+          ],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool", tool: "bash", state: { status: "completed" } },
+          ],
+        },
+      ]
+      const result = extractBySection(messages, "tools")
+      expect(result).toContain("[tool: read] (completed)")
+      expect(result).toContain("[tool: grep] (completed)")
+      expect(result).toContain("[tool: bash] (completed)")
     })
   })
 })

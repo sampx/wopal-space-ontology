@@ -53,7 +53,7 @@ function createMockTaskManager(
         }
       }
       
-      return { ok: true, message: "Task finished successfully. Session deleted from OpenCode." }
+      return { ok: true, message: "Task finished successfully. Session deleted from Ellamaka." }
     }),
   }
 }
@@ -277,7 +277,7 @@ describe("task status boundary tests", () => {
         { sessionID: parentSessionID },
       )
 
-      expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+      expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     })
 
     it("succeeds on waiting task (waiting is deletable)", async () => {
@@ -290,7 +290,7 @@ describe("task status boundary tests", () => {
         { sessionID: parentSessionID },
       )
 
-      expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+      expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     })
 
     it("succeeds on stuck task (stuck is deletable)", async () => {
@@ -303,7 +303,7 @@ describe("task status boundary tests", () => {
         { sessionID: parentSessionID },
       )
 
-      expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+      expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     })
 
     it("succeeds on error task (error is deletable)", async () => {
@@ -316,7 +316,7 @@ describe("task status boundary tests", () => {
         { sessionID: parentSessionID },
       )
 
-      expect(result).toBe("Task finished successfully. Session deleted from OpenCode.")
+      expect(result).toBe("Task finished successfully. Session deleted from Ellamaka.")
     })
   })
 
