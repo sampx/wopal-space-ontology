@@ -105,6 +105,23 @@ flow.sh issue list --project firecrawl --project wopal-cli --status planning --s
 
 Agent 查询未完成 Issue 一律使用本命令，避免手动 `gh issue list` 查错仓库。
 
+### issue view
+
+查看单个 Issue 的完整内容。已知 Issue 编号时的首选方式，无需先 `issue list`。
+
+```bash
+flow.sh issue view 215              # 格式化输出：编号/标题/Labels/State/body
+flow.sh issue view 215 --json       # 原始 JSON（含全部 gh 字段）
+```
+
+**行为**：
+- 通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`
+- 默认输出编号、标题、Labels、State 和完整 body（Markdown 原文）
+- `--json`：输出 `gh issue view --json` 的原始结果，适合脚本/agent 结构化读取
+- Issue 不存在、仓库检测失败或 `gh` 调用失败时报错退出（exit 1）
+
+Agent 定位 Issue 的顺序：已知编号 → `issue view`；需要浏览/筛选 → `issue list`。两者均禁止手动 `gh issue view/list` 绕过脚本。
+
 ### issue update（已废弃）
 
 ```bash

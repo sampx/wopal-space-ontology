@@ -51,6 +51,7 @@ description: >
 |------|------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue | `--body-file` 为主路径 |
 | `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue | 自动检测仓库，显示 repo URL，可按 project/status 过滤 |
+| `issue view <issue> [--json]` | 查看单个 Issue 内容 | 已知编号时直接查看，无需先 list；`--json` 输出原始 JSON |
 | `issue write <issue> --body-file <path>` | 全量替换 Issue body | |
 | `sync <plan> [--body-only\|--labels-only]` | Plan → Issue 同步 | Plan 内容变更后必走 |
 
@@ -392,6 +393,7 @@ flow.sh archive <issue>
 - **跳过 dev-flow 直接手动操作** — Issue/Plan 驱动的任务必须走 `flow.sh` 命令链
 - **直接调 `gh issue create` 绕过 flow.sh** — Issue 创建必须走 `flow.sh issue create`，脚本通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`。直接调 `gh` 会导致 Issue 创建到错误仓库 = 严重失职
 - **手动 `gh issue list` 查询未完成 Issue** — 查询未完成 Issue 必须走 `flow.sh issue list`，脚本自动定位空间仓库并显示 repo URL，避免 Agent 因不知道仓库归属而查错仓库
+- **手动 `gh issue view` 查看单个 Issue** — 已知编号时必须走 `flow.sh issue view <编号>`，自动定位空间仓库；直接调 `gh` 查错仓库风险同上
 - **跳过 rook 审查直接 complete** — 实施审查是强制门禁，complete 前必须委派 rook
 - **手动 `plan check` 再 submit** — 冗余步骤；`flow.sh submit` 已自动运行 `plan check` 校验，不合格会被拒绝，直接 submit 即可
 - **跳过 `submit` 直接请用户评审** — 请用户评审 Plan 前必须先 `flow.sh submit` 推进到 `reviewing`。跳过 submit 会让 Plan 停在 `planning`，用户审批后无法直接进入实施

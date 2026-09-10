@@ -23,6 +23,8 @@ flow.sh issue list --status planning        # 按 status 过滤
 flow.sh issue list --limit 100              # 指定数量
 ```
 
+**查看单个 Issue 必须使用 `flow.sh issue view <编号>`**，禁止手动 `gh issue view`。已知编号时的首选方式，自动定位空间仓库，直接输出标题、标签、状态和完整 body；`--json` 输出原始 JSON。
+
 ## Issue 标题格式
 
 Issue 标题是**自由文本**，不再强制 `type(scope): description` 格式。宽松 type 前缀（可选）用于 label 推断。

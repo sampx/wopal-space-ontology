@@ -571,6 +571,47 @@ def cmd_issue_list(args: argparse.Namespace) -> int:
 
 
 # ============================================
+# issue view
+# ============================================
+
+def cmd_issue_view(args: argparse.Namespace) -> int:
+    """View a single Issue by number from the space repo.
+
+    Auto-detects the space repository (no manual --repo needed).
+    Prints a readable rendering by default, raw JSON with --json.
+    """
+    import json
+
+    workspace_root = find_workspace_root()
+    try:
+        repo = detect_space_repo(workspace_root)
+    except RuntimeError as e:
+        log_error(f"Failed to detect space repo: {e}")
+        return 1
+
+    try:
+        info = get_issue_info(args.issue, repo)
+    except RuntimeError:
+        log_error(f"Failed to view issue #{args.issue} in {repo}")
+        return 1
+
+    if getattr(args, "json_flag", False):
+        print(json.dumps(info, ensure_ascii=False, indent=2))
+        return 0
+
+    labels = [l.get("name", "") for l in info.get("labels", []) if l.get("name")]
+    label_str = " ".join(f"[{l}]" for l in labels)
+    print(f"#{info.get('number', '?')}  {info.get('title', '')}")
+    if label_str:
+        print(f"Labels: {label_str}")
+    print(f"State: {info.get('state', '')}")
+    print("")
+    print(info.get("body", ""))
+
+    return 0
+
+
+# ============================================
 # argparse registration
 # ============================================
 
@@ -620,6 +661,13 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     list_parser.add_argument("--status", action="append", dest="status",
                              help="Filter by status (planning/executing/in-progress/verifying/done, repeatable, OR-combined)")
 
+    # issue view
+    view_parser = issue_subparsers.add_parser(
+        "view", help="View a single issue by number in space repo")
+    view_parser.add_argument("issue", help="Issue number (e.g. 215)")
+    view_parser.add_argument("--json", dest="json_flag", action="store_true",
+                             help="Print raw JSON instead of formatted output")
+
     # issue write
     write_parser = issue_subparsers.add_parser("write", help="Write to issue body")
     write_parser.add_argument("issue_number", nargs="?", help="Issue number")
@@ -635,6 +683,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
         return cmd_issue_update(args)
     elif args.issue_cmd == "list":
         return cmd_issue_list(args)
+    elif args.issue_cmd == "view":
+        return cmd_issue_view(args)
     elif args.issue_cmd == "write":
         return cmd_issue_write(args)
     else:
