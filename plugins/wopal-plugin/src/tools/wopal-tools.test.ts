@@ -91,23 +91,33 @@ describe("wopal tools", () => {
   describe("wopal_task_output", () => {
     it("enforces ownership via current session", async () => {
       const manager = {
-        getTaskForParent: vi.fn().mockReturnValue(undefined),
+        resolveTaskForParent: vi.fn().mockReturnValue({
+          type: "not_found",
+          query: "task-1",
+          availableTasks: [],
+        }),
+        formatResolveErrorMessage: vi.fn(
+          (query: string) => `Task not found: "${query}". No active tasks in the current session.`,
+        ),
       }
 
       const execute = getExecute(createWopalOutputTool(manager as never))
       await expect(
         execute({ task_id: "task-1" }, { sessionID: "parent-2" }),
-      ).resolves.toBe("Task not found for current session: task-1")
-      expect(manager.getTaskForParent).toHaveBeenCalledWith("task-1", "parent-2")
+      ).resolves.toBe('Task not found: "task-1". No active tasks in the current session.')
+      expect(manager.resolveTaskForParent).toHaveBeenCalledWith("task-1", "parent-2")
     })
 
     it("describes running tasks", async () => {
       const manager = {
-        getTaskForParent: vi.fn().mockReturnValue({
-          id: "task-1",
-          status: "running",
-          description: "Test task",
-          agent: "general",
+        resolveTaskForParent: vi.fn().mockReturnValue({
+          type: "exact",
+          task: {
+            id: "task-1",
+            status: "running",
+            description: "Test task",
+            agent: "general",
+          },
         }),
         getConcurrencyStatus: vi.fn().mockReturnValue({ used: 2, limit: 5, available: 3 }),
       }
@@ -121,12 +131,15 @@ describe("wopal tools", () => {
 
     it("describes stuck tasks with diagnostic message", async () => {
       const manager = {
-        getTaskForParent: vi.fn().mockReturnValue({
-          id: "task-1",
-          status: "stuck",
-          description: "Test task",
-          agent: "general",
-          error: "Something went wrong",
+        resolveTaskForParent: vi.fn().mockReturnValue({
+          type: "exact",
+          task: {
+            id: "task-1",
+            status: "stuck",
+            description: "Test task",
+            agent: "general",
+            error: "Something went wrong",
+          },
         }),
         getConcurrencyStatus: vi.fn().mockReturnValue({ used: 2, limit: 5, available: 3 }),
       }
@@ -140,12 +153,15 @@ describe("wopal tools", () => {
 
     it("describes waiting tasks", async () => {
       const manager = {
-        getTaskForParent: vi.fn().mockReturnValue({
-          id: "task-1",
-          status: "waiting",
-          description: "Test task",
-          agent: "general",
-          pendingQuestionID: "q-123",
+        resolveTaskForParent: vi.fn().mockReturnValue({
+          type: "exact",
+          task: {
+            id: "task-1",
+            status: "waiting",
+            description: "Test task",
+            agent: "general",
+            pendingQuestionID: "q-123",
+          },
         }),
         getConcurrencyStatus: vi.fn().mockReturnValue({ used: 2, limit: 5, available: 3 }),
       }
@@ -158,14 +174,14 @@ describe("wopal tools", () => {
 
     it("fails when context session id is missing", async () => {
       const manager = {
-        getTaskForParent: vi.fn(),
+        resolveTaskForParent: vi.fn(),
       }
 
       const execute = getExecute(createWopalOutputTool(manager as never))
       await expect(
         execute({ task_id: "task-1" }, {}),
       ).resolves.toBe("Current session ID is unavailable; cannot read task status.")
-      expect(manager.getTaskForParent).not.toHaveBeenCalled()
+      expect(manager.resolveTaskForParent).not.toHaveBeenCalled()
     })
   })
 })

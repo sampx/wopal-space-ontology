@@ -14,15 +14,37 @@ function createMockClient() {
   }
 }
 
+/**
+ * Mock the manager with a resolver-backed in-memory task store so both exact
+ * and fuzzy (prefix/suffix) lookups behave like the real SimpleTaskManager.
+ */
 function createMockTaskManager(
   task?: WopalTask,
   client?: ReturnType<typeof createMockClient>,
 ) {
   const mockClient = client ?? createMockClient()
+  const tasks: WopalTask[] = task ? [task] : []
   return {
-    getTaskForParent: vi.fn((id: string, parentID: string) =>
-      task && task.id === id && task.parentSessionID === parentID ? task : undefined,
-    ),
+    tasks,
+    resolveTaskForParent: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const exact = owned.find((t) => t.id === query)
+      if (exact) return { type: "exact" as const, task: exact }
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length === 1) return { type: "unique" as const, task: fuzzy[0], matchedBy: "prefix" as const }
+      if (fuzzy.length >= 2) return { type: "ambiguous" as const, query, candidates: fuzzy }
+      return { type: "not_found" as const, query, availableTasks: owned }
+    }),
+    formatResolveErrorMessage: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length >= 2) {
+        return `Ambiguous task reference (ambiguous): "${query}" matches ${fuzzy.length} tasks. Task IDs are ambiguous; use one of the full task IDs:\n${fuzzy.map((t) => `- ${t.id}`).join("\n")}`
+      }
+      return owned.length > 0
+        ? `Task not found: "${query}". Active tasks in the current session:\n${owned.map((t) => `- ${t.id} [${t.status}] ${t.description}`).join("\n")}`
+        : `Task not found: "${query}". No active tasks in the current session.`
+    }),
     getClient: vi.fn(() => mockClient),
     releaseConcurrencySlot: vi.fn(),
   }
@@ -64,7 +86,44 @@ describe("wopal_task_abort", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe("Failed to abort task: task not found or not owned by this session.")
+    expect(result).toContain("Failed to abort task: Task not found")
+    expect(result).toContain("No active tasks in the current session")
+  })
+
+  it("ambiguous reference: returns candidate list without aborting", async () => {
+    const taskA = createRunningTask({ id: "wopal-task-dup-aaa", description: "Task A" })
+    const taskB = createRunningTask({ id: "wopal-task-dup-bbb", description: "Task B" })
+    const mockClient = createMockClient()
+    const mockManager = createMockTaskManager(taskA, mockClient)
+    mockManager.tasks.push(taskB)
+    const execute = getExecute(createWopalTaskAbortTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: "wopal-task-dup" },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toContain("Failed to abort task: Ambiguous task reference")
+    expect(result).toContain("wopal-task-dup-aaa")
+    expect(result).toContain("wopal-task-dup-bbb")
+    expect(mockClient.session.abort).not.toHaveBeenCalled()
+  })
+
+  it("unique prefix reference: aborts the resolved task", async () => {
+    const runningTask = createRunningTask()
+    const mockClient = createMockClient()
+    const mockManager = createMockTaskManager(runningTask, mockClient)
+    const execute = getExecute(createWopalTaskAbortTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: runningTask.id.slice(0, 12) },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toContain(`Task ${runningTask.id} aborted`)
+    expect(mockClient.session.abort).toHaveBeenCalledWith({
+      path: { id: runningTask.sessionID },
+    })
   })
 
   it("non-running task: returns error with guidance", async () => {

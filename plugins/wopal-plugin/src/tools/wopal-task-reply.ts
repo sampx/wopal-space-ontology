@@ -105,10 +105,11 @@ Decision guide:
         return "Error: Current session ID is unavailable; cannot reply to task."
       }
 
-      const task = manager.getTaskForParent(task_id, context.sessionID)
-      if (!task) {
-        return "Error: Task not found or not owned by this session"
+      const verdict = manager.resolveTaskForParent(task_id, context.sessionID)
+      if (verdict.type === "ambiguous" || verdict.type === "not_found") {
+        return `Error: ${manager.formatResolveErrorMessage(task_id, context.sessionID)}`
       }
+      const task = verdict.task
 
       if (task.status === "error") {
         return "Error: Task is in error state and cannot be resumed. Use wopal_task_finish to clean it up, then launch a new task with a valid configuration."
@@ -186,7 +187,7 @@ Decision guide:
 
           taskLogger.debug({ task_id: formatSessionID(task.sessionID, true) }, "Task interrupted and resumed")
 
-          return `Interrupt sent to task ${task_id}. Previous execution aborted, new message injected. Task will continue with new direction.`
+          return `Interrupt sent to task ${task.id}. Previous execution aborted, new message injected. Task will continue with new direction.`
         } catch (err) {
           // Rollback: release the slot we acquired before the failed message
           preserveSlotForRetry(task, manager)
@@ -215,7 +216,7 @@ Decision guide:
           resetTaskForResume(task)
           taskLogger.debug({ task_id: formatSessionID(task.sessionID, true) }, "Task resumed via question.reply")
 
-          return `Reply sent to task ${task_id}. The background task will continue execution.`
+          return `Reply sent to task ${task.id}. The background task will continue execution.`
         }
 
           if (typeof client?.session?.promptAsync !== "function") {
@@ -236,7 +237,7 @@ Decision guide:
         resetTaskForResume(task)
         taskLogger.debug({ task_id: formatSessionID(task.sessionID, true) }, "Task resumed")
 
-        return `Reply sent to task ${task_id}. The background task will continue execution.`
+        return `Reply sent to task ${task.id}. The background task will continue execution.`
       } catch (err) {
         // Rollback: release the slot we acquired before the failed operation
         preserveSlotForRetry(task, manager)

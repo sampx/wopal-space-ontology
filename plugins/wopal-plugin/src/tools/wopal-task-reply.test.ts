@@ -18,6 +18,10 @@ function createMockClient() {
   }
 }
 
+/**
+ * Mock the manager with a resolver-backed in-memory task store so both exact
+ * and fuzzy (prefix/suffix) lookups behave like the real SimpleTaskManager.
+ */
 function createMockTaskManager(
   task?: WopalTask,
   client?: ReturnType<typeof createMockClient>,
@@ -25,10 +29,28 @@ function createMockTaskManager(
   serverUrl?: URL,
 ) {
   const mockClient = client ?? createMockClient()
+  const tasks: WopalTask[] = task ? [task] : []
   return {
-    getTaskForParent: vi.fn((id: string, parentID: string) =>
-      task && task.id === id && task.parentSessionID === parentID ? task : undefined,
-    ),
+    tasks,
+    resolveTaskForParent: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const exact = owned.find((t) => t.id === query)
+      if (exact) return { type: "exact" as const, task: exact }
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length === 1) return { type: "unique" as const, task: fuzzy[0], matchedBy: "prefix" as const }
+      if (fuzzy.length >= 2) return { type: "ambiguous" as const, query, candidates: fuzzy }
+      return { type: "not_found" as const, query, availableTasks: owned }
+    }),
+    formatResolveErrorMessage: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length >= 2) {
+        return `Ambiguous task reference (ambiguous): "${query}" matches ${fuzzy.length} tasks. Task IDs are ambiguous; use one of the full task IDs:\n${fuzzy.map((t) => `- ${t.id}`).join("\n")}`
+      }
+      return owned.length > 0
+        ? `Task not found: "${query}". Active tasks in the current session:\n${owned.map((t) => `- ${t.id} [${t.status}] ${t.description}`).join("\n")}`
+        : `Task not found: "${query}". No active tasks in the current session.`
+    }),
     getClient: vi.fn(() => mockClient),
     getV2Client: vi.fn(() => v2Client),
     getServerUrl: vi.fn(() => serverUrl),
@@ -72,7 +94,46 @@ describe("wopal_task_reply", () => {
       { sessionID: parentSessionID },
     )
 
-    expect(result).toBe("Error: Task not found or not owned by this session")
+    expect(result).toContain("Error: Task not found")
+    expect(result).toContain("No active tasks in the current session")
+  })
+
+  it("ambiguous reference: returns candidate list without replying", async () => {
+    const taskA = createWaitingTask({ id: "wopal-task-dup-aaa", description: "Task A" })
+    const taskB = createWaitingTask({ id: "wopal-task-dup-bbb", description: "Task B" })
+    const mockClient = createMockClient()
+    const mockManager = createMockTaskManager(taskA, mockClient)
+    mockManager.tasks.push(taskB)
+    const execute = getExecute(createWopalReplyTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: "wopal-task-dup", message: "test" },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toContain("Error: Ambiguous task reference")
+    expect(result).toContain("wopal-task-dup-aaa")
+    expect(result).toContain("wopal-task-dup-bbb")
+    expect(mockClient.session.promptAsync).not.toHaveBeenCalled()
+  })
+
+  it("unique prefix reference: replies to the resolved task with canonical ID echo", async () => {
+    const mockClient = createMockClient()
+    const task = createWaitingTask()
+    const mockManager = createMockTaskManager(task, mockClient)
+    const execute = getExecute(createWopalReplyTool(mockManager as never))
+
+    const result = await execute(
+      { task_id: task.id.slice(0, 12), message: "continue" },
+      { sessionID: parentSessionID },
+    )
+
+    expect(result).toBe(`Reply sent to task ${task.id}. The background task will continue execution.`)
+    expect(mockClient.session.promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: task.sessionID },
+      }),
+    )
   })
 
   it("task status is stuck (not waiting): reply works and re-acquires slot", async () => {

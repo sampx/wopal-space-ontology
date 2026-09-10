@@ -20,10 +20,11 @@ export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefini
 
       const { task_id } = args
 
-      const task = manager.getTaskForParent(task_id, context.sessionID)
-      if (!task) {
-        return "Failed to abort task: task not found or not owned by this session."
+      const verdict = manager.resolveTaskForParent(task_id, context.sessionID)
+      if (verdict.type === "ambiguous" || verdict.type === "not_found") {
+        return `Failed to abort task: ${manager.formatResolveErrorMessage(task_id, context.sessionID)}`
       }
+      const task = verdict.task
 
       // abort only works on running status tasks
       // idle/waiting/stuck tasks should use finish instead
@@ -64,9 +65,11 @@ export function createWopalTaskAbortTool(manager: SimpleTaskManager): ToolDefini
           }
         }
 
-        taskLogger.info({ task_id: formatSessionID(task_id, true) }, "Task aborted")
+        taskLogger.info({ task_id: formatSessionID(task.sessionID, true) }, "Task aborted")
 
-        return `Task ${task_id} aborted. Execution stopped. Task is now idle awaiting your judgment: (1) wopal_task_finish to delete, or (2) TTL 30min auto cleanup. Use wopal_task_reply to wake up and redirect if needed.`
+        // Echo the canonical task.id, not the caller's (possibly truncated)
+        // reference, so follow-up tool calls use the full ID.
+        return `Task ${task.id} aborted. Execution stopped. Task is now idle awaiting your judgment: (1) wopal_task_finish to delete, or (2) TTL 30min auto cleanup. Use wopal_task_reply to wake up and redirect if needed.`
       } catch (err) {
         return `Failed to abort task: ${err instanceof Error ? err.message : String(err)}`
       }

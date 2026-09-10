@@ -14,28 +14,57 @@ function createMockClient() {
   }
 }
 
+/**
+ * Mock the manager with a resolver-backed in-memory task store so both exact
+ * and fuzzy (prefix/suffix) lookups behave like the real SimpleTaskManager.
+ * finishTask mirrors the real implementation: it resolves the reference and
+ * deletes by the resolved task id.
+ */
 function createMockTaskManager(
   task?: WopalTask,
   client?: ReturnType<typeof createMockClient>,
 ) {
   const mockClient = client ?? createMockClient()
+  const tasks: WopalTask[] = task ? [task] : []
   return {
-    getTaskForParent: vi.fn((id: string, parentID: string) =>
-      task && task.id === id && task.parentSessionID === parentID ? task : undefined,
-    ),
+    tasks,
+    resolveTaskForParent: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const exact = owned.find((t) => t.id === query)
+      if (exact) return { type: "exact" as const, task: exact }
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length === 1) return { type: "unique" as const, task: fuzzy[0], matchedBy: "prefix" as const }
+      if (fuzzy.length >= 2) return { type: "ambiguous" as const, query, candidates: fuzzy }
+      return { type: "not_found" as const, query, availableTasks: owned }
+    }),
+    formatResolveErrorMessage: vi.fn((query: string, parentID: string) => {
+      const owned = tasks.filter((t) => t.parentSessionID === parentID)
+      const fuzzy = owned.filter((t) => t.id.startsWith(query))
+      if (fuzzy.length >= 2) {
+        return `Ambiguous task reference (ambiguous): "${query}" matches ${fuzzy.length} tasks. Task IDs are ambiguous; use one of the full task IDs:\n${fuzzy.map((t) => `- ${t.id}`).join("\n")}`
+      }
+      return owned.length > 0
+        ? `Task not found: "${query}". Active tasks in the current session:\n${owned.map((t) => `- ${t.id} [${t.status}] ${t.description}`).join("\n")}`
+        : `Task not found: "${query}". No active tasks in the current session.`
+    }),
     getClient: vi.fn(() => mockClient),
     releaseConcurrencySlot: vi.fn(),
     finishTask: vi.fn(async (taskId: string, parentSessionID: string) => {
-      const t = task && task.id === taskId && task.parentSessionID === parentSessionID ? task : undefined
+      const owned = tasks.filter((t) => t.parentSessionID === parentSessionID)
+      const fuzzy = owned.filter((t) => t.id.startsWith(taskId))
+      if (fuzzy.length >= 2) {
+        return { ok: false, message: "Task not found or not owned by this session" }
+      }
+      const t = fuzzy[0]
       if (!t) {
         return { ok: false, message: "Task not found or not owned by this session" }
       }
-      
+
       // Check if task can be deleted (not actively running)
       if (t.status === "running") {
         return { ok: false, message: "Task is actively running. Use wopal_task_abort or wopal_task_reply(interrupt=true) to stop first, then finish." }
       }
-      
+
       // Delete session if present
       if (t.sessionID && mockClient.session.delete) {
         try {
@@ -47,7 +76,7 @@ function createMockTaskManager(
           return { ok: false, message: `Failed to delete session: ${String(err)}` }
         }
       }
-      
+
       return { ok: true, message: "Task finished successfully. Session deleted from Ellamaka." }
     }),
   }

@@ -306,6 +306,128 @@ describe("SimpleTaskManager", () => {
     })
   })
 
+  describe("task ID resolution (prefix/suffix/ambiguous)", () => {
+    it("getTaskForParent resolves a unique truncated prefix", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      if (!result.ok) throw new Error("expected successful launch")
+
+      const task = manager.getTaskForParent("wopal-task-child", "parent-1")
+
+      expect(task?.id).toBe(result.taskId)
+    })
+
+    it("getTaskForParent resolves a unique suffix fragment", async () => {
+      await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      const task = manager.getTaskForParent("session-1", "parent-1")
+
+      expect(task?.id).toBe("wopal-task-child-session-1")
+    })
+
+    it("getTaskForParent returns undefined for ambiguous prefix (hard block)", async () => {
+      await manager.launch({
+        description: "Task A",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      mockClient.session.create.mockResolvedValueOnce({ id: "ses_child-session-1b" })
+      await manager.launch({
+        description: "Task B",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      // "wopal-task-child-session" prefix-matches both tasks
+      expect(manager.getTaskForParent("wopal-task-child-session", "parent-1")).toBeUndefined()
+    })
+
+    it("getTaskForParent keeps multi-session isolation for fuzzy matches", async () => {
+      const resultA = await manager.launch({
+        description: "Task A",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      mockClient.session.create.mockResolvedValueOnce({ id: "ses_child-2" })
+      const resultB = await manager.launch({
+        description: "Task B",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-2",
+      })
+      if (!resultA.ok || !resultB.ok) throw new Error("expected successful launches")
+
+      // Both IDs share the "wopal-task-child" prefix, but each parent only
+      // sees its own task — scoping happens before fuzzy matching.
+      expect(manager.getTaskForParent("wopal-task-child", "parent-1")?.id).toBe(resultA.taskId)
+      expect(manager.getTaskForParent("wopal-task-child", "parent-2")?.id).toBe(resultB.taskId)
+    })
+
+    it("resolveTaskForParent exposes the full verdict (exact/unique/ambiguous/not_found)", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      if (!result.ok) throw new Error("expected successful launch")
+      const taskId = result.taskId
+
+      const exact = manager.resolveTaskForParent(taskId, "parent-1")
+      expect(exact).toMatchObject({ type: "exact" })
+
+      const unique = manager.resolveTaskForParent("wopal-task-child", "parent-1")
+      expect(unique).toMatchObject({ type: "unique", matchedBy: "prefix" })
+
+      mockClient.session.create.mockResolvedValueOnce({ id: "ses_child-session-1b" })
+      await manager.launch({
+        description: "Task B",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      const ambiguous = manager.resolveTaskForParent("wopal-task-child-session", "parent-1")
+      expect(ambiguous.type).toBe("ambiguous")
+      if (ambiguous.type === "ambiguous") {
+        expect(ambiguous.candidates).toHaveLength(2)
+      }
+
+      const notFound = manager.resolveTaskForParent("wopal-task-zzz", "parent-1")
+      expect(notFound.type).toBe("not_found")
+      if (notFound.type === "not_found") {
+        expect(notFound.availableTasks.length).toBeGreaterThan(0)
+      }
+    })
+
+    it("resolveTaskForParent never returns tasks owned by another session", async () => {
+      await manager.launch({
+        description: "Task A",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      const verdict = manager.resolveTaskForParent("wopal-task-child", "parent-2")
+
+      expect(verdict.type).toBe("not_found")
+      if (verdict.type === "not_found") {
+        expect(verdict.availableTasks).toEqual([])
+      }
+    })
+  })
+
   describe("recovery", () => {
     it("restores child sessions as idle tasks", async () => {
       mockClient.session.children.mockResolvedValueOnce({
@@ -653,7 +775,64 @@ describe("SimpleTaskManager", () => {
       const finishResult = await manager.finishTask(result.taskId, "parent-2")
 
       expect(finishResult.ok).toBe(false)
-      expect(finishResult.message).toContain("not found or not owned")
+      expect(finishResult.message).toContain("not found")
+    })
+
+    it("finishes by unique prefix and frees the concurrency slot", async () => {
+      const result = await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      if (!result.ok) throw new Error("expected successful launch")
+      expect(manager.getConcurrencyStatus().used).toBe(1)
+
+      const task = manager.getTask(result.taskId)
+      if (!task) throw new Error("expected task")
+      task.status = "idle"
+
+      const finishResult = await manager.finishTask("wopal-task-child", "parent-1")
+
+      expect(finishResult.ok).toBe(true)
+      expect(mockClient.session.delete).toHaveBeenCalledWith({
+        path: { id: "ses_child-session-1" },
+      })
+      // tasks.delete(task.id) must remove the map entry even though a prefix
+      // was passed in — the slot is freed for future launches.
+      expect(manager.getTask(result.taskId)).toBeUndefined()
+      expect(manager.getConcurrencyStatus().used).toBe(0)
+
+      // The manager accepts a fresh launch afterwards (slot released).
+      const relaunch = await manager.launch({
+        description: "Task after finish",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      expect(relaunch.ok).toBe(true)
+    })
+
+    it("rejects ambiguous prefix when finishing", async () => {
+      await manager.launch({
+        description: "Task A",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+      mockClient.session.create.mockResolvedValueOnce({ id: "ses_child-session-1b" })
+      await manager.launch({
+        description: "Task B",
+        prompt: "Do something",
+        agent: "general",
+        parentSessionID: "parent-1",
+      })
+
+      const finishResult = await manager.finishTask("wopal-task-child-session", "parent-1")
+
+      expect(finishResult.ok).toBe(false)
+      expect(finishResult.message).toContain("Ambiguous task reference")
+      expect(mockClient.session.delete).not.toHaveBeenCalled()
     })
   })
 

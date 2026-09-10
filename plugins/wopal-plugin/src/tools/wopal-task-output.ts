@@ -41,13 +41,20 @@ Default returns only the last message — sufficient for most cases. Use \`last_
 
       const { task_id, section, detail, last_n } = args
 
-      const task = manager.getTaskForParent(task_id, context.sessionID)
-
-      if (!task) {
-        return `Task not found for current session: ${task_id}`
+      const verdict = manager.resolveTaskForParent(task_id, context.sessionID)
+      if (verdict.type === "ambiguous") {
+        return manager.formatResolveErrorMessage(task_id, context.sessionID)
       }
+      if (verdict.type === "not_found") {
+        return manager.formatResolveErrorMessage(task_id, context.sessionID)
+      }
+      const task = verdict.task
+      const resolved =
+        verdict.type === "unique"
+          ? `\n**Matched:** "${task_id}" matched via ${verdict.matchedBy} → ${task.id}\n`
+          : ""
 
-      let result = `**Task:** ${task.id}\n`
+      let result = `${resolved}**Task:** ${task.id}\n`
       const statusDisplay = getDisplayStatus(task)
       result += `**Status:** ${statusDisplay}\n`
       result += `**Description:** ${task.description}\n`

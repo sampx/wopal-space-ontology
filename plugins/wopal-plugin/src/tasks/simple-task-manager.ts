@@ -27,6 +27,12 @@ import {
   shutdownManager,
 } from "./task-lifecycle.js"
 import { sessionIDToTaskID } from "../session-ref.js"
+import {
+  resolveTask,
+  formatAmbiguousErrorMessage,
+  formatNotFoundErrorMessage,
+  type TaskResolveResult,
+} from "./task-resolver.js"
 import { getDisplayStatus, isResumableTask, canDeleteTask } from "./task-phase.js"
 import { isSessionDeleteResult } from "../types.js"
 
@@ -119,12 +125,48 @@ export class SimpleTaskManager {
     return this.tasks.get(id)
   }
 
-  getTaskForParent(id: string, parentSessionID: string): WopalTask | undefined {
-    const task = this.tasks.get(id)
-    if (!task || task.parentSessionID !== parentSessionID) {
-      return undefined
+  /**
+   * Resolve a (possibly truncated) task reference against the tasks owned by
+   * `parentSessionID`. Returns a structured verdict: exact, unique
+   * (prefix/suffix/normalized match), ambiguous (candidate list), or
+   * not_found (with available tasks of this session).
+   */
+  resolveTaskForParent(query: string, parentSessionID: string): TaskResolveResult<WopalTask> {
+    const owned: WopalTask[] = []
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionID === parentSessionID) {
+        owned.push(task)
+      }
     }
-    return task
+    return resolveTask(owned, query)
+  }
+
+  /**
+   * Look up a task owned by `parentSessionID`, accepting truncated IDs.
+   * Keeps the historical signature: returns the task on exact or unique
+   * fuzzy match, `undefined` on ambiguous (hard block) or not_found.
+   */
+  getTaskForParent(id: string, parentSessionID: string): WopalTask | undefined {
+    const verdict = this.resolveTaskForParent(id, parentSessionID)
+    if (verdict.type === "exact" || verdict.type === "unique") {
+      return verdict.task
+    }
+    return undefined
+  }
+
+  /**
+   * Diagnostic error message for a failed lookup within `parentSessionID`.
+   * Distinguishes ambiguous references from genuinely unknown ones.
+   */
+  formatResolveErrorMessage(query: string, parentSessionID: string): string {
+    const verdict = this.resolveTaskForParent(query, parentSessionID)
+    if (verdict.type === "ambiguous") {
+      return formatAmbiguousErrorMessage(verdict.query, verdict.candidates)
+    }
+    if (verdict.type === "not_found") {
+      return formatNotFoundErrorMessage(verdict.query, verdict.availableTasks)
+    }
+    return `Task "${query}" resolved.`
   }
 
   listTasksForParent(parentSessionID: string): Array<{
@@ -196,10 +238,11 @@ export class SimpleTaskManager {
   async finishTask(taskId: string, parentSessionID: string): Promise<{ ok: boolean; message: string }> {
     const { tasks, client, debugLog, releaseConcurrencySlot } = this.getLifecycleDeps()
 
-    const task = this.getTaskForParent(taskId, parentSessionID)
-    if (!task) {
-      return { ok: false, message: "Task not found or not owned by this session" }
+    const verdict = this.resolveTaskForParent(taskId, parentSessionID)
+    if (verdict.type === "ambiguous" || verdict.type === "not_found") {
+      return { ok: false, message: this.formatResolveErrorMessage(taskId, parentSessionID) }
     }
+    const task = verdict.task
 
     if (!canDeleteTask(task)) {
       return { ok: false, message: "Task is actively running. Use wopal_task_abort or wopal_task_reply(interrupt=true) to stop first, then finish." }
@@ -218,7 +261,10 @@ export class SimpleTaskManager {
       }
     }
 
-    tasks.delete(taskId)
+    // Delete by the resolved canonical task.id — the caller may have passed a
+    // truncated (prefix/suffix) reference, which would leave the map entry
+    // behind and leak the concurrency slot.
+    tasks.delete(task.id)
 
     releaseConcurrencySlot(task)
 
