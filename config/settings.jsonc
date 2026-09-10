@@ -2,11 +2,14 @@
   "ellamaka": {
     "default_agent": "wopal",
     "autoupdate": true,
+    "server": {
+      "cors": ["http://192.168.1.101:3000", "http://192.168.1.101:4097"]
+    },
     "plugin": [
       [
         "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
         {
-          "sandbox": { "enabled": false }
+          "sandbox": { "enabled": true, "mode": "workspace-write" }
         }
       ]
     ],

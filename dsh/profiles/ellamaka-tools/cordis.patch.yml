@@ -47,8 +47,7 @@
   disabled: true
 - id: llm-pi-ai
   disabled: true
-- id: settings
-  disabled: true
+# settings service enabled: feeds settings.yaml into plugins (e.g. sandbox-policy.writableRoots)
 - id: credentials
   disabled: true
 
@@ -155,25 +154,10 @@
 - id: deepseek-llm-api-extensions
   disabled: true
 # --- extra writable roots (dsh-sandbox-roots) ---
-# Stock writableRoots is a closed set [workspaceRoot, /tmp, tmpdir]; the
-# @wopal/dsh-sandbox-roots bundle replaces the three stock rows
-# (sandbox-policy / sandbox / fs-sandbox) and reads THIS override for the
-# extra roots merged into both the fs fence and the Seatbelt profile.
-# `settings` is disabled in this container, so the roots must live in the
-# static config (the service falls back to config.writableRoots when the
-# settings section is absent). Re-state mode/workspaceRoot: config replaces
-# whole, it does not deep-merge.
+# Extra roots live in $DSH_HOME/settings.yaml under `sandbox-policy.writableRoots`
+# (hot-reloaded via the `settings` service enabled above). Only mode and
+# workspaceRoot are composition-owned here.
 - id: sandbox-roots-policy
   config:
     mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
     workspaceRoot: !!js process.cwd()
-    writableRoots:
-      - ~/.wopal
-      - ~/.Trash
-      - /Volumes/U500G/.Trashes/501
-
-- { id: session-log-deepseek, disabled: true }
-- { id: plugin-package-inventory-deepseek, disabled: true }
-- { id: session-projection-cache, disabled: true }
-- { id: web-fetch-http, disabled: true }
-- { id: deepseek-llm-api-extensions, disabled: true }
