@@ -3,15 +3,20 @@
  *
  * The adapter now registers a `tool.provider` hook instead of a static
  * `tool` table, so the tool set is read from the container's live schemas on
- * every model request. Verifies:
- *  - `enable:false` suppresses a mapping (no tool registered for that slot)
- *  - `source->target` name mapping (rename) is honored
+ * every model request. There is no per-tool mapping table: enabling the
+ * sandbox projects the fixed set (grep/glob/read/write/edit/str_replace_editor/
+ * bash) that the container exposes, each shadowing the same-name builtin.
+ * Verifies:
+ *  - `sandbox.enabled:false` (or absent) idles the projection: no
+ *    `tool.provider` is registered, so builtin tools run untouched
+ *  - `sandbox.enabled:true` projects the container's fixed-set tools onto
+ *    their same-name slots
  *  - the provider reads the current container schemas per call, so adding or
  *    removing container tools shows up on the next provider invocation
  *  - absent container degrades to a provider that silently returns no tools
- *  - an `enable:true` mapping for a container tool that does not exist is skipped
- *  - `sandbox.enabled:false` (or absent) injects a `danger-full-access`
- *    `sandbox/mode` event; `sandbox.enabled:true` injects the configured mode
+ *  - a projected tool absent from the container is skipped
+ *  - `sandbox.enabled:true` seeds the configured mode (`read-only` or
+ *    `workspace-write`, default `workspace-write`) as a `sandbox/mode` event
  *  - execute passes a per-call agent with header.id/header.cwd only (no
  *    container session is created)
  *  - the session facade owns a private events array (deep-copied sandbox
@@ -49,9 +54,13 @@ type Container = {
 }
 
 type AdapterOptions = {
-  tools?: { source: string; target: string; enable: boolean }[]
   sandbox?: { enabled: boolean; mode?: string }
   escalation?: "ask" | "never"
+}
+
+/** Sandbox-on options: the only shape that mounts the tool projection. */
+function sandboxOn(mode?: "read-only" | "workspace-write"): AdapterOptions {
+  return { sandbox: mode ? { enabled: true, mode } : { enabled: true } }
 }
 
 type ToolCtx = {
@@ -184,50 +193,40 @@ afterEach(() => {
 })
 
 describe("dsh-adapter projection", () => {
-  test("enable:false suppresses a mapping entirely", async () => {
+  test("sandbox off idles the projection: no tool.provider is registered", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: false }],
-    })
+    const out = await mod.dshAdapter({}, { sandbox: { enabled: false } })
     expect(out).toEqual({})
   })
 
-  test("enable:true projects container tool onto target slot (same-name)", async () => {
+  test("sandbox absent idles the projection: no tool.provider is registered", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
-    })
-    expect(Object.keys(out)).toEqual(["tool.provider"])
-    const tools = await invokeProvider(out)
-    expect(Object.keys(tools)).toEqual(["grep"])
-    expect((tools.grep as { description: string }).description).toContain("dsh")
+    const out = await mod.dshAdapter({}, {})
+    expect(out).toEqual({})
   })
 
-  test("source->target rename is honored", async () => {
+  test("sandbox on projects every container tool in the fixed set (same-name shadow)", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep2", enable: true }],
-    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    expect(Object.keys(out)).toEqual(["tool.provider"])
     const tools = await invokeProvider(out)
-    expect(Object.keys(tools)).toEqual(["grep2"])
+    expect(Object.keys(tools)).toEqual(["grep", "glob"])
+    expect((tools.grep as { description: string }).description).toContain("dsh")
   })
 
   test("missing container degrades to a provider that returns no tools", async () => {
     delete (globalThis as Record<string, unknown>).__ellamakaDshContainer
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     expect(Object.keys(out)).toEqual(["tool.provider"])
     const tools = await invokeProvider(out)
     expect(Object.keys(tools)).toEqual([])
   })
 
-  test("mapping for a missing source tool is skipped", async () => {
-    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, {
-      tools: [
-        { source: "nope", target: "missing", enable: true },
-        { source: "glob", target: "glob", enable: true },
-      ],
+  test("a projected tool absent from the container is skipped", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [{ name: "glob", description: "dsh glob", parameters: {} }],
     })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     expect(Object.keys(tools)).toEqual(["glob"])
   })
@@ -240,13 +239,7 @@ describe("dsh-adapter projection", () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       schemas: () => schemas,
     })
-    const out = await mod.dshAdapter({}, {
-      tools: [
-        { source: "grep", target: "grep", enable: true },
-        { source: "glob", target: "glob", enable: true },
-        { source: "bash", target: "bash", enable: true },
-      ],
-    })
+    const out = await mod.dshAdapter({}, sandboxOn())
     expect(Object.keys(await invokeProvider(out))).toEqual(["grep", "glob"])
 
     schemas.push({ name: "bash", description: "dsh bash", parameters: {} })
@@ -258,7 +251,7 @@ describe("dsh-adapter projection", () => {
 
   test("execute closure propagates container output with dsh-container metadata", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const res = await tool.execute({}, { sessionID: "ses-meta", directory: "/w" })
@@ -275,7 +268,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctx = {
@@ -293,11 +286,11 @@ describe("dsh-adapter projection", () => {
     }
     expect(exec.agent?.session?.header?.id).toBe("ses-abc")
     expect(exec.agent?.session?.header?.cwd).toBe("/ellamaka/ws")
-    // Sandbox option absent -> adapter injects danger-full-access (P3.5); the
+    // Sandbox on (no explicit mode) -> adapter seeds workspace-write; the
     // dispatch happens inside an open turn (snapshot taken before the
     // finally-closed turn/end is appended).
     expect(first.eventsAtDispatch).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
       { type: "turn/start", data: {} },
     ])
     expect(repeated.exec.agent?.session).toBe(exec.agent?.session)
@@ -311,7 +304,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctxA = { sessionID: "ses-a", directory: "/w", worktree: "/w", ask: async () => {} }
@@ -326,7 +319,7 @@ describe("dsh-adapter projection", () => {
     // into session B's log (the shared sandboxEvents array would break this).
     expect(eventsA).not.toBe(eventsB)
     expect(eventsB).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
       { type: "turn/start", data: {} },
       { type: "turn/end", data: {} },
     ])
@@ -340,7 +333,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctx = { sessionID: "ses-append", directory: "/w", worktree: "/w", ask: async () => {} }
@@ -351,7 +344,7 @@ describe("dsh-adapter projection", () => {
     // the append surface approval/asked will use between them.
     const exec = captured[1] as { agent?: { session?: unknown } }
     expect(eventsOf(exec)).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
       { type: "turn/start", data: {} },
       { type: "turn/end", data: {} },
       { type: "turn/start", data: {} },
@@ -370,7 +363,7 @@ describe("dsh-adapter projection", () => {
         throw new Error("boom")
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await expect(
@@ -396,7 +389,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctx = { sessionID: "ses-concurrent", directory: "/w", worktree: "/w", ask: async () => {} }
@@ -432,13 +425,7 @@ describe("dsh-adapter projection", () => {
         },
       ],
     })
-    const out = await mod.dshAdapter({}, {
-      tools: [
-        { source: "read", target: "read", enable: true },
-        { source: "write", target: "write", enable: true },
-        { source: "edit", target: "edit", enable: true },
-      ],
-    })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const ctx = {
       sessionID: "ses-permission",
@@ -477,9 +464,7 @@ describe("dsh-adapter projection", () => {
         },
       ],
     })
-    const out = await mod.dshAdapter({}, {
-      tools: [{ source: "str_replace_editor", target: "str_replace_editor", enable: true }],
-    })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const editor = tools.str_replace_editor as Projected
     const ctx = {
@@ -517,7 +502,7 @@ describe("dsh-adapter projection", () => {
         },
       ],
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "bash", target: "bash", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const bash = tools.bash as Projected
     const ctx = {
@@ -558,7 +543,7 @@ describe("dsh-adapter projection", () => {
         },
       ],
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as { args: Record<string, unknown> }
     // The plugin SDK contract is a ZodRawShape: each property value is a Zod
@@ -579,7 +564,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "read-only" },
     })
     const tools = await invokeProvider(out)
@@ -601,7 +585,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true },
     })
     const tools = await invokeProvider(out)
@@ -613,45 +596,17 @@ describe("dsh-adapter projection", () => {
     ])
   })
 
-  test("sandbox disabled injects danger-full-access mode event", async () => {
-    const captured: { eventsAtDispatch: unknown[] }[] = []
-    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
-      execute: async (exec: unknown) => {
-        const events = eventsOf(exec)
-        captured.push({ eventsAtDispatch: [...events] })
-        return { isError: false, content: [{ type: "text", text: "ok" }] }
-      },
-    })
-    const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
-      sandbox: { enabled: false },
-    })
-    const tools = await invokeProvider(out)
-    const tool = tools.grep as Projected
-    await tool.execute({}, { sessionID: "ses-nosandbox", directory: "/w", worktree: "/w", ask: async () => {} })
-    expect(captured[0]?.eventsAtDispatch).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
-      { type: "turn/start", data: {} },
-    ])
+  test("sandbox disabled idles the projection (no facade, no events)", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
+    const out = await mod.dshAdapter({}, { sandbox: { enabled: false } })
+    // No tool.provider: the builtin tools run untouched and no facade is built.
+    expect(out).toEqual({})
   })
 
-  test("sandbox config absent injects danger-full-access mode event", async () => {
-    const captured: { eventsAtDispatch: unknown[] }[] = []
-    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
-      execute: async (exec: unknown) => {
-        const events = eventsOf(exec)
-        captured.push({ eventsAtDispatch: [...events] })
-        return { isError: false, content: [{ type: "text", text: "ok" }] }
-      },
-    })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
-    const tools = await invokeProvider(out)
-    const tool = tools.grep as Projected
-    await tool.execute({}, { sessionID: "ses-noopt", directory: "/w", worktree: "/w", ask: async () => {} })
-    expect(captured[0]?.eventsAtDispatch).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
-      { type: "turn/start", data: {} },
-    ])
+  test("sandbox config absent idles the projection (no facade, no events)", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
+    const out = await mod.dshAdapter({}, {})
+    expect(out).toEqual({})
   })
 
   test("extra.sandboxMode read-only overrides a full-access space default", async () => {
@@ -663,7 +618,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute(
@@ -671,7 +626,7 @@ describe("dsh-adapter projection", () => {
       { sessionID: "ses-override", directory: "/w", worktree: "/w", extra: { sandboxMode: "read-only" }, ask: async () => {} },
     )
     expect(captured[0]?.eventsAtDispatch).toEqual([
-      { type: "sandbox/mode", data: { mode: "danger-full-access" } },
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
       { type: "sandbox/mode", data: { mode: "read-only" } },
       { type: "turn/start", data: {} },
     ])
@@ -687,7 +642,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "workspace-write" },
     })
     const tools = await invokeProvider(out)
@@ -713,7 +667,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "read-only" },
     })
     const tools = await invokeProvider(out)
@@ -742,7 +695,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "workspace-write" },
     })
     const tools = await invokeProvider(out)
@@ -788,7 +740,6 @@ describe("dsh-adapter projection", () => {
       },
     })
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "read-only" },
     })
     const tools = await invokeProvider(out)
@@ -816,7 +767,7 @@ describe("dsh-adapter projection", () => {
     const logger = container.logger("dsh-adapter")
     logger.info = (message, extra) => logged.push({ level: "info", message, extra })
     logger.error = (message, extra) => logged.push({ level: "error", message, extra })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({ pattern: "needle" }, { sessionID: "ses-log", directory: "/w", callID: "call-1" })
@@ -834,7 +785,7 @@ describe("dsh-adapter projection", () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = container
     const logger = container.logger("dsh-adapter")
     logger.error = (message, extra) => logged.push({ level: "error", message, extra })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await expect(tool.execute({ pattern: "needle" }, { sessionID: "ses-log", directory: "/w" })).rejects.toThrow("boom")
@@ -863,7 +814,7 @@ describe("dsh-adapter projection", () => {
         },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     const res = await tool.execute(
@@ -900,7 +851,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     await tool.execute(
@@ -930,7 +881,7 @@ describe("dsh-adapter projection", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.write as Projected
     await tool.execute(
@@ -959,7 +910,7 @@ describe("dsh-adapter projection", () => {
         meta: { diffs: [{ path: "x", newText: null }] },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     const res = await tool.execute(
@@ -984,7 +935,7 @@ describe("dsh-adapter projection", () => {
         meta: { diffs: [{ path: "/w/f.ts", oldText: "same\nsame\n", newText: "same\n" }] },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     const res = await tool.execute(
@@ -1012,7 +963,7 @@ describe("dsh-adapter projection", () => {
         meta: { diffs: [{ path: "/w/f.ts", oldText: null, newText: "new\nline\n" }] },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.write as Projected
     const res = await tool.execute(
@@ -1044,7 +995,7 @@ describe("dsh-adapter projection", () => {
         },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     const res = await tool.execute(
@@ -1079,7 +1030,7 @@ describe("dsh-adapter projection", () => {
         },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "edit", target: "edit", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.edit as Projected
     const res = await tool.execute(
@@ -1108,7 +1059,7 @@ describe("dsh-adapter projection", () => {
         },
       }),
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "write", target: "write", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.write as Projected
     const res = await tool.execute(
@@ -1130,7 +1081,7 @@ describe("dsh-adapter projection", () => {
         },
       ],
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "read", target: "read", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.read as { args: Record<string, unknown> }
     expect(Object.keys(tool.args)).toEqual(["filePath"])
@@ -1150,10 +1101,10 @@ describe("dsh-adapter escalation answerer bridge", () => {
   test("registers an approval/request answerer on the container ctx", async () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     expect(Object.keys(out)).toEqual(["tool.provider"])
     const tools = await invokeProvider(out)
-    expect(Object.keys(tools)).toEqual(["grep"])
+    expect(Object.keys(tools)).toEqual(["grep", "glob"])
     // Run one execute so the ask closure registers for ses-esc...
     const tool = tools.grep as Projected
     await tool.execute({}, {
@@ -1169,15 +1120,15 @@ describe("dsh-adapter escalation answerer bridge", () => {
 
   test("no container ctx.on (legacy fake) degrades: provider still works", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
-    expect(Object.keys(tools)).toEqual(["grep"])
+    expect(Object.keys(tools)).toEqual(["grep", "glob"])
   })
 
   test("ask resolve maps to allowed-once with sandbox_escalation ask params", async () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const asks: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }[] = []
     const tool = tools.grep as Projected
@@ -1209,7 +1160,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
   test("ask RejectedError maps to rejected", async () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const rejected = Object.assign(new Error("The user rejected permission to use this specific tool call."), { name: "PermissionRejectedError" })
@@ -1228,7 +1179,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
   test("ask CorrectedError maps to rejected", async () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const corrected = Object.assign(new Error("rejected with feedback: no"), { name: "PermissionCorrectedError", feedback: "no" })
@@ -1247,7 +1198,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
   test("unknown session (askRegistry miss) delegates via next() and yields unavailable", async () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, {
@@ -1285,7 +1236,6 @@ describe("dsh-adapter escalation answerer bridge", () => {
       },
     }
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "workspace-write" },
       escalation: "never",
     })
@@ -1303,7 +1253,7 @@ describe("dsh-adapter escalation answerer bridge", () => {
     const containerCtx = fakeContainerCtx()
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = containerCtx
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
+      sandbox: { enabled: true, mode: "workspace-write" },
       escalation: "never",
     })
     const tools = await invokeProvider(out)
@@ -1345,7 +1295,6 @@ describe("dsh-adapter escalation answerer bridge", () => {
       },
     }
     const out = await mod.dshAdapter({}, {
-      tools: [{ source: "grep", target: "grep", enable: true }],
       sandbox: { enabled: true, mode: "workspace-write" },
     })
     const tools = await invokeProvider(out)
@@ -1377,7 +1326,7 @@ describe("facade rc.1 session contract", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctx = { sessionID: "ses-seq", directory: "/w", worktree: "/w", ask: async () => {} }
@@ -1423,7 +1372,7 @@ describe("facade rc.1 session contract", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     await tool.execute({}, { sessionID: "ses-snap", directory: "/w", worktree: "/w", ask: async () => {} })
@@ -1452,7 +1401,7 @@ describe("facade rc.1 session contract", () => {
         return { isError: false, content: [{ type: "text", text: "ok" }] }
       },
     })
-    const out = await mod.dshAdapter({}, { tools: [{ source: "grep", target: "grep", enable: true }] })
+    const out = await mod.dshAdapter({}, sandboxOn())
     const tools = await invokeProvider(out)
     const tool = tools.grep as Projected
     const ctx = { sessionID: "ses-open", directory: "/w", worktree: "/w", ask: async () => {} }

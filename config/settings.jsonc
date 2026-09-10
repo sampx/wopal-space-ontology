@@ -6,20 +6,7 @@
       [
         "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
         {
-          "tools": [
-            { "source": "grep", "target": "grep", "enable": true },
-            { "source": "glob", "target": "glob", "enable": true },
-            { "source": "read", "target": "read", "enable": true },
-            { "source": "write", "target": "write", "enable": true },
-            { "source": "edit", "target": "edit", "enable": true },
-            {
-              "source": "str_replace_editor",
-              "target": "str_replace_editor",
-              "enable": true
-            },
-            { "source": "bash", "target": "bash", "enable": true }
-          ],
-          "sandbox": { "enabled": true, "mode": "workspace-write" }
+          "sandbox": { "enabled": false }
         }
       ]
     ],
