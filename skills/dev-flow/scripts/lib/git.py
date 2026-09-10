@@ -5,9 +5,14 @@ All functions work with an explicit repo_path to support multi-repo scenarios.
 """
 
 import subprocess
+import time
 from pathlib import Path
 
-from lib.logging import log_error
+from lib.logging import log_error, log_warn
+
+# Retry budget for race self-healing on push (issue #215).
+PUSH_RETRY_LIMIT = 3
+PUSH_RETRY_DELAY = 0.5
 
 
 def is_repo_dirty(repo_path: str, ignore_paths: list[str] | None = None) -> bool:
@@ -492,10 +497,34 @@ def commit_paths(repo_root: str, paths: list[str], message: str) -> bool:
     return False
 
 
+def _run_git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _is_ancestor(repo_root: str, older: str, newer: str) -> bool:
+    """True if commit `older` is an ancestor of (or equal to) `newer`."""
+    result = _run_git(repo_root, "merge-base", "--is-ancestor", older, newer)
+    return result.returncode == 0
+
+
 def push_repo(repo_root: str, branch: str | None = None) -> bool:
-    """Push a specific branch in a given repo.
+    """Push a specific branch in a given repo, healing parallel-run races.
 
     If branch is None, pushes the current branch.
+
+    When the push is rejected because another process advanced the remote
+    (the parallel flow.sh race, issue #215), this function self-heals:
+
+    - origin tip is an ancestor of HEAD  -> plain retry after fetch
+    - HEAD is an ancestor of origin tip  -> fetch + `git merge --ff-only`
+      to catch up locally, then retry
+    - true divergence with a dirty tree -> no recovery attempt (never
+      autostash/rebase/force); returns False with manual instructions
 
     Args:
         repo_root: Path to git repository root
@@ -509,13 +538,70 @@ def push_repo(repo_root: str, branch: str | None = None) -> bool:
         if not branch:
             return False
 
-    result = subprocess.run(
-        ["git", "push", "origin", branch],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
+    for attempt in range(1, PUSH_RETRY_LIMIT + 1):
+        result = _run_git(repo_root, "push", "origin", branch)
+        if result.returncode == 0:
+            return True
+
+        rejected = "non-fast-forward" in (result.stderr or "") or \
+            "! [rejected]" in (result.stderr or "")
+        if not rejected:
+            # Unrelated failure (network, auth, permissions): not healable here.
+            log_error(f"Push failed: {(result.stderr or result.stdout).strip()}")
+            return False
+
+        if attempt == PUSH_RETRY_LIMIT:
+            break
+
+        fetch = _run_git(repo_root, "fetch", "origin", branch)
+        if fetch.returncode != 0:
+            break
+
+        remote_ref = f"origin/{branch}"
+        if _is_ancestor(repo_root, remote_ref, "HEAD"):
+            # Our HEAD already contains everything on the remote: a plain
+            # retry after the fetch refresh will fast-forward the remote.
+            time.sleep(PUSH_RETRY_DELAY)
+            continue
+        if _is_ancestor(repo_root, "HEAD", remote_ref):
+            # We are strictly behind: fast-forward our branch to the remote,
+            # then retry the push. Safe on a clean tree only.
+            dirty = _run_git(repo_root, "status", "--porcelain")
+            if dirty.stdout.strip():
+                log_warn(
+                    f"Push rejected: local branch is behind origin/{branch} "
+                    f"and the worktree is dirty. Manual step: cd {repo_root} "
+                    f"&& git pull --ff-only && git push"
+                )
+                return False
+            merge = _run_git(repo_root, "merge", "--ff-only", remote_ref)
+            if merge.returncode != 0:
+                break
+            time.sleep(PUSH_RETRY_DELAY)
+            continue
+
+        # True divergence. Only attempt healing on a clean tree, and never
+        # rebase/autostash (space regulations forbid unowned stashes).
+        dirty = _run_git(repo_root, "status", "--porcelain")
+        if dirty.stdout.strip():
+            log_warn(
+                f"Push rejected: local and origin/{branch} have diverged and "
+                f"the worktree is dirty. Manual step: cd {repo_root} && "
+                f"git pull --ff-only, resolve, commit, then git push"
+            )
+            return False
+        log_warn(
+            f"Push rejected: local and origin/{branch} have diverged. "
+            f"Manual step: cd {repo_root} && git pull --ff-only, resolve, "
+            f"commit, then git push"
+        )
+        return False
+
+    log_error(
+        f"Push failed after {PUSH_RETRY_LIMIT} attempts "
+        f"(commit is safe locally). Retry: cd {repo_root} && git push"
     )
-    return result.returncode == 0
+    return False
 
 
 def check_branch_merged(workspace_root: Path, plan_path: str) -> int:

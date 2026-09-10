@@ -368,9 +368,12 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # Commit/push the Plan baseline (executing + Worktree metadata) on integration branch
     result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve")
     if result == RESULT_PUSH_FAILED:
-        log_error("Approve succeeded locally but push failed. See error above.")
-        return 1
-    if result != RESULT_OK:
+        # Issue #215: push failure must not abort approve mid-lifecycle.
+        # Local state (status transition + commit + worktree below) stays
+        # complete and consistent; the commit syncs to origin on a later push.
+        log_warn("Approve committed locally but push failed; continuing. "
+                 "The commit will sync to origin on a later push.")
+    elif result != RESULT_OK:
         log_error("Failed to commit Plan baseline")
         return 1
     

@@ -20,7 +20,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from lib.logging import log_info, log_success, log_error, log_step
+from lib.logging import log_info, log_success, log_error, log_step, log_warn
 from lib.workspace import find_workspace_root
 from workflow import update_plan_status, parse_plan_status, STATUS_PLANNING
 from plan import find_plan, get_plan_issue, get_plan_status
@@ -101,9 +101,11 @@ def cmd_submit(args: argparse.Namespace) -> int:
     # 6. Commit and push
     result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="submit")
     if result == RESULT_PUSH_FAILED:
-        log_error("Submit succeeded locally but push failed. See error above.")
-        return 1
-    if result != RESULT_OK:
+        # Issue #215: submit has no follow-up steps, so a push failure leaves
+        # a complete local state; warn and finish instead of aborting.
+        log_warn("Submit committed locally but push failed; the commit "
+                 "will sync to origin on a later push.")
+    elif result != RESULT_OK:
         log_error("Failed to commit Plan")
         return 1
 
