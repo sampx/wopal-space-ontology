@@ -14,12 +14,12 @@ Canonical references:
 
 | Module | Responsibility | Disable Switch |
 |--------|---------------|----------------|
-| Global (`index.ts`) | Load .env, check switches, register Hooks/Tools | None |
-| Rules (`rules/`) | Rule discovery → condition matching → system prompt injection | `WOPAL_RULES_INJECTION_ENABLED` |
-| Memory (`memory/`) | LanceDB storage, semantic retrieval, distillation injection | `WOPAL_MEMORY_ENABLED` (master), `WOPAL_MEMORY_INJECTION_ENABLED` (injection only) |
+| Global (`index.ts`) | Load .env, load config, register Hooks/Tools | None |
+| Rules (`rules/`) | Rule discovery → condition matching → system prompt injection | None (always enabled) |
+| Memory (`memory/`) | LanceDB storage, semantic retrieval, distillation injection | `wopal.memory.enabled` (master), `wopal.memory.injection` (injection only) — config `wopal` node |
 | Task (`tasks/`) | Non-blocking sub-sessions, state monitoring, bidirectional communication, concurrency control | None |
 | Monitor (`monitor/`) | Periodic scheduling engine, unified strategy management | None |
-| Context (`hooks/`) | Session summary, context compaction and recovery | None |
+| Context (`hooks/`) | Session summary, context compaction and recovery | `wopal.context.enabled` — config `wopal` node |
 
 | Directory | Responsibility |
 |-----------|---------------|
@@ -131,7 +131,7 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 | Tool definitions | `wopal-task-*.ts` | `wopal-task-output.ts` |
 | Hook functions | `create*` factory pattern | `createAllHooks()` |
 | Loggers | Module-level singleton, import from `logger.ts` | `taskLogger`, `memoryLogger` |
-| Environment variables | `WOPAL_` + `UPPER_SNAKE_CASE` | `WOPAL_MEMORY_ENABLED` |
+| Environment variables | `WOPAL_` + `UPPER_SNAKE_CASE` | `WOPAL_PLUGIN_LOG_LEVEL` |
 
 ### Error Handling
 
@@ -168,9 +168,20 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | Log threshold: trace/debug/info/warn/error/fatal |
-| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | Log file path |
-| `WOPAL_PLUGIN_LOG_MODULES` | (empty) | Module filter (comma-separated), empty=all. Options: core/rules/task/memory/context |
-| `WOPAL_RULES_INJECTION_ENABLED` | `true` | Rules module (entire) |
-| `WOPAL_MEMORY_ENABLED` | `true` | Memory module (entire; when off, `MEMORY_INJECTION` is ignored) |
-| `WOPAL_MEMORY_INJECTION_ENABLED` | `true` | Memory injection only |
+| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | Log threshold: trace/debug/info/warn/error/fatal (env override; config `wopal.logLevel` is the default source) |
+| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | Log file path (env override; config `wopal.logFile` is the default source) |
+| `WOPAL_PLUGIN_LOG_MODULES` | (empty) | Module filter (comma-separated), empty=all. Options: core/rules/task/memory/context (env override; config `wopal.logModules` is the default source) |
+
+## 8. Config Nodes (`wopal` node in settings.jsonc)
+
+Feature switches and connection settings live in the `wopal` node of the three-layer settings (`global` → `space-public` → `space-local`, later wins):
+
+| Node | Fields | Notes |
+|------|--------|-------|
+| `memory` | `enabled`, `injection` | Default both `true`; `injection=false` stops auto-injection but keeps `memory_manage` and search |
+| `context` | `enabled` | Default `true`; gates LLM resource (see Known Coupling in Plan docs) |
+| `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR` referencing process.env / `.env` files; never store plaintext keys |
+| `embedding` | `baseUrl`, `model`, `apiKey` | Same `$VAR` semantics as `llm` |
+| `logLevel` / `logFile` / `logModules` | — | Config is the default source; `WOPAL_PLUGIN_LOG_*` env vars override |
+
+`.env` files hold only secrets referenced via `$VAR` (e.g. `WOPAL_LLM_API_KEY`) plus the log diagnostic overrides; feature switches never go in `.env`.

@@ -80,7 +80,13 @@ export function createMemoryPrompts(
   context: RuntimeContext,
   logger: LoggerInstance = memoryLogger,
 ): MemoryPrompts {
-  const load = (filename: string) => loadPromptFile(context, logger, filename);
+  const cache = new Map<string, string | null>();
+  const load = (filename: string) => {
+    if (!cache.has(filename)) {
+      cache.set(filename, loadPromptFile(context, logger, filename));
+    }
+    return cache.get(filename) ?? null;
+  };
   return {
     resolvePromptFile: (filename) => resolveRuntimePromptFile(context, filename),
     loadTitlePrompt: () => load("title.md") ?? TITLE_FALLBACK,
@@ -108,20 +114,29 @@ export function createMemoryPrompts(
   };
 }
 
-function defaultPrompts(): MemoryPrompts {
-  const context = createRuntimeContext({
-    directory: process.cwd(),
-    ...(process.env.WOPAL_HOME ? { wopalHome: process.env.WOPAL_HOME } : {}),
-  });
-  return createMemoryPrompts(context);
+let sharedPrompts: MemoryPrompts | undefined;
+
+/**
+ * Module-level default prompts, built lazily on first call and cached for
+ * subsequent invocations. Avoids filesystem access at import time.
+ */
+function sharedDefaultPrompts(): MemoryPrompts {
+  sharedPrompts ??= (() => {
+    const context = createRuntimeContext({
+      directory: process.cwd(),
+      ...(process.env.WOPAL_HOME ? { wopalHome: process.env.WOPAL_HOME } : {}),
+    });
+    return createMemoryPrompts(context);
+  })();
+  return sharedPrompts;
 }
 
 export function resolvePromptFile(filename: string): string | null {
-  return defaultPrompts().resolvePromptFile(filename);
+  return sharedDefaultPrompts().resolvePromptFile(filename);
 }
 
 export function loadTitlePrompt(): string {
-  return defaultPrompts().loadTitlePrompt();
+  return sharedDefaultPrompts().loadTitlePrompt();
 }
 
 /** Extracted memory from LLM (single-layer body) */
@@ -138,7 +153,7 @@ export interface ExtractResult {
  * Load extraction prompt template.
  */
 export function buildExtractionPrompt(conversation: string): string {
-  return defaultPrompts().buildExtractionPrompt(conversation);
+  return sharedDefaultPrompts().buildExtractionPrompt(conversation);
 }
 
 /**
@@ -148,5 +163,5 @@ export function buildBatchDedupPrompt(
   candidates: Array<{ index: number; category: string; body: string }>,
   existingByCandidate: Map<number, Array<{ index: number; body: string; id: string }>>
 ): string {
-  return defaultPrompts().buildBatchDedupPrompt(candidates, existingByCandidate);
+  return sharedDefaultPrompts().buildBatchDedupPrompt(candidates, existingByCandidate);
 }

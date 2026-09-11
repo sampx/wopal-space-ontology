@@ -252,7 +252,9 @@ describe("formatAmbiguousErrorMessage", () => {
     const message = formatAmbiguousErrorMessage("wopal-task-a", [a, b])
 
     expect(message).toContain("wopal-task-a")
-    expect(message).toContain("ambiguous")
+    expect(message).toContain("Ambiguous task reference")
+    expect(message).not.toContain("(ambiguous)")
+    expect(message).not.toContain("Task IDs are ambiguous; use one of the full task IDs")
     expect(message).toContain("wopal-task-aaa")
     expect(message).toContain("wopal-task-bbb")
     expect(message).toContain("Task A")

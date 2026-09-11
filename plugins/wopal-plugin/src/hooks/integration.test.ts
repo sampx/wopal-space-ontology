@@ -25,34 +25,15 @@ function teardownTestDirs() {
   }
 }
 
-// Save and clear injection toggle env vars so tests aren't affected by external config
+// Isolate WOPAL_HOME so tests aren't affected by external config
 function saveAndClearInjectionEnv() {
   savedInjectionEnv = {
-    WOPAL_RULES_INJECTION_ENABLED: process.env.WOPAL_RULES_INJECTION_ENABLED,
-    WOPAL_MEMORY_INJECTION_ENABLED: process.env.WOPAL_MEMORY_INJECTION_ENABLED,
-    WOPAL_MEMORY_ENABLED: process.env.WOPAL_MEMORY_ENABLED,
     WOPAL_HOME: process.env.WOPAL_HOME,
   };
-  delete process.env.WOPAL_RULES_INJECTION_ENABLED;
-  delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
-  process.env.WOPAL_MEMORY_ENABLED = "false";
   process.env.WOPAL_HOME = path.join(testDir, ".wopal");
 }
 
 function restoreInjectionEnv() {
-  if (savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED !== undefined) {
-    process.env.WOPAL_RULES_INJECTION_ENABLED = savedInjectionEnv.WOPAL_RULES_INJECTION_ENABLED;
-  }
-  if (savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED !== undefined) {
-    process.env.WOPAL_MEMORY_INJECTION_ENABLED = savedInjectionEnv.WOPAL_MEMORY_INJECTION_ENABLED;
-  } else {
-    delete process.env.WOPAL_MEMORY_INJECTION_ENABLED;
-  }
-  if (savedInjectionEnv.WOPAL_MEMORY_ENABLED !== undefined) {
-    process.env.WOPAL_MEMORY_ENABLED = savedInjectionEnv.WOPAL_MEMORY_ENABLED;
-  } else {
-    delete process.env.WOPAL_MEMORY_ENABLED;
-  }
   if (savedInjectionEnv.WOPAL_HOME !== undefined) {
     process.env.WOPAL_HOME = savedInjectionEnv.WOPAL_HOME;
   } else {

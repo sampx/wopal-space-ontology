@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { readFileSync, unlinkSync, existsSync, rmSync } from "fs"
+import { readFileSync, unlinkSync, existsSync, rmSync, mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import {
   coreLogger,
@@ -9,6 +9,10 @@ import {
   contextLogger,
   createPluginLoggers,
   formatSessionID,
+  getAllowedModules,
+  getLogFile,
+  getMinLevel,
+  getMinLevelName,
 } from "./logger"
 import { createRuntimeContext } from "./runtime-context.js"
 
@@ -470,5 +474,124 @@ describe("logDir routing via RuntimeContext", () => {
     // In VITEST env, getLogFile returns WOPAL_PLUGIN_LOG_FILE ?? ""
     // Since we cleared WOPAL_PLUGIN_LOG_FILE, it should return ""
     expect(getLogFile()).toBe("")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Log config resolution (config file defaults + env overrides)
+// ---------------------------------------------------------------------------
+
+describe("Log config resolution", () => {
+  const originalEnv: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    originalEnv["WOPAL_PLUGIN_LOG_LEVEL"] = process.env.WOPAL_PLUGIN_LOG_LEVEL
+    originalEnv["WOPAL_PLUGIN_LOG_FILE"] = process.env.WOPAL_PLUGIN_LOG_FILE
+    originalEnv["WOPAL_PLUGIN_LOG_MODULES"] = process.env.WOPAL_PLUGIN_LOG_MODULES
+    setEnv({
+      WOPAL_PLUGIN_LOG_LEVEL: undefined,
+      WOPAL_PLUGIN_LOG_FILE: undefined,
+      WOPAL_PLUGIN_LOG_MODULES: undefined,
+    })
+  })
+
+  afterEach(() => {
+    resetEnv(originalEnv)
+  })
+
+  it("uses config logLevel when no env override exists", () => {
+    expect(getMinLevelName(process.env, { level: "debug" })).toBe("debug")
+    expect(getMinLevel(process.env, { level: "debug" })).toBe(20)
+  })
+
+  it("env WOPAL_PLUGIN_LOG_LEVEL overrides config logLevel", () => {
+    setEnv({ WOPAL_PLUGIN_LOG_LEVEL: "warn" })
+    expect(getMinLevelName(process.env, { level: "debug" })).toBe("warn")
+    expect(getMinLevel(process.env, { level: "debug" })).toBe(40)
+  })
+
+  it("defaults to info when neither config nor env provides a level", () => {
+    expect(getMinLevelName(process.env, {})).toBe("info")
+    expect(getMinLevelName()).toBe("info")
+  })
+
+  it("falls back to config level when env value is invalid", () => {
+    setEnv({ WOPAL_PLUGIN_LOG_LEVEL: "not-a-level" })
+    expect(getMinLevelName(process.env, { level: "debug" })).toBe("debug")
+  })
+
+  it("falls back to info when env is invalid and config has no level", () => {
+    setEnv({ WOPAL_PLUGIN_LOG_LEVEL: "not-a-level" })
+    expect(getMinLevelName(process.env)).toBe("info")
+  })
+
+  it("uses config logFile when no env override exists", () => {
+    expect(getLogFile(undefined, process.env, { file: "/tmp/from-config.log" })).toBe(
+      "/tmp/from-config.log",
+    )
+  })
+
+  it("env WOPAL_PLUGIN_LOG_FILE overrides config logFile", () => {
+    setEnv({ WOPAL_PLUGIN_LOG_FILE: "/tmp/from-env.log" })
+    expect(getLogFile(undefined, process.env, { file: "/tmp/from-config.log" })).toBe(
+      "/tmp/from-env.log",
+    )
+  })
+
+  it("env WOPAL_PLUGIN_LOG_MODULES overrides config logModules", () => {
+    const config = { modules: ["task"] }
+    expect(getAllowedModules(process.env, config)).toEqual(new Set(["task"]))
+    setEnv({ WOPAL_PLUGIN_LOG_MODULES: "core,memory" })
+    expect(getAllowedModules(process.env, config)).toEqual(
+      new Set(["core", "memory"]),
+    )
+  })
+
+  it("createPluginLoggers applies config level and reports the effective name", () => {
+    const root = join("/tmp", `logger-config-${crypto.randomUUID()}`)
+    const space = join(root, "space")
+    const logFile = join(space, ".wopal-space", "logs", "wopal-plugin.log")
+    try {
+      const context = createRuntimeContext({ directory: space, wopalSpaceRoot: space })
+      const loggers = createPluginLoggers(
+        context,
+        { WOPAL_PLUGIN_LOG_FILE: logFile },
+        { level: "debug" },
+      )
+      expect(loggers.logLevel).toBe("debug")
+      loggers.core.debug("debug-from-config")
+      loggers.core.info("info-from-config")
+      const log = readFileSync(logFile, "utf-8")
+      expect(log).toContain("debug-from-config")
+      expect(log).toContain("info-from-config")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it("createPluginLoggers keeps env override over config level", () => {
+    const root = join("/tmp", `logger-config-${crypto.randomUUID()}`)
+    const space = join(root, "space")
+    const logFile = join(space, ".wopal-space", "logs", "wopal-plugin.log")
+    mkdirSync(join(space, ".wopal-space", "logs"), { recursive: true })
+    writeFileSync(logFile, "", "utf-8")
+    try {
+      const context = createRuntimeContext({ directory: space, wopalSpaceRoot: space })
+      const loggers = createPluginLoggers(
+        context,
+        {
+          WOPAL_PLUGIN_LOG_LEVEL: "fatal",
+          WOPAL_PLUGIN_LOG_FILE: logFile,
+        },
+        { level: "debug" },
+      )
+      expect(loggers.logLevel).toBe("fatal")
+      loggers.core.info("env-fatal-visible")
+      loggers.core.debug("should-be-suppressed")
+      const log = readFileSync(logFile, "utf-8")
+      expect(log).not.toContain("should-be-suppressed")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

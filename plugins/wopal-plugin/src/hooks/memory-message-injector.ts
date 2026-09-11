@@ -19,14 +19,14 @@ export interface MemoryMessageInjectorContext {
   memoryInjector: MemoryInjector | undefined;
   sessionStore: SessionStore;
   memoryLogger: LoggerInstance;
-  memoryInjectionEnabled: boolean;
+  capabilities?: { memoryInjectionEnabled?: boolean };
 }
 
 /**
  * Inject relevant memories into the last user message as a synthetic part.
  *
  * Trigger conditions (checked in order):
- * 1. memoryInjectionEnabled must be true
+ * 1. capabilities.memoryInjectionEnabled must be true (default true)
  * 2. memoryInjector must exist
  * 3. needsMemoryInjection flag must be set (consumed immediately)
  * 4. Not a child session
@@ -39,7 +39,7 @@ export async function injectMemoryToMessage(
   messages: MessageWithInfo[],
   lastUserMsg: MessageWithInfo | undefined,
 ): Promise<void> {
-  if (!ctx.memoryInjectionEnabled) return;
+  if (ctx.capabilities?.memoryInjectionEnabled === false) return;
   if (!ctx.memoryInjector) return;
 
   const state = ctx.sessionStore.get(sessionID);

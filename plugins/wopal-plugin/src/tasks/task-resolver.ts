@@ -143,7 +143,7 @@ export function formatAmbiguousErrorMessage<T extends { id: string; status?: str
       `- ${task.id}${task.status ? ` [${task.status}]` : ""}${task.description ? ` ${task.description}` : ""}`,
   )
   return [
-    `Ambiguous task reference (ambiguous): "${query}" matches ${candidates.length} tasks. Task IDs are ambiguous; use one of the full task IDs:`,
+    `Ambiguous task reference: "${query}" matches ${candidates.length} tasks. Use one of the full task IDs:`,
     ...lines,
   ].join("\n")
 }

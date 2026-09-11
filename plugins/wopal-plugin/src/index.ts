@@ -71,8 +71,6 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
       : {}),
   });
   const env = loadRuntimeEnvironment(context);
-  const loggers = createPluginLoggers(context, env);
-  const prompts = createMemoryPrompts(context, loggers.memory);
   const config = loadWopalConfig({
     wopalHome: context.wopalHome,
     ...(context.wopalSpaceRoot !== undefined
@@ -80,6 +78,13 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
       : {}),
     fallbackEnvironment: env,
   });
+  const { logLevel, logFile, logModules } = config.config;
+  const loggers = createPluginLoggers(context, env, {
+    ...(logLevel !== undefined ? { level: logLevel } : {}),
+    ...(logFile !== undefined ? { file: logFile } : {}),
+    ...(logModules !== undefined ? { modules: logModules } : {}),
+  });
+  const prompts = createMemoryPrompts(context, loggers.memory);
   return Object.freeze({ context, env, loggers, prompts, config });
 }
 
@@ -107,7 +112,7 @@ const openCodeRulesPlugin = async (
       ? { wopalSpaceRoot: input.wopalSpaceRoot }
       : {}),
   });
-  const { context: runtimeCtx, env, loggers } = runtime;
+  const { context: runtimeCtx, loggers } = runtime;
   const {
     core: coreLogger,
     rules: rulesLogger,
@@ -131,31 +136,17 @@ const openCodeRulesPlugin = async (
     "Effective wopal config loaded",
   );
 
-  const rulesInjectionEnabled = env.WOPAL_RULES_INJECTION_ENABLED !== "false";
-  const memoryEnabled = env.WOPAL_MEMORY_ENABLED !== "false";
-  const memoryInjectionEnabled = env.WOPAL_MEMORY_INJECTION_ENABLED !== "false";
-  coreLogger.debug(
+  // Rules are always enabled — no config switch (DESIGN §4.2)
+  const ruleFiles: DiscoveredRule[] = await discoverRuleFiles(
+    undefined,
+    rulesLogger,
     {
-      rules_injection: rulesInjectionEnabled,
-      memory: memoryEnabled,
-      memory_injection: memoryInjectionEnabled,
-    },
-    "Feature switches",
-  );
-
-  // Rules module initialization
-  let ruleFiles: DiscoveredRule[];
-  if (rulesInjectionEnabled) {
-    ruleFiles = await discoverRuleFiles(undefined, rulesLogger, {
       wopalHome: runtimeCtx.wopalHome,
       ...(runtimeCtx.wopalSpaceRoot
         ? { wopalSpaceRoot: runtimeCtx.wopalSpaceRoot }
         : {}),
-    });
-  } else {
-    coreLogger.info("Rules module disabled");
-    ruleFiles = [];
-  }
+    },
+  );
 
   // Resource layer initialization — memory resources depend on memory.enabled,
   // LLM resource depends on context.enabled (dependency-driven minimal set).
@@ -191,10 +182,6 @@ const openCodeRulesPlugin = async (
       llm: resources.llm !== undefined,
     },
     "Resources resolved",
-  );
-
-  coreLogger.debug(
-    `Tools registered: wopal_task, wopal_task_output, wopal_task_reply, memory_manage, context_manage`,
   );
 
   // Extract the internal fetch from v1 client (which uses Server.Default().fetch
@@ -244,6 +231,8 @@ const openCodeRulesPlugin = async (
   const systemMetadataMap = new Map<string, SystemPromptMetadata>();
   const systemInjectionsMap = new Map<string, string[]>();
 
+  // Config → capability state conversion happens here; hooks consume only
+  // the resolved state (never env or the raw config object).
   const ctx = createHookContext({
     client: input.client as OpenCodeClient,
     directory: input.directory,
@@ -261,8 +250,9 @@ const openCodeRulesPlugin = async (
     systemSnapshots,
     systemMetadataMap,
     systemInjectionsMap,
-    rulesInjectionEnabled,
-    memoryInjectionEnabled,
+    capabilities: {
+      memoryInjectionEnabled: runtime.config.config.memory.injection,
+    },
     ...(memory
       ? {
           generateSessionTitle: async (summary: string) =>
@@ -283,6 +273,29 @@ const openCodeRulesPlugin = async (
     memory?.distillEngine,
     pluginInput.client,
   );
+
+  // memory_manage registration is resource-availability driven (single source
+  // of truth — resolveResources already consulted config.memory.enabled).
+  if (!tools.memory_manage) {
+    const reason =
+      runtime.config.config.memory.enabled === false
+        ? "disabled_by_config"
+        : "initialization_failed";
+    coreLogger.info(
+      {
+        tool: "memory_manage",
+        reason,
+        ...(reason === "initialization_failed"
+          ? {
+              store: resources.store !== undefined,
+              embedder: resources.embedder !== undefined,
+              llm: resources.llm !== undefined,
+            }
+          : {}),
+      },
+      "memory_manage not registered",
+    );
+  }
 
   // context_manage is session/context management — independent of memory system
   const { createContextManageTool } = await import("./tools/context-manage.js");

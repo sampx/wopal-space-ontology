@@ -4,7 +4,10 @@ import type { MessageWithInfo } from "./message-context.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
 import type { OpenCodeClient } from "../types.js";
 import { injectRules } from "./rule-injector.js";
-import { extractLatestUserPrompt, extractAgentName } from "./message-context.js";
+import {
+  extractLatestUserPrompt,
+  extractAgentName,
+} from "./message-context.js";
 import { isChildSession } from "./session-utils.js";
 
 export interface RuleMessageInjectorContext {
@@ -14,7 +17,6 @@ export interface RuleMessageInjectorContext {
   taskManager?: { findBySession: (sessionID: string) => unknown } | undefined;
   childSessionCache: Map<string, boolean> | undefined;
   rulesLogger: LoggerInstance;
-  rulesInjectionEnabled: boolean;
 }
 
 export async function injectRulesToMessage(
@@ -23,7 +25,6 @@ export async function injectRulesToMessage(
   messages: MessageWithInfo[],
   lastUserMsg: MessageWithInfo | undefined,
 ): Promise<void> {
-  if (!ctx.rulesInjectionEnabled) return;
   if (!lastUserMsg) return;
 
   const userPrompt = extractLatestUserPrompt(messages);

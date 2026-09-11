@@ -1,4 +1,11 @@
-import { coreLogger, rulesLogger, taskLogger, memoryLogger, contextLogger, type LoggerInstance } from "../logger.js";
+import {
+  coreLogger,
+  rulesLogger,
+  taskLogger,
+  memoryLogger,
+  contextLogger,
+  type LoggerInstance,
+} from "../logger.js";
 import type { SessionStore } from "../session-store.js";
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js";
 import type { MemoryInjector } from "../memory/index.js";
@@ -12,6 +19,10 @@ import { createEventRouter } from "./event-router.js";
 import { createCompactionHooks } from "./compaction.js";
 import type { RuleInjectorContext } from "./rule-injector.js";
 import type { MemoryInjectorContext } from "./memory-injection-utils.js";
+
+export interface HookCapabilities {
+  memoryInjectionEnabled?: boolean; // Default true
+}
 
 export interface HookContextOptions {
   client: OpenCodeClient;
@@ -32,8 +43,7 @@ export interface HookContextOptions {
   systemSnapshots?: Map<string, string[]>;
   systemMetadataMap?: Map<string, SystemPromptMetadata>;
   systemInjectionsMap?: Map<string, string[]>;
-  rulesInjectionEnabled?: boolean;    // Default true
-  memoryInjectionEnabled?: boolean;   // Default true
+  capabilities?: HookCapabilities;
 }
 
 export interface HookContext {
@@ -44,11 +54,11 @@ export interface HookContext {
   logDir: string;
   ruleFiles: DiscoveredRule[];
   sessionStore: SessionStore;
-  coreLogger: LoggerInstance;     // Plugin lifecycle (passed from index.ts)
-  rulesLogger: LoggerInstance;      // Rule discovery and injection
-  taskLogger: LoggerInstance;       // Task delegation and monitoring
-  memoryLogger: LoggerInstance;     // Memory system (store, retrieval)
-  contextLogger: LoggerInstance;    // Session state, snapshots, compaction
+  coreLogger: LoggerInstance; // Plugin lifecycle (passed from index.ts)
+  rulesLogger: LoggerInstance; // Rule discovery and injection
+  taskLogger: LoggerInstance; // Task delegation and monitoring
+  memoryLogger: LoggerInstance; // Memory system (store, retrieval)
+  contextLogger: LoggerInstance; // Session state, snapshots, compaction
   now: () => number;
   taskManager: SimpleTaskManager | undefined;
   memoryInjector: MemoryInjector | undefined;
@@ -56,9 +66,10 @@ export interface HookContext {
   systemSnapshots: Map<string, string[]>;
   systemMetadataMap: Map<string, SystemPromptMetadata>;
   systemInjectionsMap: Map<string, string[]>;
-  rulesInjectionEnabled: boolean;
-  memoryInjectionEnabled: boolean;
-  generateSessionTitle: ((summary: string) => Promise<{ title?: unknown }>) | undefined;
+  capabilities: { memoryInjectionEnabled: boolean };
+  generateSessionTitle:
+    | ((summary: string) => Promise<{ title?: unknown }>)
+    | undefined;
 }
 
 export function createHookContext(opts: HookContextOptions): HookContext {
@@ -81,8 +92,9 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     systemSnapshots: opts.systemSnapshots ?? new Map(),
     systemMetadataMap: opts.systemMetadataMap ?? new Map(),
     systemInjectionsMap: opts.systemInjectionsMap ?? new Map(),
-    rulesInjectionEnabled: opts.rulesInjectionEnabled ?? true,
-    memoryInjectionEnabled: opts.memoryInjectionEnabled ?? true,
+    capabilities: {
+      memoryInjectionEnabled: opts.capabilities?.memoryInjectionEnabled ?? true,
+    },
     generateSessionTitle: opts.generateSessionTitle,
   };
 }
@@ -123,7 +135,6 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
       taskManager: ctx.taskManager,
       childSessionCache: ctx.childSessionCache,
       rulesLogger: ctx.rulesLogger,
-      rulesInjectionEnabled: ctx.rulesInjectionEnabled,
     },
     memoryMessageCtx: {
       memoryInjectorCtx: {
@@ -137,7 +148,7 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
       memoryInjector: ctx.memoryInjector,
       sessionStore: ctx.sessionStore,
       memoryLogger: ctx.memoryLogger,
-      memoryInjectionEnabled: ctx.memoryInjectionEnabled,
+      capabilities: ctx.capabilities,
     },
   });
 
