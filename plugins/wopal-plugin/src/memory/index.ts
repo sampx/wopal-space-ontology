@@ -5,9 +5,14 @@
  */
 
 export { MemoryStore } from "./store.js";
-export type { Memory, MemoryInput, MemoryCategory, MemoryUpdate, QueryType } from "./types.js";
+export type {
+  Memory,
+  MemoryInput,
+  MemoryCategory,
+  MemoryUpdate,
+  QueryType,
+} from "./types.js";
 export { EmbeddingClient } from "./embedder.js";
-export { LLMClient } from "../llm-client.js";
 
 // Core engine exports
 export {
@@ -18,10 +23,7 @@ export {
   setPendingConfirmation,
   clearPendingConfirmation,
 } from "./distill.js";
-export type {
-  DistillResult,
-  PreviewCandidate,
-} from "./distill.js";
+export type { DistillResult, PreviewCandidate } from "./distill.js";
 export type { ExtractResult } from "./prompts.js";
 export { MemoryRetriever } from "./retriever.js";
 export type { RetrieveOptions } from "./retriever.js";

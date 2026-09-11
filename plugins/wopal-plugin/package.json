@@ -51,12 +51,12 @@
     "@lancedb/lancedb": "0.22.3",
     "@opencode-ai/plugin": "~1.15.13",
     "@opencode-ai/sdk": "~1.15.13",
+    "jsonc-parser": "^3.3.1",
     "openai": "^6.33.0",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.2",
+    "zod": "^3.25.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  }
+  "trustedDependencies": [
+    "esbuild"
+  ]
 }

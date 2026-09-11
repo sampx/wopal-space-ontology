@@ -22,12 +22,12 @@ ontology 拥有的目标态能力组：
 
 | 能力域 | 拥有的目标能力 | 明确边界 |
 |---|---|---|
-| Agent 定义 | 3 级核心 Agent（Wopal/Fae/Rook）+ 24 个 WSF 子代理 + Translator，灵魂文件仅定义角色与决策原则 | 不持有 Agent runtime 实现 |
-| 技能生态 | 80+ 技能三层体系（空间根 / 工作流 / 专用），按触发条件自动注入 | 不判断技能产品价值，不负责 skill 内容设计 |
-| 命令体系 | 17+ 命令覆盖空间维护、记忆进化、项目管理、开发支持、上下文管理，可覆盖内置命令 | 不实现命令执行引擎 |
-| 规则体系 | 项目级 + 空间级 + Agent 专属规则，wopal-plugin 按条件匹配注入 | 不修改 ellamaka 核心行为 |
+| Agent 体系 | 4 维核心角色（Wopal/Fae/Rook + Evolver）+ 按空间类型动态装配的专职子代理（Writer/Editor 等）；灵魂文件仅定义角色边界与决策原则 | 不持有 Agent runtime 实现；不硬编码微型工种 |
+| 技能生态 | 空间根 / 工作流 / 专用技能池，通过空间装配清单（BOM）按需软链接与 JIT 动态注入 | 不判断技能产品价值，不负责 skill 内容设计 |
+| 命令体系 | 覆盖空间维护、自进化、项目管理、开发支持、上下文管理，可覆盖内置命令 | 不实现命令执行引擎 |
+| 规则体系 | 项目级 + 空间级 + 领域专属规则，wopal-plugin 条件匹配注入 | 不修改 ellamaka 核心行为 |
 | 运行时插件 | wopal-plugin 提供规则注入、任务委派、记忆系统、上下文管理四大能力，7 个 plugin tools | 仅限插件内部，不侵入技能/规则/命令 |
-| 模板体系 | 空间初始化模板（结构、守则、用户档案）+ 文档模板（PRD/DESIGN/phase/AGENTS） | 不持有空间运行态实例 |
+| 模板与装配 | 空间初始化模板 + 空间类型装配清单（`config/types/*.yaml`） | 不持有空间运行态实例 |
 | 辅助脚本 | ontology 维护、git hooks 与辅助自动化脚本 | 仅承担辅助维护动作 |
 
 ---
@@ -37,11 +37,12 @@ ontology 拥有的目标态能力组：
 | Decision | Rationale |
 |----------|-----------|
 | 声明式优于命令式 | 本体声明"空间应该有什么"，引擎负责解释执行。Markdown + YAML 是一等公民。 |
-| 灵魂、规约与能力协同演进 | Agent 灵魂、规则、技能、命令、模板与脚本共同构成空间本体，演进时保持角色、规约与执行面的协同。 |
-| 灵魂与操作分离 | Agent 灵魂文件只定义角色与决策原则（"我是谁"），操作知识由技能承载（"我怎么做"）。 |
+| 灵魂与操作分离 | Agent 灵魂文件只定义角色边界与决策原则（"我是谁"），操作知识由技能承载（"我怎么做"）。 |
+| 提示词目标化（Outcome-Oriented）优于过程干涉（Hand-Holding） | 面向 2026 前沿模型原生推理与测试时计算（TTC），剔除微型伪专员与教科书式编程说教，给目标与验证门禁，不干涉过程。 |
+| 单分支集中维护优于多分支隔离（BOM 装配模型） | 本体资产在单一 `main` 分支集中维护，通过 `config/types/*.yaml` 声明装配单，空间端以软链接（Symlinks）按需挂载。一处优化全域自动受益，彻底消除 Git 多分支合并与冲突地狱。 |
+| 进化的"提议权"与"实施权"分离 | Evolver 专职元认知分析、去特异化清洗与出方案（Read & Propose Only），严禁 Agent 就地直接篡改软链接；落地由 Wopal 统筹、Fae 规范提交、Rook 审查守门。 |
 | 插件适配原则 | wopal-plugin 是运行时插件，集中提供规则注入、任务委派、记忆系统和上下文管理，插件能实现尽量不改造 engine。 |
 | Plugin instance 隔离 | Ellamaka 通过 `PluginInput.wopalSpaceRoot` 传递可选空间根。wopal-plugin 为每次 `server(input)` 调用构造独立 RuntimeContext、effective env、logger 与 memory client。 |
-| Git source + worktree 分发 | clone 降低门槛，fork 支持贡献；分支承载空间演化，通用能力回流上游（详见 §6.8）。 |
 
 ---
 
@@ -49,13 +50,35 @@ ontology 拥有的目标态能力组：
 
 ### 4.1 Agent 体系
 
-| 模块 | 职责 | 载体 |
-|------|------|------|
-| 核心三级 | Wopal（主控）/ Fae（执行）/ Rook（审查），职责分离协作 | `agents/wopal.md`、`agents/fae.md`、`agents/rook.md` |
-| WSF 子代理 | 24 个专职 Agent（mapper、researcher、planner、executor、reviewer、auditor、verifier 等），覆盖产品调研到验收全生命周期 | `agents/wsf-*.md` |
-| Translator | 内容翻译，保留技术术语 | `agents/translator.md` |
+面向 2026 年具备自适应深度推理与长程规划能力的前沿模型，Agent 体系确立**“灵魂守恒、武器多态、动态装配、四维闭环”**原则：
 
-协作闭环：Wopal 规划并委派 Fae 实施，委派 Rook 审查 Fae 产出。修订循环上限 3 轮。权限隔离通过 ellamaka agent frontmatter 的 `permission.skill` 字段实现。
+#### 4.1.1 四核职能分工
+
+| 角色 | 核心职责 | 物理权限沙箱 | 核心判据 / 行为 |
+|------|---------|-------------|----------------|
+| **Wopal**（主控 / 统筹脑） | 意图解析、人机对齐、宏观规划、跨空间记忆承载、任务派发 | 全量感知与派发权 (`wopal_*`, `task`, `memory_manage`)，`question: allow` | 双模确认原则（自由对话须确认，工作流按 Plan 执行）；结论先行 |
+| **Fae**（执行手 / 全栈工兵） | 全栈落地编码、重构、编译构建、测试用例运行、提交验证 | `edit: allow` (全栈文件), `bash: allow`, `task: deny` (防套娃) | 必须产出客观测试与构建结果；能通过真实测试的代码是唯一指标 |
+| **Rook**（审查眼 / 正交哨兵） | 独立正交质量审计、代码缺陷与安全风险排查、技术债预警 | 严格只读沙箱 (`read: allow`, `edit: deny`, `bash: allow` 仅限只读命令) | 严格遵守“无证据即无效”（Evidence-or-Downgrade），只认 `file:line` 事实 |
+| **Evolver**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`, `edit: deny` 对中央库只读提案) | **只出方案、不动刀**；执行严格的三级防污染分流检疫 |
+
+#### 4.1.2 动态装配（Agents are assembled, not invariant）
+Agent 不是全空间固定不变的。空间初始化时，根据 `config/types/<type>.yaml` 装配单，仅软链接当前空间所需的子代理：
+- **Coding 空间**：装配 `[wopal, fae, rook]`（研发闭环）；
+- **Content 空间**：装配 `[wopal, writer, editor]`（内容创作与审校）；
+- **Data 空间**：装配 `[wopal, analyst, statistician]`（数据与统计）。
+Ellamaka 启动时扫描 `.wopal/agents/` 仅能看到被软链接投影进来的当前空间代理，杜绝界面杂乱与提示词交叉污染。
+
+#### 4.1.3 废弃陈旧微型专员代理
+全面废除旧时代按文件后缀切片的 8 个微型伪专员与外部污染遗留：
+- 废弃 `code-reviewer`（完全归口至 Rook）；
+- 废弃 `code-simplifier`（70 行教科书说教失效，重构能力完全由 Fae 原生承担）；
+- 废弃 `architect`（单步盘问模式过时，规划由 Wopal + `dev-flow` 承载）；
+- 废弃 `frontend-specialist`、`test-engineer`、`docs-specialist`（消除人为文件切块导致的上下文盲区与交接税，回归 Fae 全栈原子共变）；
+- 清除 `code-skeptic`、`data`（清除外部 Kilo Code 历史飞地与不存在的 actor system 污染）。
+
+#### 4.1.4 提示词去脚手架化与“入魂 / 入脑”
+- **灵魂提示词瘦身**：剔除所有流程步骤分支（如 Phase 1~7）、搜索停止说教与编程八股文，每份 Agent 提示词压缩到 40 行左右，只保留角色定位、安全边界与交互风格。
+- **系统提示词自进化（“入魂 / 入脑”）**：提示词作为核心资产，在 Evolver 检疫提炼并获用户批准后，由 Wopal 调度 Fae 规范更新中央仓库文件，实现跨空间协同进化。
 
 ### 4.2 技能体系
 
@@ -145,17 +168,56 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | `scripts/oc-auto-approve.py` | 本地辅助自动化脚本 |
 | `scripts/setup-git-hooks.sh` | hooks 安装脚本 |
 
-### 4.8 配置体系
+### 4.8 配置体系与装配清单 (BOM)
 
+#### 4.8.1 配置层级
 三层配置，各司其职：
 
 | 层级 | 文件 | 作用域 | Git 跟踪 | 职责 |
 |------|------|--------|----------|------|
-| 全局 | `~/.wopal/config/settings.jsonc` | 所有空间 | 否 | 跨空间共享的 provider、model、功能开关 |
-| 空间级（公共）| `.wopal/config/settings.jsonc` | 当前空间 | 是 | 空间共享的 ellamaka 配置，随分支传播 |
-| 空间级（私有）| `.wopal/config/settings.local.jsonc` | 当前空间 | 否（git 忽略）| 覆盖公共默认值的本地配置 |
+| 全局 | `~/.wopal/config/settings.jsonc` | 所有空间 | 否 | 跨空间共享的 provider、model、全局功能开关 |
+| 空间级（公共）| `.wopal/config/settings.jsonc` | 当前空间 | 是 | 空间共享的 ellamaka 与插件配置，随仓库传播 |
+| 空间级（私有）| `.wopal/config/settings.local.jsonc` | 当前空间 | 否（git 忽略）| 覆盖公共默认值的本地开发者配置 |
 
-空间级公共配置与全局配置合并生效，空间级私有配置覆盖前两者。详见 §6.8 配置隔离约定。
+#### 4.8.2 空间类型装配清单 (Archetype Manifest / BOM)
+空间武器库通过 `.wopal/config/types/<type>.yaml` 声明式定义，作为空间初始化时软链接投影的唯一依据：
+
+```yaml
+# 示例: .wopal/config/types/coding.yaml
+version: 1
+type: coding
+description: 全栈工程研发空间
+
+# 声明该空间挂载的 Agent (Ellamaka 扫描软链接展示)
+agents:
+  - wopal
+  - fae
+  - rook
+
+# 声明该空间所需技能
+skills:
+  - dev-flow
+  - agents-collab
+  - modern-web-guidance
+  - git-worktrees
+
+# 声明该空间加载的规则
+rules:
+  - typescript
+  - python
+  - business-rules
+
+# 空间特化权限切片 (通过 settings.jsonc 自动合并)
+permissions:
+  fae:
+    edit: allow
+    bash: allow
+  rook:
+    edit: deny
+    read: allow
+```
+
+空间初始化时，CLI 读取对应装配清单，在 `<space>/.wopal/` 对应目录下批量建立指向中央库相应资产的相对软链接。一处优化，全域软链接即刻生效。
 
 ---
 
@@ -508,104 +570,58 @@ Ontology source 是去中心化的——任何 GitHub 仓库都可以是 source�
 
 **规则 1：单向下行合并**
 
+### 6.8 集中能力池演进与自进化闭环
+
+随着 2026 前沿大模型原生推理能力的飞跃，原先复杂的多层 Git 分支隔离机制（`main -> type/* -> space/*`）在工程实践中被重构为**单分支集中维护 + 软链接声明式装配（BOM）+ 专职海关自进化**的极简架构。
+
+#### 6.8.1 单分支能力池模型
+- **中央单一 `main` 分支**：所有公共 `agents/`、`skills/`、`rules/`、`plugins/` 集中维护在单个 `main` 分支下，消除分支切片产生的 merge/rebase 泥潭。
+- **声明式装配单（BOM）**：在 `.wopal/config/types/<type>.yaml` 中声明各空间类型所需的能力切片（如 `coding.yaml` 声明加载 `wopal/fae/rook` 与开发技能）。
+- **软链接透视**：空间初始化时按装配单在本地 `.wopal/` 建立相对软链接。一处优化，全域软链接自动静默获益。
+
+#### 6.8.2 自进化闭环：Evolver 专职海关与提议-实施权责分立
+空间运行中产生的能力进化必须遵循严格的**防特异性泄漏与海关检疫机制**，严禁 Agent 随手直接修改 `.wopal/` 软链接：
+
 ```
-upstream/main → main → type/coding → space/<name>
+会话运行事实 / 报错日志 / 用户纠偏
+  │
+  ▼
+[Evolver 独立元认知代理 + ontology-evolution 技能]
+  │  • 去特异化清洗 (De-contextualization): 抹除绝对路径与特定项目业务词
+  │  • 泛化性三问 (Generalization Gate): 验证是否具备跨空间通用性
+  │  • 三级分流判定: 空间私有 vs 类型专属 vs 公共核心
+  ▼
+生成《进化方案 (Evolution Plan)》呈交用户审查
+  │
+  ▼ 用户批准
+[Wopal 统筹调度] ──委派──> [Fae 规范实施落盘]
+                               │
+                               ├─ 规范写入中央库源文件 (保持软链接完整性)
+                               ├─ 执行原子提交: git commit -m "evolve(...): ..."
+                               ▼
+                        [Rook 正交质检守门]
+                               │
+                               └─ 校验 frontmatter 语法合法性与反污染底线
 ```
 
-- 下行更新只走这条链，用 `git merge`
-- 禁止反向 merge：space→type、type→main、local→upstream
-- 上行只用 squash merge（同仓库贡献）或 PR（跨仓库贡献）
+##### 核心进化规则：
+1. **提议权与实施权严格分离**：Evolver **只出方案、不动刀（Read & Propose Only）**；具体改动经用户批准后，由 Wopal 委派 Fae 执行原子 commit，由 Rook 审查把关。
+2. **严禁就地直接篡改软链接**：直接向软链接写入极易触发 Node/Bun 常见工具的原子覆盖（Atomic Write），直接截断符号链接，且会导致中央仓库产生未提交的脏代码。所有公共进化必须直接、规范地提交给中央仓库。
+3. **空间私有资产物理锁死**：属于当前项目特有的架构规范，仅限写入本地 `.wopal-space/memory/` 或项目 `AGENTS.md`，绝对禁止穿透软链接写入中央仓库。
 
-**规则 2：top-down 顺序**
+#### 6.8.4 维护与分发命令演进
 
-更新必须从最上层开始，逐层往下：
+在单分支能力池与软链接装配模型下，CLI 命令表面大幅精简：
 
-`ontology update` 内部：
-1. merge `upstream/main → main`
-2. merge `main → type/coding`
-3. 任一步冲突即停
+| 命令 | 方向 | 职责 |
+|------|------|------|
+| `ontology status` | — | 检查本地中央仓库相对上游 upstream 的版本落后情况与本地 Commit |
+| `ontology update` | 下行 | 在本地中央仓库拉取 upstream/main 最新提交，全空间软链接同步获益 |
+| `ontology contribute` | 上行 | 基于本地中央仓库的高质量演进 Commit，向上游官方仓库提交标准 GitHub PR |
+| `space status` | — | 检查当前空间的软链接装配状态是否与 `config/types/<type>.yaml` 装配单一致 |
+| `space sync` | — | 根据装配单修复或补齐当前空间缺失的 Agent/Skill/Rule 软链接 |
 
-`space update` 前置守卫：
-- 检查 type/coding 是否已合并最新 main
-- 未合并 → 拒绝执行，提示"请先 `ontology update`"
-
-跳步会产生复杂历史，是错的根源。
-
-**规则 3：贡献走 squash merge，不强制先 update**
-
-上行贡献分两个场景：
-
-**同仓库（space → type/coding）**：用 `git merge --squash`。把 space 相对 type/coding 的全部变更压成一次暂存，不自动提交。预览后排除不该贡献的文件，用户确认后 commit。
-
-**跨仓库（fork → upstream）**：创建临时分支基于 upstream 最新 → `git merge --squash` fork 分支 → 预览排除 → commit → `gh pr create`。
-
-贡献前不强制 update——squash merge 只带 diff，PR 用临时分支隔离，fork 分支不被碰，不需要先同步。
-
-**规则 4：冲突即停**
-
-任何 merge / squash merge 冲突：
-- CLI 立即停止
-- 报告冲突文件列表
-- agent 手动编辑 → `git add` + `git commit` 完成
-- 永远不自动解决
-
-**规则 5：update 多步顺序执行**
-
-`ontology update` 内部多步（main merge + type/coding merge）按顺序执行。任一步冲突 → 停在该点，不继续后续步骤。agent 手动解决冲突并 commit 完成该步 merge 后，重跑 `ontology update`，CLI 跳过已完成的步骤，从下一步继续。
-
-**规则 6：promote 前置检查**
-
-`ontology promote` 在执行前检查 `fromBranch`（type/*）是否已包含 main 的全部 commit。如果 main 有 type/* 尚未吸收的通用变更，promote 会拒绝执行并提示先运行 `ontology update`。
-
-这条规则避免"promote 快照旧 type → 下次 update main→type 冲突"的循环：promote 只在 type 已经是 main 超集时执行，快照内容完整，后续 update 不会因 promote 产生假冲突。
-
-Dry-run 不受此规则限制——用户可以随时预览 promote 会带来什么，包括冲突预览。
-
-**规则 7：配置隔离与 .gitignore 一致性**
-
-空间分支相对父层的差异只包含能力变更，由配置文件的分层约定保证：
-
-- `settings.jsonc`：公共配置，随分支传播，所有层级共享。
-- `settings.local.jsonc`：空间私有配置，被 git 忽略，保留在本地文件系统。
-
-每个分支（main、type/*、space/*）都有自己的 `.gitignore`，声明该分支忽略的文件清单。分支间基本一致，差异不大。space 分支的 `.gitignore` 必须与其所属 type/* 分支一致——如果不一致，视为当前变更，需要同步一致（squash merge 上行或 reset 回来）。这保证被忽略的私有文件在 merge 时不受影响。
-
-#### 命令总览
-
-| 命令 | 方向 | 底层操作 | CLI 守卫 |
-|------|------|---------|---------|
-| `ontology status` | — | 下行/上行全链路 git log/diff 展示差异 + `git merge-tree` 预测 merge 结果 | — |
-| `ontology update` | 下行 | `git merge upstream/main → main` + `git merge main → type/coding` | 强制顺序，冲突即停 |
-| `ontology contribute` | 上行 | 创建临时分支 + squash merge + PR | `--type <type>` 物理隔绝空间分支，支持 `--resume` 和 `--abort` 挂起恢复 |
-| `ontology promote` | 上行 | `git merge --squash type/* → main` | 前置检查 type/* 已包含 main 全部 commit，否则拒绝 |
-| `space status` | — | 当前 space 相关的完整链路 git log/diff 展示差异 + `git merge-tree` 预测 merge 结果 | — |
-| `space update` | 下行 | `git merge type/coding → space` | 前置检查 type 已更新 |
-| `space contribute` | 上行 | `git merge --squash space → type/coding` | 预览排除，不自动提交 |
-
-所有命令 context-aware——在 space 目录运行时自动定位关联 of 关联的 ontology source 和 type 分支。用户不需要切到 ontology repo。
-
-##### 贡献生命周期守卫（Resume & Abort）
-
-为了最大化保护本地本体主仓库的稳定性（防止全局 Agent 依赖的软链接因合并冲突或分支切走而失效），`ontology contribute` 采用**临时工作树挂起与生命周期恢复/放弃**的闭环设计：
-- **隔离合并**：在独立的临时工作树中执行 squash merge，主仓库始终保持干净的 `main` 分支。
-- **冲突挂起与恢复**：若发生冲突，工作树挂起，用户解决并 commit 后，使用 `--resume` 恢复执行，自动完成 Push、PR 创建和收尾清理。
-- **一键放弃与清理**：若要放弃本次贡献，使用 `--abort` 参数。支持指定 `--message` 精准清理，或不指定 `--message` 进行按类型的模糊批量清理。
-
-#### AI 辅助流程
-
-Agent 是本体维护的决策中枢。CLI 输出分支差异的结构化事实，agent 解读后与用户讨论，再构造命令执行。详细操作规则见 space-master 技能的本体维护操作指南。
-
-**决策框架**：
-
-1. `ontology status` 显示 upstream → local 落后 → 执行 `ontology update`
-2. update 冲突 → agent 手动解决冲突文件，重跑 update 继续
-3. `space status` 显示 type/coding → space 落后 → 执行 `space update`
-4. space 有修改想贡献到 type → `space contribute`（squash merge + 预览排除）
-5. 想贡献回 upstream → `ontology contribute`（临时分支 + PR）
-
-**冲突处理**：所有冲突（update、contribute）统一由 agent 解决。CLI 报告冲突文件，agent 手动编辑后继续命令。
-
-**`/ontology-maintain` 命令**：Agent 使用此命令触发完整维护流程——status（差异对比）→ 分析建议（按决策框架排序）→ 报告确认（等待用户确认）→ 执行操作（每次操作后验证）。
+> **注**：原先的 `space contribute`（空间往类型分支合并）与 `ontology promote`（类型分支向 main 提升）随多分支模型的废除而自然退役。日常空间内的能力进化通过 Evolver 检疫提炼后，直接由 Fae 规范落盘并原子 Commit 到本地中央仓库。
 
 ---
 ## 7. Data and State Model

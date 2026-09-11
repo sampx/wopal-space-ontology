@@ -457,7 +457,7 @@ describe("Per-invocation env loading", () => {
     // Create user-level .env
     writeFileSync(
       path.join(wopalHomeDir, ".env"),
-      "WOPAL_LLM_MODEL=qwen-3-next\nWOPAL_TEST_VAR=hello\n",
+      "WOPAL_LLM_API_KEY=qwen-key\n",
       "utf-8",
     );
 
@@ -473,12 +473,9 @@ describe("Per-invocation env loading", () => {
       wopalHome: wopalHomeDir,
     }));
 
-    expect(env.WOPAL_LLM_MODEL).toBe("qwen-3-next");
-    expect(env.WOPAL_TEST_VAR).toBe("hello");
-    expect(process.env.WOPAL_TEST_VAR).toBeUndefined();
+    expect(env.WOPAL_LLM_API_KEY).toBe("qwen-key");
 
-    delete process.env.WOPAL_LLM_MODEL;
-    delete process.env.WOPAL_TEST_VAR;
+    delete process.env.WOPAL_LLM_API_KEY;
   });
 
   it("loads space-level env that overrides user-level", async () => {
@@ -487,7 +484,7 @@ describe("Per-invocation env loading", () => {
     // Create user-level .env
     writeFileSync(
       path.join(wopalHomeDir, ".env"),
-      "WOPAL_LLM_MODEL=qwen-3-next\n",
+      "WOPAL_LLM_API_KEY=qwen-key\n",
       "utf-8",
     );
 
@@ -498,7 +495,7 @@ describe("Per-invocation env loading", () => {
     // Create space-level .env
     writeFileSync(
       path.join(spaceDir, ".wopal", ".env"),
-      "WOPAL_LLM_MODEL=deepseek-chat\nWOPAL_SPACE_ONLY=true\n",
+      "WOPAL_LLM_API_KEY=deepseek-key\n",
       "utf-8",
     );
 
@@ -512,12 +509,9 @@ describe("Per-invocation env loading", () => {
     }));
 
     // Space-level overrides user-level
-    expect(env.WOPAL_LLM_MODEL).toBe("deepseek-chat");
-    expect(env.WOPAL_SPACE_ONLY).toBe("true");
-    expect(process.env.WOPAL_SPACE_ONLY).toBeUndefined();
+    expect(env.WOPAL_LLM_API_KEY).toBe("deepseek-key");
 
-    delete process.env.WOPAL_LLM_MODEL;
-    delete process.env.WOPAL_SPACE_ONLY;
+    delete process.env.WOPAL_LLM_API_KEY;
   });
 
   it("only loads user-level env outside wopal-space", async () => {
@@ -526,7 +520,7 @@ describe("Per-invocation env loading", () => {
     // Create user-level .env
     writeFileSync(
       path.join(wopalHomeDir, ".env"),
-      "WOPAL_LLM_MODEL=user-model\n",
+      "WOPAL_LLM_API_KEY=user-key\n",
       "utf-8",
     );
 
@@ -542,19 +536,19 @@ describe("Per-invocation env loading", () => {
       wopalHome: wopalHomeDir,
     }));
 
-    expect(env.WOPAL_LLM_MODEL).toBe("user-model");
+    expect(env.WOPAL_LLM_API_KEY).toBe("user-key");
 
-    delete process.env.WOPAL_LLM_MODEL;
+    delete process.env.WOPAL_LLM_API_KEY;
   });
 
   it("does not override existing process.env values", async () => {
     process.env.WOPAL_HOME = wopalHomeDir;
-    process.env.WOPAL_LLM_MODEL = "existing-model";
+    process.env.WOPAL_LLM_API_KEY = "existing-key";
 
     // Create user-level .env
     writeFileSync(
       path.join(wopalHomeDir, ".env"),
-      "WOPAL_LLM_MODEL=from-env-file\n",
+      "WOPAL_LLM_API_KEY=from-env-file\n",
       "utf-8",
     );
 
@@ -569,17 +563,17 @@ describe("Per-invocation env loading", () => {
       wopalHome: wopalHomeDir,
     }));
 
-    expect(env.WOPAL_LLM_MODEL).toBe("existing-model");
+    expect(env.WOPAL_LLM_API_KEY).toBe("existing-key");
 
-    delete process.env.WOPAL_LLM_MODEL;
+    delete process.env.WOPAL_LLM_API_KEY;
   });
 
-  it("skips non-WOPAL_ prefixed variables", async () => {
+  it("skips non-WOPAL_ prefixed and non-whitelisted variables", async () => {
     process.env.WOPAL_HOME = wopalHomeDir;
 
     writeFileSync(
       path.join(wopalHomeDir, ".env"),
-      "WOPAL_LLM_MODEL=valid\nOTHER_VAR=ignored\n",
+      "WOPAL_LLM_API_KEY=valid\nOTHER_VAR=ignored\nWOPAL_MEMORY_ENABLED=true\n",
       "utf-8",
     );
 
@@ -594,9 +588,10 @@ describe("Per-invocation env loading", () => {
       wopalHome: wopalHomeDir,
     }));
 
-    expect(env.WOPAL_LLM_MODEL).toBe("valid");
+    expect(env.WOPAL_LLM_API_KEY).toBe("valid");
     expect(env.OTHER_VAR).toBeUndefined();
+    expect(env.WOPAL_MEMORY_ENABLED).toBeUndefined();
 
-    delete process.env.WOPAL_LLM_MODEL;
+    delete process.env.WOPAL_LLM_API_KEY;
   });
 });

@@ -1,14 +1,10 @@
 /**
  * Prompt Loading
  *
- * Loads prompt templates via 4-layer cascading:
- * 1. Env var override (absolute/~/relative path)
- * 2. Space-level: <workspace>/.wopal/prompts/<filename>
- * 3. User-level: WOPAL_HOME/prompts/<filename>
- * 4. Inline fallback (caller provides)
- *
- * Env vars WOPAL_DISTILL_PROMPT_FILE / WOPAL_DEDUP_PROMPT_FILE / WOPAL_TITLE_PROMPT_FILE
- * override file paths with higher priority.
+ * Loads prompt templates via cascading convention paths:
+ * 1. Space-level: <space>/.wopal/prompts/<filename>
+ * 2. User-level: WOPAL_HOME/prompts/<filename>
+ * 3. Inline fallback (caller provides)
  */
 
 import { join } from "path";
@@ -16,56 +12,20 @@ import { existsSync, readFileSync } from "fs";
 import type { MemoryCategory } from "./types.js";
 import { memoryLogger, type LoggerInstance } from "../logger.js";
 import { createRuntimeContext, type RuntimeContext } from "../runtime-context.js";
-import type { RuntimeEnvironment } from "../runtime-environment.js";
 
 /**
- * Resolve prompt file path from environment variable.
- *
- * Supports:
- * - Absolute path: /path/to/file.md
- * - Home directory: ~/path/to/file.md
- * - Relative path: path/to/file.md (relative to cwd)
- */
-function resolveEnvFilePath(
-  environment: RuntimeEnvironment,
-  directory: string,
-  envVar: string,
-): string | null {
-  const envPath = environment[envVar];
-  if (!envPath) return null;
-
-  if (envPath.startsWith("/")) {
-    return envPath;
-  }
-
-  if (envPath.startsWith("~/")) {
-    return join(environment.HOME ?? process.env.HOME ?? "", envPath.slice(2));
-  }
-
-  return join(directory, envPath);
-}
-
-/**
- * Resolve a prompt template file via 4-layer cascading.
+ * Resolve a prompt template file via convention paths.
  * Returns the file path if found, null otherwise (caller falls back to inline default).
  *
  * Layers:
- * 1. Env var override — resolved via resolveEnvFilePath
- * 2. Space-level — .wopal/prompts/<filename> (if running inside a wopal-space)
- * 3. User-level — WOPAL_HOME/prompts/<filename>
- * 4. null — caller uses inline default
+ * 1. Space-level — .wopal/prompts/<filename> (if running inside a wopal-space)
+ * 2. User-level — WOPAL_HOME/prompts/<filename>
+ * 3. null — caller uses inline default
  */
 function resolveRuntimePromptFile(
   context: RuntimeContext,
-  environment: RuntimeEnvironment,
-  envVar: string,
   filename: string,
 ): string | null {
-  const envPath = resolveEnvFilePath(environment, context.directory, envVar);
-  if (envPath && existsSync(envPath)) {
-    return envPath;
-  }
-
   if (context.wopalSpaceRoot) {
     const spacePath = join(context.wopalSpaceRoot, ".wopal", "prompts", filename);
     if (existsSync(spacePath)) {
@@ -82,17 +42,15 @@ function resolveRuntimePromptFile(
 }
 
 /**
- * Load a prompt file: env var override → space-level → user-level → null.
+ * Load a prompt file: space-level → user-level → null.
  * Returns null if no source is available (caller uses inline default).
  */
 function loadPromptFile(
   context: RuntimeContext,
-  environment: RuntimeEnvironment,
   logger: LoggerInstance,
-  envVar: string,
   filename: string,
 ): string | null {
-  const filePath = resolveRuntimePromptFile(context, environment, envVar, filename);
+  const filePath = resolveRuntimePromptFile(context, filename);
   if (!filePath) return null;
 
   try {
@@ -105,7 +63,7 @@ function loadPromptFile(
 }
 
 export interface MemoryPrompts {
-  resolvePromptFile(envVar: string, filename: string): string | null;
+  resolvePromptFile(filename: string): string | null;
   loadTitlePrompt(): string;
   buildExtractionPrompt(conversation: string): string;
   buildBatchDedupPrompt(
@@ -120,17 +78,14 @@ const DEDUP_FALLBACK = "You are a memory deduplicator. For each candidate, compa
 
 export function createMemoryPrompts(
   context: RuntimeContext,
-  environment: RuntimeEnvironment,
   logger: LoggerInstance = memoryLogger,
 ): MemoryPrompts {
-  const load = (envVar: string, filename: string) =>
-    loadPromptFile(context, environment, logger, envVar, filename);
+  const load = (filename: string) => loadPromptFile(context, logger, filename);
   return {
-    resolvePromptFile: (envVar, filename) =>
-      resolveRuntimePromptFile(context, environment, envVar, filename),
-    loadTitlePrompt: () => load("WOPAL_TITLE_PROMPT_FILE", "title.md") ?? TITLE_FALLBACK,
+    resolvePromptFile: (filename) => resolveRuntimePromptFile(context, filename),
+    loadTitlePrompt: () => load("title.md") ?? TITLE_FALLBACK,
     buildExtractionPrompt: (conversation) =>
-      (load("WOPAL_DISTILL_PROMPT_FILE", "distill.md") ?? EXTRACTION_FALLBACK)
+      (load("distill.md") ?? EXTRACTION_FALLBACK)
         .replace("{{conversation}}", conversation),
     buildBatchDedupPrompt: (candidates, existingByCandidate) => {
       const candidatesWithExisting = candidates.filter(
@@ -147,7 +102,7 @@ export function createMemoryPrompts(
           body: existing.body,
         })),
       }));
-      return (load("WOPAL_DEDUP_PROMPT_FILE", "dedup.md") ?? DEDUP_FALLBACK)
+      return (load("dedup.md") ?? DEDUP_FALLBACK)
         .replace("{{input}}", JSON.stringify(input, null, 2));
     },
   };
@@ -158,11 +113,11 @@ function defaultPrompts(): MemoryPrompts {
     directory: process.cwd(),
     ...(process.env.WOPAL_HOME ? { wopalHome: process.env.WOPAL_HOME } : {}),
   });
-  return createMemoryPrompts(context, process.env);
+  return createMemoryPrompts(context);
 }
 
-export function resolvePromptFile(envVar: string, filename: string): string | null {
-  return defaultPrompts().resolvePromptFile(envVar, filename);
+export function resolvePromptFile(filename: string): string | null {
+  return defaultPrompts().resolvePromptFile(filename);
 }
 
 export function loadTitlePrompt(): string {

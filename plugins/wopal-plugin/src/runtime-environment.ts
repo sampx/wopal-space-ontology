@@ -4,6 +4,31 @@ import type { RuntimeContext } from "./runtime-context.js";
 
 export type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
 
+const ENV_ALLOWLIST = [
+  // Connection parameters and secrets required by resource client construction.
+  "WOPAL_LLM_BASE_URL",
+  "WOPAL_LLM_MODEL",
+  "WOPAL_LLM_API_KEY",
+  "WOPAL_EMBEDDING_BASE_URL",
+  "WOPAL_EMBEDDING_MODEL",
+  "WOPAL_EMBEDDING_API_KEY",
+  // Log diagnostic overrides.
+  "WOPAL_PLUGIN_LOG_LEVEL",
+  "WOPAL_PLUGIN_LOG_FILE",
+  "WOPAL_PLUGIN_LOG_MODULES",
+  // Path fallback (logger.ts getLogFile).
+  "WOPAL_HOME",
+] as const;
+
+function pickAllowlisted(source: Record<string, string | undefined>): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const key of ENV_ALLOWLIST) {
+    const value = source[key];
+    if (value !== undefined && value !== "") values[key] = value;
+  }
+  return values;
+}
+
 function loadEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
 
@@ -20,7 +45,7 @@ function loadEnvFile(path: string): Record<string, string> {
     const separator = trimmed.indexOf("=");
     if (separator === -1) continue;
     const key = trimmed.slice(0, separator).trim();
-    if (!key.startsWith("WOPAL_")) continue;
+    if (!ENV_ALLOWLIST.includes(key as (typeof ENV_ALLOWLIST)[number])) continue;
     values[key] = trimmed
       .slice(separator + 1)
       .trim()
@@ -40,6 +65,6 @@ export function loadRuntimeEnvironment(
   return Object.freeze({
     ...homeEnvironment,
     ...spaceEnvironment,
-    ...processEnvironment,
+    ...pickAllowlisted(processEnvironment),
   });
 }

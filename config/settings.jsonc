@@ -2,21 +2,11 @@
   "ellamaka": {
     "default_agent": "wopal",
     "autoupdate": true,
-    // "server": {
-    //   "cors": [
-    //     "http://192.168.1.101:3000",
-    //     "http://192.168.1.101:4097",
-    //     "http://192.168.1.101:8888",
-    //     "http://192.168.1.101:9999"
-    //   ]
-    // },
-    "plugin": [
-      [
-        "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
-        {
-          "sandbox": { "enabled": true, "mode": "workspace-write" }
-        }
-      ]
+    "instructions": [
+      ".wopal-space/STRUCTURE.md",
+      ".wopal-space/REGULATIONS.md",
+      ".wopal-space/memory/USER.md",
+      ".wopal-space/memory/MEMORY.md"
     ],
     "permission": {
       "external_directory": {
@@ -37,9 +27,6 @@
         "bash -n *": "allow"
       }
     }
-    // "skills": {
-    //   "paths": ["/Users/sam/coding/wopal/wopal-workspace/.agents/skills"]
-    // },
   },
   "tui": {
     "plugin": [
