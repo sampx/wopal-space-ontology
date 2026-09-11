@@ -43,18 +43,20 @@ def _get_repo_slug(path: Path) -> str | None:
 
 
 def _get_default_branch(project_path: Path) -> str:
-    try:
-        result = subprocess.run(
-            ["git", "ls-remote", "--symref", "origin", "HEAD"],
-            cwd=str(project_path),
-            capture_output=True, text=True, check=True,
-        )
-        first_line = result.stdout.strip().split("\n")[0]
-        if first_line.startswith("ref: refs/heads/"):
-            return first_line.split("/")[-1].split("\t")[0]
-    except subprocess.CalledProcessError:
-        pass
+    """Resolve the default branch of a repo using LOCAL git refs only.
 
+    The default branch name is always derivable locally (origin/HEAD symref,
+    remote refs, or init.defaultBranch). A remote `git ls-remote` round-trip
+    is deliberately avoided: it performs network I/O plus credential lookups
+    that hang under a sandbox (flow.sh verify/archive timeout root cause).
+
+    Order:
+      1. origin/HEAD symbolic-ref (authoritative default-branch marker)
+      2. rev-parse --abbrev-ref origin/HEAD (remote ref fallback)
+      3. init.defaultBranch config
+      4. "main" (universal modern default)
+    """
+    # 1. origin/HEAD symref — fast, local, authoritative
     try:
         result = subprocess.run(
             ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
@@ -62,9 +64,34 @@ def _get_default_branch(project_path: Path) -> str:
             capture_output=True, text=True, check=True,
         )
         return result.stdout.strip().split("/")[-1]
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         pass
 
+    # 2. rev-parse --abbrev-ref origin/HEAD — local remote ref
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
+            cwd=str(project_path),
+            capture_output=True, text=True, check=True,
+        )
+        if result.stdout.strip():
+            return result.stdout.strip().split("/")[-1]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    # 3. init.defaultBranch config
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", "init.defaultBranch"],
+            cwd=str(project_path),
+            capture_output=True, text=True, check=True,
+        )
+        if result.stdout.strip():
+            return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    # 4. Universal default
     return "main"
 
 

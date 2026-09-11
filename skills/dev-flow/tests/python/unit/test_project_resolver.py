@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # test_project_resolver.py - TDD tests for lib.project resolver module
 
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -18,6 +19,7 @@ from lib.project import (
     find_plan,
     resolve_plan_location,
     build_plan_blob_url,
+    _get_default_branch,
 )
 
 
@@ -127,3 +129,60 @@ class TestBuildPlanBlobUrl:
             is_archived=False,
         )
         assert build_plan_blob_url(loc) == ""
+
+
+# -- _get_default_branch ------------------------------------------------------
+
+class _FakeResult:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class _FakeRun:
+    """Mimic subprocess.run honoring check=True: raise CalledProcessError
+    when returncode != 0 and check is truthy."""
+
+    def __init__(self, scripted):
+        # scripted: list of (returncode, stdout) consumed in order; last entry repeats
+        self._scripted = scripted
+        self.calls = []
+
+    def __call__(self, cmd, *args, **kwargs):
+        self.calls.append(cmd)
+        rc, out = self._scripted[min(len(self.calls) - 1, len(self._scripted) - 1)]
+        if rc != 0 and kwargs.get("check"):
+            raise subprocess.CalledProcessError(rc, cmd, output=out, stderr="fatal")
+        return _FakeResult(rc, out)
+
+
+class TestGetDefaultBranch:
+    """_get_default_branch must resolve the default branch from LOCAL git
+    refs only. It must NEVER invoke `git ls-remote` (a network round-trip that
+    hangs in sandboxed environments and caused flow.sh verify/archive timeouts).
+    """
+
+    def test_uses_local_symbolic_ref_when_available(self, tmp_path, monkeypatch):
+        """Prefer local origin/HEAD symbolic-ref over any fallback."""
+        fake = _FakeRun([(0, "refs/remotes/origin/main\n")])
+        monkeypatch.setattr("lib.project.subprocess.run", fake)
+        assert _get_default_branch(tmp_path) == "main"
+        # Only a single local git call, never the network ls-remote
+        assert fake.calls == [["git", "symbolic-ref", "refs/remotes/origin/HEAD"]]
+
+    def test_falls_back_to_rev_parse_abbrev_ref(self, tmp_path, monkeypatch):
+        """When symbolic-ref fails, fall back to rev-parse --abbrev-ref."""
+        fake = _FakeRun([(1, ""), (0, "origin/main\n")])
+        monkeypatch.setattr("lib.project.subprocess.run", fake)
+        assert _get_default_branch(tmp_path) == "main"
+        assert not any("ls-remote" in c for c in fake.calls)
+
+    def test_never_calls_ls_remote_when_refs_exist(self, tmp_path, monkeypatch):
+        """Regression guard: resolving default branch must be purely local —
+        even when every local lookup fails it degrades to 'main' without
+        ever issuing a network call."""
+        fake = _FakeRun([(1, ""), (1, ""), (1, "")])
+        monkeypatch.setattr("lib.project.subprocess.run", fake)
+        assert _get_default_branch(tmp_path) == "main"
+        assert not any("ls-remote" in c for c in fake.calls)
