@@ -167,9 +167,13 @@ AC 全部通过 → 勾选 Agent Verification checkbox → 在空间仓库提交
 
 ### 第三层：User Validation（用户独占）
 
-用户验证功能是否符合预期。checkbox 勾选权在用户，Agent **绝对禁止**代勾。
+User Validation 只承载**必须由用户手动执行并观察**的验证项，checkbox 勾选权在用户，Agent **绝对禁止**代勾。
 
-Agent 可以执行验证动作、展示结果，但必须等用户明确确认。
+**边界铁律**：写入 UV 前二连问——(1) Agent 能否自动验证？能则**禁止列入 UV**，放 Agent Verification；(2) 是否必须用户手动执行观察？否则禁止列入。任何可自动化的验证（测试/lint/typecheck/静态检查/可脚本断言的行为）不得推给用户。
+
+**环境完整性**：每个场景必备 验证环境 + 启动命令（用户可直接复制执行）+ 通过判据（可断言，非"行为一致"空话）+ 失败反馈。依赖的验证机制若项目 AGENTS.md 尚未记录，必须先补入项目规范再引用。
+
+Agent 可以执行验证动作、展示结果，但必须等用户明确确认。详见 `references/plan-guide.md`。
 
 ## 标准流程
 
@@ -403,6 +407,8 @@ flow.sh archive <issue>
 - **未实际验证就勾选 AC** — 必须运行命令、检查输出，凭记忆打勾 = 严重失职
 - **被 `complete` 报错催着补勾** — 应在 rook PASS 后立即实证，不是等到 `complete` 才发现
 - **User Validation 越权代勾** — checkbox 勾选权在用户
+- **把可自动化验证推给用户** — UV 只放"Agent 无法自动 + 必须用户手动观察"的项；测试/lint/typecheck 等放 Agent Verification
+- **UV 场景无启动命令** — 每个场景必须有用户可直接复制的命令与可断言判据；依赖的验证机制缺失时先补入项目规范
 - **grep/glob 搜索 Plan** — 使用 `flow.sh plan <name>` 或 `flow.sh plan status <name>`
 - **`approve` 不带 `--confirm`** — 报错退出，使用 `submit` 提审
 - **verify-switch 前未先移除 worktree** — 脚本内已处理顺序（先 remove worktree 再 checkout），agent 不手动操作

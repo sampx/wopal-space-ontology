@@ -134,24 +134,41 @@ Agent Verification 承载所有可自动化的验证项（包括单 Task 内验�
 
 ## User Validation 规则
 
-User Validation 只承载人工感知验证项：UI / UX、交互体验、业务流程、视觉确认。
+User Validation 只承载**必须由用户手动执行并观察**的验证项：UI / UX、交互体验、业务流程、视觉确认。
 
-**禁止的自动化验证项**：❌ `npm test` / `pytest` / `cargo test` / `eslint` / `prettier` 等
+**边界判定（写入 UV 前强制二连问）**：
+1. Agent 能否自动验证此项？（测试 / lint / typecheck / 静态检查 / 可脚本断言的行为）→ **能，禁止列入 UV**，放入 Agent Verification。
+2. 此项是否必须用户手动执行并观察？→ **否，禁止列入 UV**。
+
+可自动验证的内容必须全部进入 Agent Verification；只有两道都指向"必须用户手动"的项才允许列入 User Validation。
+
+**环境完整性（每个场景必备四要素）**：
+| 要素 | 要求 | 反例（不合格） |
+|---|---|---|
+| 验证环境 | 引用项目规范中的验证机制章节或脚本入口；项目规范缺失时必须先补入项目 AGENTS.md | 只写"启动应用" |
+| 启动命令 | 一条用户可直接复制执行的真实命令，含必要环境变量 | "运行命令观察输出" |
+| 通过判据 | 用户可观察到的具体可断言结果 | "确认行为正确" / "行为一致" |
+| 失败反馈 | 失败时用户提供什么（日志路径、diff 输出） | 缺失 |
+
+**验证机制沉淀义务**：若本次验证依赖某个环境/机制（沙箱、测试模式、端口、隔离 home），而项目 AGENTS.md 尚未记录，必须先补入项目规范再引用，禁止在 Plan 里只出现一次后遗失。
 
 **正确场景**：
 ```markdown
-#### Scenario 1: 新功能验证
-- Goal: 确认功能行为符合预期
-- Precondition: 已构建包含变更的 CLI
+#### Scenario 1: 引导流程无回归
+- Goal: 确认引导向导各步骤行为与改动前一致
+- 验证环境: 项目 AGENTS.md「验证机制」章节（ELLAMAKA_TEST_ONBOARDING 沙箱模式）
+- Precondition: 沙箱模式（WOPAL_HOME=/tmp/wopal-onboarding-sandbox），无需构建
+- 启动命令: `ELLAMAKA_TEST_ONBOARDING=1 ./scripts/dev.sh desktop`
 - User Actions:
-  1. 运行命令观察输出
-  2. 确认行为正确
-- Expected Result: 输出符合预期
+  1. 走一遍引导流程：系统检查 → 安装 CLI → 配置 AI provider
+  2. 观察各步骤提示与状态
+- 通过判据: 各步骤正常推进、无新增报错、界面无 `[object Object]` 文本
+- 失败反馈: 附 `logs/dev/<scope>/ellamaka-dev-desktop.log` 与 `git diff -w` 输出
 
 - [ ] 用户已完成上述功能验证并确认结果符合预期
 ```
 
-`plan check` 在 `submit` 或 `approve` 时自动验证 User Validation 中存在至少一个场景和最终确认 checkbox。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
+`plan check` 在 `submit` 或 `approve` 时自动验证 User Validation 中存在至少一个场景和最终确认 checkbox，且场景含可执行命令。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
 
 ---
 

@@ -168,6 +168,17 @@ def check_user_validation_new(content: str) -> list[str]:
     if not re.search(r'^\s*-\s+\[[ x]\]\s+用户已完成', section, re.MULTILINE):
         issues.append("User Validation: final checkbox missing")
 
+    # Each scenario must carry the required fields and an executable command
+    # (backtick line) — a user has to be able to run it without guessing.
+    scenarios = re.split(r'^####\s+', section, flags=re.MULTILINE)[1:]
+    for i, scn in enumerate(scenarios, start=1):
+        if not re.search(r'启动命令|Launch Command|Command\s*:', scn, re.IGNORECASE):
+            issues.append(f"User Validation: Scenario {i} missing '启动命令' field")
+        elif not re.search(r'`[^`\n]+`', scn):
+            issues.append(f"User Validation: Scenario {i} '启动命令' has no executable command (backtick line)")
+        if not re.search(r'通过判据|Expected Result|Pass Criteria', scn, re.IGNORECASE):
+            issues.append(f"User Validation: Scenario {i} missing pass criteria (通过判据)")
+
     for p in FORBIDDEN_UV_PATTERNS:
         m = re.search(p, section, re.IGNORECASE)
         if m:
