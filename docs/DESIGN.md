@@ -120,14 +120,14 @@ ontology 命令可覆盖 ellamaka 内置命令。
 
 wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
-| 模块 | 职责 | 禁用开关 |
-|------|------|---------|
-| Global（入口） | 构造 instance runtime、检查开关、注册 Hooks/Tools | 无 |
-| Rules | 规则发现 → 条件匹配 → 注入系统提示词 | `WOPAL_RULES_INJECTION_ENABLED` |
-| Memory | LanceDB 存储、语义检索、蒸馏注入 | `WOPAL_MEMORY_ENABLED`（总控） |
-| Task | 非阻塞子会话启动、状态监控、双向通信、并发控制 | 无（始终启用） |
-| Monitor | 周期性调度引擎，统一管理监控策略 | 无（始终启用） |
-| Context | 会话摘要、上下文压缩与恢复 | 无（始终启用） |
+| 模块 | 职责 | 可配置 |
+|------|------|--------|
+| Global（入口） | 构造 instance runtime、加载三层配置、检查开关、注册 Hooks/Tools | 无 |
+| Rules | 规则发现 → 条件匹配 → 注入系统提示词 | 恒启用 |
+| Memory | LanceDB 存储、语义检索、记忆注入 | `wopal.memory.enabled`（总控）、`wopal.memory.injection`（仅注入） |
+| Task | 非阻塞子会话启动、状态监控、双向通信、并发控制 | 恒启用 |
+| Monitor | 周期性调度引擎，统一管理监控策略 | 恒启用 |
+| Context | 上下文压缩与恢复、标题生成、蒸馏 | `wopal.context.enabled`（门控标题/恢复/蒸馏，压缩恒启用） |
 
 每次 plugin invocation 以 `PluginInput.wopalSpaceRoot` 作为唯一空间根来源。字段缺失表示非 WopalSpace instance。effective env 由进程启动环境、`$WOPAL_HOME/.env` 与 `<wopalSpaceRoot>/.wopal/.env` 合并生成，并保持只读，不写回 `process.env`。
 
@@ -256,8 +256,8 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal_task_reply` | 双向通信与恢复 |
 | `wopal_task_abort` | 任务终止 |
 | `wopal_task_finish` | 任务完成清理 |
-| `memory_manage` | LanceDB 记忆 CRUD + 蒸馏 |
-| `context_manage` | 会话摘要 + 上下文压缩 |
+| `memory_manage` | LanceDB 记忆 CRUD 与语义检索（list/stats/search/add/update/delete/injected） |
+| `context_manage` | 会话上下文管理（status/dump/compact）+ 蒸馏（distill/confirm/cancel） |
 
 ### 6.3 初始化与维护目标
 

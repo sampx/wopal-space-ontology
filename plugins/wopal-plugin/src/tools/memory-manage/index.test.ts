@@ -1,74 +1,61 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import {
-  clearPendingConfirmation,
-  getPendingConfirmation,
-  setPendingConfirmation,
-} from '../../memory/distill.js';
 import { createMemoryManageTool } from './index.js';
+
+function getToolArgEnum(toolDefinition: unknown): string[] {
+  const args = (toolDefinition as { args: { command: { values?: string[]; options?: string[] } } }).args;
+  const schema = args.command as unknown as {
+    values?: string[];
+    options?: string[];
+    _def?: { values?: string[] };
+  };
+  return schema.values ?? schema.options ?? schema._def?.values ?? [];
+}
 
 function getExecute(toolDefinition: unknown) {
   return (toolDefinition as { execute: (...args: unknown[]) => Promise<string> }).execute;
 }
 
-const mockMessages = vi.fn();
-const client = {
-  session: { messages: mockMessages },
-};
+describe('memory_manage: pure memory operations', () => {
+  it('does not expose distillation actions after the context migration', () => {
+    const tool = createMemoryManageTool({} as never);
+    const commands = getToolArgEnum(tool);
 
-describe('memory_manage: distill/confirm/cancel', () => {
-  afterEach(() => {
-    clearPendingConfirmation('ses-test');
-    vi.restoreAllMocks();
+    expect(commands).not.toContain('distill');
+    expect(commands).not.toContain('confirm');
+    expect(commands).not.toContain('cancel');
+    expect(commands).toContain('search');
+    expect(commands).toContain('add');
   });
 
-  it('prevents duplicate concurrent confirm for same session', async () => {
-    let resolveConfirm: ((value: { created: number; merged: number; skipped: number; mergeDetails: Array<{ existingId: string; existingPreview: string; mergedPreview: string }> }) => void) | undefined;
-    const confirmCandidates = vi.fn().mockImplementation(
-      () => new Promise((resolve) => {
-        resolveConfirm = resolve;
-      }),
-    );
+  it('does not reference distillation actions in the tool description', () => {
+    const tool = createMemoryManageTool({} as never) as { description: string };
 
-    setPendingConfirmation('ses-test', {
-      title: 'test title',
-      candidates: [
-        {
-          category: 'knowledge',
-          body: '## [技术知识]: 测试\n这是一个用于验证 confirm 重入保护的候选记忆正文，长度足够。',
-          tags: ['test'],
-          importance: 0.7,
-        },
-      ],
-    });
+    expect(tool.description.toLowerCase()).not.toContain('distill');
+    expect(tool.description).not.toContain('- confirm:');
+    expect(tool.description).not.toContain('- cancel:');
+  });
 
-    const mockStore = {
-      searchByQuery: vi.fn().mockResolvedValue([]),
-    } as never;
-
-    const tool = createMemoryManageTool(
-      mockStore,
-      undefined,
-      undefined,
-      { confirmCandidates } as never,
-      undefined,
-      client,
-    );
+  it('rejects distillation actions as unknown commands', async () => {
+    const tool = createMemoryManageTool({} as never);
     const execute = getExecute(tool);
 
-    const first = execute({ command: 'confirm' }, { sessionID: 'ses-test' });
-    await Promise.resolve();
+    const result = await execute({ command: 'distill' }, { sessionID: 'ses-test' });
 
-    const second = await execute({ command: 'confirm' }, { sessionID: 'ses-test' });
+    expect(result).toContain('未知命令');
+    expect(result).not.toContain('Distillation');
+  });
 
-    expect(second).toBe('⚠️ Distillation confirm is already running for this session. Wait for it to finish.');
-    expect(getPendingConfirmation('ses-test')).toBeUndefined();
+  it('keeps search available without a distill engine dependency', async () => {
+    const store = {
+      searchByQuery: vi.fn().mockResolvedValue([]),
+    } as never;
+    const tool = createMemoryManageTool(store);
+    const execute = getExecute(tool);
 
-    resolveConfirm?.({ created: 1, merged: 0, skipped: 0, mergeDetails: [] });
-    const firstResult = await first;
+    const result = await execute({ command: 'search', query: 'anything' }, { sessionID: 'ses-test' });
 
-    expect(firstResult).toContain('Distillation Complete');
-    expect(confirmCandidates).toHaveBeenCalledTimes(1);
-    expect(getPendingConfirmation('ses-test')).toBeUndefined();
+    expect(store.searchByQuery).toHaveBeenCalled();
+    expect(result).not.toContain('unknown');
   });
 });

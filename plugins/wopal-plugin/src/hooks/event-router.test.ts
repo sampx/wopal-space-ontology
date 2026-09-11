@@ -14,14 +14,6 @@ function createMockLogger(): LoggerInstance {
   }
 }
 
-const mockLoggers = {
-  coreLogger: createMockLogger(),
-  rulesLogger: createMockLogger(),
-  taskLogger: createMockLogger(),
-  memoryLogger: createMockLogger(),
-  contextLogger: createMockLogger(),
-}
-
 function createEventRouterWithTaskManager(taskManager: {
   markTaskCompletedBySession?: ReturnType<typeof vi.fn>
   markTaskIdleBySession: ReturnType<typeof vi.fn>
@@ -671,6 +663,103 @@ describe("OpenCodeRulesRuntime event handling", () => {
       // Verify recoverySent was set during recovery
       const stateAfter = sessionStore.get("main-session")
       expect(stateAfter?.recoverySent).toBe(true)
+    })
+
+    it("does not send recovery for main session when context is disabled", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        taskLogger: createMockLogger(),
+        contextLogger: createMockLogger(),
+        capabilities: { contextEnabled: false },
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(undefined),
+          isTaskSession: vi.fn().mockReturnValue(false),
+          getClient: vi.fn().mockReturnValue({
+            session: { messages: vi.fn().mockResolvedValue({ data: [] }) },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskIdleBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+
+      sessionStore.markCompacting("main-session", Date.now(), "plugin")
+      sessionStore.upsert("main-session", (state) => {
+        state.loadedSkills = new Set(["space-master"])
+      })
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "main-session" } },
+      })
+
+      // Compaction state still updated, but no recovery prompt is sent
+      expect(mockPromptAsync).not.toHaveBeenCalled()
+      const state = sessionStore.get("main-session")
+      expect(state?.recoverySent).toBeUndefined()
+      expect(state?.needsRecoveryInjection).toBeUndefined()
+    })
+
+    it("does not send compacted notification for child session when context is disabled", async () => {
+      const sessionStore = new SessionStore({ max: 10 })
+      const mockPromptAsync = vi.fn().mockResolvedValue(undefined)
+
+      const mockTask = {
+        id: "wopal-task-123",
+        sessionID: "child-session",
+        description: "Test task",
+        parentSessionID: "parent-session",
+      }
+
+      const ctx = {
+        client: {
+          session: {
+            messages: vi.fn().mockResolvedValue({ data: [] }),
+            promptAsync: mockPromptAsync,
+          },
+        },
+        sessionStore,
+        taskLogger: createMockLogger(),
+        contextLogger: createMockLogger(),
+        capabilities: { contextEnabled: false },
+        taskManager: {
+          findBySession: vi.fn().mockReturnValue(mockTask),
+          isTaskSession: vi.fn().mockReturnValue(true),
+          getClient: vi.fn().mockReturnValue({
+            session: { messages: vi.fn().mockResolvedValue({ data: [] }) },
+          }),
+          markTaskCompletedBySession: vi.fn(),
+          markTaskIdleBySession: vi.fn(),
+          notifyParent: vi.fn(),
+          releaseConcurrencySlot: vi.fn(),
+          recoverFromSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      }
+
+      sessionStore.markCompacting("child-session", Date.now(), "plugin")
+
+      const hooks = createEventRouter(ctx as never)
+
+      await hooks.event({
+        event: { type: "session.compacted", properties: { sessionID: "child-session" } },
+      })
+
+      expect(mockPromptAsync).not.toHaveBeenCalled()
+      const state = sessionStore.get("child-session")
+      expect(state?.recoverySent).toBeUndefined()
+      expect(state?.needsRecoveryInjection).toBeUndefined()
     })
   })
 

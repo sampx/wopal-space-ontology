@@ -26,13 +26,10 @@ import {
   loadRuntimeEnvironment,
   type RuntimeEnvironment,
 } from "./runtime-environment.js";
-import { createMemoryPrompts, type MemoryPrompts } from "./memory/prompts.js";
+import { createContextPrompts, type ContextPrompts } from "./context/index.js";
 import { MemoryInjector } from "./memory/injector.js";
 import { MemoryRetriever } from "./memory/retriever.js";
-import { DistillEngine } from "./memory/distill.js";
-import type { MemoryStore } from "./memory/store.js";
-import type { EmbeddingClient } from "./memory/embedder.js";
-import type { LLMClient } from "./llm-client.js";
+import { DistillEngine } from "./context/index.js";
 import { loadWopalConfig, type LoadedConfig } from "./config/index.js";
 import {
   resolveResources,
@@ -42,18 +39,13 @@ import {
 
 interface MemorySystem {
   injector: MemoryInjector;
-  distillEngine: DistillEngine;
-  store: MemoryStore;
-  embedder: EmbeddingClient;
-  llm: LLMClient;
-  prompts: MemoryPrompts;
 }
 
 export interface PluginRuntime {
   context: RuntimeContext;
   env: RuntimeEnvironment;
   loggers: PluginLoggers;
-  prompts: MemoryPrompts;
+  prompts: ContextPrompts;
   config: LoadedConfig;
 }
 
@@ -84,7 +76,7 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
     ...(logFile !== undefined ? { file: logFile } : {}),
     ...(logModules !== undefined ? { modules: logModules } : {}),
   });
-  const prompts = createMemoryPrompts(context, loggers.memory);
+  const prompts = createContextPrompts(context, loggers.context);
   return Object.freeze({ context, env, loggers, prompts, config });
 }
 
@@ -151,8 +143,11 @@ const openCodeRulesPlugin = async (
   // Resource layer initialization — memory resources depend on memory.enabled,
   // LLM resource depends on context.enabled (dependency-driven minimal set).
   const resources = await createPluginResources(runtime);
+  // D-06: MemorySystem assembly requires only store + embedder. LLM is consumed
+  // by context capabilities (distillation, title generation, auto-recovery), so
+  // context.enabled=false no longer tears down the memory system.
   const memory: MemorySystem | null =
-    resources.store && resources.embedder && resources.llm
+    resources.store && resources.embedder
       ? {
           injector: new MemoryInjector(
             new MemoryRetriever(
@@ -162,24 +157,30 @@ const openCodeRulesPlugin = async (
             ),
             loggers.memory,
           ),
-          distillEngine: new DistillEngine(
-            resources.store,
-            resources.embedder,
-            resources.llm,
-            runtime.prompts,
-            loggers.memory,
-          ),
-          store: resources.store,
-          embedder: resources.embedder,
-          llm: resources.llm,
-          prompts: runtime.prompts,
         }
       : null;
+
+  // Context capability (D-04): LLM-driven context abilities (distillation,
+  // title generation, auto-recovery) are gated by context.enabled. Compaction
+  // is never gated (D-05).
+  const contextEnabled = runtime.config.config.context.enabled !== false;
+  const distillEngine =
+    contextEnabled && resources.store && resources.embedder && resources.llm
+      ? new DistillEngine(
+          resources.store,
+          resources.embedder,
+          resources.llm,
+          runtime.prompts,
+          loggers.context,
+        )
+      : undefined;
+
   coreLogger.debug(
     {
       store: resources.store !== undefined,
       embedder: resources.embedder !== undefined,
       llm: resources.llm !== undefined,
+      context_enabled: contextEnabled,
     },
     "Resources resolved",
   );
@@ -252,12 +253,13 @@ const openCodeRulesPlugin = async (
     systemInjectionsMap,
     capabilities: {
       memoryInjectionEnabled: runtime.config.config.memory.injection,
+      contextEnabled,
     },
-    ...(memory
+    ...(contextEnabled && resources.llm
       ? {
           generateSessionTitle: async (summary: string) =>
-            memory.llm.completeJson(
-              memory.prompts.loadTitlePrompt().replace("{{summary}}", summary),
+            resources.llm!.completeJson(
+              runtime.prompts.loadTitlePrompt().replace("{{summary}}", summary),
             ),
         }
       : {}),
@@ -265,13 +267,15 @@ const openCodeRulesPlugin = async (
 
   const { hooks: hookHandlers, transformedMessagesMap } = createAllHooks(ctx);
 
+  // memory_manage registration follows store availability (single source of
+  // truth). The embedder is optional: embedder-dependent capabilities degrade
+  // inside the tool rather than blocking registration. MemorySystem (injector)
+  // still requires store + embedder, which is why the two are passed directly.
   const tools = createWopalTools(
     taskManager,
-    memory?.store,
-    memory?.embedder,
+    resources.store,
+    resources.embedder,
     sessionStore,
-    memory?.distillEngine,
-    pluginInput.client,
   );
 
   // memory_manage registration is resource-availability driven (single source
@@ -309,6 +313,8 @@ const openCodeRulesPlugin = async (
     sessionStore,
     taskManager,
     runtimeCtx.logDir,
+    { contextEnabled },
+    distillEngine,
   );
 
   coreLogger.debug(

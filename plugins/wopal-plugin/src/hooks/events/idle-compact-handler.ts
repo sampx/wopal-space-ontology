@@ -13,7 +13,7 @@ import {
   loadSessionContext,
   saveSessionContext,
   type SessionContext,
-} from "../../memory/session-context.js"
+} from "../../context/session-context.js"
 import { formatSessionID } from "../../logger.js"
 import { classifyTaskStop } from "../../tasks/task-stop-classifier.js"
 import { consumeStopNotificationSuppression } from "../../tasks/task-stop-suppression.js"
@@ -26,6 +26,8 @@ export interface IdleCompactHandlerContext {
   contextLogger: LoggerInstance
   taskLogger: LoggerInstance
   generateSessionTitle?: (summary: string) => Promise<{ title?: unknown }>
+  /** Context capability state (D-04); gates auto-recovery, not compaction. */
+  capabilities?: { contextEnabled?: boolean }
 }
 
 interface TitleGenerationResult {
@@ -160,6 +162,21 @@ export async function handleSessionCompacted(
   // Only handle Plugin-initiated compacts (skip EllaMaka auto-compact or manual /compact)
   const state = compactedState
   if (!state?.compactingTrigger || !state?.needsAutoContinue) return
+
+  // D-04: auto-recovery (main auto-continue / child compacted notification and
+  // its fallback injection) is an LLM-driven context ability. When context is
+  // disabled, skip recovery entirely while compaction bookkeeping above stands.
+  if (ctx.capabilities?.contextEnabled === false) {
+    ctx.sessionStore.upsert(sessionID, (s) => {
+      delete s.compactingTrigger
+      delete s.needsAutoContinue
+    })
+    ctx.contextLogger.debug(
+      { session_id: formatSessionID(sessionID, !!ctx.taskManager?.isTaskSession(sessionID)) },
+      "context disabled; recovery prompt suppressed",
+    )
+    return
+  }
 
   const task = ctx.taskManager?.findBySession(sessionID)
 

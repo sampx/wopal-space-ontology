@@ -5,22 +5,18 @@
  * with two-stage deduplication (vector pre-filter + LLM decision).
  */
 
-import type { MemoryStore } from "./store.js";
-import type { MemoryCategory } from "./types.js";
-import type { EmbeddingClient } from "./embedder.js";
+import type { MemoryStore } from "../memory/store.js";
+import type { MemoryCategory } from "../memory/types.js";
+import type { EmbeddingClient } from "../memory/embedder.js";
 import type { LLMClient } from "../llm-client.js";
 import type { SessionMessage } from "../types.js";
-import { memoryLogger, formatSessionID, type LoggerInstance } from "../logger.js";
+import { contextLogger, formatSessionID, type LoggerInstance } from "../logger.js";
 import { loadSessionContext, saveSessionContext, clearSessionContext, type SessionContext } from "./session-context.js";
-import { CATEGORY_LABELS, validateCategory, getDefaultImportance } from "./categories.js";
-import { MIN_CONVERSATION_LENGTH, extractConversationText } from "./conversation.js";
-import {
-  buildBatchDedupPrompt,
-  buildExtractionPrompt,
-  type ExtractResult,
-  type MemoryPrompts,
-} from "./prompts.js";
-import { performDeduplication, type DedupResult } from "./dedup.js";
+import { CATEGORY_LABELS, validateCategory, getDefaultImportance } from "../memory/categories.js";
+import { MIN_CONVERSATION_LENGTH, extractConversationText } from "../memory/conversation.js";
+import { buildExtractionPrompt, type ExtractResult, type ContextPrompts } from "./prompts.js";
+import { buildBatchDedupPrompt } from "../memory/prompts.js";
+import { performDeduplication, type DedupResult } from "../memory/dedup.js";
 
 /**
  * Result of distillation process
@@ -58,7 +54,7 @@ export function clearPendingConfirmation(sessionID: string): void {
   const had = pendingConfirmations.has(sessionID);
   pendingConfirmations.delete(sessionID);
   if (had) {
-    memoryLogger.info({ session_id: formatSessionID(sessionID, false) }, "[distill] Cancelled");
+    contextLogger.info({ session_id: formatSessionID(sessionID, false) }, "[distill] Cancelled");
   }
 }
 
@@ -83,18 +79,18 @@ export class DistillEngine {
   private store: MemoryStore;
   private embedder: EmbeddingClient;
   private llm: LLMClient;
-  private prompts: Pick<MemoryPrompts, "buildExtractionPrompt" | "buildBatchDedupPrompt">;
+  private prompts: Pick<ContextPrompts, "buildExtractionPrompt" | "buildBatchDedupPrompt">;
   private logger: LoggerInstance;
 
   constructor(
     store: MemoryStore,
     embedder: EmbeddingClient,
     llm: LLMClient,
-    prompts: Pick<MemoryPrompts, "buildExtractionPrompt" | "buildBatchDedupPrompt"> = {
+    prompts: Pick<ContextPrompts, "buildExtractionPrompt" | "buildBatchDedupPrompt"> = {
       buildExtractionPrompt,
       buildBatchDedupPrompt,
     },
-    logger: LoggerInstance = memoryLogger,
+    logger: LoggerInstance = contextLogger,
   ) {
     this.store = store;
     this.embedder = embedder;

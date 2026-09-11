@@ -8,12 +8,8 @@ import type { LoggerInstance } from "../../logger.js"
 import type { SimpleTaskManager } from "../../tasks/simple-task-manager.js"
 import type { WopalTask } from "../../types.js"
 import {
-  loadSessionContext,
   clearSessionContext,
-} from "../../memory/session-context.js"
-import { join } from "path"
-import { existsSync, mkdirSync, rmSync } from "fs"
-import { homedir } from "os"
+} from "../../context/session-context.js"
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -43,6 +39,7 @@ function createMockContext(overrides?: {
   taskManager?: Partial<SimpleTaskManager>
   promptAsync?: ReturnType<typeof vi.fn>
   updateSessionTitle?: ReturnType<typeof vi.fn>
+  contextEnabled?: boolean
 }): {
   ctx: IdleCompactHandlerContext
   sessionStore: SessionStore
@@ -65,6 +62,9 @@ function createMockContext(overrides?: {
     contextLogger: createMockLogger(),
     taskLogger: createMockLogger(),
     generateSessionTitle: mockCompleteJson,
+    ...(overrides?.contextEnabled !== undefined
+      ? { capabilities: { contextEnabled: overrides.contextEnabled } }
+      : {}),
   }
 
   return { ctx, sessionStore, promptAsync, updateSessionTitle }
@@ -149,6 +149,80 @@ describe("handleSessionCompacted — recovery message", () => {
     // Must NOT contain compaction summary text
     expect(callArgs.body.parts[0].text).not.toContain("Compaction Summary:")
     expect(callArgs.body.parts[0].text).not.toContain("Child task work")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Context capability gating (D-04) — auto-recovery is an LLM-driven context
+// ability, so context.enabled=false must not send recovery prompts.
+// ---------------------------------------------------------------------------
+
+describe("handleSessionCompacted — context capability gating", () => {
+  const testSessionID = "test-ctx-gating-session-id"
+
+  it("does not send main-session recovery when context is disabled", async () => {
+    const { ctx, sessionStore, promptAsync } = createMockContext({ contextEnabled: false })
+
+    sessionStore.setCompactionSummary(testSessionID, "## Goal\nGated recovery")
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    expect(promptAsync).not.toHaveBeenCalled()
+    const state = sessionStore.get(testSessionID)
+    expect(state?.recoverySent).toBeUndefined()
+    // No fallback injection either — recovery is entirely blocked.
+    expect(state?.needsRecoveryInjection).toBeUndefined()
+  })
+
+  it("does not send child-session notification when context is disabled", async () => {
+    const task: WopalTask = {
+      id: "task-1",
+      sessionID: "child-session-id",
+      parentSessionID: "parent-session-id",
+      status: "running",
+      description: "Test task",
+      agent: "test-agent",
+      prompt: "test",
+      createdAt: new Date(),
+    }
+    const taskManager = {
+      isTaskSession: vi.fn().mockReturnValue(true),
+      findBySession: vi.fn().mockReturnValue(task),
+    } as unknown as Partial<SimpleTaskManager>
+
+    const { ctx, sessionStore, promptAsync } = createMockContext({ taskManager, contextEnabled: false })
+
+    sessionStore.setCompactionSummary("child-session-id", "## Goal\nChild gated")
+    sessionStore.upsert("child-session-id", (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, "child-session-id")
+
+    expect(promptAsync).not.toHaveBeenCalled()
+    const state = sessionStore.get("child-session-id")
+    expect(state?.recoverySent).toBeUndefined()
+    expect(state?.needsRecoveryInjection).toBeUndefined()
+  })
+
+  it("still caches compaction summary when context is disabled", async () => {
+    const { ctx, sessionStore } = createMockContext({ contextEnabled: false })
+
+    sessionStore.setCompactionSummary(testSessionID, "## Goal\nCached despite gate")
+    sessionStore.upsert(testSessionID, (s) => {
+      s.compactingTrigger = "plugin"
+      s.needsAutoContinue = true
+    })
+
+    await handleSessionCompacted(ctx, testSessionID)
+
+    // Compaction bookkeeping (summary consumption + markCompacted) still runs.
+    expect(sessionStore.get(testSessionID)?.compactionSummaryText).toBeUndefined()
   })
 })
 

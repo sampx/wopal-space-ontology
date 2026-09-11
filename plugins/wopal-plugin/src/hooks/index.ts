@@ -22,6 +22,7 @@ import type { MemoryInjectorContext } from "./memory-injection-utils.js";
 
 export interface HookCapabilities {
   memoryInjectionEnabled?: boolean; // Default true
+  contextEnabled?: boolean; // Default true; gates LLM-driven context abilities (D-04)
 }
 
 export interface HookContextOptions {
@@ -66,7 +67,7 @@ export interface HookContext {
   systemSnapshots: Map<string, string[]>;
   systemMetadataMap: Map<string, SystemPromptMetadata>;
   systemInjectionsMap: Map<string, string[]>;
-  capabilities: { memoryInjectionEnabled: boolean };
+  capabilities: { memoryInjectionEnabled: boolean; contextEnabled: boolean };
   generateSessionTitle:
     | ((summary: string) => Promise<{ title?: unknown }>)
     | undefined;
@@ -94,6 +95,7 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     systemInjectionsMap: opts.systemInjectionsMap ?? new Map(),
     capabilities: {
       memoryInjectionEnabled: opts.capabilities?.memoryInjectionEnabled ?? true,
+      contextEnabled: opts.capabilities?.contextEnabled ?? true,
     },
     generateSessionTitle: opts.generateSessionTitle,
   };
@@ -123,6 +125,7 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
     skillReloadCtx: {
       sessionStore: ctx.sessionStore,
       contextLogger: ctx.contextLogger,
+      capabilities: ctx.capabilities,
     },
     ruleMessageCtx: {
       sessionStore: ctx.sessionStore,
@@ -177,7 +180,10 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
     coreLogger: ctx.coreLogger,
     taskManager: ctx.taskManager,
     directory: ctx.directory,
-    ...(ctx.generateSessionTitle
+    capabilities: ctx.capabilities,
+    // D-04: title generation is an LLM-driven context ability; context.enabled=false
+    // withholds the generator so the event router falls back to its default title.
+    ...(ctx.capabilities.contextEnabled && ctx.generateSessionTitle
       ? { generateSessionTitle: ctx.generateSessionTitle }
       : {}),
   });

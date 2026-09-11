@@ -5,7 +5,7 @@
  */
 
 import type { LoggerInstance } from "../logger.js";
-import { loadSessionContext } from "../memory/session-context.js";
+import { loadSessionContext } from "../context/session-context.js";
 import type { MessageWithInfo } from "./message-context.js";
 
 /**

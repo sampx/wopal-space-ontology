@@ -6,7 +6,7 @@ import { createPluginRuntime } from "./index.js";
 import { LLMClient } from "./llm-client.js";
 import { EmbeddingClient } from "./memory/embedder.js";
 import { getDefaultMemoryDbPath } from "./memory/store.js";
-import { getSessionContextDir } from "./memory/session-context.js";
+import { getSessionContextDir } from "./context/session-context.js";
 
 describe("plugin runtime isolation", () => {
   const keys = [

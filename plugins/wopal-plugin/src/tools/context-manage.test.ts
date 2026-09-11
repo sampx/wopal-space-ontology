@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  _clearPendingConfirmation,
-  _getPendingConfirmation,
-  _setPendingConfirmation,
-} from '../memory/distill.js';
+  clearPendingConfirmation,
+  getPendingConfirmation,
+  setPendingConfirmation,
+} from '../context/distill.js';
 import { createContextManageTool } from './context-manage.js';
 import { SessionStore } from '../session-store.js';
 import { existsSync, readFileSync, rmSync, readdirSync } from 'fs';
@@ -29,8 +29,6 @@ const mockUpdate = vi.fn();
 const summaryClient = {
   session: { messages: mockMessages, update: mockUpdate },
 };
-
-const summaryCtx = { sessionID: 'ses-summary-test' } as { sessionID: string };
 
 describe('context_manage: schema', () => {
   it('marks session_id as optional and detail as optional with default', () => {
@@ -717,5 +715,319 @@ describe('context_manage: handleCompact', () => {
       path: { id: 'ses_child_raw' },
       body: { providerID: 'test-provider', modelID: 'test-model' },
     });
+  });
+});
+
+// --- Distillation action tests (context 总开关，Task 2) ---
+
+const distillMockMessages = vi.fn();
+
+const distillClient = {
+  session: { messages: distillMockMessages },
+};
+
+const distillCtx = { sessionID: 'ses_distill_ctx' } as { sessionID: string };
+
+interface DistillToolOptions {
+  contextEnabled?: boolean;
+  distillEngine?: unknown;
+}
+
+function createDistillTool({ contextEnabled = true, distillEngine }: DistillToolOptions = {}) {
+  return createContextManageTool(
+    distillClient,
+    new Map(),
+    new Map(),
+    new Map(),
+    new Map(),
+    tmpdir(),
+    new SessionStore(),
+    undefined,
+    undefined,
+    { contextEnabled },
+    distillEngine as never,
+  );
+}
+
+describe('context_manage: distillation actions', () => {
+  afterEach(() => {
+    clearPendingConfirmation('ses_distill_ctx');
+    vi.restoreAllMocks();
+  });
+
+  it('D1: returns degraded hint when context is disabled', async () => {
+    const tool = createDistillTool({ contextEnabled: false, distillEngine: {} });
+    const execute = getExecute(tool);
+
+    const result = await execute({ action: 'distill' }, distillCtx);
+
+    expect(result).toContain('requires the memory system to be initialized');
+    expect(distillMockMessages).not.toHaveBeenCalled();
+  });
+
+  it('D2: returns degraded hint when distill engine is unavailable', async () => {
+    const tool = createDistillTool({ contextEnabled: true });
+    const execute = getExecute(tool);
+
+    const result = await execute({ action: 'confirm' }, distillCtx);
+
+    expect(result).toContain('requires the memory system to be initialized');
+  });
+
+  it('D3: distill previews candidates and stores pending confirmation', async () => {
+    const preview = vi.fn().mockResolvedValue({
+      title: 'Test Session',
+      candidates: [
+        {
+          category: 'knowledge',
+          body: '## [技术知识]: 测试\n这是一条用于验证上下文蒸馏动作迁移的候选记忆正文。',
+          tags: ['context'],
+          importance: 0.7,
+        },
+      ],
+    });
+    distillMockMessages.mockResolvedValue({ data: [{ info: { role: 'user' }, parts: [] }] });
+
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: { preview } });
+    const execute = getExecute(tool);
+
+    const result = await execute({ action: 'distill' }, distillCtx);
+
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(result).toContain('Distillation Preview');
+    expect(getPendingConfirmation('ses_distill_ctx')).toBeDefined();
+  });
+
+  it('D4: cancel clears pending confirmation', async () => {
+    setPendingConfirmation('ses_distill_ctx', { title: null, candidates: [] });
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: {} });
+    const execute = getExecute(tool);
+
+    const result = await execute({ action: 'cancel' }, distillCtx);
+
+    expect(result).toContain('cancelled');
+    expect(getPendingConfirmation('ses_distill_ctx')).toBeUndefined();
+  });
+
+  it('D5: confirm writes selected candidates', async () => {
+    setPendingConfirmation('ses_distill_ctx', {
+      title: 'Test Session',
+      candidates: [
+        {
+          category: 'knowledge',
+          body: '## [技术知识]: 测试\n这是一条用于验证上下文 confirm 动作的候选记忆正文。',
+          tags: ['context'],
+          importance: 0.7,
+        },
+      ],
+    });
+    const confirmCandidates = vi.fn().mockResolvedValue({ created: 1, merged: 0, skipped: 0, mergeDetails: [] });
+
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: { confirmCandidates } });
+    const execute = getExecute(tool);
+
+    const result = await execute({ action: 'confirm', selectedIndices: [0] }, distillCtx);
+
+    expect(confirmCandidates).toHaveBeenCalledTimes(1);
+    expect(result).toContain('Distillation Complete');
+  });
+
+  it('D6: context switch is exposed in tool description', () => {
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: {} }) as { description: string };
+
+    expect(tool.description).toContain('distill');
+    expect(tool.description).toContain('confirm');
+    expect(tool.description).toContain('cancel');
+  });
+
+  it('D7: compaction still works when context is disabled', async () => {
+    compactSessionStore.upsert('ses_compact_disabled', (state) => {
+      state.providerID = 'test-provider';
+      state.modelID = 'test-model';
+      state.lastTokens = { input: 50000, output: 1000, updatedAt: Date.now() };
+    });
+    compactMockSummarize.mockResolvedValue({});
+    compactMockGet.mockResolvedValue({ data: { id: 'ses_compact_disabled' } });
+    compactMockMessages.mockResolvedValue({ data: [] });
+    compactMockConfigProviders.mockResolvedValue({
+      data: {
+        providers: [
+          { id: 'test-provider', models: { 'test-model': { limit: { context: 100000 } } } },
+        ],
+      },
+    });
+
+    const tool = createContextManageTool(
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+      new SessionStore(),
+      undefined,
+      undefined,
+      { contextEnabled: false },
+    );
+    const execute = getExecute(tool);
+
+    const result = await execute(
+      { action: 'compact' },
+      { sessionID: 'ses_compact_disabled', sessionStore: compactSessionStore },
+    );
+
+    expect(result).toContain('Compacting session');
+    expect(compactSessionStore.get('ses_compact_disabled')?.pendingCompactTrigger).toBe('plugin');
+    vi.clearAllMocks();
+  });
+
+  it('D10: compact message omits auto-recovery promise when context is disabled', async () => {
+    compactSessionStore.reset();
+    compactSessionStore.upsert('ses_compact_gate_msg', (state) => {
+      state.providerID = 'test-provider';
+      state.modelID = 'test-model';
+      state.lastTokens = { input: 50000, output: 1000, updatedAt: Date.now() };
+    });
+    compactMockSummarize.mockResolvedValue({});
+    compactMockGet.mockResolvedValue({ data: { id: 'ses_compact_gate_msg' } });
+    compactMockMessages.mockResolvedValue({ data: [] });
+    compactMockConfigProviders.mockResolvedValue({
+      data: {
+        providers: [
+          { id: 'test-provider', models: { 'test-model': { limit: { context: 100000 } } } },
+        ],
+      },
+    });
+
+    const tool = createContextManageTool(
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+      new SessionStore(),
+      undefined,
+      undefined,
+      { contextEnabled: false },
+    );
+    const execute = getExecute(tool);
+
+    const result = await execute(
+      { action: 'compact' },
+      { sessionID: 'ses_compact_gate_msg', sessionStore: compactSessionStore },
+    );
+
+    expect(result).toContain('Compacting session');
+    expect(result).not.toContain('auto-recovery');
+    vi.clearAllMocks();
+  });
+
+  it('D11: compact action description omits completion-notification promise when context is disabled', () => {
+    const tool = createContextManageTool(
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+      new SessionStore(),
+      undefined,
+      undefined,
+      { contextEnabled: false },
+    ) as { description: string };
+
+    expect(tool.description).not.toContain('You will receive a notification');
+
+    // Enabled state keeps the promise (regression guard).
+    const enabledTool = createContextManageTool(
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+      new SessionStore(),
+      undefined,
+      undefined,
+      { contextEnabled: true },
+    ) as { description: string };
+    expect(enabledTool.description).toContain('You will receive a notification');
+  });
+
+  it('D12: child compact message omits parent notification promise when context is disabled', async () => {
+    compactSessionStore.reset();
+    compactSessionStore.upsert('ses_gatemsg', (state) => {
+      state.providerID = 'test-provider';
+      state.modelID = 'test-model';
+      state.lastTokens = { input: 30000, output: 500, updatedAt: Date.now() };
+    });
+    compactMockSummarize.mockResolvedValue({});
+    compactMockGet.mockResolvedValue({ data: { id: 'ses_gatemsg' } });
+    compactMockMessages.mockResolvedValue({ data: [] });
+    compactMockConfigProviders.mockResolvedValue({
+      data: {
+        providers: [
+          { id: 'test-provider', models: { 'test-model': { limit: { context: 100000 } } } },
+        ],
+      },
+    });
+
+    const tool = createContextManageTool(
+      compactClient,
+      new Map(),
+      new Map(),
+      new Map(),
+      new Map(),
+      compactTestDir,
+      new SessionStore(),
+      undefined,
+      undefined,
+      { contextEnabled: false },
+    );
+    const execute = getExecute(tool);
+
+    const result = await execute(
+      { action: 'compact', session_id: 'wopal-task-gatemsg' },
+      { sessionID: 'ses_main', sessionStore: compactSessionStore },
+    );
+
+    expect(compactMockSummarize).toHaveBeenCalledWith({
+      path: { id: 'ses_gatemsg' },
+      body: { providerID: 'test-provider', modelID: 'test-model' },
+    });
+    expect(result).not.toContain('Parent agent will receive');
+    expect(result).toContain('Context capability is disabled');
+    vi.clearAllMocks();
+  });
+
+  it('D8: distill resolves wopal-task-xxx to the underlying session ID', async () => {
+    const preview = vi.fn().mockResolvedValue({ title: null, candidates: [] });
+    distillMockMessages.mockResolvedValue({ data: [{ info: { role: 'user' }, parts: [] }] });
+
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: { preview } });
+    const execute = getExecute(tool);
+
+    await execute(
+      { action: 'distill', session_id: 'wopal-task-abc123' },
+      { sessionID: 'ses_main', sessionStore: new SessionStore() },
+    );
+
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(preview.mock.calls[0][0]).toBe('ses_abc123');
+  });
+
+  it('D9: cancel resolves wopal-task-xxx to the underlying session ID', async () => {
+    setPendingConfirmation('ses_abc123', { title: null, candidates: [] });
+    const tool = createDistillTool({ contextEnabled: true, distillEngine: {} });
+    const execute = getExecute(tool);
+
+    const result = await execute(
+      { action: 'cancel', session_id: 'wopal-task-abc123' },
+      { sessionID: 'ses_main', sessionStore: new SessionStore() },
+    );
+
+    expect(result).toContain('cancelled');
+    expect(getPendingConfirmation('ses_abc123')).toBeUndefined();
   });
 });

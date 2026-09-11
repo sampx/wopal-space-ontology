@@ -66,6 +66,12 @@ export class LLMClient {
         }
       );
 
+      if (!response || !Array.isArray(response.choices)) {
+        throw new Error(
+          `LLM returned no completion (model=${this.model}); the endpoint responded without a choices array`
+        );
+      }
+
       const content = response.choices[0]?.message?.content ?? "";
 
       return content;

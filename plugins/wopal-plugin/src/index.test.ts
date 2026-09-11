@@ -647,6 +647,20 @@ function buildTestResources(store: unknown): PluginResources {
   };
 }
 
+function buildTestResourcesWithoutLlm(store: unknown): PluginResources {
+  return {
+    ...(store !== undefined ? { store: store as never } : {}),
+    embedder: {} as never,
+  };
+}
+
+function buildTestResourcesWithoutEmbedder(store: unknown): PluginResources {
+  return {
+    ...(store !== undefined ? { store: store as never } : {}),
+    llm: {} as never,
+  };
+}
+
 interface SwitchTestEnv {
   testRoot: string;
   savedWopalHome: string | undefined;
@@ -689,12 +703,35 @@ async function runPluginWithMocks(
 ): Promise<{
   infoCalls: Array<{ data: Record<string, unknown>; msg: string }>;
   tools: Record<string, unknown>;
+  injectorConstructions: number;
 }> {
+  // Explicit isolated space root so space config never leaks in from the real
+  // `.wopal/` tree; mirrors the tmpdir fixture convention.
+  const wopalSpaceRoot = path.join(os.tmpdir(), `wopal-plugin-space-${cacheKey}`);
+  mkdirSync(wopalSpaceRoot, { recursive: true });
+
   vi.doMock("./resources/index.js", () => ({
     resolveResources: vi.fn(async () => mockResources),
   }));
   vi.doMock("./config/index.js", () => ({
     loadWopalConfig: vi.fn(() => config),
+  }));
+
+  // Spy on MemoryInjector construction: proves the MemorySystem (injector) is
+  // actually assembled, independently of memory_manage tool registration.
+  let injectorConstructions = 0;
+  vi.doMock("./memory/injector.js", () => ({
+    MemoryInjector: class {
+      constructor(_retriever: unknown) {
+        injectorConstructions += 1;
+      }
+      isEmpty(): Promise<boolean> {
+        return Promise.resolve(true);
+      }
+      retrieveAndFormat(): Promise<string | undefined> {
+        return Promise.resolve(undefined);
+      }
+    },
   }));
 
   const infoCalls: Array<{ data: Record<string, unknown>; msg: string }> = [];
@@ -741,12 +778,13 @@ async function runPluginWithMocks(
     project: {} as never,
     directory: testDir,
     worktree: testDir,
+    wopalSpaceRoot,
     $: {} as never,
     serverUrl: new URL("http://localhost"),
   } as never);
 
   const tools = (hooks as { tool: Record<string, unknown> }).tool;
-  return { infoCalls, tools };
+  return { infoCalls, tools, injectorConstructions };
 }
 
 describe("capability switches wiring", () => {
@@ -761,6 +799,7 @@ describe("capability switches wiring", () => {
     vi.doUnmock("./resources/index.js");
     vi.doUnmock("./config/index.js");
     vi.doUnmock("./logger.js");
+    vi.doUnmock("./memory/injector.js");
     vi.restoreAllMocks();
     resetSessionState();
     if (savedInjectionEnv.WOPAL_HOME !== undefined) {
@@ -792,13 +831,15 @@ describe("capability switches wiring", () => {
   it("does not register memory_manage when store is missing despite memory.enabled=true and logs init-failure", async () => {
     const switchEnv = setupSwitchTestEnv();
     try {
-      const { infoCalls, tools } = await runPluginWithMocks(
+      const { infoCalls, tools, injectorConstructions } = await runPluginWithMocks(
         {},
         buildTestConfig({ memoryEnabled: true }),
         "mm-store-missing",
       );
 
       expect(tools.memory_manage).toBeUndefined();
+      // Negative control: with no store the injector must not be assembled.
+      expect(injectorConstructions).toBe(0);
       const unregisterLog = infoCalls.find((call) =>
         String(call.msg).includes("memory_manage"),
       );
@@ -824,22 +865,35 @@ describe("capability switches wiring", () => {
     }
   });
 
-  it("does not build the memory system when context.enabled=false (known coupling)", async () => {
+  it("builds the memory system when context.enabled=false (D-06 decoupling)", async () => {
     const switchEnv = setupSwitchTestEnv();
     try {
-      const { infoCalls, tools } = await runPluginWithMocks(
-        { store: {} },
+      const { tools, injectorConstructions } = await runPluginWithMocks(
+        buildTestResourcesWithoutLlm({}),
         buildTestConfig({ memoryEnabled: true, contextEnabled: false }),
-        "ctx-off",
+        "ctx-off-decoupled",
       );
 
-      // store exists but llm is missing → MemorySystem not assembled → tool not registered
-      expect(tools.memory_manage).toBeUndefined();
-      const unregisterLog = infoCalls.find((call) =>
-        String(call.msg).includes("memory_manage"),
+      // llm is no longer part of the MemorySystem assembly condition. The
+      // injector is actually constructed, and memory_manage is registered.
+      expect(injectorConstructions).toBe(1);
+      expect(tools.memory_manage).toBeDefined();
+    } finally {
+      teardownSwitchTestEnv(switchEnv);
+    }
+  });
+
+  it("builds the memory system from store+embedder alone, without llm", async () => {
+    const switchEnv = setupSwitchTestEnv();
+    try {
+      const { tools } = await runPluginWithMocks(
+        buildTestResourcesWithoutLlm({}),
+        buildTestConfig({ memoryEnabled: true, contextEnabled: true }),
+        "mm-no-llm",
       );
-      expect(unregisterLog).toBeDefined();
-      expect(unregisterLog?.data.reason).toBe("initialization_failed");
+
+      // MemorySystem = injector(store + embedder); llm is not required.
+      expect(tools.memory_manage).toBeDefined();
     } finally {
       teardownSwitchTestEnv(switchEnv);
     }
@@ -854,6 +908,23 @@ describe("capability switches wiring", () => {
         "inj-off",
       );
 
+      expect(tools.memory_manage).toBeDefined();
+    } finally {
+      teardownSwitchTestEnv(switchEnv);
+    }
+  });
+
+  it("registers memory_manage when store exists but embedder is missing", async () => {
+    const switchEnv = setupSwitchTestEnv();
+    try {
+      const { tools } = await runPluginWithMocks(
+        buildTestResourcesWithoutEmbedder({}),
+        buildTestConfig({ memoryEnabled: true }),
+        "mm-no-embedder",
+      );
+
+      // Registration is driven by store availability alone; embedder-dependent
+      // capabilities degrade inside the tool rather than blocking registration.
       expect(tools.memory_manage).toBeDefined();
     } finally {
       teardownSwitchTestEnv(switchEnv);

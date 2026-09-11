@@ -2,19 +2,13 @@ import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin
 import type { MemoryStore, MemoryCategory } from "../../memory/store.js";
 import type { EmbeddingClient } from "../../memory/embedder.js";
 import type { SessionStore } from "../../session-store.js";
-import type { DistillEngine } from "../../memory/distill.js";
-import { clearPendingConfirmation } from "../../memory/distill.js";
 import { ECHO_REMINDER } from "./formatters.js";
 import { formatList, formatStats, formatSearch, deleteMemories, addMemory, updateMemory, formatInjected } from "./crud.js";
-import { handleDistill, handleConfirm } from "./distill.js";
 
 export function createMemoryManageTool(
   store: MemoryStore,
   embedder?: EmbeddingClient,
   sessionStore?: SessionStore,
-  distillEngine?: DistillEngine,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client?: any,
 ): ToolDefinition {
   return tool({
     description: `Manage long-term memory in LanceDB.
@@ -29,9 +23,6 @@ export function createMemoryManageTool(
 - add: Create a memory. Required flow: search for duplicates → show full text to user → wait for approval → execute. Category required.
 - update: Modify a memory. Show before/after content to user → wait for approval → execute.
 - delete: Remove memories. Show full content of each memory to user → wait for approval → execute.
-- distill: Preview session distillation candidates (no write yet).
-- confirm: Write candidates to database. Show candidates to user → wait for approval → execute.
-- cancel: Discard pending candidates.
 
 Categories: requirement, profile, preference, knowledge, fact, gotcha, experience (English only).
 
@@ -47,7 +38,7 @@ Categories: requirement, profile, preference, knowledge, fact, gotcha, experienc
 ID format: from list/search results in brackets (e.g., [53cc9388] → id="53cc9388"). Never pass body text as id.`,
     args: {
       command: tool.schema
-        .enum(["list", "stats", "search", "delete", "add", "update", "injected", "distill", "confirm", "cancel"])
+        .enum(["list", "stats", "search", "delete", "add", "update", "injected"])
         .describe("Subcommand"),
       query: tool.schema
         .string()
@@ -83,17 +74,9 @@ ID format: from list/search results in brackets (e.g., [53cc9388] → id="53cc93
         .string()
         .optional()
         .describe("Memory ID from list/search brackets (e.g., 53cc9388). Delete accepts comma-separated IDs."),
-      force: tool.schema
-        .boolean()
-        .optional()
-        .describe("Force re-distill (distill command only)"),
-      selectedIndices: tool.schema
-        .array(tool.schema.number())
-        .optional()
-        .describe("Candidate indices to write (confirm command only, 0-based)"),
     },
     execute: async (args, context: ToolContext) => {
-      const { command, query, category, limit, text, importance, project, tags, force, selectedIndices, id } = args;
+      const { command, query, category, limit, text, importance, project, tags, id } = args;
 
       switch (command) {
         case "list":
@@ -122,24 +105,6 @@ ID format: from list/search results in brackets (e.g., [53cc9388] → id="53cc93
         }
         case "injected":
           return await formatInjected(sessionStore, context.sessionID);
-        case "distill": {
-          const sessionID = context.sessionID;
-          if (!sessionID) return "Failed: current session ID is unavailable.";
-          if (!distillEngine) return "Memory system unavailable. Distillation requires the memory system to be initialized.";
-          return await handleDistill(sessionID, distillEngine, client, force);
-        }
-        case "confirm": {
-          const sessionID = context.sessionID;
-          if (!sessionID) return "Failed: current session ID is unavailable.";
-          if (!distillEngine) return "Memory system unavailable. Distillation requires the memory system to be initialized.";
-          return await handleConfirm(sessionID, distillEngine, selectedIndices);
-        }
-        case "cancel": {
-          const sessionID = context.sessionID;
-          if (!sessionID) return "Failed: current session ID is unavailable.";
-          clearPendingConfirmation(sessionID);
-          return "❌ Distillation cancelled. Candidates discarded.";
-        }
         default:
           return `未知命令: ${command}`;
       }

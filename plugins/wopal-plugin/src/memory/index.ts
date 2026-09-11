@@ -1,7 +1,9 @@
 /**
  * Memory Module - Public API
  *
- * Provides memory storage, embedding, LLM distillation, retrieval, and injection capabilities.
+ * Provides memory storage, embedding, retrieval, and injection capabilities.
+ * Session distillation, prompt handling, and session context state live in the
+ * context module (`src/context/`).
  */
 
 export { MemoryStore } from "./store.js";
@@ -14,17 +16,6 @@ export type {
 } from "./types.js";
 export { EmbeddingClient } from "./embedder.js";
 
-// Core engine exports
-export {
-  DistillEngine,
-  loadExtractionState,
-  clearExtractionState,
-  getPendingConfirmation,
-  setPendingConfirmation,
-  clearPendingConfirmation,
-} from "./distill.js";
-export type { DistillResult, PreviewCandidate } from "./distill.js";
-export type { ExtractResult } from "./prompts.js";
 export { MemoryRetriever } from "./retriever.js";
 export type { RetrieveOptions } from "./retriever.js";
 export { MemoryInjector } from "./injector.js";

@@ -1,5 +1,5 @@
 /**
- * Context Manage Actions - Handlers for status/dump/compact
+ * Context Manage Actions - Handlers for status/dump/compact/distill/confirm/cancel
  *
  * Extracted from context-manage.ts to reduce orchestration layer size.
  * Each handler is pure or has minimal side effects.
@@ -16,6 +16,21 @@ import { writeContextDump, findActualKey } from "./dump-formatter.js"
 import { fetchContextPercent } from "../session-runtime-info.js"
 import { resolveChildModelString } from "../tasks/task-notifier.js"
 import { taskLogger } from "../logger.js"
+import type { DistillEngine } from "../context/distill.js"
+import {
+  clearExtractionState,
+  getPendingConfirmation,
+  setPendingConfirmation,
+  clearPendingConfirmation,
+} from "../context/distill.js"
+import { formatPreviewReport, formatConfirmReportWithDedup, ECHO_REMINDER_DISTILL } from "../context/context-formatters.js"
+import type { SessionMessage } from "../types.js"
+
+/** Degraded hint shared by all distillation actions when the context capability is off. */
+export const DISTILL_UNAVAILABLE_HINT =
+  "Context unavailable. Distillation requires the memory system to be initialized."
+
+const confirmingSessions = new Set<string>()
 
 export interface StatusPayload {
   sessionID: string
@@ -187,6 +202,10 @@ export async function handleDump(
 
 /**
  * Handle compact action - trigger session compaction.
+ *
+ * @param contextEnabled - Context capability state (D-04). When false, the
+ *   completion message must not promise auto-recovery / parent notification
+ *   because those prompts are gated off.
  */
 export async function handleCompact(
   sessionID: string,
@@ -195,6 +214,7 @@ export async function handleCompact(
   sessionStore: SessionStore,
   directory: string,
   taskManager?: TaskSessionInspector,
+  contextEnabled = true,
 ): Promise<string> {
   const state = sessionStore.get(sessionID)
   if (state?.isCompacting) {
@@ -235,7 +255,9 @@ export async function handleCompact(
       contextInfo,
       `Model: ${providerID || "?"}/${modelID || "?"}`,
       "Main-session compaction scheduled. It will start automatically when the current turn becomes idle.",
-      "Main session will receive auto-recovery message when compaction completes.",
+      contextEnabled
+        ? "Main session will receive auto-recovery message when compaction completes."
+        : "Context capability is disabled: no recovery message will be sent when compaction completes.",
     ].join("\n")
   }
 
@@ -260,6 +282,104 @@ export async function handleCompact(
     contextInfo,
     `Model: ${providerID || "?"}/${modelID || "?"}`,
     "Compaction triggered. The session will be summarized and become IDLE.",
-    "Parent agent will receive [WOPAL TASK COMPACTED] notification when done.",
+    contextEnabled
+      ? "Parent agent will receive [WOPAL TASK COMPACTED] notification when done."
+      : "Context capability is disabled: no parent notification will be sent when compaction completes.",
   ].join("\n")
+}
+
+/**
+ * Handle distill action - preview session distillation candidates (no write).
+ */
+export async function handleDistill(
+  sessionID: string,
+  distillEngine: DistillEngine,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any,
+  force?: boolean,
+): Promise<string> {
+  if (force) {
+    clearExtractionState(sessionID)
+    clearPendingConfirmation(sessionID)
+  }
+
+  if (typeof client?.session?.messages !== "function") {
+    return "Failed: session.messages API is unavailable."
+  }
+
+  try {
+    const result = await client.session.messages({ path: { id: sessionID } })
+    const messages: SessionMessage[] = result?.data ?? []
+
+    if (messages.length === 0) {
+      return "No messages in current session to distill."
+    }
+
+    const previewResult = await distillEngine.preview(sessionID, messages)
+
+    if (previewResult.candidates.length === 0) {
+      return "No memories extracted from this session. The conversation may be too short or contain no long-term valuable information."
+    }
+
+    setPendingConfirmation(sessionID, previewResult)
+    return (
+      formatPreviewReport(previewResult.candidates, previewResult.title, messages.length) +
+      ECHO_REMINDER_DISTILL
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return `Distillation preview failed: ${message}`
+  }
+}
+
+/**
+ * Handle confirm action - write selected candidates to the memory store.
+ */
+export async function handleConfirm(
+  sessionID: string,
+  distillEngine: DistillEngine,
+  selectedIndices?: number[],
+): Promise<string> {
+  if (confirmingSessions.has(sessionID)) {
+    return "⚠️ Distillation confirm is already running for this session. Wait for it to finish."
+  }
+
+  const pending = getPendingConfirmation(sessionID)
+  if (!pending) {
+    return "⚠️ No pending candidates to confirm. Run with action='distill' first."
+  }
+
+  confirmingSessions.add(sessionID)
+  clearPendingConfirmation(sessionID)
+
+  try {
+    let candidatesToWrite = pending.candidates
+    if (selectedIndices && selectedIndices.length > 0) {
+      candidatesToWrite = selectedIndices
+        .filter((i) => i >= 0 && i < pending.candidates.length)
+        .map((i) => pending.candidates[i])
+      if (candidatesToWrite.length === 0) {
+        setPendingConfirmation(sessionID, pending)
+        return "⚠️ No valid candidates selected."
+      }
+    }
+
+    const result = await distillEngine.confirmCandidates(sessionID, candidatesToWrite, "wopal-space")
+
+    return formatConfirmReportWithDedup(candidatesToWrite, pending.title, result) + ECHO_REMINDER_DISTILL
+  } catch (error) {
+    setPendingConfirmation(sessionID, pending)
+    const message = error instanceof Error ? error.message : String(error)
+    return `Distillation confirm failed: ${message}`
+  } finally {
+    confirmingSessions.delete(sessionID)
+  }
+}
+
+/**
+ * Handle cancel action - discard pending candidates.
+ */
+export function handleCancel(sessionID: string): string {
+  clearPendingConfirmation(sessionID)
+  return "❌ Distillation cancelled. Candidates discarded."
 }

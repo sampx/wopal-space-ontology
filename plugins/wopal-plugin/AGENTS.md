@@ -16,10 +16,10 @@ Canonical references:
 |--------|---------------|----------------|
 | Global (`index.ts`) | Load .env, load config, register Hooks/Tools | None |
 | Rules (`rules/`) | Rule discovery → condition matching → system prompt injection | None (always enabled) |
-| Memory (`memory/`) | LanceDB storage, semantic retrieval, distillation injection | `wopal.memory.enabled` (master), `wopal.memory.injection` (injection only) — config `wopal` node |
+| Memory (`memory/`) | LanceDB storage, semantic retrieval, memory injection | `wopal.memory.enabled` (master), `wopal.memory.injection` (injection only) — config `wopal` node |
 | Task (`tasks/`) | Non-blocking sub-sessions, state monitoring, bidirectional communication, concurrency control | None |
 | Monitor (`monitor/`) | Periodic scheduling engine, unified strategy management | None |
-| Context (`hooks/`) | Session summary, context compaction and recovery | `wopal.context.enabled` — config `wopal` node |
+| Context (`hooks/`, `context/`) | Session compaction and recovery, title generation, distillation | `wopal.context.enabled` — gates title/recovery/distillation; compaction always on |
 
 | Directory | Responsibility |
 |-----------|---------------|
@@ -87,8 +87,8 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 | `coreLogger` | Bootstrap, lifecycle |
 | `rulesLogger` | Rule discovery/matching/injection |
 | `taskLogger` | Task delegation/monitoring/communication |
-| `memoryLogger` | LanceDB/retrieval/injection/distillation |
-| `contextLogger` | Session state/compaction/recovery |
+| `memoryLogger` | LanceDB/retrieval/injection |
+| `contextLogger` | Session state/compaction/recovery/distillation |
 
 - Log levels: trace(10) / debug(20) / info(30) / warn(40) / error(50) / fatal(60); default `info`
 - **Log level usage rules**:
@@ -104,7 +104,13 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 
 - **tasks**: `SimpleTaskManager` periodic monitoring must register via `MonitorStrategy` into `MonitorEngine`
 - **monitor**: New monitoring strategies implement `MonitorStrategy` and register with engine; creating independent scheduling chains in other modules is forbidden
-- **memory**: `MemoryStore` is the sole persistence entry; records use `tags` field (not `concepts`); distillation follows `preview → confirm` two-step flow, skipping user review is forbidden
+- **memory**: `MemoryStore` is the sole persistence entry; records use `tags` field (not `concepts`)
+- **context**: distillation follows `preview → confirm` two-step flow, skipping user review is forbidden
+
+### Agent-Facing Tools
+
+- `memory_manage`: pure memory operations — list/stats/search/add/update/delete/injected; registered when the memory store is available
+- `context_manage`: session context — status/dump/compact, plus distillation actions distill/confirm/cancel; distillation requires the context capability (`context.enabled`)
 
 ### `promptAsync` Session Model Discipline
 
@@ -179,7 +185,7 @@ Feature switches and connection settings live in the `wopal` node of the three-l
 | Node | Fields | Notes |
 |------|--------|-------|
 | `memory` | `enabled`, `injection` | Default both `true`; `injection=false` stops auto-injection but keeps `memory_manage` and search |
-| `context` | `enabled` | Default `true`; gates LLM resource (see Known Coupling in Plan docs) |
+| `context` | `enabled` | Default `true`; gates title generation, auto-recovery, and distillation; compaction always on |
 | `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR` referencing process.env / `.env` files; never store plaintext keys |
 | `embedding` | `baseUrl`, `model`, `apiKey` | Same `$VAR` semantics as `llm` |
 | `logLevel` / `logFile` / `logModules` | — | Config is the default source; `WOPAL_PLUGIN_LOG_*` env vars override |

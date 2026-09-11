@@ -20,8 +20,8 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 |--------|----------------|------|
 | 规则注入 | 规则文件发现、条件匹配、系统提示词注入 | 不定义规则内容 |
 | 任务委派 | 非阻塞子会话启动、状态监控、双向通信、并发控制、进程清理 | 不管理任务业务逻辑 |
-| 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD、蒸馏确认流 | 不持有记忆数据 |
-| 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储 | 不改变模型行为 |
+| 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD | 不持有记忆数据 |
+| 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储、蒸馏（preview → confirm） | 不改变模型行为 |
 
 插件向 Agent 暴露 7 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`memory_manage`、`context_manage`。
 
@@ -46,7 +46,7 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | Resources | LLM / Embedding 客户端共享资源，按模块依赖初始化 | — |
 | Rules（`rules/`） | 规则发现 → 条件匹配 → 格式化注入 | 默认启用 |
 | Memory（`memory/`） | LanceDB 存储、语义检索、自动注入、CRUD | `enabled`、`injection` |
-| Context（`hooks/`） | 会话摘要、压缩恢复、标题生成、蒸馏 | `enabled` |
+| Context（`hooks/`, `context/`） | 会话摘要、压缩恢复、标题生成、蒸馏 | `enabled` |
 | Task（`tasks/`） | 子会话启动、状态监控、双向通信、并发控制 | 始终启用 |
 | Monitor（`monitor/`） | 周期性调度引擎，统一管理监控策略 | 始终启用 |
 | Lifecycle（`lifecycle/`） | 进程退出清理注册表 | — |
@@ -221,8 +221,8 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 | `coreLogger` | Bootstrap、生命周期 |
 | `rulesLogger` | 规则发现/匹配/注入 |
 | `taskLogger` | 任务委派/监控/通信 |
-| `memoryLogger` | LanceDB/检索/注入/蒸馏 |
-| `contextLogger` | 会话状态/压缩/恢复 |
+| `memoryLogger` | LanceDB/检索/注入 |
+| `contextLogger` | 会话状态/压缩/恢复/蒸馏 |
 
 日志级别 trace/debug/info/warn/error/fatal，默认 info。核心事件完成记录一条 info；关键数据点用 debug；详细流程用 trace。结构化字段通过 data 对象携带，字段名 snake_case。错误日志必须携带 `{ err: error }`。
 

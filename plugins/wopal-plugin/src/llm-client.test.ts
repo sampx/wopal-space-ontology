@@ -134,3 +134,23 @@ describe("LLMClient completeJson", () => {
     expect(result.title).toBe('He said "hello"')
   })
 })
+
+describe("LLMClient complete response guard", () => {
+  it("throws a descriptive error when the API resolves null", async () => {
+    const { LLMClient } = await import("./llm-client.js")
+    const client = new LLMClient()
+    const mockCreate = (client as unknown as { client: OpenAI }).client.chat.completions.create as ReturnType<typeof vi.fn>
+    mockCreate.mockResolvedValue(null)
+
+    await expect(client.complete("test")).rejects.toThrow("responded without a choices array")
+  })
+
+  it("throws a descriptive error when choices is missing", async () => {
+    const { LLMClient } = await import("./llm-client.js")
+    const client = new LLMClient()
+    const mockCreate = (client as unknown as { client: OpenAI }).client.chat.completions.create as ReturnType<typeof vi.fn>
+    mockCreate.mockResolvedValue({ id: "x", object: "chat.completion" })
+
+    await expect(client.complete("test")).rejects.toThrow("responded without a choices array")
+  })
+})

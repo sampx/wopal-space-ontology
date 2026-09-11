@@ -6,6 +6,8 @@ import type { MessageWithInfo } from "./message-context.js";
 export interface SkillReloadInjectorContext {
   sessionStore: SessionStore;
   contextLogger: LoggerInstance;
+  /** Context capability state (D-04); gates the auto-recovery injection, not compaction. */
+  capabilities?: { contextEnabled?: boolean };
 }
 
 export async function injectSkillReload(
@@ -32,6 +34,16 @@ export async function injectSkillReload(
   // Check if full recovery protocol needs injection (manual/EllaMaka-triggered compact)
   const needsInjection = ctx.sessionStore.consumeRecoveryInjection(sessionID);
   if (needsInjection) {
+    // D-04: auto-recovery is an LLM-driven context ability. When context is
+    // disabled, drop the pending injection rather than emitting a recovery
+    // protocol prompt; compaction bookkeeping is unaffected.
+    if (ctx.capabilities?.contextEnabled === false) {
+      ctx.contextLogger.debug(
+        `${formatSessionID(sessionID, false)} context disabled, skipped recovery injection`,
+      )
+      return
+    }
+
     const skills = state?.loadedSkills?.size ? Array.from(state.loadedSkills).join(", ") : null
     const skillLine = skills ? `\n- Reload previously loaded skills: ${skills}` : ""
 
@@ -67,6 +79,16 @@ The session context has been compacted. Execute recovery protocol immediately an
   // Legacy: skill-reload injection (when no full recovery needed)
   const skillsToReload = ctx.sessionStore.consumeSkillReload(sessionID);
   if (!skillsToReload || skillsToReload.length === 0) return;
+
+  // D-04: skill-reload prompts are part of the auto-recovery family. When
+  // context is disabled, consume-and-discard the flag: compaction already
+  // happened, so a later re-enable must not inject a stale instruction.
+  if (ctx.capabilities?.contextEnabled === false) {
+    ctx.contextLogger.debug(
+      `${formatSessionID(sessionID, false)} context disabled, skipped skill-reload injection`,
+    )
+    return
+  }
 
   const reminderText = [
     "<system-reminder>",

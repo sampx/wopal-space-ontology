@@ -8,6 +8,14 @@
       ".wopal-space/memory/USER.md",
       ".wopal-space/memory/MEMORY.md"
     ],
+    "plugin": [
+      [
+        "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
+        {
+          "sandbox": { "enabled": true, "mode": "workspace-write" }
+        }
+      ]
+    ],
     "permission": {
       "external_directory": {
         "*": "ask",

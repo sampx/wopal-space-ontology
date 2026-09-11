@@ -25,6 +25,8 @@ export interface EventRouterHookContext {
   taskManager: SimpleTaskManager | undefined
   directory: string
   generateSessionTitle?: (summary: string) => Promise<{ title?: unknown }>
+  /** Context capability state (D-04); gates auto-recovery on session.compacted. */
+  capabilities?: { contextEnabled?: boolean }
 }
 
 export function createEventRouter(ctx: EventRouterHookContext) {
@@ -134,6 +136,7 @@ export function createEventRouter(ctx: EventRouterHookContext) {
           ...(ctx.generateSessionTitle
             ? { generateSessionTitle: ctx.generateSessionTitle }
             : {}),
+          ...(ctx.capabilities ? { capabilities: ctx.capabilities } : {}),
         },
         sessionID ?? "",
       )
