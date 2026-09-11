@@ -54,6 +54,28 @@ Deployment: `.wopal/plugins/wopal-plugin.ts` → symlink → `src/index.ts`.
 
 Issues that `typecheck:fix` cannot resolve must be fixed manually; do not skip and commit. `build` is for artifact verification/release only, not routine validation.
 
+### Verification Mechanisms
+
+Runtime behavior that unit tests cannot exercise (plugin bootstrap, config loading from real files, resource construction, tool registration) is verified by launching ellamaka headless against the real space:
+
+```bash
+# From the space root; prints plugin logs to stderr and appends to the plugin log file.
+ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
+```
+
+Output lands in `<space>/.wopal-space/logs/wopal-plugin.log`. Boot markers to look for:
+
+| Marker | Meaning |
+|--------|---------|
+| `Runtime context initialized` | Space root and `wopalHome` resolved |
+| `Effective wopal config loaded` | Three-layer config merged; secrets redacted |
+| `Resources resolved` | Which of store / embedder / llm were constructed |
+| `Plugin initialized` | Final tool list and `memory` flag |
+
+Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts injected `wopalHome` / `wopalSpaceRoot` / `fallbackEnvironment` for this purpose.
+
+`WOPAL_HOME` overrides the user-level config and storage root, which makes sandboxed runs possible.
+
 ## 4. Implementation Rules
 
 ### Logging
