@@ -10,7 +10,7 @@ Create or update a product PRD document.
 
 **Parameter Notes**: Product name. When not provided, look up `docs/products/` to infer.
 
-- Deprecated: project-level PRDs no longer exist independently; project-level information is maintained in DESIGN documents
+- Project-level information is maintained in DESIGN documents; PRDs exist only at product level.
 
 ---
 
