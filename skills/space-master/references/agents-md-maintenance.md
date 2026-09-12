@@ -41,6 +41,15 @@ All document links in `AGENTS.md` must use relative paths (relative to the repos
 
 The Canonical References section in the header carries only mandatory documents (PRD, DESIGN, business rules) that the agent must follow. Reference-only material (research, tutorials, auxiliary specs) is not canonical and must not be listed there. A document is either a canonical link or a reference, never both.
 
+## 3.5 Document-Set Consistency
+
+Updating `AGENTS.md` is never isolated. The rules must match the actual project code and stay consistent with the project DESIGN, PRD, and README:
+
+- Audit every rule against the codebase and authoritative documents (per the Rule Audit below); delete or fix rules whose referenced code no longer exists or whose constraint is now enforced by structure.
+- When the DESIGN or PRD changes, check `AGENTS.md` for stale constraints that contradict the new design, and align them when evidence is clear.
+- The architecture / directory table lists only paths that currently exist; durable target-structure constraints belong in Implementation Rules, not as current facts.
+- Report which related documents (DESIGN, PRD, README) were checked or aligned in the completion response.
+
 ## 4. Rule Audit (Before Any Update)
 
 **An update to an existing `AGENTS.md` starts with auditing the current rules, not translating or polishing them.** Audit every existing rule against the codebase and authoritative documents, classify it as keep / delete / fix, and include the audit result in the confirmation plan.
