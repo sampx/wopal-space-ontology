@@ -16,6 +16,7 @@ After a project change completes, first judge whether a new long-lived agent beh
 - If the user's preferred language is English, update `AGENTS.md` directly.
 - All headings in the preferred-language version use the target language; mixing Chinese and English headings is forbidden.
 - Headings use Markdown heading levels only. Do not add chapter numbers (`## 1. ...`); structure is expressed through heading levels.
+- The AGENTS.md structure follows the template at `templates/agent-rules.md` in this skill directory (single source of truth; the space-level `.wopal/templates/agent-rules.md` is deprecated).
 
 ## 3. Content Boundary Rules
 
