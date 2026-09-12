@@ -36,6 +36,14 @@ In the standard flow, the product DESIGN is used for phase decomposition and arc
 - Present the full content and obtain explicit user confirmation before any write operation.
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
+### Document Naming and Splitting
+
+- The main product DESIGN has no suffix: `docs/products/<product-name>/DESIGN.md`.
+- Sub-DESIGNs split by topic use `DESIGN-<topic>.md` (kebab-case), placed in the same directory as the main DESIGN. The suffix expresses a parent-child relationship: no suffix = main document, suffixed = sub-document.
+- Split a main DESIGN into sub-DESIGNs when it grows too long (roughly over 500 lines, or a single chapter over roughly 150 lines). Keep a chapter summary and a link to the sub-DESIGN in the main document.
+- The sub-DESIGN header keeps the parent link: `> **上级**: ./DESIGN.md` (or localized equivalent). Sub-DESIGNs may split further into deeper sub-DESIGNs only when the topic itself exceeds the size guideline.
+- Both main and sub DESIGN documents use Markdown heading levels without chapter numbering (per the numbering rule above).
+
 ## Step 1: Gather Context
 
 **Standard flow**:

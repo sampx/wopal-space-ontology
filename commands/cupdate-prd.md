@@ -22,7 +22,7 @@ Write the generated or updated document in the user's preferred language unless 
 
 ### Document Paths
 
-**Product PRD**: use the established naming convention when one exists. Default: `docs/products/<product-name>/PRD-<product-name>.md`. Acceptable variants: `PRD.md`, `PRD-*.md`. When updating, preserve the existing file path.
+**Product PRD**: the main PRD has no suffix. Default: `docs/products/<product-name>/PRD.md`. Sub-PRDs (if split by topic) use `PRD-<topic>.md` and express a parent-child relationship with the main PRD. When updating, preserve the existing file path.
 
 ### Context Collection
 
