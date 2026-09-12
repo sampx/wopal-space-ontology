@@ -5,7 +5,7 @@ description: <One-line stable description of the current project or directory mo
 
 # Agent Development Rules
 
-## 1. Canonical References
+## Canonical References
 
 Canonical references:
 
@@ -15,31 +15,32 @@ Canonical references:
 - Business Rules: `<path-when-relevant>`
 - Referral Rules: `<path-when-relevant>`
 
-## 2. Architecture and Directories
+## Architecture and Directories
 
 <Brief current architecture description; may include a concise runtime flow>
 
 | Directory | Responsibility |
 |---|---|
+| | |
 
 <!-- The directory table lists only paths that currently exist. Durable target-structure constraints belong in Implementation Rules, not as current directory facts. -->
 
-## 3. Development Commands (build format test)
+## Development Commands (build format test)
 
 | Scenario | Command | When |
-|---|---|---|
+|---|---|------|
 
-## 4. Implementation Rules
+## Implementation Rules
 
 - <technical implementation rule>
 - <project-specific UI/UX or output rule if applicable>
 
-## 5. Testing
+## Testing
 
 - <For testable pure logic, follow TDD: write a failing test first, then implement code to make it pass>
 - <state which project logic must be covered by automated tests and which host APIs, external systems, or real runtime boundaries require manual verification>
 
-## 6. User-Supplied Rules
+## User-Supplied Rules
 
 - <user-supplied rules; commands must not modify this section>
-- <when updating: original rules that do not fit sections 1-5 should be preserved here verbatim>
+- <when updating: original rules that do not fit the sections above should be preserved here verbatim>

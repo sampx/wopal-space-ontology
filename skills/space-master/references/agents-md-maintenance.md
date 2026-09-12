@@ -15,6 +15,7 @@ After a project change completes, first judge whether a new long-lived agent beh
 - The formal English version keeps no suffix: `AGENTS.md`; do not create English variants like `AGENTS.en-US.md`.
 - If the user's preferred language is English, update `AGENTS.md` directly.
 - All headings in the preferred-language version use the target language; mixing Chinese and English headings is forbidden.
+- Headings use Markdown heading levels only. Do not add chapter numbers (`## 1. ...`); structure is expressed through heading levels.
 
 ## 3. Content Boundary Rules
 
@@ -35,6 +36,8 @@ The following must not be written into `AGENTS.md`:
 - Lessons that only record experience without constraining agent decisions; those belong to long-term memory.
 
 Merge or delete duplicate and stale rules before adding new ones. Use one sentence when one suffices.
+
+All document links in `AGENTS.md` must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
 ## 4. Rule Audit (Before Any Update)
 
@@ -88,7 +91,7 @@ Prefer reading:
 - Key source files in the target scope, only to extract commands and hard constraints, not to create source encyclopedias
 - `rules-context` when provided
 
-**Then run the Rule Audit (§4) on every existing rule.**
+**Then run the Rule Audit on every existing rule.**
 
 Common WopalSpace document locations:
 
@@ -108,8 +111,8 @@ Before writing, present the full plan and get explicit user confirmation. The pl
 1. Target file path
 2. Canonical documents to reference
 3. frontmatter `name` and `description` to write or preserve
-4. Summary of rules to preserve, add, remove, or compress, with the audit classification from §4
-5. Original rules to move to section 6 (rules not fitting sections 1-5), and any rules proposed for deletion with justification
+4. Summary of rules to preserve, add, remove, or compress, with the audit classification from the Rule Audit
+5. Original rules to move to User-Supplied Rules (rules not fitting the sections above), and any rules proposed for deletion with justification
 6. Architecture / directory summary plan
 7. Development, testing, and verification requirements
 8. Where `rules-context` will be merged
@@ -136,7 +139,7 @@ For a small update to an existing `AGENTS.md` (no frontmatter change, no target-
 ## 6. Quality Checklist
 
 - [ ] Target path is explicit or safely inferred
-- [ ] Every existing rule was audited against the codebase and authoritative docs (§4); the audit result was presented in the plan
+- [ ] Every existing rule was audited against the codebase and authoritative docs; the audit result was presented in the plan
 - [ ] frontmatter `name` and `description` exist, and body content does not repeat frontmatter information
 - [ ] frontmatter `description` is single-line, stable, and suitable for `wopal space scan`
 - [ ] Target and parent `AGENTS.md` files were considered when present
@@ -155,7 +158,7 @@ For a small update to an existing `AGENTS.md` (no frontmatter change, no target-
 - [ ] Testing section includes a TDD requirement and identifies which logic must be automated vs which boundaries require manual verification only
 - [ ] User-preferred language version follows the AGENTS template headings and does not translate template-defined English section headings
 - [ ] `User-Supplied Rules` remained unchanged: no additions, modifications, deletions, or reordering (original specification migrations excepted)
-- [ ] All non-obsolete original rules were preserved: rules fitting sections 1-5 placed there, remaining rules moved verbatim to section 6; any deleted rule has explicit justification in the plan
+- [ ] All non-obsolete original rules were preserved: rules fitting the sections above placed there, remaining rules moved verbatim to User-Supplied Rules; any deleted rule has explicit justification in the plan
 - [ ] The full plan was shown and confirmed before writing
 - [ ] The formal English version was updated after confirmation when applicable
 

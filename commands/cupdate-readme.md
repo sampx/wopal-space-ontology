@@ -45,6 +45,7 @@ Before generating, prefer reading:
 - Do not dive into internal implementation details or Agent-specific implementation rules.
 - Technology stack and project structure belong in DESIGN / AGENTS.md; do not duplicate them in README.
 - All commands must be verified from package / config files. Never guess.
+- All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
 ## Output Language and File Naming
 

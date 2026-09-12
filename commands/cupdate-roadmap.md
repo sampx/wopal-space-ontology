@@ -4,7 +4,7 @@ description: Guide product phase discussions and produce phase definition and tr
 
 # Create or Update Roadmap
 
-Starting from the product DESIGN §5 Evolution Roadmap, guide the user through per-phase discussion of goals, current state, scope, targets and gaps (with design updates), and holistic review to surface and resolve residual risks.
+Starting from the product DESIGN Evolution Roadmap section, guide the user through per-phase discussion of goals, current state, scope, targets and gaps (with design updates), and holistic review to surface and resolve residual risks.
 
 **Input**: `$1` `$2`
 
@@ -15,16 +15,17 @@ Starting from the product DESIGN §5 Evolution Roadmap, guide the user through p
 ## Core Principles
 
 - The core responsibility is helping the user clarify phase goals, analyze current state, define scope, analyze gaps and their design solutions, and surface and resolve residual risks through review.
-- Discussion uses the product DESIGN §5 Evolution Roadmap as the skeleton and the product PRD as the vision baseline.
+- Discussion uses the product DESIGN Evolution Roadmap section as the skeleton and the product PRD as the vision baseline.
 - The Phase document is written continuously during discussion — each step's output is written directly into the living document.
 - The Phase document uses the `.wopal/templates/phase.md` template.
 - Phase documents provide reliable input for the next step: splitting into Plans.
 - During goal and design solution discussion, user-confirmed decisions must be promptly updated in the corresponding PRD and product or project DESIGN documents, following product DESIGN and project DESIGN templates and `/cupdate-design` standards.
 - Present the plan and obtain explicit user confirmation before any write operation.
+- All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
 ## Step 1: Identify the Current Phase
 
-Read the product DESIGN §5 and product PRD. List all phases and their current status (Active / Completed / Planned).
+Read the product DESIGN Evolution Roadmap section and product PRD. List all phases and their current status (Active / Completed / Planned).
 
 Guide the user to select the phase to discuss. Default to the current Active phase; the user may specify a completed phase for retrospective adjustment or a planned phase for early discussion.
 
@@ -38,13 +39,13 @@ Discuss the product capability goal for this phase with the user, anchoring on t
 - The goal must be a verifiable product capability statement, ≥20 characters. Placeholders are forbidden.
 - Allow goal refinement during discussion until consensus is reached.
 
-**Output**: Confirmed phase Goal — write §0 of the Phase document; update the product PRD and product DESIGN as needed
+**Output**: Confirmed phase Goal — write the Goal section of the Phase document; update the product PRD and product DESIGN as needed
 
 ## Step 3: Analyze Current State
 
 Conduct a deep analysis of the current state for each project or subsystem relevant to this phase goal. Use concise narrative prose to describe the gap between the current state and the phase goal. Cover both existing capabilities and what is missing.
 
-**Output**: Current state narrative per project — write §1 of the Phase document
+**Output**: Current state narrative per project — write the Current State section of the Phase document
 
 ## Step 4: Discuss Phase Scope
 
@@ -53,7 +54,7 @@ Clarify the product capability boundaries for this phase:
 - **Scope**: a concise summary list of the product capabilities to be delivered. One line per scope area with Owner, so humans and agents can grasp the full scope at a glance.
 - **Out of Scope**: capabilities or projects explicitly excluded from this phase.
 
-**Output**: Scope summary list + Out of Scope list — write §2 and §3 of the Phase document
+**Output**: Scope summary list + Out of Scope list — write the Scope and Out of Scope sections of the Phase document
 
 ## Step 5: Discuss Targets, Gaps, and Design (Critical)
 
@@ -78,7 +79,7 @@ Gap formatting rules:
 - A gap without a design solution does not belong here — it is a residual risk and will be handled in Step 6.
 - Exit criteria describe delivery facts, not implementation steps.
 
-**Output**: §4 Targets and Gaps — write continuously as each gap is discussed; update associated design documents concurrently
+**Output**: Targets and Gaps section — write continuously as each gap is discussed; update associated design documents concurrently
 
 ## Step 6: Review and Surface Residual Risks
 
@@ -88,13 +89,13 @@ Holistically review the phase goal, scope, gaps, and their designs for completen
 2. Does every gap have a complete design solution? What is still open?
 3. Are there cross-project coordination issues, external dependencies, or architectural uncertainties that the current designs do not address?
 
-Surface all residual risks and write them to §6 Risks with an explicit explanation of why each risk lacks a design solution.
+Surface all residual risks and write them to the Risks section with an explicit explanation of why each risk lacks a design solution.
 
 Guide the user to discuss solutions for each residual risk. Iterate until:
-- All residual risks have been resolved (design solution found, moved back to §4), OR
+- All residual risks have been resolved (design solution found, moved back to Targets and Gaps), OR
 - The user explicitly accepts the remaining risks as unresolvable within this phase.
 
-**Output**: §6 Risks — resolved risks moved to §4 with their design solutions
+**Output**: Risks section — resolved risks moved to Targets and Gaps with their design solutions
 
 ---
 
@@ -107,12 +108,12 @@ Before writing the document, verify this quality checklist. All items must pass.
 - [ ] Uses the `.wopal/templates/phase.md` template structure
 - [ ] File placed in the `phases/` directory sibling to the product DESIGN
 - [ ] File naming: `{product}-{phase-id}-{slug}.md` — slug derived from title: lowercase → remove non-alphanumeric → replace spaces with `-` → strip trailing status markers with regex `[-—].*$` → trim leading/trailing hyphens → truncate ≤40 characters
-- [ ] §1 Current State uses narrative prose showing the gap to the phase goal
-- [ ] §2 Scope is a one-glance summary list
-- [ ] §4 each scope area has ≥1 gap; each gap has `Current / Target / Design / Exit`
+- [ ] Current State section uses narrative prose showing the gap to the phase goal
+- [ ] Scope section is a one-glance summary list
+- [ ] Targets and Gaps: each scope area has ≥1 gap; each gap has `Current / Target / Design / Exit`
 - [ ] Every gap has a design solution with a design document reference
-- [ ] §6 Risks only contains items that genuinely lack a design solution; each has an explicit "Why no design solution" explanation
-- [ ] §7 References does not repeat documents already in the Phase document header
+- [ ] Risks section only contains items that genuinely lack a design solution; each has an explicit "Why no design solution" explanation
+- [ ] References section does not repeat documents already in the Phase document header
 - [ ] Associated design documents have been updated per cupdate-design standards
 
 ## Guide Plan Decomposition
@@ -129,7 +130,7 @@ Discussion is complete when all of the following are satisfied:
 2. Current state analysis clearly presents the gap to the phase goal
 3. Scope is defined as a concise summary list with Owner per area
 4. Each scope area has detailed gap analysis with Current/Target/Design/Exit
-5. Every gap has a design solution; residual gaps without solutions are documented in §6 Risks with explicit user acceptance or a path to resolution
+5. Every gap has a design solution; residual gaps without solutions are documented in the Risks section with explicit user acceptance or a path to resolution
 6. Associated design documents have been updated per cupdate-design standards
 7. Quality gate has passed
 

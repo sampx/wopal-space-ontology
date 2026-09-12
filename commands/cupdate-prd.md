@@ -56,6 +56,7 @@ Read enough context to avoid inventing requirements.
 - Existing accurate content should be preserved and tightened, not rewritten for novelty.
 - Outdated content should be revised or removed when evidence is clear.
 - Open uncertainties should be marked as needing confirmation, not silently decided.
+- All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
 ---
 

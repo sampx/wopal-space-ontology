@@ -34,6 +34,7 @@ In the standard flow, the product DESIGN is used for phase decomposition and arc
 - Product DESIGN's Evolution Roadmap is a phase skeleton: each Phase keeps only the title, Goal, and Phase document link. Completed/landed/remaining work belongs in Phase, Plan, UAT, or Verification documents.
 - Preserve accurate existing content. Revise or remove outdated information when evidence is sufficient. Mark unresolved items as needing confirmation.
 - Present the full content and obtain explicit user confirmation before any write operation.
+- All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
 ## Step 1: Gather Context
 
@@ -107,7 +108,7 @@ After writing, run the quality gate. The command is truly complete only when the
 - [ ] Explains cross-project system composition, architecture layers, project responsibilities, and interaction contracts
 - [ ] Runtime Model clarifies state locations, data ownership, configuration layers, lifecycle, and persistence boundaries
 - [ ] End-to-End Flows cover critical cross-project paths and focus on system behavior rather than implementation steps
-- [ ] Evolution Roadmap keeps only the phase skeleton: `### Phase N: Title`, `Goal`, and `Phase doc`
+- [ ] Evolution Roadmap keeps only the phase skeleton: `### Phase <N>: <Title>`, `Goal`, and `Phase doc`
 - [ ] Does not duplicate the PRD's vision, target users, product narrative, or full roadmap
 
 ### Project DESIGN Quality Checklist

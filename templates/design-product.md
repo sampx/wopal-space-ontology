@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Architecture Design
+## Architecture Design
 
 Overall product architecture diagram (ASCII preferred) and layer table. The diagram covers all core subsystems and their interaction relationships.
 
@@ -18,8 +18,9 @@ Overall product architecture diagram (ASCII preferred) and layer table. The diag
 
 | Layer | Location | Owner | Responsibility |
 |---|---|---|---|
+| | | | |
 
-## 2. Core Projects
+## Core Projects
 
 Each core subsystem's role, boundary, and interaction contract.
 
@@ -27,32 +28,32 @@ Each core subsystem's role, boundary, and interaction contract.
 - Link to the corresponding project DESIGN document
 - Inter-subsystem interaction relationships are traceable
 
-## 3. Runtime Model
+## Runtime Model
 
 Runtime structure, state locations, data ownership, configuration layers, lifecycle, persistence boundaries.
 
 - Clarify each subsystem's state ownership scope
 - Configuration layer relationships are clear (global → space → project)
 
-## 4. End-to-End Flows
+## End-to-End Flows
 
 Key cross-project flows, from a system perspective.
 
 - Cover critical user paths (installation, daily use, failure recovery)
 - Use numbered steps, focus on system behavior
 
-## 5. Evolution Roadmap
+## Evolution Roadmap
 
 Product evolution skeleton. Each phase includes title, Goal, and Phase document link. Phase delivery details and acceptance criteria are carried by Phase documents.
 
 ```markdown
-### Phase N: Title
+### Phase <N>: <Title>
 
 - **Goal**: Product capability target for this phase (one line, ≥20 characters, verifiable product capability statement)
 
-> Phase doc: [phases/<product>-pN-<slug>.md]
+> Phase doc: [phases/<product>-p<N>-<slug>.md]
 ```
 
-## 6. Related Documents
+## Related Documents
 
 Link durable reference documents: project DESIGNs, business rules, architecture references, project specs. Each link has a clear reference purpose.

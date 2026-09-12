@@ -9,28 +9,28 @@
 
 ---
 
-## 0. Goal
+## Goal
 
 One sentence describing the product capability to be delivered in this phase (cross-project perspective).
 
-## 1. Current State
+## Current State
 
 Describe the current state for each project or subsystem in concise narrative prose. Cover both existing capabilities and what is missing — present the full gap between current state and the phase goal.
 
-## 2. Scope
+## Scope
 
 A concise summary list of product capabilities to be delivered in this phase, so humans and agents can grasp the full scope at a glance. One line per scope area with Owner. Example:
 
 - **CLI 分发** — Node SEA release packaging → public release carrier → installer one-click install. Owner: wopal-cli
 - **ellamaka 分发** — artifact branding + 4-platform matrix + GitHub Release. Owner: ellamaka
 
-## 3. Out of Scope
+## Out of Scope
 
 - Capabilities or projects explicitly excluded from this product phase
 
-## 4. Targets and Gaps
+## Targets and Gaps
 
-Each scope area from §2 gets a detailed gap analysis here. Organized by `###` for each scope area, with `#### Gaps` and `#####` for individual gaps.
+Each scope area from Scope gets a detailed gap analysis here. Organized by `###` for each scope area, with `#### Gaps` and `#####` for individual gaps.
 
 Gap structure:
 
@@ -56,26 +56,26 @@ Owner: <project>
 
 Writing rules for gaps:
 
-- A gap without a design solution does not belong here — it belongs in §6 Risks.
+- A gap without a design solution does not belong here — it belongs in Risks.
 - Exit criteria describe delivery facts, not implementation steps.
 - Each scope area should have ≥1 gap.
 - Each gap should be independently verifiable via its exit criteria.
 
-## 5. Related Plans
+## Related Plans
 
 <!-- Maintained automatically or manually after Plans are linked -->
 
 | Project | Plan | Status |
 |---------|------|--------|
 
-## 6. Risks
+## Risks
 
-Only items without a design solution go here. Gaps with design solutions are managed in §4.
+Only items without a design solution go here. Gaps with design solutions are managed in Targets and Gaps.
 
 | Risk / Dependency | Impact | Why no design solution |
 |-------------------|--------|------------------------|
 
-## 7. References
+## References
 
 Do not repeat documents already referenced in the Phase document header. List project DESIGNs and other relevant references.
 
