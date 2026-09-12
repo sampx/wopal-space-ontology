@@ -1,31 +1,30 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-07-05
+> **Updated**: 2026-09-12
+> **上级**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
-> **Project Design**: `./DESIGN.md`
 
 ---
 
-## 1. Scope
+## Scope
 
-本文件定义 ontology 的分发方式：Git source 的 clone / fork / worktree 物化。
+本文件定义 ontology 的分发方式：中央能力池（local main）与空间装配 worktree（sparse-checkout 物化）。
 
-ontology 的分发天然是 Git 仓库模型。wopal-cli 的 `wopal space init` / `wopal setup` 封装了这个过程，将其与 space runtime 初始化串联。
+ontology 的分发天然是 Git 仓库模型。wopal-cli 的 `wopal space init` / `wopal setup` 封装了这个过程，将其与 space runtime 初始化串联。分发模型详见 `DESIGN.md` 的 Ontology 协作模型章节。
 
 能力边界、模板语义与运行态维护设计见 `DESIGN.md`。
 
 ---
 
-## 2. Distribution Model
+## Distribution Model
 
-P1 的 ontology 分发模型：
+ontology 分发模型：
 
 ```text
-ontology source repo
-  -> local clone or local fork clone
-  -> space/<name> branch
-  -> <space>/.wopal/ worktree
+ontology source repo (upstream/main)
+  -> local ontology clone (local main)          # 中央能力池，用户级唯一真相源
+  -> space/<name> branch + sparse-checkout      # 空间装配 worktree，按装配单物化
   -> CLI renders deterministic runtime skeleton from templates
   -> ellamaka loads commands/agents/plugins/config at runtime
 ```
@@ -42,27 +41,29 @@ P1 canonical identity 是 `wopal-space-ontology`。同一个 identity 用于默�
 
 ---
 
-## 3. Materialization Contract
+## Materialization Contract
 
-ontology 的安装形态是 materialization（而不是 archive extraction）。
+ontology 的安装形态是 Git 仓库 + 装配 worktree。
 
 `wopal space init` / `wopal setup` 负责：
 
 1. 解析目标 ontology source
-2. 准备本地 ontology repo
-3. 创建 `space/<space-name>` 分支
-4. 在 `<space>/.wopal/` 建立 worktree
+2. 准备本地 ontology repo（clone/fork，物化 local main）
+3. 读取 `config/types/<type>.yaml` 装配单（缺省 common）
+4. 创建 `space/<space-name>` 分支
+5. 在 `<space>/.wopal/` 建立装配 worktree（sparse-checkout 按装配单物化）
 
 P1 目标语义：
 
 1. 默认使用 clone-based canonical source flow
 2. fork flow 是显式选择的替代模式
-3. 每个 space 拥有独立的 `space/<name>` 分支
-4. `.wopal/` 是 ontology worktree，不是复制目录
+3. 每个 space 拥有独立的 `space/<name>` 分支与装配 worktree
+4. `.wopal/` 是装配 worktree，不是复制目录，也不持有独立能力演化
+5. 空间装配单 `.wopal-space/assembly.yaml` 记录类型、来源 revision 与装配时间
 
 ---
 
-## 4. Template and Runtime Skeleton Contract
+## Template and Runtime Skeleton Contract
 
 ontology 通过 `.wopal/templates/wopalspace-schema.yaml` 与相关模板，为 CLI 提供确定性初始化输入。
 
@@ -84,7 +85,7 @@ Contract：
 
 ---
 
-## 5. Base Capability Source Contract
+## Base Capability Source Contract
 
 `wopal setup` 从 ontology source 物化 user-level base capabilities 到 `$WOPAL_HOME/`，为所有 space 提供共享基础能力层。物化逻辑由 wopal-cli 实现（P1-06），ontology 在此声明 source 侧契约。
 
@@ -100,6 +101,8 @@ macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应
 | `ontologies/wopal-space-ontology/rules/` | `rules/` |
 | `ontologies/wopal-space-ontology/plugins/` | `plugins/` |
 | `ontologies/wopal-space-ontology/dsh/agents-presets/` | `dsh/agents-presets/` |
+
+> **注**：user-level base capabilities 是跨空间共享的**只读入口**，物化为 symlink 合理——它们由 `ontology update` 统一推进，不经由空间内修改。空间内可写的装配资产位于 `<space>/.wopal/`（sparse-checkout 真实文件），两者职责不同。
 
 ### DSH Profiles 物化契约
 
@@ -118,9 +121,11 @@ $WOPAL_HOME/{agents,skills,commands,rules,plugins}  # base
 -> <space>/.wopal/{agents,skills,commands,rules,plugins}  # overlay，优先级最高
 ```
 
+空间 overlay 层由装配 worktree 物化（sparse-checkout 真实文件），空间内可写可进化；进化经 `space sync` 汇入 local main。
+
 ---
 
-## 6. Runtime Loading Handoff
+## Runtime Loading Handoff
 
 ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时加载：
 
@@ -139,7 +144,7 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 ---
 
-## 7. Out of Scope for P1
+## Out of Scope for P1
 
 1. binary installer
 2. release asset metadata
@@ -149,14 +154,11 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 ---
 
-## 8. Related Documents
+## Related Documents
 
 | Document | Purpose |
 |---|---|
-| `../../docs/products/wopal-space/DESIGN-distribution.md` | 产品级分发总设计：R2 架构、缓存策略、完整性模型 |
 | `../../docs/products/wopal-space/DESIGN.md` | 产品级架构与版本体系 |
 | `./DESIGN.md` | ontology 的能力边界、模板、命令、规则与 runtime 维护设计 |
-| `../../projects/wopal-cli/docs/DESIGN.md` | CLI 的 deterministic init 与 runtime handoff 设计 |
-| `../../projects/wopal-cli/docs/DISTRIBUTION.md` | CLI 对 ontology materialization 的消费契约 |
+| `../../projects/wopal-cli/docs/DESIGN.md` | CLI 的 deterministic init、space sync 与 runtime handoff 设计 |
 | `../../projects/ellamaka/docs/DESIGN.md` | ellamaka 的 wopal-space mode 与 runtime loading 设计 |
-| `../../projects/ellamaka/docs/DISTRIBUTION.md` | ellamaka 对 ontology runtime loading 的消费契约 |

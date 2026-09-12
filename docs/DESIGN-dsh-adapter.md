@@ -1,14 +1,14 @@
-# ellamaka 能力 → dsh 工具映射表（评审草案）
+# DESIGN — dsh-adapter 能力映射
 
-> **Status**: Draft — 待评审
+> **Status**: Draft
+> **Updated**: 2026-09-12
+> **上级**: `./DESIGN.md`（ontology 总体设计：插件体系章节）
 > **评审范围**: wopal / fae / rook 核心三角 + 能力类别主表
-> **Updated**: 2026-09-03
-> **评审后生效**: 成为「预设生成器」（见 poc DESIGN-dsh-poc.md 的「预设生成器」）把 ellamaka 定义翻译成 dsh 配置单的契约真相源
 > **Language**: 中文（Sam 偏好；docs/ 不强制 i18n 拆分）
 
 ---
 
-## 1. 背景与定位
+## 背景与定位
 
 ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter）与 dsh 的工具收窄（agent preset 的工具行集合）**词汇表、粒度、语义三者都不一致**，无法逐键机械翻译。本表是人工评审确定的「意图 → dsh 工具行」映射，是两套引擎之间唯一可靠的语言桥梁。
 
@@ -16,7 +16,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 2. 核心事实：为什么不能机械翻译
+## 核心事实：为什么不能机械翻译
 
 | 维度 | ellamaka 侧 | dsh 侧 | 结论 |
 |---|---|---|---|
@@ -29,7 +29,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 3. 能力类别主表（意图 → dsh 工具行）
+## 能力类别主表（意图 → dsh 工具行）
 
 | ellamaka 能力类别 | ellamaka 值 | dsh 配置单表达 | 边界/例外 |
 |---|---|---|---|
@@ -51,9 +51,9 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 4. 核心三角意图翻译
+## 核心三角意图翻译
 
-### 4.1 wopal — 全能编排者
+### wopal — 全能编排者
 
 **ellamaka 意图**: 万能巫师，理解意图、调动所有能力、委派协作，全能。permission 几乎无 deny（plan_exit/skill 全开/doom_loop 与 sandbox_escalation 为 ask）。
 
@@ -61,7 +61,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 **dsh 配置单 = 近似 full 工具集**：`tool-fs` + `tool-fs-search` + `tool-bash` + `tool-skill`（技能目录不设限）+ `tool-ask-user` + `tool-todo` + `plan-mode` 组 + 委派组（`tool-subagent` + `tool-subagent-fork` + `tool-subagent-list-agents` + `tool-workflow`）+ `tool-goal`。
 
-### 4.2 fae — 受限执行者
+### fae — 受限执行者
 
 **ellamaka 意图**: 执行编码/重构/文件操作/构建测试的精灵，只收明确工作、返证据。不做规划/设计/审查。permission：deny wopal_*/task/memory/context/doom_loop/question/plan_enter，skill 只放 skill-creator，read 全开。
 
@@ -69,7 +69,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 **dsh 配置单 = 受限执行集**：`tool-fs` + `tool-fs-search` + `tool-bash` + `tool-skill`（`customSkillDirs` 只指向 skill-creator 目录）+ `tool-todo`。**不挂** `tool-ask-user`（question deny）、**不挂** `plan-mode`（plan_enter deny）、**不挂** 委派组（task deny）。
 
-### 4.3 rook — 只读审查者
+### rook — 只读审查者
 
 **ellamaka 意图**: 黑门乌鸦，只读审查，绝不执行/修复/规划。permission：deny wopal_*/task/memory/context/question，skill 只放 df-plan-review 与 df-implement-review，read 全开，bash allow（跑测试取证？——实际 body 有 READ_ONLY_BOUNDARY 禁写禁执行，但 bash allow 与 read-only 矛盾，见「待定边界」）。
 
@@ -79,7 +79,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 5. 待定边界（需 Sam 裁决）
+## 待定边界（需 Sam 裁决）
 
 1. **扩展名级 edit 白名单**（`*.md` 允许、`*` 拒绝）在 dsh 里没有 preset 层对应，只能放 fs 沙箱文件模式。是否把「扩展名 → 沙箱可写模式」也纳入映射表？还是接受 dsh 的粗粒度、把细粒度留给 fs 策略？建议后者（dsh 语义本就到工具行级，细粒度是 fs 层职责）。
 2. **rook 的 read-only**：ellamaka 用 body 里的 READ_ONLY_BOUNDARY（提示词约束）+ bash allow 并存，靠 agent 自觉。dsh 若真要"禁写"，应在 fs 沙箱层设 read-only 模式，而非只在 preset 层删工具。是否如此落实？
@@ -88,7 +88,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 6. 范围外（本轮不映射）
+## 范围外（本轮不映射）
 
 - MCP 工具按需单列（dsh MCP 机制另行评审）
 - 24 个 WSF 子代理（由 space-flow 分发，非本轮）
@@ -96,7 +96,7 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 
 ---
 
-## 7. 结论与下一步
+## 结论与下一步
 
 映射表把「不可行的机械转换」替换为「可行的意图翻译」。它固化了 wopal / fae / rook 三个 dsh 配置单的表达方式。persona 采用**灵魂全文复刻**，工具行采用**意图裁剪**。**评审通过后**，本表成为「预设生成器」的契约真相源，并把第 4 节的三个配置单样例落为 dsh 可运行的 user preset（D-10.2：`presets/` 是机器生成的可复现产物）。
 
