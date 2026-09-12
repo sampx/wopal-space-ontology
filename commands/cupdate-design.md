@@ -47,6 +47,7 @@ In the standard flow, the product DESIGN is used for phase decomposition and arc
 - Split a main DESIGN into sub-DESIGNs when it grows too long (roughly over 500 lines, or a single chapter over roughly 150 lines). Keep a chapter summary and a link to the sub-DESIGN in the main document.
 - The sub-DESIGN header keeps the parent link: `> **上级**: ./DESIGN.md` (or localized equivalent). Sub-DESIGNs may split further into deeper sub-DESIGNs only when the topic itself exceeds the size guideline.
 - Both main and sub DESIGN documents use Markdown heading levels without chapter numbering (per the numbering rule above).
+- The main document header lists all its sub-documents: a `Sub-DESIGNs` field (or localized equivalent) enumerates every `DESIGN-<topic>.md` under it, so the main document is the single entry point to its document tree. Sub-documents listed in the header are document-structure declarations, not references — they must not be repeated in the end-of-document Related Documents.
 
 ## Step 1: Gather Context
 

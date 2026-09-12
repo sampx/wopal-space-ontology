@@ -3,7 +3,8 @@
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
 > **Product Intent** (mandatory): `<prd-path>` — the PRD this DESIGN follows  
-> **Sibling DESIGNs** (mandatory when depended on): `<path>, <path>`
+> **Sibling DESIGNs** (mandatory when depended on): `<path>, <path>`  
+> **Sub-DESIGNs** (mandatory when they exist): list every `DESIGN-<topic>.md` under this main document
 
 ---
 

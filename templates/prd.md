@@ -2,7 +2,8 @@
 
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
-> **Related DESIGN** (mandatory): `<path>` — the DESIGN contract this PRD follows
+> **Related DESIGN** (mandatory): `<path>` — the DESIGN contract this PRD follows  
+> **Sub-PRDs** (mandatory when they exist): list every `PRD-<topic>.md` under this main document
 
 ---
 

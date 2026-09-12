@@ -22,7 +22,7 @@ Write the generated or updated document in the user's preferred language unless 
 
 ### Document Paths
 
-**Product PRD**: the main PRD has no suffix. Default: `docs/products/<product-name>/PRD.md`. Sub-PRDs (if split by topic) use `PRD-<topic>.md` and express a parent-child relationship with the main PRD. When updating, preserve the existing file path.
+**Product PRD**: the main PRD has no suffix. Default: `docs/products/<product-name>/PRD.md`. Sub-PRDs (if split by topic) use `PRD-<topic>.md` and express a parent-child relationship with the main PRD. When updating, preserve the existing file path. When sub-PRDs exist, the main PRD header lists them in a `Sub-PRDs` field; sub-PRDs listed in the header are document-structure declarations and must not be repeated in Related Documents.
 
 ### Context Collection
 

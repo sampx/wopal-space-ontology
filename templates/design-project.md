@@ -3,7 +3,8 @@
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
 > **Parent Architecture** (mandatory): `<parent-design-path or N/A>` — the architecture contract this DESIGN follows  
-> **Parent Product** (mandatory): `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows
+> **Parent Product** (mandatory): `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows  
+> **Sub-DESIGNs** (mandatory when they exist): list every `DESIGN-<topic>.md` under this main document
 
 ---
 
