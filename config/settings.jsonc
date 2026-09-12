@@ -10,7 +10,7 @@
     ],
     "plugin": [
       [
-        "file:///Volumes/U500G/coding/wopal-workspace/.wopal/plugins/dsh-adapter/index.ts",
+        "../plugins/dsh-adapter/index.ts",
         {
           "sandbox": { "enabled": true, "mode": "workspace-write" }
         }
