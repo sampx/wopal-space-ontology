@@ -1,4 +1,10 @@
-import { z } from "zod";
+import { tool } from "@opencode-ai/plugin";
+
+// Build the schema on the zod engine re-exported by @opencode-ai/plugin
+// (`tool.schema`) instead of a standalone `zod` dependency. This guarantees the
+// plugin and the host share one zod instance: a separate bare `zod` resolves to
+// a second copy, and the host detects Zod types by their v4 `_zod` marker.
+const z = tool.schema;
 
 export const wopalPluginConfigSchema = z.object({
   llm: z
@@ -13,7 +19,7 @@ export const wopalPluginConfigSchema = z.object({
       baseUrl: z.string().min(1),
       model: z.string().min(1),
       apiKey: z.string().min(1).optional(),
-      options: z.record(z.unknown()).optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
   memory: z
@@ -32,6 +38,6 @@ export const wopalPluginConfigSchema = z.object({
   logModules: z.array(z.string()).optional(),
 });
 
-export type WopalPluginConfig = z.infer<typeof wopalPluginConfigSchema>;
+export type WopalPluginConfig = (typeof wopalPluginConfigSchema)["_zod"]["output"];
 
 export const defaultWopalPluginConfig: WopalPluginConfig = wopalPluginConfigSchema.parse({});

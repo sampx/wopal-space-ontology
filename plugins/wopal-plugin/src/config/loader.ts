@@ -132,7 +132,7 @@ function resolveVarReferences(
   return value;
 }
 
-function formatZodIssues(error: { issues: { path: (string | number)[]; message: string }[] }): string {
+function formatZodIssues(error: { issues: { path: PropertyKey[]; message: string }[] }): string {
   return error.issues
     .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
     .join("; ");

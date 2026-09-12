@@ -62,7 +62,20 @@
  */
 import type { Hooks, PluginInput, PluginOptions, ToolContext as PluginToolContext, ToolDefinition, ToolResult } from "@opencode-ai/plugin"
 import path from "node:path"
-import { z } from "zod"
+// Build projected tool schemas on the zod engine re-exported by
+// @opencode-ai/plugin (`tool.schema`). A standalone `zod` import resolves to a
+// second copy whose classic types carry `_def` but no `_zod` marker; the
+// ellamaka registry detects Zod types by `_zod` and would fall back to
+// `legacyJsonSchema`, leaking raw Zod internals to the model and force-marking
+// every field required. Sharing the SDK's engine keeps one zod across the host
+// and every plugin.
+import { tool } from "@opencode-ai/plugin"
+
+const z = tool.schema
+
+// The zod type surface used in signatures. `tool.schema` is the engine value,
+// so instance-based extraction keeps the type available without a namespace.
+type ZodType = InstanceType<typeof z.ZodType>
 
 type Container = {
   get(name: "tools"): {
@@ -258,11 +271,11 @@ function toSnakeCase(name: string): string {
  * to the matching Zod type. Unsupported nodes degrade to `z.unknown()` so a
  * future dsh schema extension can never break the projection.
  */
-function jsonSchemaToZodShape(schema: unknown): Record<string, z.ZodType> {
+function jsonSchemaToZodShape(schema: unknown): Record<string, ZodType> {
   const node = schema as JsonSchemaNode
   const properties = node?.properties ?? {}
   const required = new Set(node?.required ?? [])
-  const shape: Record<string, z.ZodType> = {}
+  const shape: Record<string, ZodType> = {}
   for (const [name, property] of Object.entries(properties)) {
     let type = jsonSchemaNodeToZod(property)
     if (!required.has(name)) type = type.optional()
@@ -271,7 +284,7 @@ function jsonSchemaToZodShape(schema: unknown): Record<string, z.ZodType> {
   return shape
 }
 
-function jsonSchemaNodeToZod(node: JsonSchemaNode | undefined): z.ZodType {
+function jsonSchemaNodeToZod(node: JsonSchemaNode | undefined): ZodType {
   if (!node || typeof node !== "object") return z.unknown()
   switch (node.type) {
     case "string":
