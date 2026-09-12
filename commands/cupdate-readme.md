@@ -46,6 +46,7 @@ Before generating, prefer reading:
 - Technology stack and project structure belong in DESIGN / AGENTS.md; do not duplicate them in README.
 - All commands must be verified from package / config files. Never guess.
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
+- Technical References at the end carry reference-only documents (design, product docs, durable references). They are informational links, never mandatory-follow links. Do not repeat a document in both the body and Technical References.
 
 ## Output Language and File Naming
 

@@ -35,6 +35,10 @@ In the standard flow, the product DESIGN is used for phase decomposition and arc
 - Preserve accurate existing content. Revise or remove outdated information when evidence is sufficient. Mark unresolved items as needing confirmation.
 - Present the full content and obtain explicit user confirmation before any write operation.
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
+- Header links carry mandatory documents only: the parent document (product PRD for product DESIGN; parent product PRD/DESIGN for project DESIGN; `./DESIGN.md` for sub-DESIGNs) and sibling DESIGNs that this DESIGN must follow. Do not list reference-only documents in the header.
+- End-of-document links (Related Documents) carry reference-only documents: research, business rules, project specs, architecture references, and other auxiliary material that is informational, not mandatory. A document that appears in the header must not be repeated in Related Documents.
+- A document is either a mandatory link (header) or a reference link (Related Documents), never both.
+- Sibling DESIGNs are mandatory links when the current DESIGN depends on their contracts; they belong in the header. Project-level implementation DESIGNs (e.g. `projects/*/docs/DESIGN.md`) are references, not siblings — they belong in Related Documents unless they are the direct parent.
 
 ### Document Naming and Splitting
 

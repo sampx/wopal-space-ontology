@@ -39,6 +39,8 @@ Merge or delete duplicate and stale rules before adding new ones. Use one senten
 
 All document links in `AGENTS.md` must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 
+The Canonical References section in the header carries only mandatory documents (PRD, DESIGN, business rules) that the agent must follow. Reference-only material (research, tutorials, auxiliary specs) is not canonical and must not be listed there. A document is either a canonical link or a reference, never both.
+
 ## 4. Rule Audit (Before Any Update)
 
 **An update to an existing `AGENTS.md` starts with auditing the current rules, not translating or polishing them.** Audit every existing rule against the codebase and authoritative documents, classify it as keep / delete / fix, and include the audit result in the confirmation plan.

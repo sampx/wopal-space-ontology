@@ -57,12 +57,15 @@ Read enough context to avoid inventing requirements.
 - Outdated content should be revised or removed when evidence is clear.
 - Open uncertainties should be marked as needing confirmation, not silently decided.
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
+- Header links carry mandatory documents only: the parent or sibling DESIGN documents that this PRD must follow. Do not list reference-only documents in the header.
+- End-of-document links (Related Documents) carry reference-only documents: research, business rules, project specs, and other auxiliary material that is informational, not mandatory. A document that appears in the header must not be repeated in Related Documents.
+- A document is either a mandatory link (header) or a reference link (Related Documents), never both.
 
 ---
 
 ## Shared Document Header
 
-Every PRD should start with a concise metadata block after the title:
+Every PRD should start with a concise metadata block after the title. The header holds only mandatory documents: the DESIGN (or sibling DESIGNs) that this PRD follows. Reference-only documents belong in the Related Documents section at the end, never in the header.
 
 ```markdown
 > **Status**: Active  

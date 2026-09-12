@@ -2,7 +2,7 @@
 
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
-> **Related DESIGN**: `<path-if-known>`
+> **Related DESIGN** (mandatory): `<path>` — the DESIGN contract this PRD follows
 
 ---
 
@@ -36,4 +36,4 @@ Document product-level rules that protect user trust, safety, maintainability, o
 
 ## Related Documents
 
-Link the DESIGN document, project DESIGNs, business rules, plans, research, and project specs.
+Reference-only documents: research, business rules, plans, project specs, and auxiliary material. Do not repeat the DESIGN listed in the header.

@@ -4,8 +4,8 @@
 > **Phase ID**: `<phase-id>`
 > **Status**: Planned | Active | Completed
 > **Updated**: YYYY-MM-DD
-> **Product PRD**: `<prd-path>`
-> **Product DESIGN**: `<design-path>`
+> **Product PRD** (mandatory): `<prd-path>` — the PRD this Phase follows  
+> **Product DESIGN** (mandatory): `<design-path>` — the DESIGN contract this Phase follows
 
 ---
 
@@ -77,6 +77,6 @@ Only items without a design solution go here. Gaps with design solutions are man
 
 ## References
 
-Do not repeat documents already referenced in the Phase document header. List project DESIGNs and other relevant references.
+Reference-only documents: project DESIGNs and other relevant auxiliary material. Do not repeat the PRD or DESIGN listed in the header.
 
 - Project DESIGN: `<project-design-path>`

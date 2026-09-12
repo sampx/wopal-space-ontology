@@ -2,8 +2,8 @@
 
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
-> **Parent Architecture**: `<parent-design-path or N/A>`  
-> **Parent Product**: `<parent-product-prd-path or N/A>`
+> **Parent Architecture** (mandatory): `<parent-design-path or N/A>` — the architecture contract this DESIGN follows  
+> **Parent Product** (mandatory): `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows
 
 ---
 
@@ -73,4 +73,4 @@ Project-owned state, persistence, configuration, caches, generated files. Clarif
 
 ## Related Documents
 
-Link durable reference documents: parent PRD/DESIGN, business rules, architecture references, project specs. Each link has a clear reference purpose.
+Reference-only documents: business rules, architecture references, project specs, and auxiliary material. Do not repeat the parent PRD/DESIGN listed in the header.

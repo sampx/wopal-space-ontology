@@ -26,3 +26,4 @@ Do not duplicate or paraphrase the specification here. When in doubt, read the r
 
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
 - AGENTS.md headings use Markdown heading levels without chapter numbering. Do not write `## 1. ...` numbered headings; express structure with heading levels only.
+- The Canonical References section in the header carries only mandatory documents (PRD, DESIGN, business rules) that the agent must follow. Reference-only material (research, tutorials, auxiliary specs) belongs in other sections and must not be listed as canonical.

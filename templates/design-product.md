@@ -2,7 +2,8 @@
 
 > **Status**: Active  
 > **Updated**: YYYY-MM-DD  
-> **Product Intent**: `<prd-path>`
+> **Product Intent** (mandatory): `<prd-path>` — the PRD this DESIGN follows  
+> **Sibling DESIGNs** (mandatory when depended on): `<path>, <path>`
 
 ---
 
@@ -56,4 +57,4 @@ Product evolution skeleton. Each phase includes title, Goal, and Phase document 
 
 ## Related Documents
 
-Link durable reference documents: project DESIGNs, business rules, architecture references, project specs. Each link has a clear reference purpose.
+Reference-only documents: project DESIGNs, business rules, architecture references, project specs. Do not repeat the PRD or sibling DESIGNs listed in the header.

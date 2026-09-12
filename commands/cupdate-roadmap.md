@@ -22,6 +22,9 @@ Starting from the product DESIGN Evolution Roadmap section, guide the user throu
 - During goal and design solution discussion, user-confirmed decisions must be promptly updated in the corresponding PRD and product or project DESIGN documents, following product DESIGN and project DESIGN templates and `/cupdate-design` standards.
 - Present the plan and obtain explicit user confirmation before any write operation.
 - All document links must use relative paths (relative to the repository root or the document's directory). Absolute paths are forbidden because these documents are committed to git and shared across machines.
+- Header links carry mandatory documents only: the product PRD and product DESIGN that this Phase document follows. Do not list reference-only documents in the header.
+- End-of-document links (References) carry reference-only documents: project DESIGNs and other auxiliary material that is informational, not mandatory. A document that appears in the header must not be repeated in References.
+- A document is either a mandatory link (header) or a reference link (References), never both.
 
 ## Step 1: Identify the Current Phase
 
