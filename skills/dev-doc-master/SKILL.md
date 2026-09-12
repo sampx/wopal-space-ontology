@@ -49,8 +49,8 @@ Read `references/consistency.md` for the full text. In short:
 2. **Gather context**: read the existing target document, its parent/sibling documents, and the actual code (for updates). Never invent facts.
 3. **Discuss / plan**: guide discussion for new documents, or present the update plan for existing ones. Obtain explicit user confirmation before writing.
 4. **Write**: produce the document from the template, applying the universal rules.
-5. **Verify**: run the quality checklist in the reference; check document-set consistency and the bidirectional index.
-6. **Report**: file path, change summary, and the whole affected document set (checked / aligned / needs follow-up).
+5. **Verify**: run the quality checklist in the reference, then run the **mandatory quality gate**: `scripts/verify-docset.py <docs-dir> --main DESIGN.md`. The script scans the actual filesystem for sub-design enumeration, parent links, absolute paths, broken links, end-section duplication, process-state vocabulary, and missing dates. It must exit 0 before the update is reported complete. Check document-set consistency and the bidirectional index.
+6. **Report**: file path, change summary, quality-gate result (PASS/FAIL), and the whole affected document set (checked / aligned / needs follow-up).
 
 ## Document-Set Consistency (always)
 

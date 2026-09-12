@@ -27,6 +27,49 @@ A document is either a mandatory header link or a reference end link, never both
 
 A suffix-free main document is the single entry point to its document tree. Its header must enumerate every `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-document under it (a `Sub-DESIGNs` / `Sub-PRDs` field). Each sub-document header points back via `上级: ./DESIGN.md` (or localized equivalent). This bidirectional index must match the actual files on disk — when a sub-document is added or removed, both sides are updated. Sub-documents listed in the header are structure declarations, not references, so they never appear in the end section.
 
+## Sub-DESIGN Enumeration Is a Filesystem Fact
+
+The header's sub-document list is a filesystem fact, not a summary. Before writing the header, list every `DESIGN-<topic>.md` in the same directory with `ls`. The header must enumerate exactly those files — nothing more, nothing less. After writing, re-run the same listing and diff against the header. A header that misses a file breaks the bidirectional index; a header that lists a nonexistent file is a dead link. This check is part of the mandatory quality gate.
+
+## Companion Documents vs Sub-DESIGNs
+
+A documentation set contains two distinct kinds of supporting files:
+
+- **Sub-DESIGNs** (`DESIGN-<topic>.md`): architecture documents that decompose a main DESIGN chapter. They follow the naming convention, carry a `上级` parent link, and are enumerated in the main header's `Sub-DESIGNs` field.
+- **Companion documents** (e.g. `BRANDING.md`, `API-CONTRACT.md`): single-source-of-truth documents that belong to the set but are not architecture decompositions. They do not use the `DESIGN-<topic>.md` naming pattern, do not carry a `上级` link, and are declared in the main header's `Companion Documents` field or in the document-relationship table.
+
+A companion document is never renamed to fit the `DESIGN-*.md` pattern, and never forced into the `Sub-DESIGNs` enumeration. The two categories are distinct and both are declared in the header.
+
+## Metadata Field Semantics
+
+Header metadata fields have fixed meanings:
+
+| Field | Where | Meaning |
+|---|---|---|
+| `Status` | all | document lifecycle status (Active / Draft / Target Shape) |
+| `Updated` | all | last update date, YYYY-MM-DD, refreshed on every edit |
+| `Parent` (上级) | sub-documents | the direct parent document, `./DESIGN.md` for project sub-docs |
+| `Parent Architecture` (上级架构) | sub-documents (optional) | product-level architecture document this doc must follow, when it exists |
+| `Sub-DESIGNs` (子设计) | main documents | exact enumeration of all `DESIGN-<topic>.md` under it |
+| `Companion Documents` (配套文档) | main documents (optional) | companion truth-source documents (BRANDING, API-CONTRACT) |
+| `Related Documents` (相关文档) | end section | reference-only material, never in the header |
+
+A sub-document header must use `Parent` (上级), not `Parent Architecture` (上级架构), for its project parent. `Parent Architecture` is reserved for product-level documents above the project DESIGN. When both exist, they are separate lines with distinct targets.
+
+## Mandatory Quality Gate
+
+Every document-set update ends with an automated scan that must pass before the work is reported complete:
+
+1. Enumerate `DESIGN-*.md` on disk and diff against the main header's `Sub-DESIGNs` — bidirectional, exact match.
+2. Verify every sub-document header has `上级: ./DESIGN.md` (or the localized equivalent).
+3. Scan for absolute paths (`file:///`, `/Users/...`) — zero tolerance.
+4. Verify relative links resolve to existing files.
+5. Confirm the end section (`Related Documents`) contains no sub-DESIGNs and no header documents.
+6. Scan for process-state vocabulary (已废弃, 已放弃, 迁移, 不再执行, 历史机制, deprecated, legacy, moved from).
+7. Confirm every touched document has a refreshed `Updated` date.
+
+Run `scripts/verify-docset.py <docs-dir>` where available; otherwise run the equivalent grep checks by hand. The scan result is part of the completion report.
+
 ## Document-Set Consistency on Every Update
 
 Updating one document is never isolated. A change to any document can invalidate claims in its parents, children, or siblings. Before finalizing any update:
