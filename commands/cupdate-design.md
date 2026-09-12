@@ -96,6 +96,13 @@ Produce the DESIGN document from the discussion conclusions using the template. 
 5. Revise or remove outdated content, deleting implementation status and delivery progress from DESIGN
 6. Mark unresolved items as needing confirmation
 
+**Document-set consistency**: updating one document is never isolated. Before finalizing, review the whole document set and update every document that is affected:
+
+- Main DESIGN update → check sub-DESIGNs for stale contracts that reference the changed chapters; keep the main header `Sub-DESIGNs` list in sync with actual files.
+- Sub-DESIGN update → check the main DESIGN chapter that decomposed into this sub-DESIGN; the main document keeps a summary that stays consistent with the sub-DESIGN.
+- Any DESIGN update → check the product PRD and Phase documents for claims that contradict the changed architecture, and align them when evidence is clear.
+- Verify the bidirectional index: every sub-DESIGN header `上级` points to a real parent, and the parent header lists every actual sub-DESIGN.
+
 Present the full content and wait for user confirmation before writing.
 
 **Output**: Complete DESIGN content, awaiting confirmation
@@ -114,6 +121,8 @@ After writing, run the quality gate. The command is truly complete only when the
 - [ ] Unconfirmed items are explicitly marked as needing confirmation
 - [ ] Body uses design language and contains no template commentary, process explanation, task list, or command transcript
 - [ ] DESIGN contains no implementation status, delivery progress, acceptance results, checkbox-style tasks, or "completed / pending" module status
+- [ ] The whole document set was reviewed: sub-DESIGNs, parent DESIGN, PRD, and Phase documents were checked for staleness and aligned when affected
+- [ ] The bidirectional sub-document index is consistent (parent header lists all sub-DESIGNs; each sub-DESIGN header points to a real parent)
 
 ### Product DESIGN Quality Checklist
 

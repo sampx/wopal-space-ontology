@@ -96,6 +96,12 @@ When updating an existing PRD:
 6. Keep unresolved items explicit as "Needs confirmation" or equivalent in the document language.
 7. Remove standalone success-standard or validation-signal sections from PRDs; do not replace them with renamed validation sections.
 
+**Document-set consistency**: updating the PRD is never isolated. Review the whole document set and align every affected document:
+
+- The product DESIGN and project DESIGNs must not contradict the updated PRD; revise them when the PRD capability boundaries or vision change.
+- Phase documents must stay aligned with the PRD's capability direction; check Goals against the updated product story.
+- Sub-PRDs (when they exist) stay consistent with the main PRD; the main header `Sub-PRDs` list matches actual files.
+
 Do not add implementation internals merely because they exist in code. Convert implementation facts into product capabilities and boundaries.
 
 ## Writing Quality Bar
@@ -134,6 +140,7 @@ When a sentence fails the bar, rewrite it into a concrete product statement befo
 - [ ] Existing accurate content preserved
 - [ ] Obsolete content revised or removed
 - [ ] Related documents linked
+- [ ] The whole document set was reviewed: DESIGN and Phase documents were checked against the updated PRD and aligned when affected
 
 ## Response After Completion
 
@@ -142,4 +149,5 @@ After creating or updating the PRD, respond in the user's language with:
 1. File path
 2. Create/update summary
 3. Meaningful added, revised, removed/deprecated, and needs-confirmation items
-4. Suggested next step: PRD done → `/cupdate-design` to translate product vision into system architecture
+4. The whole document set affected by this update: which DESIGN / Phase documents were checked, aligned, or still need a follow-up update
+5. Suggested next step: PRD done → `/cupdate-design` to translate product vision into system architecture

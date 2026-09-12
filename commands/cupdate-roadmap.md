@@ -74,6 +74,7 @@ Document update discipline:
 - Design document updates follow product DESIGN and project DESIGN templates (`cupdate-design` standards).
 - PRD document updates follow the PRD template (`cupdate-prd` standards).
 - Phase document updates follow the phase template (this command's standards).
+- **Document-set consistency**: the Phase update is never isolated. After the Phase document settles, review the whole set — product PRD, product DESIGN, project DESIGNs, and sub-DESIGNs — and align every document whose claims are affected by this phase's goal, scope, or design solutions. The Phase Goal must trace to the DESIGN Evolution Roadmap entry for this phase; the DESIGN Roadmap and PRD story must not contradict the settled Phase.
 
 Gap formatting rules:
 
@@ -118,6 +119,7 @@ Before writing the document, verify this quality checklist. All items must pass.
 - [ ] Risks section only contains items that genuinely lack a design solution; each has an explicit "Why no design solution" explanation
 - [ ] References section does not repeat documents already in the Phase document header
 - [ ] Associated design documents have been updated per cupdate-design standards
+- [ ] The whole document set was reviewed: the Phase Goal traces to the DESIGN Evolution Roadmap, and PRD / product DESIGN / project DESIGNs / sub-DESIGNs were aligned with the settled Phase
 
 ## Guide Plan Decomposition
 

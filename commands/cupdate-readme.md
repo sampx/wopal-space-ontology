@@ -117,6 +117,8 @@ When updating an existing README:
 3. Add or correct the module and core command list.
 4. Link design and product details; do not duplicate sections.
 
+**Document-set consistency**: the README update is never isolated. The module list and core commands must match the actual project code and stay consistent with the project DESIGN and AGENTS.md. When the README changes what the project is or does, check the DESIGN and AGENTS.md for stale claims and align them when affected.
+
 ## Confirmation Policy
 
 Before writing or overwriting `README.md`, present the full optimization plan and get explicit user confirmation.
