@@ -6,6 +6,10 @@ These rules apply to every document in the product/project documentation set: PR
 
 Headings express structure through Markdown heading levels, not numbers. Write `## Capability Scope`, never `## 1. Capability Scope`. Chapter numbers force renumbering on every insert, move, or deletion; heading levels survive structural edits. Applies to every generated or updated document.
 
+## Target-State Writing
+
+Documents describe the target state only — what the system is, what exists, who owns it, what responsibility it carries. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", "migration", or "historical" notes. When a capability is owned elsewhere, state the ownership, not the move. A reader of a document learns the current structure and responsibilities, never the history of how it got there.
+
 ## Relative Links Only
 
 All document links are relative to the repository root or the document's directory. Absolute paths (e.g. `/Users/...`, `file:///...`) are forbidden because these documents are committed to git and shared across machines — an absolute path works only on the machine that wrote it. Use `./DESIGN.md`, `../DESIGN.md`, or `docs/products/<name>/DESIGN.md` style relative paths consistently within a document.

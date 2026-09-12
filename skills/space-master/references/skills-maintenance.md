@@ -41,6 +41,7 @@ When evaluating or optimizing existing skills:
 1. **Trigger Accuracy**: Ensure `description` in frontmatter triggers appropriately on target user queries without over-triggering on adjacent tasks.
 2. **Action-Oriented Workflow**: Instructions MUST provide clear, imperative steps rather than verbose explanations.
 3. **Resource Bundling**: Deterministic helper scripts should live in `scripts/`, while deep reference documentation lives in `references/`.
+4. **Target-State Writing**: Skill instructions describe the target state only — what the system is, what exists, who owns it, what responsibility it carries. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", "migration", or "historical" notes. When a capability is owned elsewhere, state the ownership, not the move.
 
 ### Post-Install / Edit Verification
 After installing or editing a skill, Agents MUST perform verification:

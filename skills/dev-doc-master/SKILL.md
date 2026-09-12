@@ -34,6 +34,7 @@ Read `references/consistency.md` for the full text. In short:
 - **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). End-of-document links (Related Documents / References) carry reference-only auxiliary material. A document is never listed twice.
 - **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `上级: ./DESIGN.md`. Bidirectional index must match actual files.
 - **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, README, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
+- **Target-state writing**: documents describe the target state only — what the system is, what exists, who owns it. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", or "migration" notes. When a capability is owned elsewhere, state the ownership, not the move.
 
 ## Naming Conventions
 
