@@ -20,8 +20,8 @@
 | 项目 | 负责的落地项 |
 |------|-------------|
 | **wopal-cli** | `space sync`、`space status`、`space capability`、`ontology` 命令面改造、装配物化、`prepare-ontology` 装配语义（onboarding CLI machine operation） |
-| **ontology** | 装配单资产、Agent 体系资产清理、Evolver 等新代理 |
-| **产品级** | 跨项目一致性维护（onboarding 设计文档对齐；ellamaka 项目仅消费 CLI machine operation，无实现残留） |
+| **ontology** | 装配单资产、Agent 体系资产清理、Evolver 等新代理、space-master 技能对齐 |
+| **ellamaka** | Desktop onboarding 契约消费对齐（`prepare-ontology` 返回契约变化后，`onboarding-ipc.ts` 的 `availableTypes` 消费与测试联动） |
 
 ---
 
@@ -75,15 +75,25 @@
 
 ### ONT-G2: Agent 体系资产未清理、未新建、未瘦身（ontology, P0）
 
-**目标态**: `agents/` 仅含四维核心 + 按类型装配的专职子代理；8 个微型伪专员移除；Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身至 ~40 行。
+**目标态**: `agents/` 仅含四维核心 + 按类型装配的专职子代理；Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身至 ~40 行。
 
-**当前状态**: 8 个伪专员仍在（architect、code-reviewer、code-simplifier、code-skeptic、data、docs-specialist、frontend-specialist、test-engineer）；Evolver 及新代理不存在；核心提示词未瘦身。
+**当前状态**:
+- ✅ 8 个微型伪专员已移除（architect、code-reviewer、code-simplifier、code-skeptic、data、docs-specialist、frontend-specialist、test-engineer），`agents/` 现仅剩 wopal/fae/rook 三个核心，移除项经核查在 dsh/commands/rules/prompts/templates 无引用。
+- 待办：Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身（wopal.md 198 行 → ~40 行）。
 
 ### ONT-G3: WSF 资产与新装配模型关系未定义（ontology, P1）
 
-**目标态**: `.wopal/wsf/` 资产与新「按类型装配」模型的关系明确（保留作 skill 引用 / 迁移 / 移除）。
+**目标态**: `.wopal/wsf/` 遗留资产处置明确。
 
-**当前状态**: `.wopal/wsf/` 仍存在，关系未定义。
+**当前状态**: ✅ 已解决——WSF 资产经决策移除（其为 space-flow 产品仓的内容快照，新装配模型下无运行时引用，活体归 `projects/space-flow`）。
+
+### ELL-G1: Desktop onboarding 消费 `prepare-ontology` 契约需对齐（ellamaka, P0）
+
+**目标态**: `prepare-ontology` 返回契约从「type/* 分支列表」改为「装配单类型列表」后，ellamaka Desktop 的消费逻辑与测试随之对齐。
+
+**当前状态**: `packages/ellamaka-desktop/src/main/onboarding-ipc.ts` 消费返回的 `availableTypes`（L883-893、L1188、L1457-1586，fallback 已是 `[{ type: "common", branch: "main" }]`）；`setup-machine-client.ts` 为 `prepare-ontology` 特设 300s 超时（L86）；`onboarding-ipc.test.ts` / `setup-machine-client.test.ts` 的 mock 契约需联动。当前契约仍沿用 type/* 分支语义。
+
+**落地**: 契约变更定稿后，对齐 `onboarding-ipc.ts` 消费逻辑、复核 `setup-machine-client` 超时与探测，更新两处测试 mock。
 
 ### DOC-G1: space-master 技能仍描述旧多分支模型（ontology, P1）
 
@@ -93,12 +103,30 @@
 
 ---
 
-## 解决顺序建议
+## 落地方案：三个 Plan
 
-1. CLI-G1~G5 + ONB-G1（wopal-cli 命令面、装配实现与 onboarding 流程，设计主体落地）
-2. ONT-G1~G2（装配单资产 + Agent 体系清理，装配物化的内容前提）
-3. DOC-G1（space-master 技能对齐）
-4. ONT-G3（WSF 资产决策）
+Gaps 按仓库聚合为三个 Plan，一个仓库一个 Plan，内部按 Task 分组、可委派多个 fae 并行实施。
+
+| Plan | 仓库 | 覆盖 gap | 范围 | 依赖 |
+|------|------|----------|------|------|
+| **P1** | ontology | ONT-G1、ONT-G2（剩余）、DOC-G1 | 装配单 `config/types/*.yaml`；Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身；space-master 技能对齐新模型 | 无 |
+| **P2** | wopal-cli | CLI-G1~G5、ONB-G1 | `space sync`/`status`/`capability`；`ontology install/update/contribute` 改造；删除 `reconcile`/`promote`；`space init` 装配物化；装配技术固化；`prepare-ontology` 装配语义 | P1（消费装配单） |
+| **P3** | ellamaka | ELL-G1 | Desktop onboarding 消费新 `availableTypes` 契约、`setup-machine-client` 复核、测试联动 | P2（契约定稿） |
+
+### 直接动作（不建 Plan）
+
+- ✅ 移除 `.wopal/wsf/` 遗留资产（ONT-G3）
+- ✅ 移除 8 个微型伪专员（ONT-G2 删除部分）
+
+### 实施顺序
+
+```text
+P1 装配资产落地
+  → P2 wopal-cli 命令面与装配实现（设计主体）
+    → P3 ellamaka Desktop 契约对齐
+```
+
+顺序理由：P1 的装配单是 P2 全部装配物化的硬输入前提；P2 定稿 `prepare-ontology` 返回契约后，P3 才能对齐消费端。三个 Plan 之间为硬依赖，串行推进；每个 Plan 内部 Task 按文件域分组，可委派多个 fae 并行。
 
 ---
 
