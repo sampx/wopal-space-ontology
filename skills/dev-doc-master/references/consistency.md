@@ -10,6 +10,26 @@ Headings express structure through Markdown heading levels, not numbers. Write `
 
 Documents describe the target state only — what the system is, what exists, who owns it, what responsibility it carries. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", "migration", or "historical" notes. When a capability is owned elsewhere, state the ownership, not the move. A reader of a document learns the current structure and responsibilities, never the history of how it got there.
 
+## Writing Style
+
+Target-state content is only half the job; how it reads is the other half. These rules apply to every sentence in every document of the set.
+
+### Natural Language
+
+Write like a human explaining something clearly to a colleague. Read the sentence aloud — if it sounds like a machine produced it, rewrite it. Prefer plain verbs and concrete nouns over nominalizations and stacked qualifiers.
+
+### One Idea Per Sentence
+
+Keep sentences short and carry one thought each. When a sentence contains two independent claims, split it. Long compound sentences hide which part is the commitment and which is decoration.
+
+### Affirmative Over Negative
+
+State what a component does, what it owns, and who is responsible. Instead of "X does not handle Y" or "Y is not supported", write "Y is owned by X" or "Y belongs to a later phase". The reader should learn the structure, not reconstruct it from a list of absences.
+
+### Ownership Over Exclusion
+
+Draw boundaries through ownership rather than exclusion. "X is responsible for A; Y owns B" reads better than "X does not do B, and Y is not involved in A". Every boundary statement names the owner of each side.
+
 ## Relative Links Only
 
 All document links are relative to the repository root or the document's directory. Absolute paths (e.g. `/Users/...`, `file:///...`) are forbidden because these documents are committed to git and shared across machines — an absolute path works only on the machine that wrote it. Use `./DESIGN.md`, `../DESIGN.md`, or `docs/products/<name>/DESIGN.md` style relative paths consistently within a document.
