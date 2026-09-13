@@ -14,7 +14,8 @@
         {
           "sandbox": { "enabled": true, "mode": "workspace-write" }
         }
-      ]
+      ],
+      "../plugins/wopal-plugin/src/index.ts"
     ],
     "permission": {
       "external_directory": {
