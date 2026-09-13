@@ -1,7 +1,7 @@
 # Ontology — 空间灵魂、规约与能力基因工具包设计
 
 > **Status**: Active
-> **Updated**: 2026-09-12
+> **Updated**: 2026-09-13
 > **Parent Architecture**: `docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -145,6 +145,12 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | Memory prompts | `$WOPAL_HOME/prompts` | `<wopalSpaceRoot>/.wopal/prompts` + `$WOPAL_HOME/prompts` |
 | Memory database | `$WOPAL_HOME/storage/memory` | `$WOPAL_HOME/storage/memory` |
 | Session context | `$WOPAL_HOME/storage/session_context` | `$WOPAL_HOME/storage/session_context` |
+
+#### TUI 品牌插件
+
+`tui-ellamaka` 插件为 WopalSpace 模式注入 TUI 品牌元素：首页 logo 块字符画与阴影、提示行紧凑 logo、会话提示行 logo 与会话 ID，以及 Nord 系 `ellamaka-theme.json` 主题。该插件随 `.wopal/` ontology 分发，不属于 ellamaka 引擎仓库。
+
+插件静态资源（主题文件、音频）随插件目录放置，由插件按相对路径解析。
 
 ### 模板体系
 
