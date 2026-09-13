@@ -1,0 +1,44 @@
+version: 1
+type: content
+description: 内容创作空间
+
+# 声明该空间挂载的 Agent (装配进当前空间 worktree)
+# 四维核心角色跨类型常驻，不随类型变化
+agents:
+  - wopal
+  - fae
+  - rook
+  - evolver
+
+# 声明该空间所需技能
+skills:
+  - space-master
+  - agents-collab
+  - dev-doc-master
+  - skill-creator
+
+# 声明该空间加载的规则
+rules:
+  - business-rules
+
+# 声明该空间加载的命令
+commands:
+  - init
+  - help
+  - cupdate-prd
+  - cupdate-design
+  - cupdate-roadmap
+  - cupdate-readme
+  - context-continue
+  - context-handoff
+  - context-recover
+  - wopal/memo
+  - wopal/evolve
+  - wopal/distill
+  - wopal/memory
+  - wopal/summon
+  - wopal/ontology-maintain
+
+# 声明该空间加载的插件
+plugins:
+  - wopal-plugin
