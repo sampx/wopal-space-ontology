@@ -21,7 +21,7 @@
 |------|-------------|
 | **wopal-cli** | `space sync`、`space status`、`space capability`、`ontology` 命令面改造、装配物化、`prepare-ontology` 装配语义（onboarding CLI machine operation） |
 | **ontology** | 装配单资产、Agent 体系资产清理、Evolver 等新代理、space-master 技能对齐 |
-| **ellamaka** | Desktop onboarding 契约消费对齐（`prepare-ontology` 返回契约变化后，`onboarding-ipc.ts` 的 `availableTypes` 消费与测试联动） |
+| **ellamaka** | Desktop onboarding 契约消费对齐（`prepare-ontology` 返回契约变化后，`onboarding-ipc.ts` 的 `availableTypes` 消费与测试联动）；插件相对路径规范化缺陷（已修复） |
 
 ---
 
@@ -69,17 +69,18 @@
 
 ### ONT-G1: 装配单资产未建立（ontology, P0）
 
-**目标态**: `config/types/<type>.yaml`（common/coding/content 等）声明类型默认装配的 agents/skills/rules，作为空间初始化模板与公共能力演进。
+**目标态**: `config/types/<type>.yaml`（coding、content）声明类型默认装配的 agents/skills/rules，作为空间初始化模板与公共能力演进。本地中央仓库 `main` 是能力合集，不对应任何空间类型。
 
 **当前状态**: `config/types/` 不存在。
 
 ### ONT-G2: Agent 体系资产未清理、未新建、未瘦身（ontology, P0）
 
-**目标态**: `agents/` 仅含四维核心 + 按类型装配的专职子代理；Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身至 ~40 行。
+**目标态**: `agents/` 仅含四维核心角色（wopal/fae/rook/evolver），跨类型常驻；类型差异由装配单的 skills / rules 承载；核心提示词瘦身至 ~40 行。
 
 **当前状态**:
-- ✅ 8 个微型伪专员已移除（architect、code-reviewer、code-simplifier、code-skeptic、data、docs-specialist、frontend-specialist、test-engineer），`agents/` 现仅剩 wopal/fae/rook 三个核心，移除项经核查在 dsh/commands/rules/prompts/templates 无引用。
-- 待办：Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身（wopal.md 198 行 → ~40 行）。
+- ✅ 8 个微型伪专员已移除（architect、code-reviewer、code-simplifier、code-skeptic、data、docs-specialist、frontend-specialist、test-engineer），移除项经核查在 dsh/commands/rules/prompts/templates 无引用。
+- ✅ Evolver 已建立（`agents/evolver.md`），与其他三核心一起跨类型常驻。
+- 待办：核心提示词瘦身（wopal.md 198 行 → ~40 行）。
 
 ### ONT-G3: WSF 资产与新装配模型关系未定义（ontology, P1）
 
@@ -101,17 +102,66 @@
 
 **当前状态**: `skills/space-master/SKILL.md` 及 `references/ontology-maintenance.md` 仍描述 main → type/* → space/* 三层分支与 space contribute / ontology promote。
 
+### SETTINGS-G1: settings.jsonc 中 plugin 绝对路径污染 central main（ontology, P0）
+
+**目标态**: `settings.jsonc` 人工维护、随 main 分发、CLI 永不改写；其中插件以相对空间 config 目录的路径引用（`../plugins/<name>`）。CLI 只写 gitignored 的 `settings.local.jsonc`。
+
+**当前状态**: ✅ 已完成。
+- `.wopal/config/settings.jsonc` 的 `ellamaka.plugin` 已改用相对路径（`../plugins/<name>`），随 main 分发不再携带实例绝对路径。
+- 相对路径解析依赖的 ellamaka 缺陷已修复并验证（见 ELL-G2）。
+- 相对路径声明必须使用合法 Spec 形态：无 options 时写裸字符串，禁止单元素数组 `["path"]`（不是合法的 `String | [String, Options]` 形态，会致整个 ellamaka 配置块解析失败被跳过）。
+
+**落地**: settings 分层写入权契约已记录于 DESIGN「配置分层与写入权」。CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`。
+
+### ELL-G2: WopalSpace settings 加载跳过 plugin 相对路径规范化（ellamaka, P0）
+
+**目标态**: `settings.jsonc` / `settings.local.jsonc` 中的插件相对路径，在 WopalSpace 模式下以声明它的 config 文件为基准规范化为绝对路径。
+
+**当前状态**: ✅ 已修复并验证（issue #227，提交 `db2dd48f12`）。
+
+**根因**: `config.ts` 的 `loadConfig` 只在 `{ path }` 分支调用 `resolveLoadedPlugins`，WopalSpace settings 走 `{ dir, source }` 分支时被 early return 跳过，相对路径最终按进程 CWD 解析，导致 `Cannot find module` 与插件加载失败。
+
+**修复**: 将 `resolveLoadedPlugins` 移至 early return 之前，两分支共用、以 `source` 为基准；连带修复规范化后暴露的去重碰撞（目录式插件入口均为 `index.*`，按 basename 取身份会合并不同插件，改为按包目录识别）。
+
+**验证**: 用户重启 ellamaka 后确认 serve 日志 target 指向 `.wopal/plugins/...`、插件日志正常输出。
+
+### PLUGIN-G2: prompts 应内置进 wopal-plugin（ontology, P1）
+
+**目标态**: `plugins/wopal-plugin` 内置 title / distill / dedup 提示词默认值（现有 fallback 常量机制），`prompts/` 目录退出必装能力，文件层仅作可选覆盖。
+
+**当前状态**: `prompts/{title,distill,dedup,commit-msg-gen}.md` 由 `wopal-plugin/src/context/prompts.ts` 按「空间 `.wopal/prompts/` → 用户级 `WOPAL_HOME/prompts/`」多层加载，目录被当作空间可装配资产。
+
+**落地**: 将默认提示词内化进插件源码，移除对 `prompts/` 目录的必装依赖，保留文件覆盖路径。
+
+### PLUGIN-G3: tui-ellamaka 插件未正规化（ontology, P1）
+
+**目标态**: `plugins/tui-ellamaka/` 为标准插件目录，含 `index.tsx`、`package.json`、`ellamaka-theme.json` 与 `asset/`（5 个 wav 音频资源）；settings.jsonc 以相对路径 `../plugins/tui-ellamaka` 引用。
+
+**当前状态**: `plugins/tui-ellamaka.tsx` 为散落单文件（32KB），主题 `plugins/ellamaka-theme.json` 与音频资源 `plugins/asset/`（1.1MB）独立散落在插件根；插件代码以 `./ellamaka-theme.json`、`import.meta.dir + "/asset"` 与 `./asset/*.wav` 引用。
+
+**落地**: 建立 `plugins/tui-ellamaka/` 目录，迁入 `index.tsx`、`ellamaka-theme.json` 与 assets（`asset/` 随迁）；代码引用为相对插件文件解析，迁移后无需改动；更新 settings.jsonc 引用为目录形式。`plugins/dsh-adapter` 保持纯 file 插件，不补 package.json。
+
+### TEMPLATES-G1: templates 应内化进 wopal-cli（wopal-cli, P1）
+
+**目标态**: 空间初始化模板（`wopalspace-schema.yaml` 及 `root-AGENTS.md` / `STRUCTURE.md` / `REGULATIONS.md` / `gitignore` / `memory/*` 等）内化进 wopal-cli 项目，不再由 ontology 分发。
+
+**当前状态**: `templates/` 位于 ontology 中央仓库，CLI 的 `schema-consumer.ts` / `space-initializer.ts` 从 `join(wopalDir, "templates")` 读取，形成「初始化时读取尚未物化的空间 worktree」的依赖。
+
+**落地**: 模板资产迁入 wopal-cli，初始化改从 CLI 自身资源读取；ontology 侧移除 templates 分发职责。
+
 ---
 
-## 落地方案：三个 Plan
+## 落地方式：讨论直施 + 两个 Plan
 
-Gaps 按仓库聚合为三个 Plan，一个仓库一个 Plan，内部按 Task 分组、可委派多个 fae 并行实施。
+P1 为设计与资产决策，由 Wopal 与用户讨论定稿后直接实施，不走 Plan 生命周期。P2/P3 为代码实现，各成一个 Plan，按仓库聚合。
 
-| Plan | 仓库 | 覆盖 gap | 范围 | 依赖 |
-|------|------|----------|------|------|
-| **P1** | ontology | ONT-G1、ONT-G2（剩余）、DOC-G1 | 装配单 `config/types/*.yaml`；Evolver 与 writer/editor/analyst/statistician 建立；核心提示词瘦身；space-master 技能对齐新模型 | 无 |
-| **P2** | wopal-cli | CLI-G1~G5、ONB-G1 | `space sync`/`status`/`capability`；`ontology install/update/contribute` 改造；删除 `reconcile`/`promote`；`space init` 装配物化；装配技术固化；`prepare-ontology` 装配语义 | P1（消费装配单） |
-| **P3** | ellamaka | ELL-G1 | Desktop onboarding 消费新 `availableTypes` 契约、`setup-machine-client` 复核、测试联动 | P2（契约定稿） |
+| 项 | 形态 | 仓库 | 覆盖 gap | 范围 | 依赖 |
+|------|------|----------|------|------|------|
+| **P1** | 讨论直施 | ontology | ONT-G1、ONT-G2（剩余）、DOC-G1、SETTINGS-G1、PLUGIN-G2、PLUGIN-G3 | 装配单 `config/types/*.yaml`（agents/skills/rules/commands/plugins）；Evolver 建立；核心提示词瘦身；settings 相对路径与分层契约；prompts 内置进插件；tui 插件正规化；space-master 对齐 | 无 |
+| **P2** | Plan | wopal-cli | CLI-G1~G5、ONB-G1、TEMPLATES-G1 | `space sync`/`status`/`capability`；`ontology install/update/contribute` 改造；删除 `reconcile`/`promote`；`space init` 装配物化；装配技术固化；`prepare-ontology` 装配语义；templates 内化 | P1（消费装配单） |
+| **P3** | Plan | ellamaka | ELL-G1 | Desktop onboarding 消费新 `availableTypes` 契约、`setup-machine-client` 复核、测试联动 | P2（契约定稿） |
+
+> ELL-G2 已作为独立 bug 修复完成（issue #227，提交 `db2dd48f12`），不进入 P3 范围。
 
 ### 直接动作（不建 Plan）
 
@@ -121,12 +171,12 @@ Gaps 按仓库聚合为三个 Plan，一个仓库一个 Plan，内部按 Task �
 ### 实施顺序
 
 ```text
-P1 装配资产落地
-  → P2 wopal-cli 命令面与装配实现（设计主体）
-    → P3 ellamaka Desktop 契约对齐
+P1 装配资产落地（讨论直施）
+  → P2 wopal-cli 命令面与装配实现（Plan，设计主体）
+    → P3 ellamaka Desktop 契约对齐（Plan）
 ```
 
-顺序理由：P1 的装配单是 P2 全部装配物化的硬输入前提；P2 定稿 `prepare-ontology` 返回契约后，P3 才能对齐消费端。三个 Plan 之间为硬依赖，串行推进；每个 Plan 内部 Task 按文件域分组，可委派多个 fae 并行。
+顺序理由：P1 的装配单是 P2 全部装配物化的硬输入前提；P2 定稿 `prepare-ontology` 返回契约后，P3 才能对齐消费端。P1 先行直施，P2/P3 依次走 Plan；每个 Plan 内部 Task 按文件域分组，可委派多个 fae 并行。
 
 ---
 

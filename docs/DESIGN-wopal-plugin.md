@@ -60,7 +60,7 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | `src/monitor/` | `MonitorEngine` 是唯一周期调度引擎 |
 | `src/tools/` | 工具定义；任务工具统一 `wopal_task_*` 前缀 |
 
-部署：`.wopal/plugins/wopal-plugin.ts` → symlink → `src/index.ts`。
+部署：在 `config/settings.jsonc` 中以相对路径声明插件目录 `../plugins/wopal-plugin/src/index.ts`。
 
 ### Resources 资源层
 

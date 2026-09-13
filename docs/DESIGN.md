@@ -26,12 +26,12 @@ ontology 拥有的目标态能力组：
 
 | 能力域 | 拥有的目标能力 | 明确边界 |
 |---|---|---|
-| Agent 体系 | 4 维核心角色（Wopal/Fae/Rook + Evolver）+ 按空间类型动态装配的专职子代理（Writer/Editor 等）；灵魂文件仅定义角色边界与决策原则 | 不持有 Agent runtime 实现；不硬编码微型工种 |
+| Agent 体系 | 4 维核心角色（Wopal/Fae/Rook + Evolver）跨类型常驻；类型差异由 skills / rules 能力装配承载，不靠新增代理切分 | 不持有 Agent runtime 实现；不硬编码微型工种 |
 | 技能生态 | 空间根 / 工作流 / 专用技能池，通过空间装配清单（BOM）按需物化与 JIT 动态注入 | 不判断技能产品价值，不负责 skill 内容设计 |
 | 命令体系 | 覆盖空间维护、自进化、项目管理、开发支持、上下文管理，可覆盖内置命令 | 不实现命令执行引擎 |
 | 规则体系 | 项目级 + 空间级 + 领域专属规则，wopal-plugin 条件匹配注入 | 不修改 ellamaka 核心行为 |
 | 运行时插件 | wopal-plugin 提供规则注入、任务委派、记忆系统、上下文管理四大能力，7 个 plugin tools | 仅限插件内部，不侵入技能/规则/命令 |
-| 模板与装配 | 空间初始化模板 + 空间类型装配清单（`config/types/*.yaml`） | 不持有空间运行态实例 |
+| 模板与装配 | 空间初始化模板 + 空间类型装配清单（`config/types/*.yaml`，声明 agents / skills / rules / commands / plugins） | 不持有空间运行态实例 |
 | 辅助脚本 | ontology 维护、git hooks 与辅助自动化脚本 | 仅承担辅助维护动作 |
 
 ---
@@ -65,12 +65,15 @@ ontology 拥有的目标态能力组：
 | **Rook**（审查眼 / 正交哨兵） | 独立正交质量审计、代码缺陷与安全风险排查、技术债预警 | 严格只读沙箱 (`read: allow`, `edit: deny`, `bash: allow` 仅限只读命令) | 严格遵守“无证据即无效”（Evidence-or-Downgrade），只认 `file:line` 事实 |
 | **Evolver**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`, `edit: deny` 对中央库只读提案) | **只出方案、不动刀**；执行严格的三级防污染分流检疫 |
 
-#### 动态装配（Agents are assembled, not invariant）
-Agent 不是全空间固定不变的。空间初始化时，根据 `config/types/<type>.yaml` 装配单，仅装配（sparse-checkout 物化）当前空间所需的子代理：
-- **Coding 空间**：装配 `[wopal, fae, rook]`（研发闭环）；
-- **Content 空间**：装配 `[wopal, writer, editor]`（内容创作与审校）；
-- **Data 空间**：装配 `[wopal, analyst, statistician]`（数据与统计）。
-Ellamaka 启动时扫描 `.wopal/agents/` 仅能看到被装配进当前空间 worktree 的代理，杜绝界面杂乱与提示词交叉污染。
+#### 动态装配（Capabilities are assembled, agents are constant）
+Agent soul 是角色级的，与空间类型无关。四个核心角色在所有空间常驻，类型差异由 `config/types/<type>.yaml` 装配单声明的 skills / rules 承载：
+
+- **Coding 空间**：四核心 + 工程类 skills / rules；
+- **Content 空间**：四核心 + 内容类 skills / rules。
+
+Fae 拿不同的「武器」执行，而不是换一个执行者；Rook 加载不同的审校技能，而不是换一个审查者。类型身份属于能力装配，不属于代理切分。专职子代理仅在出现真正不同的**角色**时才新增，且需专门设计确认，默认不增。
+
+Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 #### 废弃陈旧微型专员代理
 全面废除旧时代按文件后缀切片的 8 个微型伪专员与外部污染遗留：
@@ -193,16 +196,17 @@ type: coding
 description: 全栈工程研发空间
 
 # 声明该空间挂载的 Agent (装配进当前空间 worktree)
+# 四维核心角色跨类型常驻，不随类型变化
 agents:
   - wopal
   - fae
   - rook
+  - evolver
 
 # 声明该空间所需技能
 skills:
   - dev-flow
   - agents-collab
-  - modern-web-guidance
   - git-worktrees
 
 # 声明该空间加载的规则
@@ -211,17 +215,49 @@ rules:
   - python
   - business-rules
 
-# 空间特化权限切片 (通过 settings.jsonc 自动合并)
-permissions:
-  fae:
-    edit: allow
-    bash: allow
-  rook:
-    edit: deny
-    read: allow
+# 声明该空间加载的命令
+commands:
+  - init
+  - commit
+  - review
+  - wopal/memo
+
+# 声明该空间加载的插件
+plugins:
+  - wopal-plugin
+  - dsh-adapter
 ```
 
-空间初始化时，CLI 读取对应装配清单，通过 Git sparse-checkout 在 `<space>/.wopal/` worktree 内物化装配的资产为真实可写文件。空间内正常修改与提交，进化经 `space sync` 汇入 local main。
+装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`。空间初始化时，CLI 读取装配清单，通过 Git sparse-checkout 在 `<space>/.wopal/` worktree 内物化装配的资产为真实可写文件。空间内正常修改与提交，进化经 `space sync` 汇入 local main。
+
+`plugins` 声明插件名，物化对应插件目录到 `.wopal/plugins/<name>/`。插件在 settings.jsonc 中的引用使用相对空间 config 目录的路径（`../plugins/<name>`），使同一份配置在所有空间与机器上一致。
+
+#### 不进装配单的资产
+
+装配单只承载「按类型差异化装配的运行时能力」。以下资产不进入装配单：
+
+| 资产 | 归属 | 理由 |
+|------|------|------|
+| `templates/` | wopal-cli | 空间初始化时的确定性输入，渲染为 `AGENTS.md` / `STRUCTURE.md` 等产物后不再需要 |
+| `prompts/` | wopal-plugin | 插件内部运行时提示词，内置为插件默认值，文件层仅作可选覆盖 |
+| 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
+
+#### 配置分层与写入权
+
+空间配置分两层，写入权限严格区分：
+
+| 文件 | Git 跟踪 | 写入方 | 内容 |
+|------|----------|--------|------|
+| `.wopal/config/settings.jsonc` | 是（随 main 分发） | 人工维护 | 空间公共配置：instructions、permission 基准、插件相对路径引用 |
+| `.wopal/config/settings.local.jsonc` | 否（gitignore） | CLI / 用户 | 私有覆盖：model、apiKey、本地 permission 覆盖 |
+
+CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随 space 分支经 `space sync` 汇入 central main，任何实例相关内容写入都会污染中央能力池。
+
+#### 权限归属与用户覆盖
+
+Agent 的权限基准属于角色本身，写在 `agents/<name>.md` 的 frontmatter `permission:` 中，随装配物化进入空间 worktree。权限不进入类型装配单：装配单声明「装配哪些能力」，不承载权限数值。
+
+用户若要为本空间覆盖某 agent 的权限，写入 `.wopal/config/settings.local.jsonc` 的 `ellamaka.agent.<name>.permission`。该文件被 git 忽略，覆盖只作用于当前空间，不会随 space 分支提交回 central main。ellamaka 的加载顺序保证 `settings.local.jsonc` 深合并覆盖 `settings.jsonc`，因此本地覆盖天然生效。
 
 ---
 
@@ -246,7 +282,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 1. `agents/*.md` — Agent 灵魂定义与 frontmatter 权限配置
 2. `skills/*/SKILL.md` — 技能元数据与指令（按触发条件注入）
 3. `commands/*.md` 与 `commands/wopal/*.md` — 命令定义（可覆盖内置命令）
-4. `plugins/wopal-plugin.ts` — 插件入口（symlink → src/index.ts）
+4. `plugins/<name>/` — 插件目录；在 `config/settings.jsonc` 中以相对路径 `../plugins/<name>` 声明
 5. `config/settings.jsonc` + `config/settings.local.jsonc` — 空间级配置（公共 + 私有覆盖）
 
 多数加载链路相关改动以 ellamaka 重启后的加载结果作为验证标准。
@@ -278,7 +314,7 @@ wopal space init my-space --type coding
 wopal space init my-space --type content
 ```
 
-- 不传 `--type` 时默认 `common`，使用 `config/types/common.yaml` 装配单。
+- `--type` 为必填，`coding` 与 `content` 是当前支持的类型。类型语义由装配单承载，本地中央仓库 `main` 是能力合集，不对应任何空间类型。
 - `--type coding` 使用 `config/types/coding.yaml` 装配单，声明该类型默认装配的 agents / skills / rules。
 - 装配单存在且可读；空间初始化时按装配单 sparse-checkout 物化能力文件。
 - 用户可在初始化后通过 `wopal space capability add/remove` 调整空间装配清单。
@@ -552,7 +588,7 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 
 两层装配单，各司其职：
 
-1. **类型装配单**（本地中央仓库 `config/types/<type>.yaml`）：声明空间类型的默认能力组合（agents / skills / rules），是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。
+1. **类型装配单**（本地中央仓库 `config/types/<type>.yaml`）：声明空间类型的默认能力组合（agents / skills / rules / commands / plugins），是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。
 2. **空间装配单**（空间运行态 `.wopal-space/assembly.yaml`）：空间的实际装配清单——`type`、来源 `revision`、`assembledAt` 与显式能力列表。由 CLI 初始化并维护，用户通过 `wopal space capability add/remove` 增删能力，不手工编辑。
 
 装配物化使用 Git `sparse-checkout`：空间 worktree 只物化装配单选中的路径，共享中央仓库对象库，不复制历史。

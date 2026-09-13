@@ -32,7 +32,7 @@ Canonical references:
 | `src/rules/` | Rule discovery, matching, formatting |
 | `scripts/` | CLI tools, migrations, validation utilities |
 
-Deployment: `.wopal/plugins/wopal-plugin.ts` → symlink → `src/index.ts`.
+Deployment: declared in `config/settings.jsonc` as the relative path `../plugins/wopal-plugin/src/index.ts`.
 
 ## 3. Development Commands
 

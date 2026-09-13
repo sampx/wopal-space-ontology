@@ -32,7 +32,7 @@ Wopal 专用 ellamaka 运行时插件 — 规则注入、任务委派、记忆�
 | `src/rules/` | 规则发现、匹配、格式化 |
 | `scripts/` | CLI 工具、迁移、验证辅助脚本 |
 
-部署：`.wopal/plugins/wopal-plugin.ts` → symlink → `src/index.ts`。
+部署：在 `config/settings.jsonc` 中以相对路径 `../plugins/wopal-plugin/src/index.ts` 声明。
 
 ## 3. 开发命令
 

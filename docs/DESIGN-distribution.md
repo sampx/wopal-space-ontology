@@ -49,7 +49,7 @@ ontology 的安装形态是 Git 仓库 + 装配 worktree。
 
 1. 解析目标 ontology source
 2. 准备本地 ontology repo（clone/fork，物化 local main）
-3. 读取 `config/types/<type>.yaml` 装配单（缺省 common）
+3. 读取 `config/types/<type>.yaml` 装配单
 4. 创建 `space/<space-name>` 分支
 5. 在 `<space>/.wopal/` 建立装配 worktree（sparse-checkout 按装配单物化）
 
