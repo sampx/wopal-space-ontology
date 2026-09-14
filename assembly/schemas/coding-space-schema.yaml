@@ -29,5 +29,4 @@ space:
       target: BOOTSTRAP.md
   dirs:
     - path: projects
-    - path: contents
     - path: docs

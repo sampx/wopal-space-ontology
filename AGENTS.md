@@ -71,7 +71,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, 
 ### Commands: `commands/`
 
 - Shared commands go in `commands/*.md`; Wopal-specific commands go in `commands/wopal/*.md`.
-- Write uniformly per `.wopal/templates/command.md`.
+- Write uniformly per `.wopal/assembly/templates/command.md`.
 - frontmatter: `description` required (≤50 chars); sub-task commands: `subtask: true`.
 - Use `$ARGUMENTS` or `$1...$N` for parameters; the highest `$N` consumes remaining arguments (rest semantics).
 

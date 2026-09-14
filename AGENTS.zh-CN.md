@@ -71,7 +71,7 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 ### 命令: `commands/`
 
 - 共享命令放 `commands/*.md`；Wopal 专属命令放 `commands/wopal/*.md`。
-- 统一按 `.wopal/templates/command.md` 编写。
+- 统一按 `.wopal/assembly/templates/command.md` 编写。
 - frontmatter：`description` 必填（≤50 字符）；子任务命令加 `subtask: true`。
 - 参数使用 `$ARGUMENTS` 或 `$1...$N`；最大 `$N` 吃掉剩余参数（rest 语义）。
 

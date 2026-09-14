@@ -3,7 +3,11 @@ description: Read-only review agent. Audits the quality of every deliverable—p
 mode: all
 temperature: 0.1
 permission:
-  wopal_*: deny
+  wopal_task: deny
+  wopal_task_output: deny
+  wopal_task_reply: deny
+  wopal_task_abort: deny
+  wopal_task_finish: deny
   task: deny
   memory_manage: deny
   context_manage: deny

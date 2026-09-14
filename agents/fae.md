@@ -3,7 +3,11 @@ description: Execution agent for all implementation work. Receives clearly scope
 mode: all
 temperature: 0.3
 permission:
-  wopal_*: deny
+  wopal_task: deny
+  wopal_task_output: deny
+  wopal_task_reply: deny
+  wopal_task_abort: deny
+  wopal_task_finish: deny
   task: deny
   memory_manage: deny
   context_manage: deny

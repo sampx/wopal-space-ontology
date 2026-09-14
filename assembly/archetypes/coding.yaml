@@ -1,6 +1,9 @@
 version: 1
-type: content
-description: 内容创作空间
+type: coding
+description: 全栈工程研发空间
+
+# 空间骨架。省略时按约定取 <type>-space-schema.yaml
+# schema: coding-space-schema.yaml
 
 # 声明该空间挂载的 Agent (装配进当前空间 worktree)
 # 四维核心角色跨类型常驻，不随类型变化
@@ -14,21 +17,33 @@ agents:
 skills:
   - space-master
   - agents-collab
+  - dev-flow
+  - df-plan-review
+  - df-implement-review
   - dev-doc-master
+  - git-worktrees
+  - customize-opencode
   - skill-creator
 
 # 声明该空间加载的规则
 rules:
+  - typescript
+  - python
   - business-rules
 
 # 声明该空间加载的命令
 commands:
   - init
+  - commit
+  - review
   - help
   - cupdate-prd
   - cupdate-design
   - cupdate-roadmap
   - cupdate-readme
+  - cupdate-agent-rules
+  - evaluate-skill
+  - extract-br
   - context-continue
   - context-handoff
   - context-recover
@@ -42,3 +57,4 @@ commands:
 # 声明该空间加载的插件
 plugins:
   - wopal-plugin
+  - dsh-adapter
