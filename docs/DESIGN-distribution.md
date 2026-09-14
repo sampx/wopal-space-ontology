@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-09-12
+> **Updated**: 2026-09-14
 > **上级**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 
@@ -49,7 +49,7 @@ ontology 的安装形态是 Git 仓库 + 装配 worktree。
 
 1. 解析目标 ontology source
 2. 准备本地 ontology repo（clone/fork，物化 local main）
-3. 读取 `config/types/<type>.yaml` 装配单
+3. 读取 `assembly/archetypes/<type>.yaml` 装配单与其 `schema` 指向的骨架
 4. 创建 `space/<space-name>` 分支
 5. 在 `<space>/.wopal/` 建立装配 worktree（sparse-checkout 按装配单物化）
 
@@ -59,13 +59,13 @@ P1 目标语义：
 2. fork flow 是显式选择的替代模式
 3. 每个 space 拥有独立的 `space/<name>` 分支与装配 worktree
 4. `.wopal/` 是装配 worktree，不是复制目录，也不持有独立能力演化
-5. 空间装配单 `.wopal-space/assembly.yaml` 记录类型、来源 revision 与装配时间
+5. `.wopal-space/space-meta.json` 记录类型、骨架、来源 revision、装配时间与装配快照
 
 ---
 
 ## Template and Runtime Skeleton Contract
 
-ontology 通过 `.wopal/templates/wopalspace-schema.yaml` 与相关模板，为 CLI 提供确定性初始化输入。
+ontology 通过 `assembly/schemas/` 下的类型骨架与 `assembly/templates/` 素材，为 CLI 提供确定性初始化输入。装配单的 `schema` 字段选择该类型所用骨架。
 
 CLI 消费 ontology templates 时负责：
 
@@ -75,11 +75,11 @@ CLI 消费 ontology templates 时负责：
 4. 创建 `.wopal-space/REGULATIONS.md`
 5. 创建 `.wopal-space/memory/USER.md`
 6. 创建 `.wopal-space/memory/MEMORY.md`
-7. 补齐 schema 中声明的固定目录
+7. 补齐骨架中声明的固定目录
 
 Contract：
 
-1. ontology 声明 template 和 schema，CLI 负责确定性 materialization。
+1. ontology 声明装配单、骨架与模板，CLI 负责确定性 materialization。
 2. rerun 时补齐缺失项，已有文件的用户内容保持不动。
 3. `/init` 在初始化之后承接智能校准，与首次确定性 materialization 分工协作。
 

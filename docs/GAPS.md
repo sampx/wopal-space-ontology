@@ -1,7 +1,7 @@
 # GAPS — 设计优化落地追踪
 
 > **Status**: Active
-> **Updated**: 2026-09-12
+> **Updated**: 2026-09-14
 > **Parent Architecture**: `./DESIGN.md`
 > **Companion**: 本文档追踪 2026-09 设计优化（中央能力池 + 装配 worktree + `space sync`）的目标态与实现落地偏差，按项目归属拆分，逐项解决后关闭。
 
@@ -19,9 +19,10 @@
 
 | 项目 | 负责的落地项 |
 |------|-------------|
-| **wopal-cli** | `space sync`、`space status`、`space capability`、`ontology` 命令面改造、装配物化、`prepare-ontology` 装配语义（onboarding CLI machine operation） |
-| **ontology** | 装配单资产、Agent 体系资产清理、Evolver 等新代理、space-master 技能对齐 |
-| **ellamaka** | Desktop onboarding 契约消费对齐（`prepare-ontology` 返回契约变化后，`onboarding-ipc.ts` 的 `availableTypes` 消费与测试联动）；插件相对路径规范化缺陷（已修复） |
+| **wopal-cli** | `space sync`、`space status`、`space capability`、`ontology` 命令面改造、装配物化与类型骨架消费、装配定义读取、`prepare-ontology` 装配语义（onboarding CLI machine operation） |
+| **ontology** | 装配定义目录（装配单 / 骨架 / 模板）、类型骨架分化、Agent 体系资产清理、Evolver 等新代理、space-master 技能对齐、武器库清单与派发装配契约 |
+| **ellamaka** | Desktop onboarding 契约消费对齐（`prepare-ontology` 返回契约变化后，`onboarding-ipc.ts` 的 `availableTypes` 消费与测试联动）；插件相对路径规范化缺陷（已修复）；技能与 MCP 的会话级权限判定 |
+| **wopal-plugin** | 武器库扫描与能力清单工具、`wopal_task` 装配参数与权限合成、规则按会话注入、子会话权限注入通道 |
 
 ---
 
@@ -49,9 +50,9 @@
 
 ### CLI-G4: Space Init 装配物化未实现（wopal-cli, P0）
 
-**目标态**: `space init --type <type>` 读取 `config/types/<type>.yaml` 装配单，sparse-checkout 物化 `.wopal/` worktree，写入 `.wopal-space/assembly.yaml`。
+**目标态**: `space init --type <type>` 读取 `assembly/archetypes/<type>.yaml` 装配单与其 `schema` 指向的骨架，sparse-checkout 物化 `.wopal/` worktree，写入 `.wopal-space/space-meta.json`。
 
-**当前状态**: `space init` 映射 `type/<type>` 分支、materialize 全量 worktree，无装配单消费、无 assembly.yaml。
+**当前状态**: `space init` 映射 `type/<type>` 分支、materialize 全量 worktree，无装配单消费、无类型骨架消费、无 space-meta.json。
 
 ### CLI-G5: 装配技术可行性已验证，需固化实现规范（wopal-cli, P0）
 
@@ -59,28 +60,52 @@
 
 **当前状态**: 技术在 `.wopal-space/.tmp/git-assembly-spike.*` 已实测通过（独立装配、快进更新/贡献、事务隔离、脏文件保护），未固化进实现。
 
+### CLI-G6: CLI 未消费类型骨架（wopal-cli, P0）
+
+**目标态**: `space init --type <type>` 读取装配单的 `schema` 字段，按所选骨架创建空间结构；骨架缺失或格式错误时以 fail fast 报错，保持 space registry 与 active space 状态不变。
+
+**当前状态**: CLI 从 `join(wopalDir, "templates")` 读取单一 `wopalspace-schema.yaml`，所有空间使用同一套骨架。
+
+**落地**: 改从 `assembly/archetypes/` 读装配单、`assembly/schemas/` 读骨架；实现 `schema` 字段解析与稳健的错误兼容；按装配单生成空间特有插件配置到 `settings.local.jsonc`；写出 `.wopal-space/space-meta.json`。
+
 ### ONB-G1: onboarding `prepare-ontology` 装配语义未实现（wopal-cli, P0）
 
-**目标态**: onboarding 的 `prepare-ontology`（CLI machine operation）物化 local main 与类型装配单（`config/types/*.yaml`），供 `space init --type` 消费；类型选择走装配单而非 type/* 分支。
+**目标态**: onboarding 的 `prepare-ontology`（CLI machine operation）物化 local main 与装配定义（`assembly/archetypes/*.yaml`、`assembly/schemas/*.yaml`），供 `space init --type` 消费；类型选择走装配单而非 type/* 分支。
 
 **当前状态**:
 - 设计文档已对齐：产品级 `DESIGN-onboarding.md` 的 `prepare-ontology` 已更新为"物化 local main 与类型装配单"；产品级 DESIGN 与 ellamaka onboarding 文档均已明确「operation 语义由 wopal-cli 实现、ellamaka/Desktop 仅消费」的边界。
 - wopal-cli 实现仍残留 type/*：`setup-operations.ts` `prepare-ontology` 收集并物化全部 `type/*` 分支；`types/cli.ts` 的 `BehindCommonAnalysis` / `AheadOfCommonAnalysis` 均基于 type/* 分支。需随 CLI-G3 一并改造。
 
-### ONT-G1: 装配单资产未建立（ontology, P0）
+### ONT-G1: 装配定义目录未建立（ontology, P0）
 
-**目标态**: `config/types/<type>.yaml`（coding、content）声明类型默认装配的 agents/skills/rules，作为空间初始化模板与公共能力演进。本地中央仓库 `main` 是能力合集，不对应任何空间类型。
+**目标态**: 装配定义集中于 `.wopal/assembly/`，含 `archetypes/`（类型装配单）、`schemas/`（空间骨架）、`templates/`（渲染素材）；`config/` 只保留 settings 类配置。装配定义作为物化源头保留在中央仓库，不物化进空间。本地中央仓库 `main` 是能力合集，不对应任何空间类型。
 
-**当前状态**: `config/types/` 不存在。
+**当前状态**: 装配单已建立于 `config/types/`（coding、content），但与 settings 混处，语义混乱；模板位于根目录 `templates/`；骨架内嵌于模板目录，未独立；装配单未声明所用骨架。
+
+**落地**:
+- 建立 `assembly/archetypes/`、`assembly/schemas/`、`assembly/templates/` 三级结构。
+- 装配单从 `config/types/` 迁入 `assembly/archetypes/`，新增 `schema` 字段与 `scripts` 能力类目。
+- 骨架从 `templates/wopalspace-schema.yaml` 拆分，按类型独立为 `assembly/schemas/<type>-space-schema.yaml`。
+- 模板迁入 `assembly/templates/`。
+
+### ONT-G5: 空间结构未按类型分化（ontology, P0）
+
+**目标态**: 不同空间类型拥有不同骨架——coding 空间建立 `projects/`，content 空间建立 `contents/`，结构差异由装配单的 `schema` 字段选择。
+
+**当前状态**: `wopalspace-schema.yaml` 硬编码 `projects/`、`contents/`、`docs/` 三个目录，所有空间物化为同一套布局。
+
+**落地**:
+- 按类型拆分骨架：`coding-space-schema.yaml` 声明 `projects/` 与 `docs/`；`content-space-schema.yaml` 声明 `contents/` 与 `docs/`。
+- 共享部分（runtime 骨架、memory、logs 等）在两套骨架中各自声明，由装配单的 `schema` 字段选择。
 
 ### ONT-G2: Agent 体系资产未清理、未新建、未瘦身（ontology, P0）
 
-**目标态**: `agents/` 仅含四维核心角色（wopal/fae/rook/evolver），跨类型常驻；类型差异由装配单的 skills / rules 承载；核心提示词瘦身至 ~40 行。
+**目标态**: `agents/` 仅含四维核心角色（wopal/fae/rook/evolver），跨类型常驻；类型差异由装配单的 skills / rules 承载；核心提示词保持精简，只承载角色定位、职责边界、能力武器纪律与交互风格。
 
-**当前状态**:
-- ✅ 8 个微型伪专员已移除（architect、code-reviewer、code-simplifier、code-skeptic、data、docs-specialist、frontend-specialist、test-engineer），移除项经核查在 dsh/commands/rules/prompts/templates 无引用。
-- ✅ Evolver 已建立（`agents/evolver.md`），与其他三核心一起跨类型常驻。
-- 待办：核心提示词瘦身（wopal.md 198 行 → ~40 行）。
+**当前状态**: ✅ 已完成。
+- 四核心齐备：`wopal`、`fae`、`rook`、`evolver`，跨类型常驻。
+- 核心提示词已精简：wopal 97 行、fae 82 行、rook 101 行、evolver 65 行，各含能力武器纪律章节。
+- 提示词不再假设任务来源，任务可来自用户直接委派或 Wopal。
 
 ### ONT-G3: WSF 资产与新装配模型关系未定义（ontology, P1）
 
@@ -141,13 +166,64 @@
 
 **落地**: 建立 `plugins/tui-ellamaka/` 目录，迁入 `index.tsx`、`ellamaka-theme.json` 与 assets（`asset/` 随迁）；代码引用为相对插件文件解析，迁移后无需改动；更新 settings.jsonc 引用为目录形式。`plugins/dsh-adapter` 保持纯 file 插件，不补 package.json。
 
-### TEMPLATES-G1: templates 应内化进 wopal-cli（wopal-cli, P1）
+### ASSEMBLY-G1: 引擎侧技能可见性未支持会话级权限（ellamaka, P0）
 
-**目标态**: 空间初始化模板（`wopalspace-schema.yaml` 及 `root-AGENTS.md` / `STRUCTURE.md` / `REGULATIONS.md` / `gitignore` / `memory/*` 等）内化进 wopal-cli 项目，不再由 ontology 分发。
+**目标态**: 技能可见性判定综合角色基线与会话级权限，使 Wopal 为会话装配的技能能够出现在该会话的可用技能清单中。
 
-**当前状态**: `templates/` 位于 ontology 中央仓库，CLI 的 `schema-consumer.ts` / `space-initializer.ts` 从 `join(wopalDir, "templates")` 读取，形成「初始化时读取尚未物化的空间 worktree」的依赖。
+**当前状态**: 技能可见性判定只读角色基线（`skill/index.ts` 的 `available()` 接收 `agent` 并仅按 `agent.permission` 过滤；`session/system.ts` 的技能段注入同样只依据角色基线）。会话级权限无法影响技能可见性，运行时装配技能后技能不会出现在子会话的可用清单中。
 
-**落地**: 模板资产迁入 wopal-cli，初始化改从 CLI 自身资源读取；ontology 侧移除 templates 分发职责。
+**落地**: 扩展技能可见性判定，接收并合并会话级权限规则；同步调整系统提示词技能段的注入判定。技能执行时的授权判定已综合两侧规则，无需调整。
+
+### ASSEMBLY-G2: MCP 工具未纳入权限过滤（ellamaka, P1）
+
+**目标态**: MCP 工具的可见性与执行授权纳入权限规则判定，可按会话装配。
+
+**当前状态**: MCP 工具按连接状态收集（`mcp/index.ts` 的 `tools()`），不经过权限规则过滤。
+
+**落地**: 在 MCP 工具收集路径加入权限规则判定，与技能保持一致的作用域语义。
+
+### ASSEMBLY-G3: 武器库扫描与能力清单工具未实现（wopal-plugin, P0）
+
+**目标态**: 插件启动时扫描空间 worktree 构建武器库清单，并通过 `wopal_capability_list` 工具提供给 Wopal；清单含未授予任何角色基线的能力，每项携带名称、描述与物理路径。
+
+**当前状态**: 插件无武器库概念，无能力清单工具。技能与规则的物理清单只存在于各自模块的内部扫描结果中。
+
+**落地**: 实现武器库扫描（技能、规则、MCP），构建清单结构；新增 `wopal_capability_list` 工具暴露清单。
+
+### ASSEMBLY-G4: `wopal_task` 未支持能力装配参数（wopal-plugin, P0）
+
+**目标态**: `wopal_task` 接受 `capabilities` 参数（`skills` / `rules` / `mcp` 名称数组），派发时合成会话级权限并注入子会话，实现超越角色基线的运行时装配。
+
+**当前状态**: `wopal_task` 只接受 `description` / `prompt` / `agent`。子会话创建后以 `promptAsync` 的 `tools` 参数传递工具开关，该参数为引擎的兼容形态，会整体替换会话级权限。
+
+**落地**: 新增 `capabilities` 参数；派发流程改为在会话创建后经会话更新接口注入合成权限；移除 `promptAsync` 的 `tools` 传参，避免兼容形态替换已注入的权限。
+
+### ASSEMBLY-G5: 规则注入未按会话装配（wopal-plugin, P0）
+
+**目标态**: 规则注入读取会话级装配结果，只注入该会话被授予的规则，并保持既有的提示词匹配与去重行为。
+
+**当前状态**: 规则注入按角色名与提示词关键词匹配（`hooks/rule-injector.ts`、`rules/matcher.ts`），无会话级装配概念。
+
+**落地**: 规则注入路径接入会话级装配结果，按授予范围过滤可用规则集，保留既有匹配与去重逻辑。
+
+### ASSEMBLY-G6: `agents/*.md` 权限块含通配键（ontology, P1）
+
+**目标态**: 角色权限块的键使用工具的真实标识，语义明确无歧义。
+
+**当前状态**: fae / rook / evolver 的权限块使用 `wopal_*` 通配键覆盖插件工具。
+
+**落地**: 待插件工具标识命名规范确立后统一调整，确保插件工具与内置工具的权限键语义清晰。
+
+### TEMPLATES-G1: templates 与装配定义保留在 ontology（ontology + wopal-cli, P1）
+
+**目标态**: 空间骨架、模板与类型装配单留在 ontology，作为中央能力池的装配定义；wopal-cli 从中央仓库读取装配定义并物化到空间。模板的版本管理与维护归属 ontology，与空间结构契约的治理面一致。
+
+**当前状态**: 装配定义散落——`templates/` 位于 ontology 根目录，装配单位于 `config/types/`，骨架未独立，三者语义混杂。CLI 的 `schema-consumer.ts` / `space-initializer.ts` 从 `join(wopalDir, "templates")` 读取。
+
+**落地**:
+- ontology 侧建立 `assembly/` 目录，收纳 `archetypes/`（类型装配单）、`schemas/`（空间骨架）、`templates/`（渲染素材）；`config/` 只保留 settings 类配置。
+- 装配单新增 `schema` 字段指向所用骨架，使空间结构成为类型差异的一部分。
+- wopal-cli 改从 `assembly/` 读取装配定义，并对缺失、路径错误、版本不匹配做稳健处理与明确报错。
 
 ---
 
@@ -157,9 +233,10 @@ P1 为设计与资产决策，由 Wopal 与用户讨论定稿后直接实施，�
 
 | 项 | 形态 | 仓库 | 覆盖 gap | 范围 | 依赖 |
 |------|------|----------|------|------|------|
-| **P1** | 讨论直施 | ontology | ONT-G1、ONT-G2（剩余）、DOC-G1、SETTINGS-G1、PLUGIN-G2、PLUGIN-G3 | 装配单 `config/types/*.yaml`（agents/skills/rules/commands/plugins）；Evolver 建立；核心提示词瘦身；settings 相对路径与分层契约；prompts 内置进插件；tui 插件正规化；space-master 对齐 | 无 |
-| **P2** | Plan | wopal-cli | CLI-G1~G5、ONB-G1、TEMPLATES-G1 | `space sync`/`status`/`capability`；`ontology install/update/contribute` 改造；删除 `reconcile`/`promote`；`space init` 装配物化；装配技术固化；`prepare-ontology` 装配语义；templates 内化 | P1（消费装配单） |
-| **P3** | Plan | ellamaka | ELL-G1 | Desktop onboarding 消费新 `availableTypes` 契约、`setup-machine-client` 复核、测试联动 | P2（契约定稿） |
+| **P1** | 讨论直施 | ontology | ONT-G1、ONT-G5、DOC-G1、SETTINGS-G1、PLUGIN-G2、PLUGIN-G3、ASSEMBLY-G6 | 装配定义目录 `assembly/{archetypes,schemas,templates}`；类型骨架分化；Evolver 建立；核心提示词瘦身；settings 相对路径与分层契约；prompts 内置进插件；tui 插件正规化；space-master 对齐 | 无 |
+| **P2** | Plan | wopal-cli | CLI-G1~G6、ONB-G1、TEMPLATES-G1 | `space sync`/`status`/`capability`；`ontology install/update/contribute` 改造；删除 `reconcile`/`promote`；`space init` 装配物化与类型骨架消费；装配技术固化；`prepare-ontology` 装配语义；装配定义读取与错误兼容 | P1（消费装配单） |
+| **P3** | Plan | ellamaka | ELL-G1、ASSEMBLY-G1、ASSEMBLY-G2 | Desktop onboarding 消费新 `availableTypes` 契约、`setup-machine-client` 复核、测试联动；技能可见性支持会话级权限；MCP 纳入权限过滤 | P2（契约定稿） |
+| **P4** | Plan | wopal-plugin | ASSEMBLY-G3、ASSEMBLY-G4、ASSEMBLY-G5 | 武器库扫描与 `wopal_capability_list`；`wopal_task` 能力装配参数与权限合成；规则按会话装配 | P3（引擎判定就绪） |
 
 > ELL-G2 已作为独立 bug 修复完成（issue #227，提交 `db2dd48f12`），不进入 P3 范围。
 
@@ -172,11 +249,12 @@ P1 为设计与资产决策，由 Wopal 与用户讨论定稿后直接实施，�
 
 ```text
 P1 装配资产落地（讨论直施）
-  → P2 wopal-cli 命令面与装配实现（Plan，设计主体）
-    → P3 ellamaka Desktop 契约对齐（Plan）
+  → P2 wopal-cli 命令面与装配实现（Plan）
+    → P3 ellamaka 引擎会话级权限判定（Plan）
+      → P4 wopal-plugin 运行时装配实现（Plan）
 ```
 
-顺序理由：P1 的装配单是 P2 全部装配物化的硬输入前提；P2 定稿 `prepare-ontology` 返回契约后，P3 才能对齐消费端。P1 先行直施，P2/P3 依次走 Plan；每个 Plan 内部 Task 按文件域分组，可委派多个 fae 并行。
+顺序理由：P1 的装配单是 P2 全部装配物化的硬输入前提；P2 定稿 `prepare-ontology` 返回契约后，P3 才能对齐消费端；P3 打通引擎侧的会话级权限判定后，P4 的装配注入才有生效落点。每个 Plan 内部 Task 按文件域分组，可委派多个 fae 并行。
 
 ---
 

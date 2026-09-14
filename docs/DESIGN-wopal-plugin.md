@@ -1,7 +1,7 @@
 # DESIGN — wopal-plugin 总体设计
 
 > **Status**: Draft
-> **Updated**: 2026-09-12
+> **Updated**: 2026-09-14
 > **上级**: `./DESIGN.md`（ontology 总体设计：插件体系、配置体系章节）
 
 ---
@@ -22,8 +22,9 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | 任务委派 | 非阻塞子会话启动、状态监控、双向通信、并发控制、进程清理 | 不管理任务业务逻辑 |
 | 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD | 不持有记忆数据 |
 | 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储、蒸馏（preview → confirm） | 不改变模型行为 |
+| 能力装配 | 武器库扫描、能力清单暴露、派发时合成会话级权限、规则按会话注入 | 不定义能力内容，不决定中央能力池构成 |
 
-插件向 Agent 暴露 7 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`memory_manage`、`context_manage`。
+插件向 Agent 暴露 8 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`wopal_capability_list`、`memory_manage`、`context_manage`。
 
 ## Key Decisions
 
@@ -36,6 +37,8 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | compaction 不纳入开关 | 会话安全阀，永远启用 |
 | Prompt 模板按约定路径解析，不设配置项 | 空间级与用户级路径已覆盖自定义需求，配置项会为边缘场景增加心智负担 |
 | 插件能实现尽量不改造 engine | 所有能力以 Hook/Tool 注入，不改 ellamaka 核心 |
+| 能力装配以会话级权限为注入通道 | 会话级权限能超越角色基线，且持久化于会话记录，压缩不失效 |
+| 装配参数只接受能力名称 | 权限规则由插件按能力类型构造，调用方不接触权限细节，装配参数不可能出现语法形态错误 |
 | Plugin instance 隔离 | 每个 instance 独立运行时上下文、配置、日志与资源 |
 
 ## Module Architecture
@@ -109,6 +112,73 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 - 通知：进度通知、会话 ID 解析、任务引用解析
 
 任务工具永远注册，不依赖任何开关。`SimpleTaskManager` 的周期监控通过 `MonitorStrategy` 注册进 `MonitorEngine`。
+
+### 能力装配模块
+
+能力装配模块把空间武器库转化为具体会话的能力授予。它由武器库扫描、能力清单暴露、派发装配三部分组成。
+
+#### 武器库扫描
+
+插件启动时扫描空间 worktree 构建武器库清单。技能从 `.wopal/skills/` 下的 `SKILL.md` 收集，规则从 `.wopal/rules/` 下的规则文件收集，MCP 从配置的服务声明收集。
+
+清单保留**全部**扫描结果，不做角色基线过滤——未授予任何角色的能力同样在列。每项记录名称、描述与物理路径。路径供规则注入读取与人工审计定位。
+
+#### 能力清单契约
+
+`wopal_capability_list` 无参数，返回武器库清单：
+
+```jsonc
+{
+  "skills": [
+    { "name": "content-writer", "description": "内容写作技能", "path": ".wopal/skills/content-writer/SKILL.md" }
+  ],
+  "rules": [
+    { "name": "typescript", "description": "TS 项目规则", "path": ".wopal/rules/typescript.md" }
+  ],
+  "mcp": [
+    { "name": "some-mcp", "description": "外部工具服务", "path": null }
+  ]
+}
+```
+
+命令行是界面功能而非 Agent 可用的武器，不进入清单。
+
+#### 派发装配契约
+
+`wopal_task` 的 `capabilities` 参数只接受能力名称数组：
+
+```jsonc
+{
+  "description": "任务简述",
+  "prompt": "任务详情",
+  "agent": "fae",
+  "capabilities": {
+    "skills": ["content-writer", "youtube-master"],
+    "rules": ["content-style"],
+    "mcp": ["some-mcp"]
+  }
+}
+```
+
+三个字段均可选，省略即采用角色基线。省略 `capabilities` 时装配结果与角色基线一致。
+
+参数只表达「要什么」，不表达「怎么设」。插件按能力类型把名称翻译成权限规则：
+
+| 能力类型 | 合成规则 | 生效方式 |
+|---------|---------|---------|
+| Skills | 会话级权限授予技能名 | 技能进入该会话可见清单，执行时授权通过 |
+| Rules | 会话级装配记录 | 规则注入按装配结果过滤 |
+| MCP | 会话级权限授予服务名 | 工具可见与执行授权通过 |
+
+权限规则由插件构造，调用方不接触权限细节。装配参数因此不可能出现语法形态错误。
+
+#### 装配注入
+
+派发流程在会话创建后注入合成权限，经会话更新接口完成。该接口以合并语义追加规则，能与既有规则叠加而不替换。
+
+装配在会话创建时确定，会话生命周期内保持稳定。会话级权限持久化于会话记录，上下文压缩不改变它；系统提示词每轮重建，压缩后的下一轮依据既有权限重新渲染能力清单。会话结束即装配失效，后续派发由 Wopal 按当时任务性质重新装配。
+
+内置工具的可见性与授权由角色基线完整控制，不进入会话装配。
 
 ### Monitor 模块
 
@@ -204,11 +274,12 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 | 工具 | 注册条件 | 职责 |
 |------|----------|------|
-| `wopal_task` | 始终 | 非阻塞子会话启动 |
+| `wopal_task` | 始终 | 非阻塞子会话启动，可携带能力装配参数 |
 | `wopal_task_output` | 始终 | 任务状态与输出查询 |
 | `wopal_task_reply` | 始终 | 双向通信与恢复 |
 | `wopal_task_abort` | 始终 | 任务终止 |
 | `wopal_task_finish` | 始终 | 任务完成清理 |
+| `wopal_capability_list` | 始终 | 列出空间武器库可用能力（含未授予任何角色基线的） |
 | `memory_manage` | `memory.enabled` | 记忆 list/stats/search/add/update/delete/injected |
 | `context_manage` | 始终 | 会话 status/dump/compact + 蒸馏（distill/confirm/cancel） |
 
