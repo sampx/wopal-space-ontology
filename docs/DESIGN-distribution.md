@@ -2,8 +2,9 @@
 
 > **Status**: Active
 > **Updated**: 2026-09-14
-> **上级**: `./DESIGN.md`
+> **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 
 ---
 
@@ -104,7 +105,7 @@ macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应
 
 > **注**：user-level base capabilities 是跨空间共享的**只读入口**，物化为 symlink 合理——它们由 `ontology update` 统一推进，不经由空间内修改。空间内可写的装配资产位于 `<space>/.wopal/`（sparse-checkout 真实文件），两者职责不同。
 
-### DSH Profiles 物化契约
+### DSH Profiles Materialization Contract
 
 DSH Profile（`web` 与 `ellamaka-tools`）的基准声明属于本体能力基因，但其执行环境必须位于本地运行态：
 
@@ -154,11 +155,9 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 ---
 
-## Related Documents
+## Reference Documents
 
 | Document | Purpose |
 |---|---|
-| `../../docs/products/wopal-space/DESIGN.md` | 产品级架构与版本体系 |
-| `./DESIGN.md` | ontology 的能力边界、模板、命令、规则与 runtime 维护设计 |
 | `../../projects/wopal-cli/docs/DESIGN.md` | CLI 的 deterministic init、space sync 与 runtime handoff 设计 |
 | `../../projects/ellamaka/docs/DESIGN.md` | ellamaka 的 wopal-space mode 与 runtime loading 设计 |

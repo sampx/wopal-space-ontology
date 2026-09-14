@@ -1,8 +1,10 @@
-# DESIGN — wopal-plugin 总体设计
+# DESIGN — wopal-plugin Overall Design
 
 > **Status**: Draft
 > **Updated**: 2026-09-14
-> **上级**: `./DESIGN.md`（ontology 总体设计：插件体系、配置体系章节）
+> **Parent**: `./DESIGN.md`（ontology overall design: Plugin System and Configuration sections）
+> **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 
 ---
 
@@ -65,7 +67,7 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 
 部署：在 `config/settings.jsonc` 中以相对路径声明插件目录 `../plugins/wopal-plugin/src/index.ts`。
 
-### Resources 资源层
+### Resources Layer
 
 `LLMClient` 与 `EmbeddingClient` 是插件级共享资源，不属于任何功能模块。功能模块按自身需求声明对资源的依赖，资源按依赖关系初始化：
 
@@ -74,11 +76,11 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 
 资源初始化按启用能力的最小集推导。能力全关时零资源初始化。资源缺失时该模块降级并记录 warn 日志，降级以模块为粒度，不连锁拖垮无关模块。
 
-### Rules 模块
+### Rules Module
 
 Rules 模块发现全局（`~/.wopal/rules`）与空间（`<space>/.wopal/rules`）两级规则文件，按 Agent 作用域与关键词条件匹配，通过 `messages.transform` 注入系统提示词。规则发现发生在插件初始化时，注入发生在每条消息周期。Rules 默认启用，不暴露独立配置开关。
 
-### Memory 模块
+### Memory Module
 
 Memory 模块管理 LanceDB 记忆存储与检索。`MemoryStore` 是唯一持久化访问入口，记录使用 `tags` 字段。模块拥有两个配置开关：
 
@@ -89,7 +91,7 @@ Memory 模块管理 LanceDB 记忆存储与检索。`MemoryStore` 是唯一持�
 
 记忆蒸馏的 `preview → confirm` 两步流程由 context 模块拥有（见 4.4），memory 模块不承担蒸馏引擎。
 
-### Context 模块
+### Context Module
 
 Context 模块管理会话生命周期中的上下文质量。模块拥有总开关 `enabled`，统管三项增强能力：
 
@@ -101,7 +103,7 @@ Context 模块管理会话生命周期中的上下文质量。模块拥有总开
 
 蒸馏归属 context 模块的依据：蒸馏的输入是会话上下文，输出是记忆候选，其本质是用 LLM 处理会话上下文，与标题生成、压缩同族。输出落点不决定归属，输入决定归属。蒸馏关闭时相关操作返回清晰的降级提示，不影响记忆检索与 CRUD。
 
-### Task 模块
+### Task Module
 
 Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开入口，负责：
 
@@ -113,17 +115,17 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 任务工具永远注册，不依赖任何开关。`SimpleTaskManager` 的周期监控通过 `MonitorStrategy` 注册进 `MonitorEngine`。
 
-### 能力装配模块
+### Capability Assembly Module
 
 能力装配模块把空间武器库转化为具体会话的能力授予。它由武器库扫描、能力清单暴露、派发装配三部分组成。
 
-#### 武器库扫描
+#### Arsenal Scan
 
 插件启动时扫描空间 worktree 构建武器库清单。技能从 `.wopal/skills/` 下的 `SKILL.md` 收集，规则从 `.wopal/rules/` 下的规则文件收集，MCP 从配置的服务声明收集。
 
 清单保留**全部**扫描结果，不做角色基线过滤——未授予任何角色的能力同样在列。每项记录名称、描述与物理路径。路径供规则注入读取与人工审计定位。
 
-#### 能力清单契约
+#### Capability Listing Contract
 
 `wopal_capability_list` 无参数，返回武器库清单：
 
@@ -143,7 +145,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 命令行是界面功能而非 Agent 可用的武器，不进入清单。
 
-#### 派发装配契约
+#### Dispatch Assembly Contract
 
 `wopal_task` 的 `capabilities` 参数只接受能力名称数组：
 
@@ -172,7 +174,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 权限规则由插件构造，调用方不接触权限细节。装配参数因此不可能出现语法形态错误。
 
-#### 装配注入
+#### Assembly Injection
 
 派发流程在会话创建后注入合成权限，经会话更新接口完成。该接口以合并语义追加规则，能与既有规则叠加而不替换。
 
@@ -180,17 +182,17 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 内置工具的可见性与授权由角色基线完整控制，不进入会话装配。
 
-### Monitor 模块
+### Monitor Module
 
 `MonitorEngine` 是插件内唯一的周期调度引擎。以固定间隔执行已注册的 `MonitorStrategy`，统一管理会话状态视图。现有策略：任务监控策略（Task 模块注册）、主会话监控策略（会话状态与压缩触发）。其他模块不得创建独立调度链，新策略实现 `MonitorStrategy` 接口并注册进引擎。
 
-### Lifecycle 模块
+### Lifecycle Module
 
 进程退出清理注册表。监控引擎与任务管理器在进程退出时统一清理，避免孤儿定时器与未关闭资源。
 
 ## Configuration
 
-### 配置承载
+### Configuration Carrier
 
 插件配置承载于既有三层 settings 体系，顶层 `wopal` 节点：
 
@@ -204,7 +206,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 插件启动时读取三层配置，输出 effective config 日志，标明每项配置的来源层级。
 
-### 配置 Schema
+### Configuration Schema
 
 ```jsonc
 "wopal": {
@@ -220,7 +222,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 `apiKey` 支持 `$VAR` 环境变量引用：以 `$` 开头从 `process.env` 解析，未设置时启动报错；不以 `$` 开头按字面值处理。配置文件即使进 git 也不承载明文密钥。
 
-### Prompt 模板解析
+### Prompt Template Resolution
 
 提示词模板按约定路径解析，不设配置项。解析顺序：
 
@@ -242,7 +244,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 设计取舍：不提供「任意路径覆盖」配置项。约定路径已覆盖空间与用户两级自定义需求，而新增 `prompts: { distill: "/abs/path" }` 之类的配置面为边缘场景增加了用户心智负担与 schema 复杂度。需要跨空间复用的模板放用户级，需要随空间分发的模板放空间级。
 
-### 环境变量角色
+### Environment Variable Roles
 
 环境变量收敛为两个角色，功能开关不使用环境变量：
 
@@ -253,13 +255,13 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 日志诊断保留 env 通道：启动脚本按进程场景动态传入日志级别与位置，静态配置文件无法表达这种运行时变化。配置文件 `logLevel` 是声明式默认值，诊断 env 是运行时覆盖，二者定位不同，不重叠。
 
-### 配置来源优先级
+### Configuration Source Precedence
 
 一般配置：代码默认 < 全局 < 空间公共 < 空间私有。日志诊断：上述链条之上叠加 `WOPAL_PLUGIN_LOG_*` env 覆盖。
 
 ## Interfaces and Contracts
 
-### Hook 接口
+### Hook Interface
 
 | Hook | 用途 |
 |------|------|
@@ -270,7 +272,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 事件路由将事件分发到专用处理器：`message-token-handler`（消息增量）、`idle-compact-handler`（idle/compacted 恢复与标题生成）、`error-handler`（会话错误）。
 
-### 工具接口
+### Tool Interface
 
 | 工具 | 注册条件 | 职责 |
 |------|----------|------|
@@ -285,7 +287,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 `memory_manage` 条件注册，禁用时输出 info 日志说明原因。蒸馏动作属于 context 模块，承载于 `context_manage` 工具。
 
-### 日志体系
+### Logging System
 
 | Logger | Scope |
 |--------|-------|
@@ -310,9 +312,9 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 会话上下文（`session-context.ts`）采用模块化块结构：`distill` 块（提取状态）、`summary` 块（会话摘要），未来扩展不修改现有结构。
 
-## Related Documents
+## Reference Documents
 
-- `.wopal/docs/DESIGN.md` — ontology 总体设计（插件体系、配置体系、工具接口章节）
+- `.wopal/docs/DESIGN.md` — ontology overall design (Plugin System, Configuration, Tool Interface sections)
 - `.wopal/plugins/wopal-plugin/AGENTS.md` — 插件开发规范
 - `.wopal/plugins/wopal-plugin/docs/rules.md` — 规则体系使用说明
 - Issue #225 — 配置体系重构的问题清单与来源

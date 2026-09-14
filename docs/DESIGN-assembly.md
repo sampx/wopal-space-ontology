@@ -1,12 +1,14 @@
-# DESIGN — 装配模型
+# DESIGN — Assembly Model
 
 > **Status**: Active
 > **Updated**: 2026-09-14
-> **上级**: `./DESIGN.md`（ontology 总体设计：模块架构章节）
+> **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
+> **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 
 ---
 
-## 装配定义与能力资产的分野
+## Assembly Definitions vs Capability Assets
 
 装配相关的定义集中在 `.wopal/assembly/`，与可被装配的能力资产在根目录就区分开：
 
@@ -37,7 +39,7 @@
 
 装配定义不物化进空间：空间只承载物化结果（能力资产与 `.wopal-space/` 运行态），装配源头保留在中央仓库。CLI 初始化时从中央仓库读取装配定义，按定义物化到空间。
 
-## 类型装配单（Archetype Manifest）
+## Archetype Manifest
 
 装配单声明一个空间类型的全部装配决策，是空间初始化的唯一依据：
 
@@ -47,8 +49,8 @@ version: 1
 type: coding
 description: 全栈工程研发空间
 
-# 该类型使用的空间骨架
-schema: coding-space-schema.yaml
+# 空间骨架。省略时按约定取 <type>-space-schema.yaml
+# schema: coding-space-schema.yaml
 
 # 该空间挂载的 Agent（四维核心角色跨类型常驻，不随类型变化）
 agents:
@@ -86,11 +88,15 @@ scripts:
   - emt
 ```
 
-装配单覆盖六类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`、`scripts`。全部字段按名称声明，物化时在能力资产目录下解析为对应资产。
+装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`。全部字段按名称声明，物化时在能力资产目录下解析为对应资产。
 
-## 空间骨架声明（Space Schema）
+脚本等扩展类目的装配语义在后续演进中定义。
 
-装配单通过 `schema` 字段选择空间骨架。骨架声明该类型空间的结构：需要哪些运行时文件、哪些目录、哪些空间级文件：
+## Space Schema
+
+装配单通过 `schema` 字段选择空间骨架。骨架声明该类型空间的结构：需要哪些运行时文件、哪些目录、哪些空间级文件。
+
+`schema` 字段可省略，此时按约定取同名骨架 `<type>-space-schema.yaml`。约定覆盖多数场景，显式声明服务于复用既有骨架的定制类型——例如行业类型放置自己的装配单、但沿用 `coding` 的空间结构时，写入 `schema: coding-space-schema.yaml` 即可。
 
 ```yaml
 # 示例: .wopal/assembly/schemas/coding-space-schema.yaml
@@ -127,7 +133,7 @@ space:
 
 模板素材统一存放于 `assembly/templates/`，多套骨架共用。骨架只声明映射关系，不重复承载素材内容。
 
-### 骨架消费规则
+### Schema Consumption Rules
 
 CLI 读取骨架后按以下规则消费：
 
@@ -139,7 +145,7 @@ CLI 读取骨架后按以下规则消费：
 
 骨架决定该类型空间的最小结构。扩展目录（如 `labs/`、`external/`）由用户创建后经 `/init` 扫描写入实例 `STRUCTURE.md`。
 
-## 物化流程
+## Materialization Flow
 
 空间初始化时，CLI 依次执行：
 
@@ -151,16 +157,57 @@ CLI 读取骨架后按以下规则消费：
 
 空间内正常修改与提交，进化经 `space sync` 汇入 local main。
 
-## 两层装配记录
+## Two-Layer Assembly Records
 
 装配记录分两层，各司其职：
 
 1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。
-2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配——`type`、`schema`、来源 `revision`、`assembledAt` 与显式能力列表。由 CLI 初始化并维护，用户通过 `wopal space capability add/remove` 增删能力，不手工编辑。
+2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配。由 CLI 初始化并维护，用户通过 `wopal space capability add/remove` 增删能力，不手工编辑。
 
 装配物化使用 Git `sparse-checkout`：空间 worktree 只物化装配单选中的路径，共享中央仓库对象库，不复制历史。
 
-## 配置层级与写入权
+### Space Assembly Snapshot Structure
+
+`space-meta.json` 是空间装配的机器可读事实，供 `space status`、`space sync` 与 `space capability` 消费：
+
+```jsonc
+{
+  "version": 1,
+  "type": "coding",
+  "schema": "coding-space-schema.yaml",
+  "source": {
+    "ontology": "wopal-space-ontology",
+    "revision": "60a4cf5"
+  },
+  "assembledAt": "2026-09-14T10:30:00Z",
+  "capabilities": {
+    "agents": ["wopal", "fae", "rook", "evolver"],
+    "skills": ["dev-flow", "agents-collab"],
+    "rules": ["typescript", "business-rules"],
+    "commands": ["init", "commit"],
+    "plugins": ["wopal-plugin"]
+  }
+}
+```
+
+字段语义：
+
+| 字段 | 含义 |
+|------|------|
+| `version` | 快照结构版本，用于未来结构演进的兼容判定 |
+| `type` | 空间类型，与装配单 `type` 一致 |
+| `schema` | 实际使用的骨架名，由装配单解析所得 |
+| `source.ontology` | 来源 ontology 名称 |
+| `source.revision` | 装配时的来源提交，供下行对齐判断 |
+| `assembledAt` | 装配时间，ISO 8601 |
+| `capabilities` | 实际装配的能力清单，按类目分组 |
+
+`capabilities` 与类型装配单的关系是**实例与模板**：装配单声明该类型的默认组合，快照记录本空间的实际组合。用户执行 `space capability add/remove` 后，快照更新为实际状态，与装配单产生差异——这个差异正是空间私有定制，经 `space sync` 上行时作为进化汇入。
+
+`source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
+
+
+## Configuration Layers and Write Authority
 
 三层配置，各司其职：
 
@@ -172,7 +219,7 @@ CLI 读取骨架后按以下规则消费：
 
 CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随 space 分支经 `space sync` 汇入 central main，任何实例相关内容写入都会污染中央能力池。
 
-### 插件装配分层
+### Plugin Assembly Layers
 
 插件分两类，装配方式不同：
 
@@ -185,7 +232,7 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 
 插件在 settings 中的引用使用相对空间 config 目录的路径（`../plugins/<name>`），使同一份配置在所有空间与机器上一致。
 
-## 不进装配单的资产
+## Assets Outside the Manifest
 
 以下资产不进入装配单，由各自机制承载：
 
@@ -196,17 +243,17 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 | 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
 | `config/settings.jsonc` | 空间配置 | 全空间通用配置，随 main 分发 |
 
-## 权限归属与用户覆盖
+## Permission Ownership and User Override
 
 Agent 的权限基准属于角色本身，写在 `agents/<name>.md` 的 frontmatter `permission:` 中，随装配物化进入空间 worktree。权限不进入类型装配单：装配单声明「装配哪些能力」，不承载权限数值。
 
 用户若要为本空间覆盖某 agent 的权限，写入 `.wopal/config/settings.local.jsonc` 的 `ellamaka.agent.<name>.permission`。该文件被 git 忽略，覆盖只作用于当前空间，不会随 space 分支提交回 central main。ellamaka 的加载顺序保证 `settings.local.jsonc` 深合并覆盖 `settings.jsonc`，因此本地覆盖天然生效。
 
-## 模板合约
+## Template Contract
 
 各模板的 schema、字段、生成规则与消费规则在此定义。
 
-### `STRUCTURE.md` schema 与生成规则
+### `STRUCTURE.md` Schema and Generation Rules
 
 `STRUCTURE.md` 是空间实例的 compact 结构事实文件。它会进入 Agent 启动上下文，因此实例文件只保留低 token、高价值、可行动的空间索引，不承载全量扫描清单。
 
@@ -252,7 +299,7 @@ Markdown table 维护规则：
 - `/init` 负责后续结构校准：消费 scan JSON、对照 compact schema 生成更新方案、保留用户描述，并在用户确认后写入。
 - schema 与生成规则维护在设计文档和模板说明中；空间实例的 `STRUCTURE.md` 聚焦结构事实。
 
-### 最小空间模板设计
+### Minimal Space Template
 
 初始化模板表达可启动 WopalSpace 的最小协议，聚焦通用结构而非特定 space 的组织习惯。
 
@@ -278,11 +325,11 @@ CLI 首次初始化必须创建：
 
 工作容器（如 `projects/`、`contents/`、`docs/`）由骨架声明决定，随空间类型不同。`labs/`、`external/`、`scripts/` 属于特定 space 的组织扩展，不进入最小模板；若用户后续创建这些目录，由 `/init` 扫描后再写入实例 `STRUCTURE.md`。
 
-空间骨架声明确定性创建结构与模板映射，消费规则见「骨架消费规则」。
+空间骨架声明确定性创建结构与模板映射，Consumption rules are in Schema Consumption Rules.
 
 `.gitignore` 由 CLI 首次渲染；重复初始化时若已存在 `.gitignore`，CLI 保留现有内容，并报告缺失的 WopalSpace 建议忽略项。
 
-### `root-AGENTS.md` 模板设计
+### `root-AGENTS.md` Template
 
 `root-AGENTS.md` 作为模板存在，实例化目标是 space root 的 `AGENTS.md`。它定位为空间启动提示与用户个性化规则入口。
 
@@ -293,7 +340,7 @@ CLI 首次初始化必须创建：
 
 空间事实由 `STRUCTURE.md` 承载，工作规则由 `REGULATIONS.md` 承载，详细技能路由由 `space-master` 承载。
 
-### `REGULATIONS.md` 模板设计
+### `REGULATIONS.md` Template
 
 `REGULATIONS.md` 初始化时写入通用空间守则，之后作为用户可持续维护的运行态文件。ontology 守则升级通过 diff/建议呈现，由用户确认后吸收。
 

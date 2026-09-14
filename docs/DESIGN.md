@@ -1,16 +1,16 @@
-# Ontology — 空间灵魂、规约与能力基因工具包设计
+# Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
 > **Updated**: 2026-09-14
-> **Parent Architecture**: `docs/products/wopal-space/DESIGN.md`
-> **Parent Product**: `docs/products/wopal-space/PRD.md`
+> **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
-> - `./DESIGN-assembly.md` — 装配模型：装配单、骨架、模板与配置分层
-> - `./DESIGN-capabilities.md` — 能力体系：Agent、技能、命令、规则、插件与脚本
-> - `./DESIGN-distribution.md` — 分发契约：source 输入、物化与运行时加载
-> - `./DESIGN-dsh-adapter.md` — DSH 适配插件设计
-> - `./DESIGN-evolution.md` — 进化闭环：协作模型、自进化、同步命令面与设计知识分层
-> - `./DESIGN-wopal-plugin.md` — wopal-plugin 总体设计
+> - `./DESIGN-assembly.md` — Assembly model: manifest, schema, template and configuration layers
+> - `./DESIGN-capabilities.md` — Capability system: Agent, skill, command, rule, plugin and script
+> - `./DESIGN-distribution.md` — Distribution contract: source input, materialization and runtime loading
+> - `./DESIGN-dsh-adapter.md` — DSH adapter plugin design
+> - `./DESIGN-evolution.md` — Evolution loop: collaboration model, self-evolution and design knowledge layering
+> - `./DESIGN-wopal-plugin.md` — wopal-plugin overall design
 
 ---
 
@@ -88,7 +88,7 @@ ontology 由装配定义与六类能力资产构成。模块细节分见各子�
 
 ## Interfaces and Contracts
 
-### ellamaka 加载接口
+### ellamaka Loading Interface
 
 ellamaka 在 wopal-space mode 下从 ontology 加载：
 
@@ -100,7 +100,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 
 多数加载链路相关改动以 ellamaka 重启后的加载结果作为验证标准。base capabilities 与 space overlay 的加载优先级见 `./DESIGN-evolution.md`。
 
-### wopal-plugin 工具接口
+### wopal-plugin Tool Interface
 
 | 工具 | 职责 |
 |------|------|
@@ -113,9 +113,9 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `memory_manage` | LanceDB 记忆 CRUD 与语义检索（list/stats/search/add/update/delete/injected） |
 | `context_manage` | 会话上下文管理（status/dump/compact）+ 蒸馏（distill/confirm/cancel） |
 
-`wopal_capability_list` 暴露空间武器库全量能力，`wopal_task` 的装配参数只接受能力名称数组。清单字段、清单契约与派发契约的完整定义见 `./DESIGN-wopal-plugin.md` 的能力装配模块。
+`wopal_capability_list` 暴露空间武器库全量能力，`wopal_task` 的装配参数只接受能力名称数组。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
 
-### CLI 命令面
+### CLI Command Surface
 
 | 命令 | 职责 |
 |------|------|
@@ -125,9 +125,9 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal space capability add/remove` | 增删空间装配能力 |
 | `wopal ontology install/update/contribute` | 本体安装、下行整合与上行贡献 |
 
-命令语义与边界见 `./DESIGN-evolution.md` 的维护与分发命令面。
+命令语义与边界see the Maintenance and Distribution Command Surface in `./DESIGN-evolution.md`.
 
-### 初始化与维护目标
+### Initialization and Maintenance Targets
 
 Ontology 提供初始化协议，wopal-cli 负责确定性 materialize，`/init` 负责智能校准。CLI 实现建立在 ontology 装配定义与 `/init` 维护机制逐步验证成熟的基础上。
 
@@ -184,9 +184,9 @@ CLI 边界：
 5. 提示模板与实例文件之间需要用户人工处理的差异。
 6. 先输出 plan/diff，等待用户确认后写入。
 
-### 模板合约
+### Template Contract
 
-各模板的 schema、字段、生成规则与消费规则见 `./DESIGN-assembly.md` 的模板合约章节。
+各模板的 schema、字段、生成规则与消费规则see the Template Contract in `./DESIGN-assembly.md`.
 
 ---
 
@@ -232,7 +232,7 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 
 ---
 
-## Related Documents
+## Reference Documents
 
 | 文档 | 说明 |
 |------|------|

@@ -1,16 +1,18 @@
-# DESIGN — 能力体系
+# DESIGN — Capability System
 
 > **Status**: Active
 > **Updated**: 2026-09-14
-> **上级**: `./DESIGN.md`（ontology 总体设计：模块架构章节）
+> **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
+> **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 
 ---
 
-## Agent 体系
+## Agent System
 
 面向 2026 年具备自适应深度推理与长程规划能力的前沿模型，Agent 体系确立**“灵魂守恒、武器多态、动态装配、四维闭环”**原则。
 
-### 四核职能分工
+### Four Core Roles
 
 | 角色 | 核心职责 | 物理权限沙箱 | 核心判据 / 行为 |
 |------|---------|-------------|----------------|
@@ -19,7 +21,7 @@
 | **Rook**（审查眼 / 正交哨兵） | 一切产出质量的独立审计：方案、实施成果、文稿与数据 | 严格只读沙箱 (`read: allow`, `edit: deny`, `bash: allow` 仅限只读命令) | 严格遵守“无证据即无效”（Evidence-or-Downgrade），只认 `file:line` 事实 |
 | **Evolver**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`, `edit: deny` 对中央库只读提案) | **只出方案、不动刀**；执行严格的三级防污染分流检疫 |
 
-### 角色边界由职责定义
+### Role Boundaries Defined by Responsibility
 
 专职子代理按**角色**切分，不按文件类型或任务切片切分。职能重叠、上下文盲区与交接成本都源于按切片拆分角色，因此 Agent 体系的角色数量保持最小，能力差异由装配承载。
 
@@ -30,7 +32,7 @@
 - **独立审查**归 Rook，代码缺陷与安全风险的正交审计统一归口；
 - **经验进化**归 Evolver，会话摩擦的蒸馏与检疫统一归口。
 
-### 动态装配
+### Dynamic Assembly
 
 Agent soul 是角色级的，与空间类型无关。四个核心角色在所有空间常驻，类型差异由 `assembly/archetypes/<type>.yaml` 装配单声明的 skills / rules 承载：
 
@@ -41,7 +43,7 @@ Fae 拿不同的「武器」执行，而不是换一个执行者；Rook 加载�
 
 Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
-#### 装配的四个层级
+#### Four Assembly Layers
 
 能力装配分四层，各层职责与作用时机不同：
 
@@ -54,7 +56,7 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 上三层是静态声明，第四层是运行时装配。Wopal 在派发任务时，按任务性质从空间武器库中挑选能力，装配给子会话——这是「武器多态」的运行时落点。
 
-#### 空间武器库与角色基线的关系
+#### Space Arsenal and Role Baseline
 
 物化进空间的武器库**不等于**全量授予任何角色。武器库是空间拥有的能力储备，角色基线是默认授予的子集。
 
@@ -62,19 +64,19 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权限合成后覆盖基线——不配置就看不见，配置了就可用。
 
-#### 会话装配的注入通道
+#### Session Assembly Injection Channel
 
 会话装配通过**会话级权限**实现。能力在会话创建时授予，会话生命周期内保持稳定，中途不改变装配。授予依据是 ellamaka 的权限合并规则：后者覆盖前者，因此会话级规则能够超越角色基线。
 
 内置工具不进会话装配。角色基线已经完整控制工具的可见性与执行授权，重复装配只会引入歧义。
 
-装配对 skills / rules / mcp 三类能力分别生效，合成规则、注入方式与压缩后的行为细节见 `./DESIGN-wopal-plugin.md` 的能力装配模块。
+装配对 skills / rules / mcp 三类能力分别生效，合成规则、注入方式与压缩后的行为细节see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
 
-### 提示词目标化
+### Outcome-Oriented Prompts
 
 每份 Agent 提示词保持精简，只承载角色定位、职责边界、能力武器纪律与交互风格。流程分支、操作说教与编程八股由技能与项目规范承载，不进入灵魂层。这使提示词面向前沿模型的原生推理能力，给目标与验证门禁而不干涉过程。
 
-## 技能体系
+## Skill System
 
 | 层次 | 职责 | 规模 | 代表 |
 |------|------|------|------|
@@ -86,7 +88,7 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 
 `space-master` 是 ontology 的根技能，但其当前实现仍偏粗糙；后续应单独重构为概念模型入口、流程选择器、核心技能路由器、ontology/worktree 协作指南与多 Space 运维入口。
 
-## 命令体系
+## Command System
 
 | 类别 | 命令 | 载体 |
 |------|------|------|
@@ -100,7 +102,7 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 
 ontology 命令可覆盖 ellamaka 内置命令。
 
-## 规则体系
+## Rule System
 
 | 类别 | 职责 | 载体 |
 |------|------|------|
@@ -110,7 +112,7 @@ ontology 命令可覆盖 ellamaka 内置命令。
 
 规则通过 wopal-plugin 在 Agent 启动时注入，按条件匹配生效。
 
-## 插件体系
+## Plugin System
 
 wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
@@ -133,13 +135,13 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | Memory database | `$WOPAL_HOME/storage/memory` | `$WOPAL_HOME/storage/memory` |
 | Session context | `$WOPAL_HOME/storage/session_context` | `$WOPAL_HOME/storage/session_context` |
 
-### TUI 品牌插件
+### TUI Brand Plugin
 
 `tui-ellamaka` 插件为 WopalSpace 模式注入 TUI 品牌元素：首页 logo 块字符画与阴影、提示行紧凑 logo、会话提示行 logo 与会话 ID，以及 Nord 系 `ellamaka-theme.json` 主题。该插件随 `.wopal/` ontology 分发，不属于 ellamaka 引擎仓库。
 
 插件静态资源（主题文件、音频）随插件目录放置，由插件按相对路径解析。
 
-## 模板体系
+## Template System
 
 模板素材位于 `assembly/templates/`，由骨架声明决定渲染去向。
 
@@ -158,9 +160,9 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | `phase.md` | 阶段文档 | 产品阶段范围与验收条件模板 |
 | `agent-rules.md` | 项目 AGENTS.md | 开发规范模板 |
 
-模板的 schema 字段定义、生成规则、消费规则与各模板设计详见 `./DESIGN-assembly.md` 的模板合约章节。
+模板的 schema 字段定义、生成规则、消费规则与各模板设计see the Template Contract in `./DESIGN-assembly.md`.
 
-## 辅助脚本体系
+## Script System
 
 | 目录 | 职责 |
 |------|------|

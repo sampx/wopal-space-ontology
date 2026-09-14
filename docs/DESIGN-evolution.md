@@ -1,16 +1,18 @@
-# DESIGN — 进化闭环
+# DESIGN — Evolution Loop
 
 > **Status**: Active
 > **Updated**: 2026-09-14
-> **上级**: `./DESIGN.md`（ontology 总体设计：模块架构章节）
+> **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
+> **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
+> **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 
 ---
 
-## Ontology 协作模型
+## Ontology Collaboration Model
 
 Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演化。一个空间是能力池的一次**可写装配视图**：能力组合由装配单决定，能力内容在空间内可写可进化，进化通过 `space sync` 汇入用户级能力池。
 
-### 分层结构
+### Layered Structure
 
 两级仓库，职责单一：
 
@@ -19,7 +21,7 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 
 类型语义由装配单承载，不设 `type/*` 分支层级。
 
-### 核心规则
+### Core Rules
 
 1. **local main 是能力唯一真相源**：共享能力不维护空间私有版本；空间的独有提交是待贡献的进化，不是长期分叉。
 2. **`space sync` 定序：先上行、后下行**：先汇入空间独有进化，再 fast-forward 到 local main 最新，最终两分支指向同一提交。
@@ -27,7 +29,7 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 4. **冲突在隔离临时 worktree 中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
 
-## 自进化闭环
+## Self-Evolution Loop
 
 Evolver 专职海关与提议-实施权责分立，空间运行中产生的能力进化遵循严格的防特异性泄漏与海关检疫机制：
 
@@ -61,7 +63,7 @@ Evolver 专职海关与提议-实施权责分立，空间运行中产生的能�
 
 进化粒度遵循严格的海关检疫：空间私有经验物理锁死在本地，类型经验作用于类型装配，只有高度抽象且经受反污染审查的通用资产才允许回流中央。
 
-## 维护与分发命令面
+## Maintenance and Distribution Command Surface
 
 空间侧与 ontology 侧命令职责分离，语义稳定：
 
@@ -69,15 +71,18 @@ Evolver 专职海关与提议-实施权责分立，空间运行中产生的能�
 |------|------|------|
 | `space status` | — | 只读：落后 / 待贡献 / 装配状态 |
 | `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本 |
-| `space capability add/remove` | — | 增删空间装配单中的能力，重新物化 |
+| `space capability add/remove` | — | 增删本空间装配的能力，重新物化；可贡献为类型装配单 |
+| `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
 `space sync` 遵循先预览后执行：dry-run 展示将贡献与更新的清单，用户确认后 `--confirm` 执行。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
 
-空间内日常能力进化通过 Evolver 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。
+`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么。
 
-## 分发边界
+空间内日常能力进化通过 Evolver 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
+
+## Distribution Boundary
 
 ontology 的分发走 Git source + worktree 模型。wopal-cli 通过 `wopal space init` / `wopal setup` 封装 clone/fork/worktree 过程，将其与 space runtime 初始化串联。
 
@@ -90,7 +95,7 @@ ontology 的分发走 Git source + worktree 模型。wopal-cli 通过 `wopal spa
 
 详细 source 输入、materialization、template handoff 和 runtime loading handoff 见 `./DESIGN-distribution.md`。
 
-## Base Capabilities 与 Space Overlay
+## Base Capabilities and Space Overlay
 
 Ontology 通过两层模型为 WopalSpace 提供可覆盖的能力分发：
 
@@ -108,11 +113,11 @@ Ontology 通过两层模型为 WopalSpace 提供可覆盖的能力分发：
 
 本模型将 ontology main repo 的基础能力与各 space 的定制能力解耦：通用能力由 ontology main 统一维护，setup 只负责物化 base capabilities；space 内自由定制增量覆盖。
 
-## 系统提示词自进化
+## System Prompt Self-Evolution
 
 提示词是核心资产。Evolver 检疫提炼并提出方案，经用户批准后由 Wopal 调度 Fae 更新中央仓库的提示词文件，实现跨空间协同进化。
 
-## 设计知识分层
+## Design Knowledge Layering
 
 WopalSpace 的设计知识按三层分工，避免细节错位和维护混乱：
 
