@@ -15,6 +15,8 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 - Phases are registered, not predicted. Register a phase when a line of evolution starts to converge — do not pre-declare future phases to fill out a roadmap.
 - The phase document is an **index and a tracking surface**, not a second gap tracker. Gap detail lives in the project `GAPS.md`; the phase lists which gaps it closes by identifier, title, priority, and design pointer.
 - The phase document does not track execution status. Plan status is owned by the dev-flow state machine and surfaced through the `Related Plans` table.
+- When its scope areas have hard dependencies, the phase declares the internal execution order (`Execution Order`). This is capability-line dependency, which the Plan decomposition consumes; it is not a task list.
+- The phase document describes the target state only. It carries no completion log, no "what was already done" narrative, and no reference to work that preceded the phase. A phase that is complete moves to `phases/done/`; that move is the record.
 - The Phase document is written continuously during discussion — each step's output is written directly into the living document.
 - Phase documents provide reliable input for the next step: splitting into Plans.
 - User-confirmed design decisions are promptly updated in the corresponding PRD and DESIGN documents per the design reference.
@@ -27,7 +29,8 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 3. **Discuss scope**: Scope = one-line-per-area summary with Owner. Out of Scope = explicit exclusions. Write both sections.
 4. **Build the gap inventory** (critical): for each scope area, select the gaps from the project `GAPS.md` that this phase closes. Record identifier, title, priority, and the design document each gap points at. Do not restate Current / Target / Exit — those stay in `GAPS.md`. A gap with no design solution does not enter the inventory; it becomes a risk.
 5. **Define completion criteria**: the delivery facts that span multiple gaps and belong to no single one. These are the phase's own exit criteria; individual gap exit criteria stay in `GAPS.md`.
-6. **Review and surface residual risks**: holistic review; write risks to the Risks section with explicit "why no design solution" explanation. Iterate until resolved or user accepts remaining risks.
+6. **State the internal execution order**: when scope areas depend on each other, write the order with the reason each step must precede the next. When they can proceed independently, omit the section. The order guides Plan decomposition; it is not a schedule.
+7. **Review and surface residual risks**: holistic review; write risks to the Risks section with explicit "why no design solution" explanation. Iterate until resolved or user accepts remaining risks.
 
 ## Document-Update Discipline
 
@@ -55,6 +58,8 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 - [ ] Gap Inventory: each scope area has ≥1 gap; each entry carries identifier, title, priority, and design pointer
 - [ ] Every gap listed exists in a project `GAPS.md`; no Current / Target / Exit restated here
 - [ ] Completion Criteria carries only cross-gap delivery facts
+- [ ] `Execution Order` present only when scope areas have hard dependencies; it states capability-line dependency and reasons, never a task list or schedule
+- [ ] No completion log, no "already done" narrative, no reference to work preceding the phase
 - [ ] Related Plans table has no hand-maintained status beyond what dev-flow owns
 - [ ] Risks only contains items without a design solution, each with explicit why
 - [ ] References does not repeat header documents
@@ -67,4 +72,4 @@ Once the Phase document is ready, guide the user to create Plans for each scope 
 
 ## Response After Completion
 
-Respond in the user's language with: phase document path; key summary (Goal, Advancing rows, Scope areas, Gap count, Completion criteria count); design documents updated; quality gate result; suggested next step (create Plans per scope area).
+Respond in the user's language with: phase document path; key summary (Goal, Advancing rows, Scope areas, Gap count, Completion criteria count, Execution Order present or omitted); design documents updated; quality gate result; suggested next step (create Plans per scope area).

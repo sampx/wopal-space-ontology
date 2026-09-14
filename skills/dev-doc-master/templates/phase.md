@@ -66,6 +66,19 @@ The phase-level exit criteria: delivery facts that span multiple gaps and belong
 
 Individual gap exit criteria are carried by each gap in `GAPS.md`. This section carries only what closes the phase as a whole.
 
+## Execution Order
+
+Include this section only when the phase's scope areas have hard dependencies on each other — where the output of one area is the input another cannot start without. The section names the order and the reason each step must precede the next.
+
+```
+<scope area>（<owner>）
+  ← <ordering reason>
+      → <scope area>（<owner>）
+          → <scope area>（<owner>）
+```
+
+When the scope areas can proceed independently, omit this section. It describes dependency between capability lines, never a task list or a schedule.
+
 ## Related Plans
 
 The tracking surface for this phase. Plans are created per scope area through dev-flow; their status is owned by the dev-flow state machine, never maintained by hand here.
