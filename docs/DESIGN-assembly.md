@@ -239,7 +239,7 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 | 资产 | 归属 | 理由 |
 |------|------|------|
 | `assembly/` | 装配定义 | 装配单、骨架与模板本身是物化源头，不参与物化 |
-| `prompts/` | wopal-plugin | 插件内部运行时提示词，内置为插件默认值，文件层仅作可选覆盖 |
+| `prompts/` | wopal-plugin | 插件内部运行时提示词，编译进插件源码作为默认值；空间或用户层的同名文件为可选覆盖 |
 | 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
 | `config/settings.jsonc` | 空间配置 | 全空间通用配置，随 main 分发 |
 

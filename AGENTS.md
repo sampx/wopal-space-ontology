@@ -25,8 +25,7 @@ Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses 
 | `skills/` | Skill definitions; scripts live in each skill's `scripts/` |
 | `commands/` | Command definitions; `commands/wopal/` holds Wopal-specific commands |
 | `plugins/wopal-plugin/` | ellamaka plugin; see sub-module AGENTS for internal architecture and code rules |
-| `templates/` | Space init templates and document templates |
-| `prompts/` | Agent prompt templates |
+| `assembly/` | Assembly definitions: archetypes, space schemas, render templates |
 | `scripts/` | Ontology maintenance, git hooks, and auxiliary automation scripts |
 | `config/` | Space-level ellamaka configuration layer |
 
@@ -41,7 +40,7 @@ Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses 
 
 ### i18n / Multilingual
 
-Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, `prompts/`, `skills/`.
+Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/templates/`, `skills/`.
 
 - The formal English version is the runtime source, located under `.wopal/` in the corresponding directory.
 - If the user's preferred language is not English, first generate or update the user's preferred-language review version, then sync to the formal English version after approval.
@@ -49,7 +48,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, 
 - Review-version titles and body use the target language; mixing Chinese and English titles is forbidden.
 - Localized template review versions must preserve the formal template's English section headings; translate only body text, placeholder guidance, and table content.
 - After review approval, update the English runtime source under `.wopal/`. Both versions must stay semantically aligned.
-- For `agents/`, `rules/`, `commands/`, `templates/`, and `prompts/`, keep review versions under `.wopal/docs/LANG/<locale>/<type>/`.
+- For `agents/`, `rules/`, `commands/`, and `assembly/templates/`, keep review versions under `.wopal/docs/LANG/<locale>/<type>/`.
 - For `skills/`, keep the preferred-language review version in the same skill directory as `SKILL.<locale>.md`, then sync to `SKILL.md` after approval.
 - If the user's preferred language is English, update the formal English file directly. Do not create English locale variants.
 
@@ -81,13 +80,6 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `templates/`, 
 - frontmatter must have `trigger`, `description`, and `keywords`.
 - `trigger` declares the matching mode (e.g. `model_decision`); `keywords` declare triggering keywords.
 - The body only contains agent-executable constraints, not product intent or implementation details.
-
-### Workflows: `wsf/`
-
-- Workflow definitions go in `wsf/workflows/*.md`; workflow templates go in `wsf/templates/`.
-- `wsf/` is for internal consumption by the WSF skill family.
-- This module is produced by the space-flow project. See `wsf-file-manifest.json` for the full workflow asset inventory.
-- This module may be modified directly only at the user's explicit request; otherwise it should be deployed via the space-flow project.
 
 ### Dev-flow Worktree Lifecycle
 

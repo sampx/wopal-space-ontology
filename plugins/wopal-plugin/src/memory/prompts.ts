@@ -5,22 +5,23 @@
  * paths. The generic prompt-file resolver is shared with the context module:
  * 1. Space-level: <space>/.wopal/prompts/<filename>
  * 2. User-level: WOPAL_HOME/prompts/<filename>
- * 3. Inline fallback (caller provides)
+ * 3. Built-in default (see ../context/default-prompts.ts)
  */
 
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { memoryLogger, type LoggerInstance } from "../logger.js";
 import { createRuntimeContext, type RuntimeContext } from "../runtime-context.js";
+import { DEDUP_FALLBACK } from "../context/default-prompts.js";
 
 /**
  * Resolve a prompt template file via convention paths.
- * Returns the file path if found, null otherwise (caller falls back to inline default).
+ * Returns the file path if found, null otherwise (caller falls back to the built-in default).
  *
  * Layers:
  * 1. Space-level — .wopal/prompts/<filename> (if running inside a wopal-space)
  * 2. User-level — WOPAL_HOME/prompts/<filename>
- * 3. null — caller uses inline default
+ * 3. null — caller uses the built-in default
  */
 export function resolveRuntimePromptFile(
   context: RuntimeContext,
@@ -43,7 +44,7 @@ export function resolveRuntimePromptFile(
 
 /**
  * Load a prompt file: space-level → user-level → null.
- * Returns null if no source is available (caller uses inline default).
+ * Returns null if no source is available (caller uses the built-in default).
  */
 export function loadPromptFile(
   context: RuntimeContext,
@@ -70,7 +71,6 @@ export interface MemoryPrompts {
   ): string;
 }
 
-const DEDUP_FALLBACK = "You are a memory deduplicator. For each candidate, compare with similar existing memories and decide: create (unrelated, coexist), skip (discard), merge (supplement), or replace (outdated).\n\nInput:\n{{input}}\n\nOutput JSON:\n{\"decisions\": [{\"index\": 1, \"action\": \"create\"}, {\"index\": 2, \"action\": \"skip\"}, {\"index\": 3, \"action\": \"merge\", \"merge_into\": 1, \"merged_body\": \"...\", \"tags\": [\"tag\"]}]}";
 
 export function createMemoryPrompts(
   context: RuntimeContext,

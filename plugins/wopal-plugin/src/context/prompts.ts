@@ -8,7 +8,7 @@
  * Resolution order (see memory/prompts.ts):
  * 1. Space-level: <space>/.wopal/prompts/<filename>
  * 2. User-level: WOPAL_HOME/prompts/<filename>
- * 3. Inline fallback (caller provides)
+ * 3. Built-in default (see ./default-prompts.ts)
  */
 
 import type { MemoryCategory } from "../memory/types.js";
@@ -19,14 +19,12 @@ import {
   loadPromptFile,
   type MemoryPrompts,
 } from "../memory/prompts.js";
+import { EXTRACTION_FALLBACK, TITLE_FALLBACK } from "./default-prompts.js";
 
 export interface ContextPrompts extends MemoryPrompts {
   loadTitlePrompt(): string;
   buildExtractionPrompt(conversation: string): string;
 }
-
-const TITLE_FALLBACK = "You are a title generator. Output ONLY valid JSON: {\"title\":\"Brief natural thread title\"}. The title must be a single line, ≤50 characters, and use the same language as the summary. Never output labels like Thread Title or Title as the title value.\n\n---\nConversation summary:\n{{summary}}";
-const EXTRACTION_FALLBACK = "# Memory Extraction\n\nAnalyze the conversation below and extract memories worth preserving for future sessions.\n\n## Recent Conversation\n{{conversation}}\n\n## Output Format\n\nReturn a JSON object:\n{\"memories\": [{\"category\": \"knowledge\", \"body\": \"Title\\n\\nCore content...\", \"tags\": [\"tag\"]}]}\n\nIf nothing to extract, return {\"memories\": []}";
 
 export function createContextPrompts(
   context: RuntimeContext,
