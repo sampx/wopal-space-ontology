@@ -15,77 +15,9 @@
 
 ## Numbering
 
-`ONT-G<n>` = 本体资产差距，`DOC-G<n>` = 文档与技能差距，`ASSEMBLY-G<n>` = 运行时装配差距（wopal-plugin 侧）。编号一经分配不复用、不重排。
+`ASSEMBLY-G<n>` = 运行时装配差距（wopal-plugin 侧）。编号一经分配不复用、不重排；已关闭的编号保持退役，使 Plan、Issue 与提交中的引用始终可解析。
 
 wopal-plugin 随 ontology 分发，其实现差距归入本文档。
-
----
-
-## Assembly Model
-
-### ONT-G1: Assembly definition directory not established (P0)
-
-**目标态**: 装配定义集中于 `.wopal/assembly/`，含 `archetypes/`（类型装配单）、`schemas/`（空间骨架）、`templates/`（渲染素材）；`config/` 只保留 settings 类配置。装配定义作为物化源头保留在中央仓库，不物化进空间。
-
-**当前状态**: 装配单位于 `config/types/`，与 settings 混处；模板位于根目录 `templates/`；骨架内嵌于 `templates/wopalspace-schema.yaml`，未独立。
-
-**落地**:
-- 建立 `assembly/archetypes/`、`assembly/schemas/`、`assembly/templates/` 三级结构。
-- 装配单从 `config/types/` 迁入 `assembly/archetypes/`。
-- 骨架从 `templates/wopalspace-schema.yaml` 拆分，按类型独立为 `assembly/schemas/<type>-space-schema.yaml`。
-- 模板迁入 `assembly/templates/`。
-
-### ONT-G2: Manifest fields not aligned with design (P0)
-
-**目标态**: 装配单声明五类可装配能力（`agents`、`skills`、`rules`、`commands`、`plugins`），`schema` 字段可省略并按约定取 `<type>-space-schema.yaml`。
-
-**当前状态**: 装配单声明五类能力但缺 `schema` 字段；`config/types/` 下的装配单未包含骨架约定。
-
-**落地**: 迁移后的装配单补齐 `schema` 约定说明；物化时按 `<type>-space-schema.yaml` 约定解析，显式 `schema` 字段优先。
-
-### ONT-G3: Space structure not differentiated by type (P0)
-
-**目标态**: 不同空间类型拥有不同骨架——coding 空间建立 `projects/`，content 空间建立 `contents/`，结构差异由装配单的 `schema` 选择。
-
-**当前状态**: `wopalspace-schema.yaml` 硬编码 `projects/`、`contents/`、`docs/` 三个目录，所有空间物化为同一套布局。
-
-**落地**: 按类型拆分骨架，`coding-space-schema.yaml` 声明 `projects/` 与 `docs/`，`content-space-schema.yaml` 声明 `contents/` 与 `docs/`。
-
----
-
-## Capability System
-
-### ONT-G4: Agent permission block contains wildcard keys (P1)
-
-**目标态**: 角色权限块的键使用工具的真实标识，语义明确无歧义。
-
-**当前状态**: fae / rook / evolver 的权限块使用 `wopal_*` 通配键覆盖插件工具。
-
-**落地**: 待插件工具标识命名规范确立后统一调整。
-
-### ONT-G5: `prompts/` not internalized into the plugin (P1)
-
-**目标态**: 插件默认提示词内置于 wopal-plugin 源码，`prompts/` 退出 ontology 根目录；文件层保留为可选覆盖路径。
-
-**当前状态**: `prompts/` 位于 ontology 根目录，含 `title.md`、`distill.md`、`dedup.md`、`commit-msg-gen.md`，由插件按多层路径加载。
-
-**落地**: 默认值内化进插件源码，移除根目录 `prompts/`，保留文件覆盖机制。
-
-### ONT-G6: tui-ellamaka plugin not normalized (P1)
-
-**目标态**: `plugins/tui-ellamaka/` 为标准插件目录，含 `index.tsx`、`package.json`、`ellamaka-theme.json` 与 `asset/`；settings 以相对路径 `../plugins/tui-ellamaka` 引用。
-
-**当前状态**: `plugins/tui-ellamaka.tsx` 为散落单文件（32KB），主题 `plugins/ellamaka-theme.json` 与音频资源 `plugins/asset/` 独立散落。
-
-**落地**: 建立 `plugins/tui-ellamaka/` 目录，迁入插件、主题与资源；更新 settings 引用。`plugins/dsh-adapter` 保持纯文件插件。
-
-### DOC-G1: space-master skill still describes the old model (P1)
-
-**目标态**: `space-master` 技能的 ontology 维护指南对齐新模型（`space sync`、装配、`ontology capability list`、Evolver 回流），去除 type/* 分支与 contribute/promote 流程。
-
-**当前状态**: `skills/space-master/SKILL.md`（13 处 type/* 引用）与 `references/ontology-maintenance.md`（5 处）仍描述 main → type/* → space/* 三层分支与 `space contribute` / `ontology promote`。
-
-**落地**: 重写技能主体与维护参考文档，对齐新命令面与装配模型。
 
 ---
 
