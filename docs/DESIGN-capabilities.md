@@ -130,7 +130,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 |------|---------------|------------|
 | Rules | `$WOPAL_HOME/rules` | `$WOPAL_HOME/rules` + `<wopalSpaceRoot>/.wopal/rules` |
 | Plugin log | `$WOPAL_HOME/logs/wopal-plugin.log` | `<wopalSpaceRoot>/.wopal-space/logs/wopal-plugin.log` |
-| Memory prompts | `$WOPAL_HOME/prompts` | `<wopalSpaceRoot>/.wopal/prompts` + `$WOPAL_HOME/prompts` |
+| Memory prompts | `$WOPAL_HOME/prompts` | `<pluginRoot>/prompts` + `$WOPAL_HOME/prompts` |
 | Memory database | `$WOPAL_HOME/storage/memory` | `$WOPAL_HOME/storage/memory` |
 | Session context | `$WOPAL_HOME/storage/session_context` | `$WOPAL_HOME/storage/session_context` |
 
@@ -142,7 +142,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
 ## Template System
 
-模板素材位于 `assembly/templates/`，由骨架声明决定渲染去向。
+空间骨架模板素材位于 `assembly/templates/`，由骨架声明决定渲染去向。
 
 | Template | 渲染目标 | 职责 |
 |----------|---------|------|
@@ -152,14 +152,12 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | `REGULATIONS.md` | `.wopal-space/REGULATIONS.md` | 空间守则模板 |
 | `memory/USER.md` | `.wopal-space/memory/USER.md` | 用户档案模板 |
 | `memory/MEMORY.md` | `.wopal-space/memory/MEMORY.md` | 文件型长期记忆模板 |
+| `BOOTSTRAP.md` | `<space>/BOOTSTRAP.md` | 首次启动引导，`/init` 完成后删除 |
 | `command.md` | 命令文件 | 命令模板 |
-| `prd.md` | 产品 PRD | PRD 模板 |
-| `design-product.md` | 产品 DESIGN | 总体设计模板 |
-| `design-project.md` | 项目 DESIGN | 项目设计模板（含能力范围与演进路线） |
-| `phase.md` | 阶段文档 | 产品阶段范围与验收条件模板 |
-| `agent-rules.md` | 项目 AGENTS.md | 开发规范模板 |
 
 模板的 schema 字段定义、生成规则、消费规则与各模板设计see the Template Contract in `./DESIGN-assembly.md`.
+
+> 文档撰写模板（PRD / DESIGN / Phase / AGENTS.md）是技能资产，随 `dev-doc-master` 与 `space-master` 技能分发，由 `/cupdate-*` 命令消费，不进入空间装配。
 
 ## Script System
 

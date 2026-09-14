@@ -107,6 +107,51 @@ A project's GAPS.md is the **single source of truth** for gap detail. The produc
 
 This split exists because duplicated gap descriptions drift. The Phase points at gaps; the project document defines them. Execution order across multiple plans belongs to the Phase document, not to GAPS.
 
+## Gap Discovery
+
+Finding gaps is a bounded search, not an impression. The failure mode is a sample: the author reads a design, spots a few things the code lacks, and reports those. That produces a number with no denominator — neither the author nor the reader can tell whether it is 4 of 4 or 4 of 40.
+
+Gaps are discovered by bounded enumeration. The bound comes from a **change of record**, not from reading around.
+
+### Anchor the Range in a Change of Record
+
+A gap exists between a design and an implementation. When a design has been reworked, that rework is a discrete, diffable event — use it as the search boundary.
+
+1. **Find the pivot commit.** The commit where the design's model changed, not where it was merely formatted. A pivot rewrites the design's semantics: a model is replaced, a mechanism swapped, a structural layer removed. Doc renames, header normalization, and heading reshuffles are formatting and move nothing.
+2. **Diff the design across the pivot.** `git diff <pivot>^ <head> -- <docs>` yields the exact set of design claims that changed. This is the enumeration: every semantically changed design statement is a candidate to check against the implementation.
+3. **Group the diff into change themes.** Collapse the raw diff into a handful of named themes (a model swap, a new mechanism, a command-surface change, a capability-ownership move). Themes are the checklist units — they survive across many small commits and keep the audit tractable.
+
+When no rework has occurred and the design is simply older than the code, anchor instead on the design document itself: enumerate its statements section by section.
+
+### Verify Each Theme Against the Implementation
+
+For every theme, locate the actual carrier in each affected project and record judgement with evidence:
+
+| Judgement | Meaning | Required evidence |
+|---|---|---|
+| Landed | the implementation matches the design claim | file:line of the carrier |
+| Partial | the carrier exists but does not fulfill the claim | file:line plus the specific shortfall |
+| Missing | no carrier exists | the search performed (what was grepped, in what scope) |
+| Doc drift | implementation is right, the design text is stale | design file:line that contradicts reality |
+
+A judgement without a `file:line` is an impression, not a finding. `Missing` in particular requires stating the search, because absence of evidence is only meaningful when the search scope is known.
+
+### Sweep in Both Directions
+
+Design-to-code finds unimplemented claims. Code-to-design finds the opposite: assets, commands, and modules that exist with no design statement behind them. Both are gaps of a kind — one is missing work, the other is missing authority. Run both and record both.
+
+### Reconcile Against the Existing Gap Set
+
+New findings must be checked against the gaps already recorded before a new identifier is minted. An implementation shortfall is very often already covered — read the candidate gap's `Exit` criteria and ask whether they already close the finding.
+
+This step prevents duplicate tracking, and it also prevents the opposite error: declaring "uncovered" without reading. A finding is only uncovered after the full `Exit` list of every related gap has been read. A `Target` that mentions the area is not coverage; a concrete `Exit` criterion is.
+
+### Convergence
+
+The audit is complete when every theme has a judgement, every judgement carries evidence, and every finding is either mapped to an existing gap or recorded as new. That is the denominator: themes enumerated = themes judged = findings accounted for.
+
+Report the audit as the theme table plus the reconciliation result. A reader who trusts the report can re-run the diff and reach the same theme list — that is what makes the result checkable rather than asserted.
+
 ## Gap Lifecycle
 
 A gap has two states: **open** (it exists in `GAPS.md`) and **closed** (it is gone). There is no third state, and no status field — the presence or absence of the entry is the status.
@@ -139,6 +184,8 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 - [ ] End section is reference-only and does not repeat header documents
 - [ ] No design decisions recorded as gaps — those belong in DESIGN
 - [ ] No status field or "in progress" marker on any gap — presence or absence is the status
+- [ ] Every gap was found by the bounded enumeration in Gap Discovery, not by impression — the search range is stated and diffable
+- [ ] Every finding was reconciled against existing gaps' full `Exit` lists before a new identifier was minted
 
 ## Update Mode
 

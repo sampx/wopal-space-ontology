@@ -36,10 +36,11 @@ Read `references/consistency.md` for the full text. In short:
 - **No chapter numbering**: headings use Markdown heading levels only. No `## 1.` prefixes.
 - **Relative links only**: all document links are relative to the repository root or the document's directory. Absolute paths are forbidden (docs are committed to git and shared).
 - **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). The end section carries reference-only material. A document is never listed twice — an entry in both zones makes the obligation unreadable.
-- **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `上级: ./DESIGN.md`. Bidirectional index must match actual files.
+- **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `Parent: ./DESIGN.md`. Bidirectional index must match actual files.
 - **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, README, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
 - **Target-state writing**: documents describe the target state only — what the system is, what exists, who owns it. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", or "migration" notes. When a capability is owned elsewhere, state the ownership, not the move.
 - **Gap detail has one home**: gap detail lives in the project `GAPS.md`. A Phase document lists the gaps its scope closes by identifier, title, priority, and design pointer — it never restates Current / Target / Exit.
+- **Gaps are found by bounded enumeration**: when a design has been reworked, anchor the search on the pivot commit's design diff and verify each change theme against the implementation with `file:line` evidence. Reconcile findings against existing gaps' full `Exit` lists before minting a new identifier. Method: `references/gaps.md` (Gap Discovery).
 - **Writing style**: natural language that reads like a human wrote it; one idea per sentence; affirmative over negative; ownership over exclusion. State what a component does and owns rather than listing what it does not do.
 
 ## Language
