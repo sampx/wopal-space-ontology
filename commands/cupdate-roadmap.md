@@ -19,5 +19,3 @@ This command is an entry point only — the authoritative specification lives in
 1. Load the `dev-doc-master` skill.
 2. Follow the **Phase Reference** in `references/phase.md` and the universal rules in `references/consistency.md` for the full workflow: phase goal discussion, current state, scope, targets and gaps, residual risks, document-update discipline, and quality checklist.
 3. Use the template at `templates/phase.md` inside the skill.
-
-Do not duplicate or paraphrase the specification here. When in doubt, read the reference document.

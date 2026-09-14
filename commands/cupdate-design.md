@@ -19,5 +19,3 @@ This command is an entry point only — the authoritative specification lives in
 1. Load the `dev-doc-master` skill.
 2. Follow the **DESIGN Reference** in `references/design.md` and the universal rules in `references/consistency.md` for the full workflow: two design flows, discussion focus, document naming and splitting, header, update mode, and quality checklist.
 3. Use the templates at `templates/design-product.md` (product) and `templates/design-project.md` (project) inside the skill.
-
-Do not duplicate or paraphrase the specification here. When in doubt, read the reference document.

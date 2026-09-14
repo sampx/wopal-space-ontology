@@ -43,7 +43,7 @@ commands:
   - cupdate-readme
   - cupdate-agent-rules
   - evaluate-skill
-  - extract-br
+  - cupdate-br
   - context-continue
   - context-handoff
   - context-recover

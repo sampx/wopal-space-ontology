@@ -1,17 +1,17 @@
 ---
 name: dev-doc-master
-description: Authoring and maintenance of development documentation — product PRD, product/project DESIGN (including sub-DESIGN splitting), phase/roadmap documents, project README, and project gap tracking. Use whenever the user asks to create or update a PRD, DESIGN, design document, phase document, roadmap, README, or a GAPS document tracking design-vs-implementation divergence; when a main document needs splitting into topic sub-documents; or when document-set consistency (header vs reference links, bidirectional sub-document index, cross-document alignment) needs enforcement. Covers document naming rules, mandatory header links vs reference-only end links, no chapter numbering, relative-path-only links, gap numbering and retirement, and whole-document-set consistency on every update.
+description: Author and maintain a project's development documentation set. MUST load when the user asks to create or update a PRD, DESIGN, design document, sub-design, phase document, roadmap, project README, BUSINESS_RULES, or GAPS document; when a document needs splitting into topic sub-documents; or when document-set consistency needs checking (header vs reference links, bidirectional sub-document index, cross-document alignment). Triggers include "write a PRD", "update the design doc", "split this design", "create a phase doc", "update the README", "business rules", "写方案文档", "更新设计文档", "拆分设计文档", "创建 PRD", "更新 README", "业务规则", "差距文档", or any request to author or align project documentation. Also covers the /cupdate-* command family.
 ---
 
 # dev-doc-master — Development Documentation Master
 
-Authoring and maintenance workflow for the product/project documentation set: PRD, DESIGN (main + sub), Phase/Roadmap, and README. This skill owns the rules and templates; the `/cupdate-*` commands are thin entries that route here.
+Authoring and maintenance workflow for the product/project documentation set: PRD, DESIGN (main + sub), Phase/Roadmap, README, and BUSINESS_RULES. This skill owns the rules and templates; the `/cupdate-*` commands are thin entries that route here.
 
 ## When to Use
 
-- Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, or project README.
+- Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, project README, or project BUSINESS_RULES.
 - Split an oversized main document into topic sub-documents.
-- Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ README ↔ AGENTS.md).
+- Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ README ↔ BUSINESS_RULES ↔ AGENTS.md).
 - Record or update project gaps between design target state and implementation (`GAPS.md`).
 
 ## Document Set and Routing
@@ -24,6 +24,7 @@ Authoring and maintenance workflow for the product/project documentation set: PR
 | Phase / Roadmap | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
 | Project README | `/cupdate-readme` | `references/readme.md` | (inline in `references/readme.md`) |
 | Project GAPS | (no command) | `references/gaps.md` | `templates/gaps.md` |
+| Project BUSINESS_RULES | `/cupdate-br` | `references/business-rules.md` | `templates/business-rules.md` |
 | AGENTS.md | `/cupdate-agent-rules` | space-master skill | space-master skill templates |
 
 Load the matching reference file before writing. All references share the common rules in `references/consistency.md` — read it once per session.

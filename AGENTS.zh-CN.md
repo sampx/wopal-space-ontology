@@ -8,7 +8,6 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 ## 1. 规范文档引用
 
 - DESIGN: `.wopal/docs/DESIGN.md`
-- Business Rules: `.wopal/rules/business-rules.md`
 - Parent Rules: `.wopal-space/REGULATIONS.md`
 - Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
 

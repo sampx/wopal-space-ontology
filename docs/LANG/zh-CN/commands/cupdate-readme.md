@@ -26,5 +26,3 @@ description: 创建或更新项目 README.md
 1. 加载 `dev-doc-master` 技能。
 2. 遵循 `references/readme.md` 中的 **README 参考**（README Reference）与 `references/consistency.md` 中的通用规则，覆盖完整工作流：文档路径与命名、用途、核心规则、更新模式、确认策略、质量清单。
 3. 使用 README 参考中的内嵌模板。
-
-此处不重复或转述规范内容。不确定时，阅读参考文档。

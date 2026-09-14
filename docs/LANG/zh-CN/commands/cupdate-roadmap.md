@@ -19,5 +19,3 @@ description: 引导产品阶段讨论并产出阶段定义与跟踪文档
 1. 加载 `dev-doc-master` 技能。
 2. 遵循 `references/phase.md` 中的 **Phase 参考**（Phase Reference）与 `references/consistency.md` 中的通用规则，覆盖完整工作流：阶段目标讨论、当前状态、范围、目标与差距、残余风险、文档更新纪律、质量清单。
 3. 使用技能内模板 `templates/phase.md`。
-
-此处不重复或转述规范内容。不确定时，阅读参考文档。

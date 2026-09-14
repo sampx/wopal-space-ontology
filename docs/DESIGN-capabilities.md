@@ -95,10 +95,10 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 | 空间维护 | `/init`、`wopal space status`、`wopal space sync`、`wopal space capability add/remove` | `commands/init.md`、CLI 命令 |
 | 记忆与进化 | `/wopal:memo`、`/wopal:evolve`、`/wopal:distill`、`/wopal:memory` | `commands/wopal/` |
 | 唤醒与感知 | `/wopal:summon` | `commands/wopal/summon.md` |
-| 文档管理 | `/cupdate-prd`、`/cupdate-design`、`/cupdate-roadmap`、`/cupdate-agent-rules`、`/cupdate-readme` | `commands/cupdate-*.md` |
+| 文档管理 | `/cupdate-prd`、`/cupdate-design`、`/cupdate-roadmap`、`/cupdate-readme`、`/cupdate-br`、`/cupdate-agent-rules` | `commands/cupdate-*.md` |
 | 开发支持 | `/commit`、`/review` | `commands/commit.md`、`commands/review.md` |
 | 上下文管理 | `/context-continue`、`/context-handoff`、`/context-recover` | `commands/context-*.md` |
-| 其他 | `/evaluate-skill`、`/extract-br` | `commands/evaluate-skill.md`、`commands/extract-br.md` |
+| 其他 | `/evaluate-skill` | `commands/evaluate-skill.md` |
 
 ontology 命令可覆盖 ellamaka 内置命令。
 
@@ -107,7 +107,6 @@ ontology 命令可覆盖 ellamaka 内置命令。
 | 类别 | 职责 | 载体 |
 |------|------|------|
 | 项目级规则 | 语言与框架约束 | `rules/typescript.md`、`rules/python.md` |
-| 空间级规则 | 通用行为规范 | `rules/business-rules.md` |
 | Agent 专属规则 | Wopal 记忆规则、Fae Astro 规则等定向约束 | `rules/wopal/mem-rule.md`、`rules/fae/astro.md` |
 
 规则通过 wopal-plugin 在 Agent 启动时注入，按条件匹配生效。
