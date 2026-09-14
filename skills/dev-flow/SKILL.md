@@ -60,7 +60,6 @@ description: >
 | 命令 | 场景 | 说明 |
 |------|------|------|
 | `decompose-prd <prd-path>` | 从 PRD 拆分 Issue | `--dry-run` 预览 |
-| `roadmap <prd-path> --product <name>` | 产品阶段规划 | 四阶段工作流 |
 | `reset <plan>` | 重置 Plan | 破坏性，仅用户明确要求时使用 |
 
 ## 心智模型

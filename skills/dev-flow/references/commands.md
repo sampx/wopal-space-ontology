@@ -21,7 +21,6 @@
 | `verify <issue> --confirm` | 用户验证通过 |
 | `archive <issue>` | 归档 Plan，推送 Plan 变更，同步阶段文档 |
 | `verify-switch <issue> [--yes]` | 切换到特性分支验证 |
-| `roadmap <prd-path> [--product ...] [--project ...]` | 产品阶段规划（四阶段工作流） |
 
 ### Issue 管理
 
@@ -242,19 +241,6 @@ flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
 ```
 
 `--from ROADMAP.md` 模式解析 ROADMAP.md 中 `## Slices` 下的 markdown table，为每个 Slice 生成独立 Issue。Slices 表格式见 ROADMAP.md Slices 语法规范。`--product` 指定产品线名称，用于 Issue 标签和 body 元信息。
-
-### roadmap
-
-```bash
-flow.sh roadmap projects/<project>/docs/PRD.md --product <name> [--project <name>] [--yes] [--dry-run]
-```
-
-四阶段工作流：Analyze → Discuss → Produce → Decompose。
-
-- `--product`：产品线名称（默认从 PRD 文件名推断）
-- `--project`：指定项目（影响 Issue label）
-- `--yes`：跳过 Discuss 交互，直接使用 Analyze 结果（非 TTY 环境必须指定）
-- `--dry-run`：只输出阶段分析，不创建文件和 Issue
 
 ### reset（破坏性）
 

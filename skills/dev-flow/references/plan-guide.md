@@ -193,6 +193,18 @@ Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`
 
 ---
 
+## Plan 与阶段、Gap 的关系
+
+Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶段文档天然承载，Plan 只需在 Goal 或 Context 中写明所属阶段即可。
+
+**Plan 归属阶段**：Plan 的 `Phase` 元数据字段（从 Issue body 继承）记录所属产品阶段。一个阶段按 scope area 拆出多个 Plan，阶段的 `Related Plans` 表是聚合视图。
+
+**Plan 与 Gap**：Gap 明细的唯一真相源是项目 `GAPS.md`。Plan 在 Goal 或 Context 中引用它要关闭的 Gap 标识（如 `CLI-G3`），不复制 Gap 描述。
+
+**Gap 关闭时机**：Plan 达到 `done` 且其 Exit 判据全部满足时，从 `GAPS.md` 删除对应 Gap 条目（编号退役，不复用）。阶段文档的 Gap 清单随条目消失而收敛。Gap 不设 status 字段——Plan 的状态已经表明它正在被处理。
+
+---
+
 ## 委派 prompt 格式
 
 **Plan 驱动任务**（推荐）：
