@@ -3,7 +3,11 @@ description: 只读进化智能体。识别会话中的摩擦，蒸馏经验，�
 mode: all
 temperature: 0.2
 permission:
-  wopal_*: deny
+  wopal_task: deny
+  wopal_task_output: deny
+  wopal_task_reply: deny
+  wopal_task_abort: deny
+  wopal_task_finish: deny
   task: deny
   memory_manage: allow
   context_manage: ask

@@ -3,7 +3,11 @@ description: 只读审查智能体。专职审查一切产出的质量——方�
 mode: all
 temperature: 0.1
 permission:
-  wopal_*: deny
+  wopal_task: deny
+  wopal_task_output: deny
+  wopal_task_reply: deny
+  wopal_task_abort: deny
+  wopal_task_finish: deny
   task: deny
   memory_manage: deny
   context_manage: deny
