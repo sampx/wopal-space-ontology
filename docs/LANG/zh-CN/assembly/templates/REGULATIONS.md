@@ -60,7 +60,7 @@
 委派任何 subagent 前，必须按序完成以下步骤，跳过任何一步 = 严重失职：
 1. `memory_manage command=search` 搜索"委派"关键词，加载路径规则、agent 类型规则、过往教训
 2. 检查 prompt 中所有路径（`files_to_read`、输出路径等），一律使用基于空间根目录的相对路径或绝对路径，禁止裸相对路径
-3. 确认 prompt 包含目标项目路径上下文（如 `projects/gesp/`）；subagent 默认在 workspace 根目录执行，无项目路径即文件写到错误位置
+3. 确认 prompt 包含目标项目路径上下文（如 `projects/<name>/`）；subagent 默认在 workspace 根目录执行，无项目路径即文件写到错误位置
 
 - 委派必须优先使用 `wopal_task`，仅当不可用时才用内置 `Task`
 - 禁止 sleep + wopal_task_output 轮询；任务通过 `[WOPAL TASK IDLE/STUCK/PROGRESS]` 通知主动汇报，仅异常迹象时检查纠偏

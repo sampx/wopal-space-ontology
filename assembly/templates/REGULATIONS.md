@@ -60,7 +60,7 @@ Never force generic capability execution when a ready skill exists.
 Before delegating any subagent, complete the following steps in order. Skipping any step = serious negligence:
 1. Run `memory_manage command=search` for "delegation" keywords to load path rules, agent-type rules, and past lessons
 2. Check all paths in the prompt (`files_to_read`, output paths, etc.); use space-root-relative or absolute paths only; bare relative paths are forbidden
-3. Confirm the prompt includes the target project path context (e.g., `projects/gesp/`); subagents run at the workspace root by default — without a project path, files land in the wrong place
+3. Confirm the prompt includes the target project path context (e.g., `projects/<name>/`); subagents run at the workspace root by default — without a project path, files land in the wrong place
 
 - Prefer `wopal_task` for delegation; use the built-in `Task` only when unavailable
 - No sleep + wopal_task_output polling; tasks report proactively via `[WOPAL TASK IDLE/STUCK/PROGRESS]` notifications; check only when anomalies appear
