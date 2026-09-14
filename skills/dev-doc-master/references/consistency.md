@@ -38,14 +38,31 @@ All document links are relative to the repository root or the document's directo
 
 Every document has two link zones with distinct obligations:
 
-- **Header** (metadata block after the title): carries only **mandatory** documents — the parent document and sibling documents that this document must follow. Examples: a PRD's `Related DESIGN`, a sub-DESIGN's `上级: ./DESIGN.md`, a Phase's `Product PRD` + `Product DESIGN`.
-- **End** (Related Documents / References section): carries **reference-only** documents — research, business rules, project specs, auxiliary material that is informational, not binding.
+- **Header** (metadata block after the title): carries only **mandatory** documents — the parent document and sibling documents that this document must follow. Examples: a PRD's `Related DESIGN`, a sub-DESIGN's `Parent: ./DESIGN.md`, a Phase's `Product PRD` + `Product DESIGN`.
+- **End** (`Reference Documents`): carries **reference-only** documents — material that informs the document without binding it. The narrower name matters: it tells an author that a document belongs here only when a reader would genuinely benefit from following it, not merely because it is adjacent.
 
 A document is either a mandatory header link or a reference end link, never both. Never list a header document again in the end section, and never promote a reference document into the header as if it were binding.
 
-## Main Document Lists Its Sub-Documents
+## Language
 
-A suffix-free main document is the single entry point to its document tree. Its header must enumerate every `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-document under it (a `Sub-DESIGNs` / `Sub-PRDs` field). Each sub-document header points back via `上级: ./DESIGN.md` (or localized equivalent). This bidirectional index must match the actual files on disk — when a sub-document is added or removed, both sides are updated. Sub-documents listed in the header are structure declarations, not references, so they never appear in the end section.
+Headings and header field names are English in every document, regardless of the document's language. The quality-gate script matches these literally, and a stable heading vocabulary keeps documents comparable across projects.
+
+Body text and header field values follow the document's language. A Chinese document reads Chinese in the body and in field explanations; its headings stay English.
+
+## Process Documents vs Design Documents
+
+The document set contains two kinds of documents, and they relate to the design differently:
+
+- **Design documents** (PRD, DESIGN, Phase) *inherit*: they declare the parent documents they must follow, and their header carries those mandatory parents.
+- **Process documents** (GAPS) *measure divergence from*: they name the design they track, without becoming part of its lineage.
+
+The distinction matters for the header. A design document uses lineage fields (`Parent Architecture`, `Parent Product`, `Product Intent`). A process document uses `Design Source` — it points at the design it measures, and it does not claim to follow an architecture contract. Writing `Parent Architecture` on a GAPS document misstates the relationship and implies an obligation the document does not carry.
+
+Process documents also carry a lifecycle note. A GAPS document states that it is removed once its gaps close, because a reader who mistakes it for permanent documentation will maintain it as such and let stale entries accumulate.
+
+## Header = Mandatory, End = Reference
+
+A suffix-free main document is the single entry point to its document tree. Its header must enumerate every `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-document under it (a `Sub-DESIGNs` / `Sub-PRDs` field). Each sub-document header points back via `Parent: ./DESIGN.md`. This bidirectional index must match the actual files on disk — when a sub-document is added or removed, both sides are updated. Sub-documents listed in the header are structure declarations, not references, so they never appear in the end section.
 
 ## Sub-DESIGN Enumeration Is a Filesystem Fact
 
@@ -55,10 +72,41 @@ The header's sub-document list is a filesystem fact, not a summary. Before writi
 
 A documentation set contains two distinct kinds of supporting files:
 
-- **Sub-DESIGNs** (`DESIGN-<topic>.md`): architecture documents that decompose a main DESIGN chapter. They follow the naming convention, carry a `上级` parent link, and are enumerated in the main header's `Sub-DESIGNs` field.
-- **Companion documents** (e.g. `BRANDING.md`, `API-CONTRACT.md`): single-source-of-truth documents that belong to the set but are not architecture decompositions. They do not use the `DESIGN-<topic>.md` naming pattern, do not carry a `上级` link, and are declared in the main header's `Companion Documents` field or in the document-relationship table.
+- **Sub-DESIGNs** (`DESIGN-<topic>.md`): architecture documents that decompose a main DESIGN chapter. They follow the naming convention, carry a `Parent` link, and are enumerated in the main header's `Sub-DESIGNs` field.
+- **Companion documents** (e.g. `BRANDING.md`, `API-CONTRACT.md`): single-source-of-truth documents that belong to the set but are not architecture decompositions. They do not use the `DESIGN-<topic>.md` naming pattern, do not carry a `Parent` link, and are declared in the main header's `Companion Documents` field or in the document-relationship table.
 
 A companion document is never renamed to fit the `DESIGN-*.md` pattern, and never forced into the `Sub-DESIGNs` enumeration. The two categories are distinct and both are declared in the header.
+
+## Header Field Set
+
+Every document header uses fields drawn from one fixed vocabulary. Field names are English, always, and a document uses only the fields that apply to it — but it never invents a field name outside this set.
+
+| Field | Applies to | Meaning |
+|---|---|---|
+| `Status` | every document | lifecycle status: `Active`, `Draft`, `Target Shape`, `Proposed`, `Planned`, `Completed` |
+| `Updated` | every document | last update date, `YYYY-MM-DD`, refreshed on every edit |
+| `Parent Architecture` | project DESIGN, sub-DESIGN | the architecture document this one follows; `N/A` at the top of a product |
+| `Parent Product` | project DESIGN, sub-DESIGN | the product PRD this one follows; `N/A` when none |
+| `Parent` | sub-document (PRD / DESIGN / Phase) | the direct parent document in its own tree, e.g. `./DESIGN.md` |
+| `Product Intent` | product DESIGN | the PRD this DESIGN follows |
+| `Sibling DESIGNs` | product DESIGN | same-level DESIGNs whose contracts this one depends on |
+| `Sub-DESIGNs` | main DESIGN | exact enumeration of every `DESIGN-<topic>.md` under it |
+| `Sub-PRDs` | main PRD | exact enumeration of every `PRD-<topic>.md` under it |
+| `Companion Documents` | main DESIGN / PRD | companion truth sources (BRANDING, API-CONTRACT) |
+| `Design Source` | GAPS | the design document this gap tracker measures against |
+| `Product PRD` | Phase | the PRD this Phase follows |
+| `Product DESIGN` | Phase | the DESIGN contract this Phase follows |
+| `Phase ID` | Phase | the phase identifier |
+| `Product` | Phase | the product this phase belongs to |
+| `Scope` | any document | one line narrowing what the document covers, when the title alone is ambiguous |
+| `Companion` | GAPS | one line describing what the document tracks |
+
+Two rules follow from this table:
+
+- A document does not use a field that does not apply to it. A Phase document has no `Sub-DESIGNs`; a GAPS document has no `Parent Product`.
+- A document does not invent a field. If a fact does not fit the vocabulary, it belongs in the body, not in the header.
+
+`Parent` and `Parent Architecture` are separate obligations and may both appear: `Parent` points at the immediate document in the current tree (`./DESIGN.md`), `Parent Architecture` points at the product-level architecture above the whole project. They are never merged into one line.
 
 ## Metadata Field Semantics
 
@@ -68,25 +116,26 @@ Header metadata fields have fixed meanings:
 |---|---|---|
 | `Status` | all | document lifecycle status (Active / Draft / Target Shape) |
 | `Updated` | all | last update date, YYYY-MM-DD, refreshed on every edit |
-| `Parent` (上级) | sub-documents | the direct parent document, `./DESIGN.md` for project sub-docs |
-| `Parent Architecture` (上级架构) | sub-documents (optional) | product-level architecture document this doc must follow, when it exists |
-| `Sub-DESIGNs` (子设计) | main documents | exact enumeration of all `DESIGN-<topic>.md` under it |
-| `Companion Documents` (配套文档) | main documents (optional) | companion truth-source documents (BRANDING, API-CONTRACT) |
-| `Related Documents` (相关文档) | end section | reference-only material, never in the header |
+| `Parent` | sub-documents | the direct parent document, `./DESIGN.md` for project sub-docs |
+| `Parent Architecture` | sub-documents | product-level architecture document this doc must follow, when it exists |
+| `Sub-DESIGNs` | main documents | exact enumeration of all `DESIGN-<topic>.md` under it |
+| `Companion Documents` | main documents | companion truth-source documents (BRANDING, API-CONTRACT) |
+| `Reference Documents` | end section | reference-only material, never in the header |
 
-A sub-document header must use `Parent` (上级), not `Parent Architecture` (上级架构), for its project parent. `Parent Architecture` is reserved for product-level documents above the project DESIGN. When both exist, they are separate lines with distinct targets.
+A sub-document header uses `Parent` for its project parent, not `Parent Architecture`. `Parent Architecture` is reserved for product-level documents above the project DESIGN. When both exist, they are separate lines with distinct targets.
 
 ## Mandatory Quality Gate
 
 Every document-set update ends with an automated scan that must pass before the work is reported complete:
 
 1. Enumerate `DESIGN-*.md` on disk and diff against the main header's `Sub-DESIGNs` — bidirectional, exact match.
-2. Verify every sub-document header has `上级: ./DESIGN.md` (or the localized equivalent).
+2. Verify every sub-document header has `Parent: ./DESIGN.md`.
 3. Scan for absolute paths (`file:///`, `/Users/...`) — zero tolerance.
 4. Verify relative links resolve to existing files.
-5. Confirm the end section (`Related Documents`) contains no sub-DESIGNs and no header documents.
+5. Confirm the end section (`Reference Documents`) contains no sub-DESIGNs and no header documents.
 6. Scan for process-state vocabulary (已废弃, 已放弃, 迁移, 不再执行, 历史机制, deprecated, legacy, moved from).
 7. Confirm every touched document has a refreshed `Updated` date.
+8. For process documents (`GAPS.md`): confirm the header uses `Design Source` rather than a lineage field, and that header and end links are disjoint.
 
 Run `scripts/verify-docset.py <docs-dir>` where available; otherwise run the equivalent grep checks by hand. The scan result is part of the completion report.
 

@@ -5,13 +5,14 @@ Usage:
   python3 verify-docset.py <docs-dir> [--main DESIGN.md] [--strict]
 
 Checks:
-  1. Main header Sub-DESIGNs (子设计) match DESIGN-*.md files on disk (bidirectional).
-  2. Every sub-document header carries a 上级 (Parent) link to the main document.
+  1. Main header Sub-DESIGNs match DESIGN-*.md files on disk (bidirectional).
+  2. Every sub-document header carries a parent link to the main document.
   3. No absolute paths (file:/// or /Users/...) in any .md.
   4. Relative links resolve to existing files.
-  5. End section (Related Documents) contains no sub-DESIGNs and no header docs.
+  5. End section (Reference Documents) contains no sub-DESIGNs and no header docs.
   6. No process-state vocabulary (已废弃/已放弃/迁移/不再执行/deprecated/legacy/moved from).
   7. Every touched document has a refreshed Updated date.
+  8. Header field names come from the fixed English vocabulary.
 
 Exit code 0 on pass, 1 on any failure. Prints a report.
 """
@@ -132,22 +133,53 @@ def check_relative_links(doc_dir, report):
                     fail(report, f"{p.name}:{i}: broken link {target}")
 
 
+# A link may be written as a backticked path (`./DESIGN.md`) or as a bare
+# path reference inside prose. Both forms establish a header obligation, so
+# both must be caught when checking for header/end duplication.
+_LINK_RE = re.compile(r"`([^`\s]+\.md)`|(?<![`\w/.-])((?:\.{1,2}/|[\w.-]+/)*[\w.-]+\.md)")
+
+
+def _split_end_section(text):
+    """Return the end-section body, or None when the document has no end section."""
+    for marker in ("## 参考文档", "## Reference Documents"):
+        if marker in text:
+            return text.split(marker)[-1]
+    return None
+
+
 def check_end_section(doc_dir, main_name, sub_files, report):
-    """The MAIN document's end section must not repeat sub-DESIGNs (already in header).
-    Sub-documents may cross-reference each other in their own end sections; companion
-    docs (BRANDING etc.) may reference sub-designs as reference material."""
-    p = Path(doc_dir) / main_name
-    if not p.exists():
-        return
-    text = p.read_text(encoding="utf-8")
-    if "## Related Documents" not in text and "## 相关文档" not in text:
-        return
-    end = text.split("## Related Documents")[-1]
-    if "## 相关文档" in end:
-        end = end.split("## 相关文档")[-1]
-    for name in sub_files:
-        if name in end:
-            fail(report, f"{p.name}: sub-DESIGN {name} appears in Related Documents")
+    """A document's end section carries reference-only material.
+
+    Two rules are enforced across every document in the set:
+
+    1. A sub-DESIGN declared in the main header must not reappear in the end
+       section — the header is the structure declaration, the end section is
+       reference material, and a file belongs to exactly one of them.
+    2. No document may list in its end section anything its own header already
+       names. A header link is an obligation; repeating it as reference makes
+       the obligation ambiguous to a reader.
+
+    The second rule is what keeps authors from using the end section as a
+    dumping ground: if a document matters enough to bind the reader, it belongs
+    in the header; if it does not, it does not need to be named twice.
+    """
+    for p in _doc_files(doc_dir):
+        text = p.read_text(encoding="utf-8")
+        end = _split_end_section(text)
+        if end is None:
+            continue
+
+        header = text.split("##")[0]
+        header_links = {m.group(1) for m in _LINK_RE.finditer(header)}
+        end_links = {m.group(1) for m in _LINK_RE.finditer(end)}
+
+        if p.name == main_name:
+            for name in sub_files:
+                if name in end:
+                    fail(report, f"{p.name}: sub-DESIGN {name} appears in the end section")
+
+        for link in sorted(header_links & end_links):
+            fail(report, f"{p.name}: '{link}' listed in both header and end section")
 
 
 def check_process_state(doc_dir, report):
@@ -165,6 +197,64 @@ def check_updated_dates(doc_dir, report):
         text = p.read_text(encoding="utf-8")
         if not date_re.search(text):
             fail(report, f"{p.name}: no Updated date found")
+
+
+# Field names allowed in a document header. English only: a localized field
+# name would force every consumer (script and reader alike) to carry both
+# vocabularies, which is exactly the ambiguity this rule removes.
+ALLOWED_HEADER_FIELDS = {
+    "Status", "Updated", "Parent", "Parent Architecture", "Parent Product",
+    "Product Intent", "Sibling DESIGNs", "Sub-DESIGNs", "Sub-PRs", "Sub-PRDs",
+    "Companion Documents", "Design Source", "Companion", "Scope",
+    "Product PRD", "Product DESIGN", "Phase ID", "Product",
+}
+# Fields whose value must be a document link, checked for resolvability.
+LINK_FIELDS = {"Parent Architecture", "Parent Product", "Product Intent",
+               "Product PRD", "Product DESIGN", "Design Source"}
+_FIELD_RE = re.compile(r"^> \*\*([^*]+)\*\*:", re.M)
+
+
+def check_header_fields(doc_dir, report):
+    """Header field names come from one fixed English vocabulary.
+
+    A document that invents a field name, or writes one in a localized form,
+    makes its header unreadable to tooling and inconsistent with its siblings.
+    The header is metadata; its field names are part of the contract, not part
+    of the prose.
+    """
+    for p in _doc_files(doc_dir):
+        text = p.read_text(encoding="utf-8")
+        header = text.split("##")[0]
+        for m in _FIELD_RE.finditer(header):
+            field = m.group(1).strip()
+            if field not in ALLOWED_HEADER_FIELDS:
+                fail(report, f"{p.name}: unknown header field '{field}'")
+
+
+def check_gaps_docs(doc_dir, report):
+    """GAPS.md is a process document, not a design document.
+
+    It must declare the design it measures via `Design Source`, must not claim
+    an architecture lineage, and must not list that design again in its end
+    section. It must also state its own lifecycle so a reader knows the file
+    is removed once the gaps close.
+    """
+    gaps = doc_dir / "GAPS.md"
+    if not gaps.exists():
+        return
+    text = gaps.read_text(encoding="utf-8")
+    header = text.split("##")[0]
+
+    if "Design Source" not in header:
+        fail(report, "GAPS.md: header missing 'Design Source' field")
+    for lineage in ("Parent Architecture", "上级架构", "Parent Product"):
+        if lineage in header:
+            fail(report, f"GAPS.md: header uses lineage field '{lineage}' (process documents use Design Source)")
+    if "过程文档" not in text and "process document" not in text.lower():
+        fail(report, "GAPS.md: no lifecycle note stating the document is a process document")
+    if "编号规则" not in text and "Numbering" not in text:
+        fail(report, "GAPS.md: no numbering scheme section")
+    report.append("  OK: GAPS.md structure (Design Source, lifecycle, numbering)")
 
 
 def main():
@@ -185,6 +275,8 @@ def main():
     check_end_section(doc_dir, main_name, sub_files, report)
     check_process_state(doc_dir, report)
     check_updated_dates(doc_dir, report)
+    check_header_fields(doc_dir, report)
+    check_gaps_docs(doc_dir, report)
 
     print("\n".join(report))
     failed = any("FAIL:" in line for line in report)

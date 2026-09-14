@@ -1,10 +1,12 @@
 # <Product Name>
 
-> **Status**: Active  
-> **Updated**: YYYY-MM-DD  
-> **Product Intent** (mandatory): `<prd-path>` — the PRD this DESIGN follows  
-> **Sibling DESIGNs** (mandatory when depended on): `<path>, <path>`  
-> **Sub-DESIGNs** (mandatory when they exist): list every `DESIGN-<topic>.md` under this main document
+> **Status**: Active
+> **Updated**: YYYY-MM-DD
+> **Product Intent**: `<prd-path>` — the PRD this DESIGN follows
+> **Sibling DESIGNs**: `<path>, <path>` — same-level DESIGNs whose contracts this one depends on
+> **Sub-DESIGNs**: list every `DESIGN-<topic>.md` under this main document
+
+A sub-DESIGN uses `templates/design-sub.md`, which carries `Parent: ./DESIGN.md` plus the same `Parent Architecture` / `Parent Product` lines as its main document.
 
 ---
 
@@ -56,6 +58,6 @@ Product evolution skeleton. Each phase includes title, Goal, and Phase document 
 > Phase doc: [phases/<product>-p<N>-<slug>.md]
 ```
 
-## Related Documents
+## Reference Documents
 
 Reference-only documents: project DESIGNs, business rules, architecture references, project specs. Do not repeat the PRD or sibling DESIGNs listed in the header.

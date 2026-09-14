@@ -23,7 +23,7 @@ In the standard flow, product DESIGN handles phase decomposition and architectur
 - Main product DESIGN has no suffix: `docs/products/<product-name>/DESIGN.md`.
 - Sub-DESIGNs split by topic use `DESIGN-<topic>.md` (kebab-case), same directory as the main DESIGN. No suffix = main, suffixed = sub.
 - Split when the main DESIGN grows too long (roughly over 500 lines, or a single chapter over roughly 150 lines). Keep a chapter summary and a link to the sub-DESIGN in the main document.
-- The sub-DESIGN header keeps the parent link: `> **上级**: ./DESIGN.md` (or localized equivalent). Sub-DESIGNs may split further only when the topic itself exceeds the size guideline.
+- The sub-DESIGN header keeps the parent link: `> **Parent**: ./DESIGN.md`. Sub-DESIGNs may split further only when the topic itself exceeds the size guideline.
 - The main document header lists all its sub-DESIGNs (a `Sub-DESIGNs` field). Bidirectional index with sub-DESIGN parent links; must match actual files.
 
 ## Header
@@ -32,7 +32,7 @@ Header links carry mandatory documents only:
 
 - **Product DESIGN**: `Product Intent` (the PRD this DESIGN follows) + `Sibling DESIGNs` (same-level DESIGNs whose contracts this DESIGN depends on) + `Sub-DESIGNs` (all `DESIGN-<topic>.md` under it) + `Companion Documents` (BRANDING / API-CONTRACT type truth sources) when they exist.
 - **Project DESIGN**: `Parent Architecture` (the parent product DESIGN) + `Parent Product` (the parent PRD) + `Sub-DESIGNs` when they exist + `Companion Documents` when they exist.
-- Project-level implementation DESIGNs (`projects/*/docs/DESIGN.md`) are references, not siblings — they belong in Related Documents unless they are the direct parent.
+- Project-level implementation DESIGNs (`projects/*/docs/DESIGN.md`) are references, not siblings — they belong in the end section unless they are the direct parent.
 
 ## Sub-DESIGN Enumeration (mandatory, filesystem-backed)
 
@@ -46,14 +46,14 @@ A header that misses a real file, or lists a file that does not exist, fails the
 
 ## Companion Documents in the Header
 
-Documents like `BRANDING.md` (branding truth source) or `API-CONTRACT.md` (API contract) belong to the set but are not `DESIGN-<topic>.md` decompositions. Declare them in a `Companion Documents` (配套文档) header field, or in the document-relationship table at the top of the main document. Never rename them to fit the `DESIGN-*.md` pattern and never fold them into `Sub-DESIGNs`. This keeps the two categories distinct and prevents naming drift.
+Documents like `BRANDING.md` (branding truth source) or `API-CONTRACT.md` (API contract) belong to the set but are not `DESIGN-<topic>.md` decompositions. Declare them in a `Companion Documents` header field, or in the document-relationship table at the top of the main document. Never rename them to fit the `DESIGN-*.md` pattern and never fold them into `Sub-DESIGNs`. This keeps the two categories distinct and prevents naming drift.
 
 ## Metadata Field Semantics
 
-- Sub-documents use `Parent` (上级) for the project parent: `上级: ./DESIGN.md`.
-- `Parent Architecture` (上级架构) is reserved for product-level documents above the project DESIGN.
+- Sub-documents use `Parent` for the project parent: `Parent: ./DESIGN.md`.
+- `Parent Architecture` is reserved for product-level documents above the project DESIGN.
 - `Status` / `Updated` are mandatory on every document; refresh `Updated` on every edit.
-- `Sub-DESIGNs` (子设计) and `Companion Documents` (配套文档) live in the main document header only.
+- `Sub-DESIGNs` and `Companion Documents` live in the main document header only.
 
 ## Discussion Completion Standard
 
@@ -81,7 +81,7 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 - [ ] No implementation status, delivery progress, acceptance results, checkbox tasks, or "completed / pending" module status
 - [ ] Product: grounded in the PRD; Evolution Roadmap keeps only phase skeleton
 - [ ] Project: grounded in parent PRD/DESIGN (or `Parent Product: N/A`); capability scope is target-state only
-- [ ] Header = mandatory links only; Related Documents = reference-only; no duplication
+- [ ] Header = mandatory links only; Reference Documents = reference-only; no duplication
 - [ ] Whole document set reviewed: sub-DESIGNs, parent DESIGN, PRD, Phase aligned when affected
 - [ ] Bidirectional sub-document index consistent
 
@@ -90,10 +90,10 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 Run `scripts/verify-docset.py <docs-dir> --main DESIGN.md` (or `PRD.md`). The script must exit 0 before the update is reported complete. It checks, on the actual filesystem:
 
 1. `Sub-DESIGNs` header matches `DESIGN-*.md` files on disk — bidirectional, exact match
-2. Every sub-document carries a `上级` parent link to the main document
+2. Every sub-document carries a `Parent` link to the main document
 3. Zero absolute paths (`file:///`, `/Users/...`)
 4. All relative links resolve to existing files
-5. No sub-DESIGN or header document appears in the end `Related Documents` section
+5. No sub-DESIGN or header document appears in the end `Reference Documents` section
 6. No process-state vocabulary (已废弃 / 已放弃 / 迁移 / deprecated / legacy)
 7. Every document has an `Updated` date
 

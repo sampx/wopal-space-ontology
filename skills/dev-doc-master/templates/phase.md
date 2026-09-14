@@ -21,8 +21,8 @@ Describe the current state for each project or subsystem in concise narrative pr
 
 A concise summary list of product capabilities to be delivered in this phase, so humans and agents can grasp the full scope at a glance. One line per scope area with Owner. Example:
 
-- **CLI 分发** — Node SEA release packaging → public release carrier → installer one-click install. Owner: wopal-cli
-- **ellamaka 分发** — artifact branding + 4-platform matrix + GitHub Release. Owner: ellamaka
+- **CLI distribution** — Node SEA release packaging → public release carrier → installer one-click install. Owner: wopal-cli
+- **ellamaka distribution** — artifact branding + 4-platform matrix + GitHub Release. Owner: ellamaka
 
 ## Out of Scope
 
@@ -75,7 +75,7 @@ Only items without a design solution go here. Gaps with design solutions are man
 | Risk / Dependency | Impact | Why no design solution |
 |-------------------|--------|------------------------|
 
-## References
+## Reference Documents
 
 Reference-only documents: project DESIGNs and other relevant auxiliary material. Do not repeat the PRD or DESIGN listed in the header.
 

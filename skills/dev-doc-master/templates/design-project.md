@@ -1,10 +1,12 @@
 # <Project Name>
 
-> **Status**: Active  
-> **Updated**: YYYY-MM-DD  
-> **Parent Architecture** (mandatory): `<parent-design-path or N/A>` — the architecture contract this DESIGN follows  
-> **Parent Product** (mandatory): `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows  
-> **Sub-DESIGNs** (mandatory when they exist): list every `DESIGN-<topic>.md` under this main document
+> **Status**: Active
+> **Updated**: YYYY-MM-DD
+> **Parent Architecture**: `<parent-design-path or N/A>` — the architecture contract this DESIGN follows
+> **Parent Product**: `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows
+> **Sub-DESIGNs**: list every `DESIGN-<topic>.md` under this main document
+
+A sub-DESIGN uses `templates/design-sub.md`, which carries `Parent: ./DESIGN.md` plus the same `Parent Architecture` / `Parent Product` lines as its main document.
 
 ---
 
@@ -72,6 +74,6 @@ Project-owned state, persistence, configuration, caches, generated files. Clarif
 |-------|----------|-------|-------|
 | | | | |
 
-## Related Documents
+## Reference Documents
 
 Reference-only documents: business rules, architecture references, project specs, and auxiliary material. Do not repeat the parent PRD/DESIGN listed in the header.

@@ -5,7 +5,7 @@ Create or update a product PRD document. Template: `templates/prd.md`.
 ## Document Paths and Naming
 
 - Main PRD has no suffix: `docs/products/<product-name>/PRD.md`.
-- Sub-PRDs (if split by topic) use `PRD-<topic>.md` and express a parent-child relationship with the main PRD. When sub-PRDs exist, the main PRD header lists them in a `Sub-PRDs` field; they are structure declarations and never appear in Related Documents.
+- Sub-PRDs (if split by topic) use `PRD-<topic>.md` and express a parent-child relationship with the main PRD. When sub-PRDs exist, the main PRD header lists them in a `Sub-PRDs` field; they are structure declarations and never appear in the end section.
 - When updating, preserve the existing file path.
 
 ## Context Collection
@@ -27,7 +27,7 @@ WopalSpace-specific context: prefer canonical startup and structure files `.wopa
 
 ## Header
 
-The header holds only mandatory documents: the DESIGN (or sibling DESIGNs) this PRD follows, plus sub-PRDs when they exist. Reference-only documents belong in Related Documents, never the header.
+The header holds only mandatory documents: the DESIGN (or sibling DESIGNs) this PRD follows, plus sub-PRDs when they exist. Reference-only documents belong in the end section, never the header.
 
 ```markdown
 > **Status**: Active  
@@ -66,7 +66,7 @@ Reject and rewrite: section commentary ("This section describes ..."), template 
 - [ ] No template commentary or documentation-authoring language
 - [ ] Every paragraph/table row communicates a product fact or boundary
 - [ ] Existing accurate content preserved; obsolete content revised/removed
-- [ ] Header = mandatory links only; Related Documents = reference-only; no duplication
+- [ ] Header = mandatory links only; Reference Documents = reference-only; no duplication
 - [ ] Whole document set reviewed and aligned
 
 ## Response After Completion

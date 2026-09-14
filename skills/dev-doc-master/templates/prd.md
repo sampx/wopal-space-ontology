@@ -35,6 +35,6 @@ Write 3-5 scenario-level narratives. Each scenario should explain the user's goa
 
 Document product-level rules that protect user trust, safety, maintainability, or long-term evolution.
 
-## Related Documents
+## Reference Documents
 
 Reference-only documents: research, business rules, plans, project specs, and auxiliary material. Do not repeat the DESIGN listed in the header.

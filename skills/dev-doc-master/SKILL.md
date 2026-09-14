@@ -1,6 +1,6 @@
 ---
 name: dev-doc-master
-description: Authoring and maintenance of development documentation — product PRD, product/project DESIGN (including sub-DESIGN splitting), phase/roadmap documents, and project README. Use whenever the user asks to create or update a PRD, DESIGN, design document, phase document, roadmap, or README; when a main document needs splitting into topic sub-documents; or when document-set consistency (header vs reference links, bidirectional sub-document index, cross-document alignment) needs enforcement. Covers document naming rules, mandatory header links vs reference-only end links, no chapter numbering, relative-path-only links, and whole-document-set consistency on every update.
+description: Authoring and maintenance of development documentation — product PRD, product/project DESIGN (including sub-DESIGN splitting), phase/roadmap documents, project README, and project gap tracking. Use whenever the user asks to create or update a PRD, DESIGN, design document, phase document, roadmap, README, or a GAPS document tracking design-vs-implementation divergence; when a main document needs splitting into topic sub-documents; or when document-set consistency (header vs reference links, bidirectional sub-document index, cross-document alignment) needs enforcement. Covers document naming rules, mandatory header links vs reference-only end links, no chapter numbering, relative-path-only links, gap numbering and retirement, and whole-document-set consistency on every update.
 ---
 
 # dev-doc-master — Development Documentation Master
@@ -12,6 +12,7 @@ Authoring and maintenance workflow for the product/project documentation set: PR
 - Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, or project README.
 - Split an oversized main document into topic sub-documents.
 - Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ README ↔ AGENTS.md).
+- Record or update project gaps between design target state and implementation (`GAPS.md`).
 
 ## Document Set and Routing
 
@@ -19,8 +20,10 @@ Authoring and maintenance workflow for the product/project documentation set: PR
 |---|---|---|---|
 | Product PRD | `/cupdate-prd` | `references/prd.md` | `templates/prd.md` |
 | Product / Project DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` / `templates/design-project.md` |
+| Sub-DESIGN | (via `/cupdate-design`) | `references/design.md` | `templates/design-sub.md` |
 | Phase / Roadmap | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
 | Project README | `/cupdate-readme` | `references/readme.md` | (inline in `references/readme.md`) |
+| Project GAPS | (no command) | `references/gaps.md` | `templates/gaps.md` |
 | AGENTS.md | `/cupdate-agent-rules` | space-master skill | space-master skill templates |
 
 Load the matching reference file before writing. All references share the common rules in `references/consistency.md` — read it once per session.
@@ -31,11 +34,26 @@ Read `references/consistency.md` for the full text. In short:
 
 - **No chapter numbering**: headings use Markdown heading levels only. No `## 1.` prefixes.
 - **Relative links only**: all document links are relative to the repository root or the document's directory. Absolute paths are forbidden (docs are committed to git and shared).
-- **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). End-of-document links (Related Documents / References) carry reference-only auxiliary material. A document is never listed twice.
+- **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). The end section carries reference-only material. A document is never listed twice — an entry in both zones makes the obligation unreadable.
 - **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `上级: ./DESIGN.md`. Bidirectional index must match actual files.
 - **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, README, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
 - **Target-state writing**: documents describe the target state only — what the system is, what exists, who owns it. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", or "migration" notes. When a capability is owned elsewhere, state the ownership, not the move.
 - **Writing style**: natural language that reads like a human wrote it; one idea per sentence; affirmative over negative; ownership over exclusion. State what a component does and owns rather than listing what it does not do.
+
+## Language
+
+The skill's own references and templates are written in English, and section headings stay English in the produced documents. Two reasons: the quality-gate script matches headings literally, and a stable heading set keeps documents comparable across projects and languages.
+
+Document body text follows the user's preferred language. When the user writes Chinese, the body is Chinese; when English, English.
+
+Header **field names** stay English so the quality-gate script can parse them. Header **field values** follow the document language, so a reader gets a natural explanation rather than a bilingual mix:
+
+```
+> **Design Source**: `./DESIGN.md`（差距对照的设计真相源）
+> **Companion**: 追踪本项目的目标态差距，逐项解决后关闭。
+```
+
+This split means a document's structure is language-independent — a reader or a script finds the same headings and fields everywhere — while its content reads naturally to its audience. Headings stay English for the same reason as field names: the gate script matches them literally, and a stable heading set keeps documents comparable across projects.
 
 ## Naming Conventions
 
