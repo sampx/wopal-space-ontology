@@ -30,9 +30,29 @@ In the standard flow, product DESIGN handles phase decomposition and architectur
 
 Header links carry mandatory documents only:
 
-- **Product DESIGN**: `Product Intent` (the PRD this DESIGN follows) + `Sibling DESIGNs` (same-level DESIGNs whose contracts this DESIGN depends on) + `Sub-DESIGNs` (all `DESIGN-<topic>.md` under it) + `Companion Documents` (BRANDING / API-CONTRACT type truth sources) when they exist.
+- **Product DESIGN**: `Product Intent` (the PRD this DESIGN follows) + `Sibling DESIGNs` (the project DESIGNs of its core subsystems) + `Sub-DESIGNs` (all `DESIGN-<topic>.md` under it) + `Companion Documents` (BRANDING / API-CONTRACT type truth sources) when they exist.
 - **Project DESIGN**: `Parent Architecture` (the parent product DESIGN) + `Parent Product` (the parent PRD) + `Sub-DESIGNs` when they exist + `Companion Documents` when they exist.
-- Project-level implementation DESIGNs (`projects/*/docs/DESIGN.md`) are references, not siblings — they belong in the end section unless they are the direct parent.
+
+## Product DESIGN and Project DESIGNs
+
+A product DESIGN organizes its core subsystems. Each subsystem has its own project DESIGN carrying that subsystem's internal architecture. The two are documents at different levels, and the relationship between them is ownership, not adjacency.
+
+- The product DESIGN's `Core Projects` section gives each subsystem its role, boundary, and interaction contract, and links to that subsystem's project DESIGN.
+- Those project DESIGNs belong in the header's `Sibling DESIGNs` field. The product DESIGN depends on their contracts, so a reader of the product architecture must be able to reach them from the header. **A document that states a contract this DESIGN must follow is a sibling — wherever its file lives.**
+- Cross-repository location does not weaken the link. A project DESIGN in another repository is still a sibling when its contract binds this document. Repository boundaries say where files live, not how strongly they bind.
+
+The header is the reader's map of what this design depends on. Moving a binding document to the end section tells the reader it is optional reading, which is the opposite of the truth.
+
+## Sibling DESIGNs vs Reference Documents
+
+The distinction is obligation, not proximity:
+
+- **Sibling DESIGNs** (header): documents whose contracts this DESIGN must follow. A reader cannot evaluate this design without them.
+- **Reference Documents** (end section): material that informs without binding — research, external specifications, auxiliary notes, third-party design write-ups.
+
+A document is one or the other, never both. When a document's contract binds this design, it belongs in the header even if it is long, external, in another repository, or written by another team. When it merely gives useful background, it belongs in the end section.
+
+The temptation to treat every related document as "reference" is exactly what this field prevents. `Reference Documents` is not a bucket for documents that seem related; it carries documents a reader would benefit from following but that this design does not depend on.
 
 ## Sub-DESIGN Enumeration (mandatory, filesystem-backed)
 
@@ -88,6 +108,8 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 - [ ] Bidirectional sub-document index consistent
 - [ ] Every supporting document classified by content: each one carrying a main DESIGN concern is a sub-design, named and enumerated; each one that is a cross-cutting truth source stays a companion
 - [ ] No delegating reference in the main document points at a file that is neither a sub-design nor a declared companion
+- [ ] Product DESIGN: every core subsystem's project DESIGN is listed in `Sibling DESIGNs`, regardless of which repository it lives in
+- [ ] `Reference Documents` carries no document whose contract this design follows
 
 ## Mandatory Quality Gate (before reporting complete)
 

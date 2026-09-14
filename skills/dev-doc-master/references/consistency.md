@@ -38,10 +38,19 @@ All document links are relative to the repository root or the document's directo
 
 Every document has two link zones with distinct obligations:
 
-- **Header** (metadata block after the title): carries only **mandatory** documents — the parent document and sibling documents that this document must follow. Examples: a PRD's `Related DESIGN`, a sub-DESIGN's `Parent: ./DESIGN.md`, a Phase's `Product PRD` + `Product DESIGN`.
+- **Header** (metadata block after the title): carries only **mandatory** documents — the parent document and sibling documents that this document must follow. Examples: a PRD's `Related DESIGN`, a sub-DESIGN's `Parent: ./DESIGN.md`, a Phase's `Product PRD` + `Product DESIGN`, a product DESIGN's `Sibling DESIGNs`.
 - **End** (`Reference Documents`): carries **reference-only** documents — material that informs the document without binding it. The narrower name matters: it tells an author that a document belongs here only when a reader would genuinely benefit from following it, not merely because it is adjacent.
 
 A document is either a mandatory header link or a reference end link, never both. Never list a header document again in the end section, and never promote a reference document into the header as if it were binding.
+
+### The Obligation Test
+
+When a document's placement is unclear, ask whether the reader must follow it to evaluate this document.
+
+- **Must follow it** → header. The document states a contract, constraint, or architecture this one is bound by. Long file paths, another repository, another team's ownership, and a different naming convention do not weaken the obligation.
+- **Would benefit from it** → end section. The document supplies background, precedent, or external context that this one does not depend on.
+
+The common failure is drift toward the end section: an author sees a document that feels "external" (it lives in another repository, or it was written before this one) and files it as reference. That silently demotes a binding contract to optional reading. The header is the reader's map of dependencies — a dependency filed as reference is a dependency the reader will miss.
 
 ## Language
 
@@ -60,7 +69,7 @@ The distinction matters for the header. A design document uses lineage fields (`
 
 Process documents also carry a lifecycle note. A GAPS document states that it is removed once its gaps close, because a reader who mistakes it for permanent documentation will maintain it as such and let stale entries accumulate.
 
-## Header = Mandatory, End = Reference
+## Main Document Lists Its Sub-Documents
 
 A suffix-free main document is the single entry point to its document tree. Its header must enumerate every `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-document under it (a `Sub-DESIGNs` / `Sub-PRDs` field). Each sub-document header points back via `Parent: ./DESIGN.md`. This bidirectional index must match the actual files on disk — when a sub-document is added or removed, both sides are updated. Sub-documents listed in the header are structure declarations, not references, so they never appear in the end section.
 
@@ -100,7 +109,7 @@ Every document header uses fields drawn from one fixed vocabulary. Field names a
 | `Parent Product` | project DESIGN, sub-DESIGN | the product PRD this one follows; `N/A` when none |
 | `Parent` | sub-document (PRD / DESIGN / Phase) | the direct parent document in its own tree, e.g. `./DESIGN.md` |
 | `Product Intent` | product DESIGN | the PRD this DESIGN follows |
-| `Sibling DESIGNs` | product DESIGN | same-level DESIGNs whose contracts this one depends on |
+| `Sibling DESIGNs` | product DESIGN | the project DESIGNs of this product's core subsystems; their contracts bind this design |
 | `Sub-DESIGNs` | main DESIGN | exact enumeration of every `DESIGN-<topic>.md` under it |
 | `Sub-PRDs` | main PRD | exact enumeration of every `PRD-<topic>.md` under it |
 | `Companion Documents` | main DESIGN / PRD | companion truth sources (BRANDING, API-CONTRACT) |

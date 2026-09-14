@@ -3,7 +3,7 @@
 > **Status**: Active
 > **Updated**: YYYY-MM-DD
 > **Product Intent**: `<prd-path>` — the PRD this DESIGN follows
-> **Sibling DESIGNs**: `<path>, <path>` — same-level DESIGNs whose contracts this one depends on
+> **Sibling DESIGNs**: list the project DESIGNs of this product's core subsystems — their contracts bind this design, so they belong in the header even when they live in another repository
 > **Sub-DESIGNs**: list every `DESIGN-<topic>.md` under this main document
 
 A sub-DESIGN uses `templates/design-sub.md`, which carries `Parent: ./DESIGN.md` plus the same `Parent Architecture` / `Parent Product` lines as its main document.
@@ -29,7 +29,7 @@ Overall product architecture diagram (ASCII preferred) and layer table. The diag
 Each core subsystem's role, boundary, and interaction contract.
 
 - One subsection per subsystem: responsibility, design principles, external contract
-- Link to the corresponding project DESIGN document
+- Link to the corresponding project DESIGN document — those documents are the `Sibling DESIGNs` in the header, not reference material
 - Inter-subsystem interaction relationships are traceable
 
 ## Runtime Model
@@ -60,4 +60,4 @@ Product evolution skeleton. Each phase includes title, Goal, and Phase document 
 
 ## Reference Documents
 
-Reference-only documents: project DESIGNs, business rules, architecture references, project specs. Do not repeat the PRD or sibling DESIGNs listed in the header.
+Reference-only documents: research, external specifications, auxiliary material that informs without binding. Do not repeat the PRD, the sibling DESIGNs, or the sub-DESIGNs listed in the header — a document whose contract this design follows belongs in the header, not here.
