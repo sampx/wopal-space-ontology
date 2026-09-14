@@ -60,6 +60,7 @@ This split means a document's structure is language-independent — a reader or 
 - Main PRD: `PRD.md` (no suffix). Main DESIGN: `DESIGN.md` (no suffix).
 - Sub-documents: `PRD-<topic>.md`, `DESIGN-<topic>.md` (kebab-case), same directory as main. No suffix = main, suffixed = sub.
 - Split threshold: roughly 500 lines per main document, or 150 lines per chapter.
+- A supporting document is classified by content, not by its current name. One that carries a main DESIGN concern is a sub-design and is renamed to match; one that is a cross-cutting truth source stays a companion. See `references/consistency.md` (Companion Documents vs Sub-DESIGNs) for the criteria.
 - See `references/consistency.md` and the design reference for the full splitting rules.
 
 ## Workflow

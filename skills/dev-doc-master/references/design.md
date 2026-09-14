@@ -48,6 +48,8 @@ A header that misses a real file, or lists a file that does not exist, fails the
 
 Documents like `BRANDING.md` (branding truth source) or `API-CONTRACT.md` (API contract) belong to the set but are not `DESIGN-<topic>.md` decompositions. Declare them in a `Companion Documents` header field, or in the document-relationship table at the top of the main document. Never rename them to fit the `DESIGN-*.md` pattern and never fold them into `Sub-DESIGNs`. This keeps the two categories distinct and prevents naming drift.
 
+The reverse error is equally real: a supporting document that in fact carries one of the main DESIGN's own architectural concerns must be recognized as a sub-design, even when it was originally written under a descriptive name like `TESTING.md` or `CAPABILITY-PROTOCOL.md`. Leave it in place and the document tree loses a branch — the file exists, but the main header never points at it. Classification criteria and the rename that follows are in `consistency.md` (Companion Documents vs Sub-DESIGNs).
+
 ## Metadata Field Semantics
 
 - Sub-documents use `Parent` for the project parent: `Parent: ./DESIGN.md`.
@@ -84,6 +86,8 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 - [ ] Header = mandatory links only; Reference Documents = reference-only; no duplication
 - [ ] Whole document set reviewed: sub-DESIGNs, parent DESIGN, PRD, Phase aligned when affected
 - [ ] Bidirectional sub-document index consistent
+- [ ] Every supporting document classified by content: each one carrying a main DESIGN concern is a sub-design, named and enumerated; each one that is a cross-cutting truth source stays a companion
+- [ ] No delegating reference in the main document points at a file that is neither a sub-design nor a declared companion
 
 ## Mandatory Quality Gate (before reporting complete)
 

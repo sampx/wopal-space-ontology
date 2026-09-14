@@ -75,7 +75,18 @@ A documentation set contains two distinct kinds of supporting files:
 - **Sub-DESIGNs** (`DESIGN-<topic>.md`): architecture documents that decompose a main DESIGN chapter. They follow the naming convention, carry a `Parent` link, and are enumerated in the main header's `Sub-DESIGNs` field.
 - **Companion documents** (e.g. `BRANDING.md`, `API-CONTRACT.md`): single-source-of-truth documents that belong to the set but are not architecture decompositions. They do not use the `DESIGN-<topic>.md` naming pattern, do not carry a `Parent` link, and are declared in the main header's `Companion Documents` field or in the document-relationship table.
 
-A companion document is never renamed to fit the `DESIGN-*.md` pattern, and never forced into the `Sub-DESIGNs` enumeration. The two categories are distinct and both are declared in the header.
+Both directions of misclassification are errors. Promoting a companion document into the sub-design enumeration invents a structure that does not exist. Leaving a real sub-design under an ad-hoc name hides a branch of the document tree from every reader who trusts the main header as the map — the document exists, but nothing points at it.
+
+### Classification Is by Content, Not by Name
+
+A file's name records how it was first created, not what it became. Classify by asking what the document does:
+
+1. **Does the main DESIGN treat it as an elaboration of one of its own sections?** The decisive signal is a delegating reference in the main document — a sentence of the form "the full protocol lives in X", "details are in X", "the release contract is in X". If the main document hands part of its own architecture to another file, that file is a sub-design, whatever it is called.
+2. **Is it the sole authoritative source for one architectural concern** (a contract, a protocol, a layering model, a subsystem) rather than a cross-cutting reference table (brand constants, business rule numbering)? The former is a sub-design; the latter is a companion.
+
+Size corroborates the answer. A supporting document that approaches the main DESIGN's own length, or that would exceed the chapter split guideline (`design.md`, roughly 150 lines) on its own, is carrying architecture — it belongs in the sub-design enumeration.
+
+A classified sub-design is renamed to `DESIGN-<topic>.md`, given `Parent: ./DESIGN.md`, and enumerated in the main header. The rename is part of the classification, not a separate cosmetic step: the naming convention is how a reader recognizes the document's role at a glance.
 
 ## Header Field Set
 
