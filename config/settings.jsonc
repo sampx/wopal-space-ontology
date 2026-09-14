@@ -40,7 +40,7 @@
   "tui": {
     "plugin": [
       [
-        "../plugins/tui-ellamaka.tsx",
+        "../plugins/tui-ellamaka/index.tsx",
         {
           "enabled": true,
           "label": "WOPALSPACE"
