@@ -1,17 +1,17 @@
 ---
 name: space-master
 description: |
-  Root skill and master specification for WopalSpace. Everything a space can do — how it runs, how it is configured, how to write commands/rules/skills/templates — is defined in the ontology repository and distributed, propagated, and optimized across spaces through the ontology update/contribute/promote flows.
+  Root skill and master specification for WopalSpace. Everything a space can do — how it runs, how it is configured, how to write commands/rules/skills/templates — is defined in the ontology repository and distributed to spaces through the central capability pool, with space evolution flowing back through space sync.
 
   MUST load when:
-  - Ontology repo operations: update, sync, contribute, promote, PR
-  - Space structure maintenance: space init/status, .wopal directory layout, how the space runs and is configured
+  - Ontology repo operations: update, sync, capability discovery, PR
+  - Space structure maintenance: space init/status, .wopal directory layout, assembly model, how the space runs and is configured
   - Space capability authoring: writing and modifying commands, rules, skills, templates
   - AGENTS.md authoring: creating or updating project/directory AGENTS.md
   - Skill lifecycle: install, scan, remove
   - Task intent is ambiguous or Wopal is unsure which workflow/skill to use — this is the routing entry point
 
-  [CRITICAL] MUST LOAD whenever interacting with ontology repo operations (update/sync/contribute/promote/PR), even if the user does not explicitly say "upstream sync".
+  [CRITICAL] MUST LOAD whenever interacting with ontology repo operations (update/sync/PR), even if the user does not explicitly say "upstream sync".
 ---
 
 # space-master
@@ -32,7 +32,7 @@ Space skills each serve their own purpose. Choose by scenario; do not stack load
 
 This skill directly owns WopalSpace's space governance work — no routing needed:
 
-- **Ontology maintenance**: the full sync/contribute/promote/PR flow — mode contract, contribution paths, scope determination, PR splitting, sync gates
+- **Ontology maintenance**: the central capability pool model, `space sync`, capability discovery, and the upstream PR flow
 - **AGENTS.md maintenance**: creating or updating project-level or directory-level AGENTS.md — rule audit, content boundaries, workflow
 - **Skill maintenance**: the skill lifecycle — install, scan, remove
 
@@ -40,83 +40,82 @@ This skill directly owns WopalSpace's space governance work — no routing neede
 
 ## Ontology Maintenance
 
-### Mode Contract
+### The Central Pool Model
 
-Check the mode before any ontology operation:
-
-| Mode | Capability | Origin |
-|------|-----------|--------|
-| **clone** | `update` (downstream sync) only | upstream repo directly |
-| **fork** | `update` + `contribute` (upstream PR) + `promote` | user's fork → upstream |
-
-Command: `wopal ontology status`
-
-### Sync Directions and Layer Order
-
-| Direction | Command |
-|-----------|---------|
-| **Downstream** | `wopal ontology update --confirm` |
-| **Upstream** | `wopal space contribute` → `wopal ontology contribute` / `wopal ontology promote` |
-
-Run downstream updates before starting a contribution batch and after PR merges. Upstream contribution follows this layer order:
+Ontology maintenance revolves around one authoritative line of history:
 
 ```
-space/<name> → local type/* → origin/type/* → upstream PR
+upstream/main  →  local main (central capability pool)  →  space/<name> (assembly worktree)
 ```
 
-Use `space status` to identify the files to contribute. When selected files still exist on the space branch, run `space contribute` first. Run `ontology contribute` only after those files have entered local type/*. Do not insert `ontology update` between `space contribute` and the type PR.
+`local main` is the central capability pool — the single source of truth for every capability this machine's spaces can assemble. Each space mounts its own `space/<name>` branch as a `.wopal/` assembly worktree, materialized by sparse-checkout from the assembly manifest. Spaces read from the pool; they do not fork the capability lineage.
 
-### Two Contribution Paths
+Capabilities flow in two directions:
 
-Ontology has a three-layer architecture (main → type/* → space/*), and files fall into two status categories:
+| Direction | Command | What it does |
+|-----------|---------|--------------|
+| **Downstream** | `wopal ontology update` | Pulls `upstream/main` into `local main` |
+| **Space alignment** | `wopal space sync` | Reconciles a space branch with `local main` in both directions |
+| **Upstream** | `wopal ontology contribute` | Contributes `local main` changes to `upstream` as a PR |
 
-| Status | Meaning | Examples | Path |
-|--------|---------|----------|------|
-| **A-status** | Type-specific, exists only in type/* | Domain-specific skills, workflows, integration scripts | **Short path**: 4 steps |
-| **M-status** | Generic capability, ultimately lands in main for all spaces | Generic skills, dev workflows, templates | **Long path**: 7 steps |
+### Space Sync
 
-#### Short Path (A-status, type-specific)
+`wopal space sync` is the single reconciliation command for a space — it replaces the former `space update` / `space contribute` pair.
 
-```
-0. ontology update      complete pending downstream sync before this batch
-1. space contribute     space/* → local type/* → origin/type/*
-2. ontology contribute  type/* → upstream(type) (topic PR)
-3. ontology update      downstream sync after upstream merge
-```
+It runs in two ordered phases:
 
-#### Long Path (M-status, generic)
+1. **Upward first.** Space-unique evolution (capabilities the space added or changed) is integrated into `local main` through an isolated temporary worktree. Success advances `local main`; a conflict stops the sync with the conflict surfaced, leaving both sides untouched.
+2. **Downward second.** Once upward is clean, the space fast-forwards to the latest `local main`.
 
-```
-0. ontology update      complete pending downstream sync before this batch
-1. space contribute     space/* → local type/* → origin/type/*
-2. ontology contribute  type/* → upstream(type) (topic PR)
-3. ontology update      downstream sync after type PR merge
-4. ontology promote     type/* → main (discuss scope with user first)
-5. ontology contribute  main → upstream(main) (topic PR, split per Topic-Based PR Splitting)
-6. ontology update      downstream sync again after main PR merge
+Order matters: integrating upward first means the downward fast-forward always lands on a `local main` that already contains the space's own work, so no change is lost or replayed.
+
+Always preview first, then confirm:
+
+```bash
+wopal space sync            # dry-run: show what would move and where
+wopal space sync --confirm  # execute
 ```
 
-> After promote, main branch has new divergence — must contribute to upstream(main) at step 6.
+Before syncing, check `wopal space status` for the space's divergence from `local main` and its assembly state.
 
-**Post-promote completeness check** (mandatory after step 4): The promote classifier can misclassify newly added files as A-status and exclude them (observed: new test files under `skills/dev-flow/tests/` were missed). Compare the `promote --confirm` output's promote list against the type PR file set item by item; re-add missing files with `--include <files>`.
+### Capability Discovery and Assembly
 
-**Promote backfill timing**: After promote, main is ahead of type/*; another promote errors with `type branch is behind main`. Run `ontology update --confirm` first to sync main → type/*, then retry promote. The backfill `--include` only adds new files; it does not re-promote existing content.
+Two command families cover the capability surface, with distinct roles:
+
+| Command | Scope | Purpose |
+|---------|-------|---------|
+| `wopal ontology capability list` | Ontology | Lists every capability the ontology owns, grouped by category — the menu a space assembles from |
+| `wopal space capability add/remove` | Space | Adds or removes a capability from this space's assembly and re-materializes it |
+
+`wopal space capability add/remove` updates the space's assembly snapshot and re-runs the materialization. The change can later be contributed as a type archetype so other spaces of the same type inherit it.
+
+The separate `wopal capability` command is unrelated: it exposes the CLI's own machine capability OpenAPI contract.
+
+### Upstream Contribution
+
+Contributing to `upstream` is available in **fork mode** only. In clone mode `origin` points directly at the canonical upstream, so `wopal ontology contribute` is unavailable — guide the user to fork mode if a PR is needed.
+
+```bash
+wopal ontology status        # confirm mode and divergence
+wopal ontology contribute    # dry-run
+wopal ontology contribute --include "a/**,b/**" --message "<message>" --confirm
+```
 
 ### Contribution Scope Determination
 
 Contribution scope is decided by the USER, never assumed or delegated back:
 
-1. **Present the full menu first.** Enumerate EVERY pending file (`git diff --name-status`), group by directory/feature area, classify each group (M-status / A-status), and show the complete inventory to the user BEFORE asking anything. Never ask "what do you want to contribute" before showing what is contributable.
-2. **Classify by structure, not intuition.** M-status (promotable to `main`) = shared by ALL space types; A-status (type-specific) = meaningful to one space type. When unsure whether a file is generic, read `docs/DESIGN.md` and check whether the capability already exists on `main`. Do not classify from memory or gut feeling.
-3. **User circles the scope, then confirm.** Let the user pick which groups contribute, which exclude, which stay space-only. Space-only assets (e.g. unverified or space-specific skills) never enter type/* or upstream. No `--confirm` until the user has explicitly confirmed the file scope.
+1. **Present the full menu first.** Enumerate EVERY pending file (`git diff --name-status`), group by directory or feature area, and show the complete inventory to the user BEFORE asking anything. Never ask "what do you want to contribute" before showing what is contributable.
+2. **Classify by structure, not intuition.** Ask whether the capability belongs to every space type or to one. When unsure, read the ontology design and check whether the capability already exists on `local main` / `upstream/main`. Do not classify from memory or gut feeling.
+3. **User circles the scope, then confirm.** Let the user pick which groups contribute, which exclude, and which stay space-only. Space-only assets (unverified or space-specific skills) never leave the space. No `--confirm` until the user has explicitly confirmed the file scope.
 
 Full procedure and classification detail: `references/ontology-maintenance.md`.
 
 ### Topic-Based PR Splitting
 
-**One PR, one topic.** Changes from different directories or feature areas must be split into separate PRs. This applies to both the type PR and the main PR — promote pushes multiple M-status topics into main at once; re-split them by file directory when contributing. Contribute dependent PRs first; independent topics in any order.
+**One PR, one topic.** Changes from different directories or feature areas must be split into separate PRs. Contribute dependent PRs first; independent topics in any order.
 
-**Multi-round changes ship in ONE PR.** All accumulated changes to the same topic (from multiple prior contribute commits) are contributed together in a single PR — do NOT split them and do NOT ask the user whether to split them.
+**Multi-round changes ship in ONE PR.** All accumulated changes to the same topic are contributed together in a single PR — do NOT split them and do NOT ask the user whether to split them.
 
 #### PR message rules
 
@@ -133,17 +132,15 @@ Format: `<type>(<scope>): <content-described-as-result-state>`, a noun phrase de
 
 ### Sync Gates
 
-Every sync operation (`contribute`, `update`, `promote`) must pass through two gates in order:
+Every sync operation (`space sync`, `ontology update`, `ontology contribute`) must pass through two gates in order:
 
 #### Gate 1: Sync Analysis
 
 Never auto-sync. The agent must understand the full picture first:
 
-1. `wopal space status` — space-layer divergence
+1. `wopal space status` — space-layer divergence and assembly state
 2. `wopal ontology status` — ontology-layer divergence (ahead/behind, file-level diff)
 3. Follow Contribution Scope Determination: present the full inventory, let the user circle the scope, and get EXPLICIT scope confirmation before any `--confirm` operation. A dry-run inspection is never a substitute for user scope approval.
-
-**Pre-promote report** (mandatory before any `promote --confirm`): classify promotable items proactively (M-status promotable / A-status type-specific) with justification, confirm the `--include`/`--exclude` boundaries item by item, and estimate the PR split (per Topic-Based PR Splitting) with each PR's file scope, `--message`, and order. Only after the user confirms may promote and the subsequent main contribution run.
 
 #### Gate 2: Pre-Flight
 
@@ -161,10 +158,7 @@ Always inspect before pushing:
 
 1. **Separate multiple patterns with commas — never chain `--include`.** `--include` is a single-value flag; chaining (`--include A --include B`) keeps only the last one (verified empirically), overriding the others — which pushes the uncovered changes out too (irreversible). Write multiple patterns as `--include "a/**,b/**,c"` (comma-separated, spaces optional). Same for `--exclude`.
 2. **Clone mode blocks `contribute`.** Guide the user to fork mode if a PR is needed.
-3. **Deletion-risk requires `reconcile`.** When `update` warns about files unique to `type/*` being at risk, run `wopal ontology reconcile --type <type> --theirs --confirm` to preserve them, then retry `update`.
-4. **Verify after every operation.** Run `wopal ontology status` and `git diff --stat upstream/main origin/main`.
-
----
+3. **Verify after every operation.** Run `wopal ontology status` and `git diff --stat upstream/main origin/main`.
 
 ## AGENTS.md Maintenance
 
@@ -212,6 +206,6 @@ The skill body covers the essentials. When troubleshooting or encountering edge 
 
 | Document | What you'll find |
 |----------|------------------|
-| `references/ontology-maintenance.md` | Three-layer architecture (main → type/* → space/*), status signal interpretation matrix, conflict resolution by file type, remote branch cleanup |
+| `references/ontology-maintenance.md` | Central pool model and mode contracts, status signal interpretation matrix, conflict resolution by file type, remote branch cleanup, contribution scope and PR splitting procedures |
 | `references/skills-maintenance.md` | Full lifecycle details, security scan checks, quality evaluation criteria |
 | `references/agents-md-maintenance.md` | Full AGENTS.md maintenance specification: content boundaries, rule audit criteria, workflow, quality checklist |

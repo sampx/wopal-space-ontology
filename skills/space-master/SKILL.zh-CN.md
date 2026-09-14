@@ -1,17 +1,17 @@
 ---
 name: space-master
 description: |
-  WopalSpace 空间的根技能与总纲。空间的一切能力——如何运行、如何配置、如何编写命令/规则/技能/模板——都定义在本体（ontology）仓库中，通过本体的更新、贡献、提升流程在空间间分发、传播和优化。
+  WopalSpace 空间的根技能与总纲。空间的一切能力——如何运行、如何配置、如何编写命令/规则/技能/模板——都定义在本体（ontology）仓库中，经由中央能力池分发给空间，空间进化通过 space sync 回流。
 
   必须加载的场景：
-  - 本体仓库操作：更新（update）、同步（sync）、贡献（contribute）、提升（promote）、PR
-  - 空间结构维护：space init/status、.wopal 目录结构、空间如何运行与配置
+  - 本体仓库操作：更新（update）、同步（sync）、能力发现（capability list）、贡献（contribute）、PR
+  - 空间结构维护：space init/status、.wopal 目录结构、装配模型、空间如何运行与配置
   - 空间能力编写：命令、规则、技能、模板的编写与修改规范
   - AGENTS.md 编写：创建或更新项目级/目录级 AGENTS.md
   - 技能生命周期：安装、扫描、移除
   - 意图不明确、不确定用哪个流程/技能时，作为总纲路由到正确技能
 
-  [CRITICAL] 涉及 ontology 仓库协作（update/sync/contribute/promote/PR）时，即使用户未明确说"上游同步"，也必须加载本技能。
+  [CRITICAL] 涉及 ontology 仓库协作（update/sync/PR）时，即使用户未明确说"上游同步"，也必须加载本技能。
 ---
 
 # space-master
@@ -38,133 +38,127 @@ description: |
 
 ---
 
-## Ontology 本体维护
+## 本体维护
 
-### 运行模式
+### 中央能力池模型
 
-操作前先确认模式：
-
-| 模式 | 能力 | Origin |
-|------|------|--------|
-| **clone** | 仅 `update`（下行同步） | 直连上游仓库 |
-| **fork** | `update` + `contribute`（上游 PR）+ `promote` | 用户 Fork → 上游 |
-
-命令：`wopal ontology status`
-
-### 同步方向与层级顺序
-
-| 方向 | 命令 |
-|------|------|
-| **下行** | `wopal ontology update --confirm` |
-| **上行** | `wopal space contribute` → `wopal ontology contribute` / `wopal ontology promote` |
-
-下行更新在贡献批次开始前和 PR 合并后执行。上行贡献必须按以下层级顺序推进：
+本体维护围绕一条权威历史线展开：
 
 ```
-space/<name> → local type/* → origin/type/* → upstream PR
+upstream/main  →  local main（中央能力池）  →  space/<name>（装配 worktree）
 ```
 
-先用 `space status` 确认待贡献文件。文件仍在 space 分支时，先运行 `space contribute`。只有选定文件已经进入 local type/* 后，才能运行 `ontology contribute` 创建上游 PR。贡献过程中不要在 `space contribute` 与 type PR 之间插入 `ontology update`。
+`local main` 是中央能力池——本机所有空间可装配能力的唯一真相源。每个空间以自己的 `space/<name>` 分支挂载 `.wopal/` 装配 worktree，由装配单经 sparse-checkout 物化。空间从池中读取能力，不复制能力血统。
 
-### 两种贡献路径
+能力有两个流动方向：
 
-Ontology 有三层架构（main → type/* → space/*），文件按状态分为两类：
+| 方向 | 命令 | 作用 |
+|------|------|------|
+| **下行** | `wopal ontology update` | 把 `upstream/main` 拉入 `local main` |
+| **空间对齐** | `wopal space sync` | 空间分支与 `local main` 双向对齐 |
+| **上行** | `wopal ontology contribute` | 把 `local main` 的变更作为 PR 贡献到 `upstream` |
 
-| 状态 | 含义 | 示例 | 路径 |
-|------|------|------|------|
-| **A-status** | 类型专属，只存在于 type/* | 特定领域的技能、工作流、集成脚本 | **短路径**：4 步 |
-| **M-status** | 通用能力，最终进入 main 供所有空间共享 | 通用技能、开发流程、模板 | **长路径**：7 步 |
+### 空间同步
 
-#### 短路径（A-status 类型专属）
+`wopal space sync` 是空间的唯一对齐命令，取代原有的 `space update` / `space contribute` 组合。
 
-```
-0. ontology update      如下行有待同步内容，先在本批次开始前完成
-1. space contribute     space/* → local type/* → origin/type/*
-2. ontology contribute  type/* → upstream(type)（话题 PR）
-3. ontology update      上游合并后下行同步
-```
+它按顺序执行两个阶段：
 
-#### 长路径（M-status 通用能力）
+1. **先行上行。** 空间独有的进化（空间新增或修改的能力）在隔离的临时 worktree 中整合进 `local main`。成功则推进 `local main`；冲突则停止同步并呈现冲突，两侧均保持不动。
+2. **随后下行。** 上行干净后，空间 fast-forward 到最新的 `local main`。
 
-```
-0. ontology update      如下行有待同步内容，先在本批次开始前完成
-1. space contribute     space/* → local type/* → origin/type/*
-2. ontology contribute  type/* → upstream(type)（话题 PR）
-3. ontology update      上游 type PR 合并后下行同步
-4. ontology promote     type/* → main（先与用户讨论范围）
-5. ontology contribute  main → upstream(main)（话题 PR，按「分主题分批 PR」拆分）
-6. ontology update      上游 main PR 合并后再次下行同步
+顺序很关键：先上行意味着下行 fast-forward 落地时的 `local main` 已经包含空间自身的工作，不会丢失或重放任何变更。
+
+始终先预览，再确认：
+
+```bash
+wopal space sync            # dry-run：显示什么会移动、移到哪
+wopal space sync --confirm  # 执行
 ```
 
-> promote 后 main 分支产生了新的 divergence，必须在步骤 6 再次贡献到 upstream(main)。
+同步前用 `wopal space status` 查看空间与 `local main` 的分歧与装配状态。
 
-**promote 完整性核对**（步骤 4 完成后必做）：promote 的分类器可能把新增文件误判为 A-status 排除（实测 `skills/dev-flow/tests/` 新增测试文件被漏掉）。核对 `promote --confirm` 输出的 promote 文件列表，与 type PR 的文件集合逐项比对，确认无遗漏。发现遗漏时用 `--include <files>` 强制补入。
+### 能力发现与装配
 
-**promote 补漏时序**：promote 后 main 领先 type/*，再次 promote 会报 `type branch is behind main` 错误。必须先 `ontology update --confirm` 同步 main → type/*，再重试 promote。补漏的 `--include` 只补新增文件，不会重复已提升内容。
+两个命令族覆盖能力面，职责不同：
+
+| 命令 | 作用域 | 用途 |
+|------|--------|------|
+| `wopal ontology capability list` | 本体 | 列出本体拥有的全部能力，按类目分组——空间装配的菜单 |
+| `wopal space capability add/remove` | 空间 | 增删本空间装配能力并重新物化 |
+
+`wopal space capability add/remove` 更新空间装配快照并重跑物化。该变更后续可作为类型装配单贡献，使同类型的其他空间继承。
+
+另一个 `wopal capability` 命令与此无关：它暴露 CLI 自身的机器能力 OpenAPI 契约。
+
+### 上游贡献
+
+向上游贡献**仅在 fork 模式**可用。clone 模式下 `origin` 直接指向 canonical upstream，`wopal ontology contribute` 不可用——若用户需要 PR，引导其转为 fork 模式。
+
+```bash
+wopal ontology status        # 确认模式与分歧
+wopal ontology contribute    # dry-run
+wopal ontology contribute --include "a/**,b/**" --message "<message>" --confirm
+```
 
 ### 贡献范围判定
 
-贡献范围由**用户决定**，Agent 不得自行假设或把决策推回给用户：
+贡献范围由**用户**决定，绝不擅自假设或回推：
 
-1. **先展示完整清单。** 用 `git diff --name-status` 枚举所有待贡献文件，按目录/功能区分组，标注每组状态（M-status / A-status），在问任何问题前先把完整清单展示给用户。禁止在展示"可贡献什么"之前就问"你想贡献哪些"。
-2. **按结构判定，不凭直觉。** M-status（可提升到 main）= 所有类型空间共享的能力；A-status（类型专属）= 只对单一空间类型有意义。不确定某文件是否通用时，读 `docs/DESIGN.md` 并检查该能力是否已存在于 `main`。禁止凭记忆或感觉分类。
-3. **用户圈定范围，然后确认。** 让用户决定哪些组贡献、哪些排除、哪些仅保留在空间内部。"仅空间内部"的资产（如未验证或空间专属技能）绝不进入 type/* 或上游。用户明确确认文件范围前，禁止任何 `--confirm`。
+1. **先呈现完整清单。** 枚举每一个待处理文件（`git diff --name-status`），按目录或功能区块分组，在提问之前先把完整清单展示给用户。禁止在展示可贡献内容之前问"你想贡献什么"。
+2. **按结构判定，不靠直觉。** 判断该能力是所有空间类型共有，还是只属于某一类型。不确定时读本体设计，确认该能力是否已存在于 `local main` / `upstream/main`。禁止凭记忆或感觉判定。
+3. **用户圈定范围，再确认。** 由用户选定哪些组贡献、哪些排除、哪些仅留在空间。空间私有资产（未验证或空间专属技能）绝不离开空间。用户未明确确认文件范围前，不得执行 `--confirm`。
 
-完整流程与分类细节：`references/ontology-maintenance.md`。
+完整流程与判定细节：`references/ontology-maintenance.md`。
 
-### 分主题分批 PR
+### 按话题拆分 PR
 
-**一次 PR 只含一个主题。** 不同目录或功能区域的变更必须拆分为独立 PR。此规则同时适用于 type PR 和 main PR——promote 常把多个 M-status 主题推入 main，贡献时必须按文件目录重新拆分。有依赖的 PR 先贡献，独立主题顺序不限。
+**一个 PR 一个话题。** 不同目录或功能区块的变更必须拆成独立 PR。有依赖的 PR 先贡献；独立话题顺序不限。
 
-**多轮修改一次性贡献。** 同一主题累积的所有变更（来自此前多次 contribute 提交）在一次 PR 中贡献——不要拆分，也不要问用户是否拆分。
+**多轮变更合并为一个 PR。** 同一话题累积的全部变更合为一个 PR 贡献——禁止拆分，也不要询问用户是否拆分。
 
-#### PR message 规则
+#### PR 文案规则
 
-**message 描述变更交付的内容，而非采取的动作。** 写成合并后读者获得的结果状态，而不是产生它的机械操作。自问：**"合并后读者收获了什么？"**——回答这个，而不是"我做了什么操作"。
+**文案描述变更交付了什么，而不是做了什么。** 写合并后读者获得的结果状态，而不是产生该结果的机械动作。自问：**"合并之后读者得到什么？"**——回答这个，而不是"我做了什么"。
 
-- ❌ 动作+路径：`docs(space-master): add agents-md maintenance guide`（只说"我加了个指南"，没说里面是什么）
-- ✅ 内容：`docs(space-master): AGENTS.md maintenance rules and update guidance`（告诉读者指南覆盖什么）
-- ❌ 空泛动作：`docs: sync templates and rules to main`（对内容毫无说明）
-- ✅ 内容：`docs(templates): concurrency safety protection and sensitive-file read prohibition`（说明实际加入的规则）
+- ❌ 动作 + 路径：`docs(space-master): add agents-md maintenance guide`（说的是"我加了个指南"，没说内容）
+- ✅ 内容：`docs(space-master): AGENTS.md maintenance rules and update guidance`
+- ❌ 空动作：`docs: sync templates and rules to main`（完全没说内容）
+- ✅ 内容：`docs(templates): concurrency safety protection and sensitive-file read prohibition`
 
-格式：`<type>(<scope>): <描述内容的结果状态>`，用无祈使语气的名词短语描述交付的能力。
+格式：`<type>(<scope>): <以结果状态描述的内容>`，描述所交付能力的名词短语。
 
-**每个批次都重复完整门禁**：每个 PR 独立经过同步分析门禁与飞前检查门禁。
+**每批都要重跑完整门禁**：每个 PR 独立经过同步分析与预检门禁。
 
 ### 同步门禁
 
-每次同步操作（`contribute`、`update`、`promote`）必须依次通过两道门禁：
+每次同步操作（`space sync`、`ontology update`、`ontology contribute`）都必须按序通过两道门禁：
 
 #### 门禁一：同步分析
 
-禁止自动同步。Agent 必须先掌握完整状态：
+绝不自动同步。Agent 必须先掌握全貌：
 
-1. `wopal space status` — 空间层差异
-2. `wopal ontology status` — 本体层差异（领先/落后、文件级 diff）
-3. 按「贡献范围判定」执行：展示完整清单 → 用户圈定范围 → 明确确认文件范围，之后任何 `--confirm` 才被允许。dry-run 检查不能替代用户范围确认。
+1. `wopal space status` —— 空间层分歧与装配状态
+2. `wopal ontology status` —— 本体层分歧（ahead/behind、文件级 diff）
+3. 按贡献范围判定执行：呈现完整清单，由用户圈定范围，任何 `--confirm` 操作前取得**明确**的范围确认。dry-run 检视永远不能替代用户的范围批准。
 
-**提升（promote）前强制汇报**（任何 `promote --confirm` 前必做）：主动分类可提升项（M-status 可提升 / A-status 类型专属）并说明理由，逐项确认 `--include`/`--exclude` 边界，预估 PR 拆分（按「分主题分批 PR」）并列出每个 PR 的文件范围、`--message` 和顺序。用户确认后才允许执行 promote 和随后的 main 贡献。
+#### 门禁二：预检
 
-#### 门禁二：飞前检查
+推送前始终检查：
 
-先看再推：
+1. 先**不带 `--confirm`** 运行（dry-run）
+2. 确认列表中只出现你变更的文件
+3. 若有误，调整 `--include` glob 后重新 dry-run
+4. 之后才：带 `--confirm` 重跑
 
-1. **不加 `--confirm`** 先跑 dry-run
-2. 确认列表中只有你改的文件
-3. 不对则调整 `--include` glob，重跑
-4. 确认无误才加 `--confirm`
-
-> 不加 `--include` 会把分支上所有人的所有积累变更一次性全推出去。不可逆。
-> dry-run 输出中被 `exclude` 的文件必须逐一目视确认——它们不会进入 PR，如果本应贡献的文件出现在 exclude 列表，说明 glob 写错了。
+> 省略 `--include` 会推送分支上的一切——包括所有人累积的变更。无法撤销。
+> 仔细看 dry-run 输出中的 `exclude` 列表——被排除的文件永远不会进入 PR。若应贡献的文件出现在那里，说明 glob 写错了。
 
 ### 本体规则
 
-1. **多个文件模式用逗号分隔，不要链式 `--include`。** `--include` 是单值参数，链式（`--include A --include B`）实测只有最后一个生效，其余模式被覆盖——会把未覆盖的变更一并推出去（不可逆）。多模式必须写成 `--include "a/**,b/**,c"`（逗号分隔，空格可选）。`--exclude` 同理。
-2. **Clone 模式不支持 `contribute`。** 如需 PR，引导用户切换到 Fork 模式。
-3. **删除风险需 `reconcile`。** `update` 报 deletion-risk 时，`type/*` 独有的文件面临被删风险。先跑 `wopal ontology reconcile --type <type> --theirs --confirm` 保留它们，再重试 `update`。
-4. **执行后必须验证。** `wopal ontology status` 和 `git diff --stat upstream/main origin/main`。
-
----
+1. **多个模式用逗号分隔——绝不串联 `--include`。** `--include` 是单值参数；串联（`--include A --include B`）只保留最后一个（已实测验证），覆盖其余——这会把未覆盖的变更一并推出（不可逆）。多个模式写为 `--include "a/**,b/**,c"`（逗号分隔，空格可选）。`--exclude` 同理。
+2. **clone 模式阻止 `contribute`。** 若需要 PR，引导用户转为 fork 模式。
+3. **每次操作后核验。** 运行 `wopal ontology status` 与 `git diff --stat upstream/main origin/main`。
 
 ## AGENTS.md 维护
 
@@ -212,6 +206,6 @@ wopal skills remove <name> --force       # 从空间移除
 
 | 文档 | 内容 |
 |------|------|
-| `references/ontology-maintenance.md` | 三层架构（main → type/* → space/*）、状态信号解读矩阵、按文件类型的冲突处理、远程分支清理 |
+| `references/ontology-maintenance.md` | 中央能力池模型与模式契约、状态信号解读矩阵、按文件类型的冲突处理、远程分支清理、贡献范围与 PR 拆分流程 |
 | `references/skills-maintenance.md` | 完整生命周期细节、安全扫描检查项、质量评估标准 |
 | `references/agents-md-maintenance.md` | AGENTS.md 维护完整规范：内容边界、规则审计判据、工作流、质量清单 |
