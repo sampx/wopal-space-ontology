@@ -46,14 +46,22 @@ Key cross-project flows, from a system perspective.
 - Cover critical user paths (installation, daily use, failure recovery)
 - Use numbered steps, focus on system behavior
 
-## Evolution Roadmap
+## Capability Roadmap
 
-Product evolution skeleton. Each phase includes title, Goal, and Phase document link. Phase delivery details and acceptance criteria are carried by Phase documents.
+The capability map: what capability dimensions the product has, and which maturity step each one is at. Rows are capability dimensions; columns are current shape / next milestone / target shape with an owning project. It describes direction, not dates.
+
+```markdown
+| 能力维度 | 当前形态 | 下一里程碑 | 目标形态 | 主责 |
+|---|---|---|---|---|
+| <capability dimension> | <current shape> | <next milestone> | <target shape> | <project> |
+```
+
+Phases are cut from this map. Each phase entry keeps only the title, Goal, and phase document link. The Goal traces to a capability row and its target step.
 
 ```markdown
 ### Phase <N>: <Title>
 
-- **Goal**: Product capability target for this phase (one line, ≥20 characters, verifiable product capability statement)
+- **Goal**: Product capability target for this phase (one line, ≥20 characters, verifiable product capability statement, traceable to a capability row)
 
 > Phase doc: [phases/<product>-p<N>-<slug>.md]
 ```

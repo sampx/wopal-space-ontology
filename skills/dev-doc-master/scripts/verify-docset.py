@@ -234,10 +234,13 @@ def check_header_fields(doc_dir, report):
 def check_gaps_docs(doc_dir, report):
     """GAPS.md is a process document, not a design document.
 
-    It must declare the design it measures via `Design Source`, must not claim
-    an architecture lineage, and must not list that design again in its end
-    section. It must also state its own lifecycle so a reader knows the file
-    is removed once the gaps close.
+    It must declare the design it measures via `Design Source` and must not
+    claim an architecture lineage.
+
+    Every gap entry carries the four English field labels `Current`, `Target`,
+    `Design`, and `Exit`. Legacy label variants (`Current State`, `Target
+    State`, `Closing`) are rejected so the document set stays uniform and the
+    gate stays checkable.
     """
     gaps = doc_dir / "GAPS.md"
     if not gaps.exists():
@@ -250,11 +253,10 @@ def check_gaps_docs(doc_dir, report):
     for lineage in ("Parent Architecture", "上级架构", "Parent Product"):
         if lineage in header:
             fail(report, f"GAPS.md: header uses lineage field '{lineage}' (process documents use Design Source)")
-    if "过程文档" not in text and "process document" not in text.lower():
-        fail(report, "GAPS.md: no lifecycle note stating the document is a process document")
-    if "编号规则" not in text and "Numbering" not in text:
-        fail(report, "GAPS.md: no numbering scheme section")
-    report.append("  OK: GAPS.md structure (Design Source, lifecycle, numbering)")
+    for legacy in ("**Current State**", "**Target State**", "**Closing**", "**目标态**", "**当前状态**"):
+        if legacy in text:
+            fail(report, f"GAPS.md: uses legacy gap label '{legacy}' (use Current / Target / Design / Exit)")
+    report.append("  OK: GAPS.md structure (Design Source, gap labels)")
 
 
 def main():

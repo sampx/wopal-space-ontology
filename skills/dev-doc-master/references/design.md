@@ -6,17 +6,26 @@ Create or update product DESIGN or project DESIGN. Templates: `templates/design-
 
 | Flow | Use Case | Chain |
 |---|---|---|
-| Standard | Multi-project product requiring cross-project architecture coordination | PRD → Product DESIGN → Roadmap → Project DESIGN → Plan |
+| Standard | Multi-project product requiring cross-project architecture coordination | PRD → Product DESIGN (architecture + Capability Roadmap) → Project DESIGN → Phase → Plan |
 | Simplified | Standalone project with no associated product | Project DESIGN (with product-level design) → Plan |
 
-In the standard flow, product DESIGN handles phase decomposition and architecture contracts; project DESIGN handles single-project internal architecture. In the simplified flow, project DESIGN assumes product-level responsibility (Header `Parent Product: N/A`).
+In the standard flow, product DESIGN handles architecture contracts and the capability map; project DESIGN handles single-project internal architecture. In the simplified flow, project DESIGN assumes product-level responsibility (Header `Parent Product: N/A`).
 
 ## Discussion Focus
 
-- **Product DESIGN**: system layering and subsystem boundaries, runtime model, end-to-end flows, phase decomposition (current phase's overall goal; detail deferred to `/cupdate-roadmap`).
+- **Product DESIGN**: system layering and subsystem boundaries, runtime model, end-to-end flows, capability roadmap (the capability dimensions and their maturity steps).
 - **Project DESIGN**: project role and boundaries, capability scope, module architecture, technology choices, interface contracts, data model.
-- DESIGN keeps only architecture, boundaries, contracts, runtime model, and evolution skeleton. It does not keep implementation status, delivery progress, acceptance results, or task lists.
-- Product DESIGN's Evolution Roadmap is a phase skeleton: each Phase keeps only the title, Goal, and Phase document link.
+- DESIGN keeps only architecture, boundaries, contracts, runtime model, and the capability map. It does not keep implementation status, delivery progress, acceptance results, or task lists.
+
+## Capability Roadmap
+
+The product DESIGN's `Capability Roadmap` is a capability map, not a time-line of phases. Each row is a capability dimension; the columns are its maturity steps (current shape / next milestone / target shape) with an owning project.
+
+The map describes direction, not dates. It answers "what shape does this capability still grow toward", never "when will it ship". This is what keeps it from drifting away from reality: a capability's direction is fixed by architecture, while a phase schedule guessed months ahead is not.
+
+A phase is cut from this map: a phase is a batch of capability steps that can be verified together. The phase's Goal traces to a row and a target step. The map's `Phase` entries keep only the title, Goal, and phase document link.
+
+When a capability dimension advances or a new one appears, add or update its row. New capability dimensions surface from project designs — a project DESIGN that introduces a new architectural concern registers it here.
 
 ## Document Naming and Splitting
 
@@ -101,7 +110,7 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 - [ ] Unconfirmed items marked as needing confirmation
 - [ ] Body uses design language; no template commentary, process explanation, task list, or command transcript
 - [ ] No implementation status, delivery progress, acceptance results, checkbox tasks, or "completed / pending" module status
-- [ ] Product: grounded in the PRD; Evolution Roadmap keeps only phase skeleton
+- [ ] Product: grounded in the PRD; Capability Roadmap is a capability map (rows are capability dimensions, columns are maturity steps), phase entries keep only title + Goal + link
 - [ ] Project: grounded in parent PRD/DESIGN (or `Parent Product: N/A`); capability scope is target-state only
 - [ ] Header = mandatory links only; Reference Documents = reference-only; no duplication
 - [ ] Whole document set reviewed: sub-DESIGNs, parent DESIGN, PRD, Phase aligned when affected

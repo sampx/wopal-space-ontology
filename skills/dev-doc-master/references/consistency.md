@@ -58,6 +58,12 @@ Headings and header field names are English in every document, regardless of the
 
 Body text and header field values follow the document's language. A Chinese document reads Chinese in the body and in field explanations; its headings stay English.
 
+## Gap Detail Has One Home
+
+Gap detail lives in the project `GAPS.md` and nowhere else. A Phase document lists the gaps its scope closes by identifier, title, priority, and design pointer — it does not restate Current / Target / Exit. Duplicated gap descriptions drift apart, and the reader then cannot tell which copy is authoritative.
+
+The Phase document carries only what no single gap can carry: the phase-level Completion Criteria, the scope grouping, the capability rows advanced, and the residual risks.
+
 ## Process Documents vs Design Documents
 
 The document set contains two kinds of documents, and they relate to the design differently:
@@ -166,7 +172,7 @@ Updating one document is never isolated. A change to any document can invalidate
 1. Identify the affected set: parents (what this document follows), children (sub-documents), and siblings (documents sharing the same parent or describing the same phase/project).
 2. Check each affected document for stale claims that contradict the change; revise or remove them when evidence is clear.
 3. Align the bidirectional index and header links.
-4. Align Phase Goals with the DESIGN Evolution Roadmap; align DESIGN architecture with the PRD vision; align README module/command lists with DESIGN and actual code.
+4. Align Phase Goals with the DESIGN Capability Roadmap; align DESIGN architecture with the PRD vision; align README module/command lists with DESIGN and actual code.
 
 The completion response must state which related documents were checked, which were aligned, and which still need a follow-up update.
 
