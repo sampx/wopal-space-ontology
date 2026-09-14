@@ -73,6 +73,8 @@ The document set contains two kinds of documents, and they relate to the design 
 
 The distinction matters for the header. A design document uses lineage fields (`Parent Architecture`, `Parent Product`, `Product Intent`). A process document uses `Design Source` — it points at the design it measures, and it does not claim to follow an architecture contract. Writing `Parent Architecture` on a GAPS document misstates the relationship and implies an obligation the document does not carry.
 
+Because a gap measures the distance between a settled target and the current reality, `Design Source` points at a formal document. A draft is promoted to `Active` before it is analysed; see the document lifecycle section.
+
 Process documents also carry a lifecycle note. A GAPS document states that it is removed once its gaps close, because a reader who mistakes it for permanent documentation will maintain it as such and let stale entries accumulate.
 
 ## Main Document Lists Its Sub-Documents
@@ -103,13 +105,31 @@ Size corroborates the answer. A supporting document that approaches the main DES
 
 A classified sub-design is renamed to `DESIGN-<topic>.md`, given `Parent: ./DESIGN.md`, and enumerated in the main header. The rename is part of the classification, not a separate cosmetic step: the naming convention is how a reader recognizes the document's role at a glance.
 
+## Document Lifecycle: Draft and Formal
+
+Every design document is either a **draft** or a **formal** document. The distinction is not a matter of taste; it decides whether the document can be measured against reality.
+
+| Status | Class | Meaning |
+|---|---|---|
+| `Draft` | draft | the design is still being worked out; its target state may change |
+| `Proposed` | draft | the design is written but not yet settled |
+| `Active` | formal | the design is settled and binding |
+
+**Only formal documents take part in GAPS analysis.** A draft describes a target state that is still moving. Measuring implementation against it produces gaps that the next revision invalidates, so the tracker fills with noise and the team learns to ignore it. The rule follows directly from what a gap means: a gap is the distance between a settled target and the current reality, and a draft has no settled target to measure.
+
+**A draft becomes formal before its gaps are analysed.** Moving a document from `Draft` or `Proposed` to `Active` states that its target shape is settled — the design decisions are made, the boundaries are drawn, the contracts are defined. Only then does the project `GAPS.md` list gaps against it.
+
+`Design Source` in a `GAPS.md` therefore points at a formal document. When the source design is still a draft, analysis waits for the promotion rather than tracking a moving target.
+
+A design document has no completed state. A design states what the system is; implementation progress belongs to Plans and `GAPS.md`. When the design changes, the document is revised in place and stays `Active`. The design's own status describes whether its target shape is settled, never how much of it has been built.
+
 ## Header Field Set
 
 Every document header uses fields drawn from one fixed vocabulary. Field names are English, always, and a document uses only the fields that apply to it — but it never invents a field name outside this set.
 
 | Field | Applies to | Meaning |
 |---|---|---|
-| `Status` | every document | lifecycle status: `Active`, `Draft`, `Target Shape`, `Proposed`, `Planned`, `Completed` |
+| `Status` | every document | lifecycle status: `Draft`, `Proposed`, `Active` |
 | `Updated` | every document | last update date, `YYYY-MM-DD`, refreshed on every edit |
 | `Parent Architecture` | project DESIGN, sub-DESIGN | the architecture document this one follows; `N/A` at the top of a product |
 | `Parent Product` | project DESIGN, sub-DESIGN | the product PRD this one follows; `N/A` when none |
@@ -119,7 +139,7 @@ Every document header uses fields drawn from one fixed vocabulary. Field names a
 | `Sub-DESIGNs` | main DESIGN | exact enumeration of every `DESIGN-<topic>.md` under it |
 | `Sub-PRDs` | main PRD | exact enumeration of every `PRD-<topic>.md` under it |
 | `Companion Documents` | main DESIGN / PRD | companion truth sources (BRANDING, API-CONTRACT) |
-| `Design Source` | GAPS | the design document this gap tracker measures against |
+| `Design Source` | GAPS | the formal design document this gap tracker measures against |
 | `Product PRD` | Phase | the PRD this Phase follows |
 | `Product DESIGN` | Phase | the DESIGN contract this Phase follows |
 | `Phase ID` | Phase | the phase identifier |
@@ -140,7 +160,7 @@ Header metadata fields have fixed meanings:
 
 | Field | Where | Meaning |
 |---|---|---|
-| `Status` | all | document lifecycle status (Active / Draft / Target Shape) |
+| `Status` | all | document lifecycle status (`Draft` / `Proposed` / `Active`) |
 | `Updated` | all | last update date, YYYY-MM-DD, refreshed on every edit |
 | `Parent` | sub-documents | the direct parent document, `./DESIGN.md` for project sub-docs |
 | `Parent Architecture` | sub-documents | product-level architecture document this doc must follow, when it exists |

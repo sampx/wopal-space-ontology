@@ -1,6 +1,6 @@
 # <Product Name>
 
-> **Status**: Active
+> **Status**: Draft | Proposed | Active
 > **Updated**: YYYY-MM-DD
 > **Product Intent**: `<prd-path>` — the PRD this DESIGN follows
 > **Sibling DESIGNs**: list the project DESIGNs of this product's core subsystems — their contracts bind this design, so they belong in the header even when they live in another repository

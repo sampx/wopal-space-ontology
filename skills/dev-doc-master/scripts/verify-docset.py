@@ -13,6 +13,7 @@ Checks:
   6. No process-state vocabulary (已废弃/已放弃/迁移/不再执行/deprecated/legacy/moved from).
   7. Every touched document has a refreshed Updated date.
   8. Header field names come from the fixed English vocabulary.
+  9. Every document's Status is Draft / Proposed / Active.
 
 Exit code 0 on pass, 1 on any failure. Prints a report.
 """
@@ -208,6 +209,12 @@ ALLOWED_HEADER_FIELDS = {
     "Companion Documents", "Design Source", "Companion", "Scope",
     "Product PRD", "Product DESIGN", "Phase ID", "Product",
 }
+# Status values a design document may carry. A design document is a draft
+# (`Draft` / `Proposed`) or formal (`Active`). Only formal documents take part
+# in GAPS analysis. A design has no completed state: it states what the system
+# is, and implementation progress belongs to Plans and GAPS.md.
+ALLOWED_STATUS_VALUES = {"Draft", "Proposed", "Active"}
+_STATUS_RE = re.compile(r"^> \*\*Status\*\*:\s*([A-Za-z ]+?)\s*$", re.M)
 # Fields whose value must be a document link, checked for resolvability.
 LINK_FIELDS = {"Parent Architecture", "Parent Product", "Product Intent",
                "Product PRD", "Product DESIGN", "Design Source"}
@@ -229,6 +236,28 @@ def check_header_fields(doc_dir, report):
             field = m.group(1).strip()
             if field not in ALLOWED_HEADER_FIELDS:
                 fail(report, f"{p.name}: unknown header field '{field}'")
+
+
+def check_status_values(doc_dir, report):
+    """A design document's Status is one of the lifecycle values.
+
+    The lifecycle has exactly two classes: draft (`Draft` / `Proposed`) and
+    formal (`Active`). A value outside the set — including a retired one such
+    as `Target Shape`, or `Completed`, which is a Plan state rather than a
+    design state — leaves the document unclassifiable, so no consumer can tell
+    whether its target shape is settled.
+    """
+    for p in _doc_files(doc_dir):
+        text = p.read_text(encoding="utf-8")
+        header = text.split("##")[0]
+        m = _STATUS_RE.search(header)
+        if not m:
+            fail(report, f"{p.name}: header missing 'Status' field")
+            continue
+        value = m.group(1).strip()
+        if value not in ALLOWED_STATUS_VALUES:
+            fail(report, f"{p.name}: unknown Status value '{value}' "
+                         f"(use {' / '.join(sorted(ALLOWED_STATUS_VALUES))})")
 
 
 def check_gaps_docs(doc_dir, report):
@@ -278,6 +307,7 @@ def main():
     check_process_state(doc_dir, report)
     check_updated_dates(doc_dir, report)
     check_header_fields(doc_dir, report)
+    check_status_values(doc_dir, report)
     check_gaps_docs(doc_dir, report)
 
     print("\n".join(report))

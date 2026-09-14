@@ -1,6 +1,6 @@
 # DESIGN — <Topic>
 
-> **Status**: Active
+> **Status**: Draft | Proposed | Active
 > **Updated**: YYYY-MM-DD
 > **Parent**: `./DESIGN.md` — the main DESIGN this sub-document decomposes
 > **Parent Architecture**: `<product-design-path or N/A>` — the product-level architecture this project follows

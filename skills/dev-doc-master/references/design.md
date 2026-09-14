@@ -84,6 +84,9 @@ The reverse error is equally real: a supporting document that in fact carries on
 - Sub-documents use `Parent` for the project parent: `Parent: ./DESIGN.md`.
 - `Parent Architecture` is reserved for product-level documents above the project DESIGN.
 - `Status` / `Updated` are mandatory on every document; refresh `Updated` on every edit.
+- `Status` is `Draft` / `Proposed` / `Active`. A draft describes a target state still being worked out; a formal document (`Active`) is settled and binding.
+- Only formal documents take part in GAPS analysis. A draft is promoted to `Active` before a project `GAPS.md` measures gaps against it — a gap needs a settled target to mean anything.
+- A design document has no completed state. Implementation progress belongs to Plans and `GAPS.md`; when the design changes, the document is revised in place and stays `Active`.
 - `Sub-DESIGNs` and `Companion Documents` live in the main document header only.
 
 ## Discussion Completion Standard
@@ -106,6 +109,7 @@ The discussion can end and writing begin when: product DESIGN has clear architec
 - [ ] Correct template selected: product or project
 - [ ] Document language follows user preference
 - [ ] Header includes current `Updated` date
+- [ ] `Status` is one of `Draft` / `Proposed` / `Active`, and reflects where the design actually stands
 - [ ] Accurate existing content preserved; obsolete content revised/removed
 - [ ] Unconfirmed items marked as needing confirmation
 - [ ] Body uses design language; no template commentary, process explanation, task list, or command transcript

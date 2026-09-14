@@ -54,6 +54,8 @@ The header carries the design truth the gaps are measured against:
 
 `Design Source` names the authoritative design document this project's gaps are measured against. Use `Design Source`, not `Parent Architecture` — a GAPS document does not inherit an architecture contract, it measures divergence from one. When the project has a document set, point at the main DESIGN; the sub-designs are reachable through its `Sub-DESIGNs` field.
 
+The source design must be **formal** (`Active`). A gap is the distance between a settled target and the current reality, so measuring against a draft produces gaps that the next design revision invalidates. When the design is still `Draft` or `Proposed`, promote it to `Active` first, then open the gap. See the document lifecycle rules in `consistency.md`.
+
 `Updated` is refreshed on every edit.
 
 ## Gap Entries
@@ -124,6 +126,7 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 
 - [ ] File is `GAPS.md` in the project's `docs/`, beside the `DESIGN.md` it measures
 - [ ] Header uses `Design Source`, not `Parent Architecture`
+- [ ] `Design Source` points at a formal document (`Active`), never a draft
 - [ ] `Updated` date is current
 - [ ] Every identifier follows `<PREFIX>-G<n>`; no number is reused or renumbered
 - [ ] No `About This Document` or `Numbering` prose section in the body — the document goes straight from the header to its topic groups

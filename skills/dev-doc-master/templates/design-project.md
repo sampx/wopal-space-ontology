@@ -1,6 +1,6 @@
 # <Project Name>
 
-> **Status**: Active
+> **Status**: Draft | Proposed | Active
 > **Updated**: YYYY-MM-DD
 > **Parent Architecture**: `<parent-design-path or N/A>` — the architecture contract this DESIGN follows
 > **Parent Product**: `<parent-product-prd-path or N/A>` — the product PRD this DESIGN follows
