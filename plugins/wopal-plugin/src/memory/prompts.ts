@@ -3,9 +3,13 @@
  *
  * Loads memory-side prompt templates (deduplication) via cascading convention
  * paths. The generic prompt-file resolver is shared with the context module:
- * 1. Space-level: <space>/.wopal/prompts/<filename>
+ * 1. Plugin-level: <pluginRoot>/prompts/<filename>
  * 2. User-level: WOPAL_HOME/prompts/<filename>
  * 3. Built-in default (see ../context/default-prompts.ts)
+ *
+ * There is deliberately no space-level layer: `.wopal/` is a sparse-checkout
+ * assembly worktree, so a prompt file placed there would be picked up by
+ * `space sync` as space evolution and flow back into the central pool.
  */
 
 import { join } from "path";
@@ -19,7 +23,7 @@ import { DEDUP_FALLBACK } from "../context/default-prompts.js";
  * Returns the file path if found, null otherwise (caller falls back to the built-in default).
  *
  * Layers:
- * 1. Space-level — .wopal/prompts/<filename> (if running inside a wopal-space)
+ * 1. Plugin-level — <pluginRoot>/prompts/<filename>
  * 2. User-level — WOPAL_HOME/prompts/<filename>
  * 3. null — caller uses the built-in default
  */
@@ -27,11 +31,9 @@ export function resolveRuntimePromptFile(
   context: RuntimeContext,
   filename: string,
 ): string | null {
-  if (context.wopalSpaceRoot) {
-    const spacePath = join(context.wopalSpaceRoot, ".wopal", "prompts", filename);
-    if (existsSync(spacePath)) {
-      return spacePath;
-    }
+  const pluginPath = join(context.pluginRoot, "prompts", filename);
+  if (existsSync(pluginPath)) {
+    return pluginPath;
   }
 
   const userPath = join(context.wopalHome, "prompts", filename);
@@ -43,7 +45,7 @@ export function resolveRuntimePromptFile(
 }
 
 /**
- * Load a prompt file: space-level → user-level → null.
+ * Load a prompt file: plugin-level → user-level → null.
  * Returns null if no source is available (caller uses the built-in default).
  */
 export function loadPromptFile(

@@ -6,7 +6,7 @@
  * composes the memory-owned deduplication prompt into a single facade.
  *
  * Resolution order (see memory/prompts.ts):
- * 1. Space-level: <space>/.wopal/prompts/<filename>
+ * 1. Plugin-level: <pluginRoot>/prompts/<filename>
  * 2. User-level: WOPAL_HOME/prompts/<filename>
  * 3. Built-in default (see ./default-prompts.ts)
  */

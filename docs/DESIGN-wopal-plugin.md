@@ -228,21 +228,24 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 | 层级 | 路径 | 说明 |
 |------|------|------|
-| 空间级 | `<space>/.wopal/prompts/<filename>` | 空间自定义，随空间分发 |
-| 用户级 | `$WOPAL_HOME/prompts/<filename>` | 跨空间共享 |
-| 内联默认 | 插件内置 | 前两层均未命中时使用 |
+| 插件级 | `<pluginRoot>/prompts/<filename>` | 随插件分发，是提示词的正式所在 |
+| 用户级 | `$WOPAL_HOME/prompts/<filename>` | 本机跨空间覆盖，位于装配 worktree 之外 |
+| 内联默认 | 插件源码 `default-prompts.ts` | 前两层均未命中时使用 |
 
-三个模板文件的约定名：
+四个模板文件的约定名：
 
 | 文件 | 消费方 | 用途 |
 |------|--------|------|
 | `distill.md` | context | 会话蒸馏的提取提示词 |
 | `dedup.md` | context | 蒸馏候选与既有记忆的去重决策提示词 |
 | `title.md` | context | 会话标题生成提示词 |
+| `commit-msg-gen.md` | 提交信息生成 | 依据 git diff 生成 Conventional Commits 提交信息 |
 
 模板加载发生在消费方首次调用时（惰性），加载结果按文件路径缓存。模板内容使用 `{{placeholder}}` 占位符，由消费方填充。
 
-设计取舍：不提供「任意路径覆盖」配置项。约定路径已覆盖空间与用户两级自定义需求，而新增 `prompts: { distill: "/abs/path" }` 之类的配置面为边缘场景增加了用户心智负担与 schema 复杂度。需要跨空间复用的模板放用户级，需要随空间分发的模板放空间级。
+设计取舍：不提供「任意路径覆盖」配置项。约定路径已覆盖插件与用户两级需求，而新增 `prompts: { distill: "/abs/path" }` 之类的配置面为边缘场景增加了用户心智负担与 schema 复杂度。
+
+不设空间级（`<space>/.wopal/prompts/`）：`.wopal/` 是 sparse-checkout 物化出的装配 worktree，其中的文件变更会被 `space sync` 作为空间进化上行、汇入中央能力池。提示词是随插件分发的能力资产，不是空间私有定制，因此不设空间级覆盖；本机范围的调整走用户级。
 
 ### Environment Variable Roles
 

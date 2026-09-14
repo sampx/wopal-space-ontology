@@ -13,22 +13,16 @@ describe("createContextPrompts", () => {
       rmSync(root, { recursive: true, force: true });
   });
 
-  it("binds prompt resolution to the invocation context", () => {
+  it("resolves the user-level prompt for every invocation context", () => {
     const root = join(tmpdir(), `wopal-prompts-${crypto.randomUUID()}`);
     const home = join(root, "home");
     const spaceA = join(root, "a");
     const spaceB = join(root, "b");
     roots.push(root);
-    for (const directory of [
-      join(home, "prompts"),
-      join(spaceA, ".wopal", "prompts"),
-      join(spaceB, ".wopal", "prompts"),
-    ]) {
+    for (const directory of [join(home, "prompts"), spaceA, spaceB]) {
       mkdirSync(directory, { recursive: true });
     }
     writeFileSync(join(home, "prompts", "title.md"), "home");
-    writeFileSync(join(spaceA, ".wopal", "prompts", "title.md"), "space-a");
-    writeFileSync(join(spaceB, ".wopal", "prompts", "title.md"), "space-b");
 
     const promptsA = createContextPrompts(
       createRuntimeContext({
@@ -48,12 +42,12 @@ describe("createContextPrompts", () => {
       createRuntimeContext({ directory: root, wopalHome: home }),
     );
 
-    expect(promptsA.loadTitlePrompt()).toBe("space-a");
-    expect(promptsB.loadTitlePrompt()).toBe("space-b");
+    expect(promptsA.loadTitlePrompt()).toBe("home");
+    expect(promptsB.loadTitlePrompt()).toBe("home");
     expect(promptsGlobal.loadTitlePrompt()).toBe("home");
   });
 
-  it("resolves the space-level prompt file first", () => {
+  it("ignores a space-level prompt file", () => {
     const root = join(tmpdir(), `wopal-prompts-${crypto.randomUUID()}`);
     const home = join(root, "home");
     const space = join(root, "space");
@@ -64,17 +58,42 @@ describe("createContextPrompts", () => {
       join(space, ".wopal", "prompts", "distill.md"),
       "space-distill",
     );
-    writeFileSync(join(home, "prompts", "distill.md"), "home-distill");
 
-    const prompts = createContextPrompts(
-      createRuntimeContext({
-        directory: space,
-        wopalHome: home,
-        wopalSpaceRoot: space,
-      }),
+    const context = createRuntimeContext({
+      directory: space,
+      wopalHome: home,
+      wopalSpaceRoot: space,
+    });
+
+    // A space-level file must never be picked up: the plugin ships its own
+    // `distill.md`, and the space layer is not part of the resolution chain.
+    expect(createContextPrompts(context).resolvePromptFile("distill.md")).toBe(
+      join(context.pluginRoot, "prompts", "distill.md"),
     );
+  });
 
-    expect(prompts.buildExtractionPrompt("hello")).toBe("space-distill");
+  it("resolves the plugin-level prompt ahead of the user-level prompt", () => {
+    const root = join(tmpdir(), `wopal-prompts-${crypto.randomUUID()}`);
+    const home = join(root, "home");
+    roots.push(root);
+    mkdirSync(join(home, "prompts"), { recursive: true });
+    writeFileSync(join(home, "prompts", "title.md"), "home-title");
+
+    // The plugin root is fixed by the module location, so write the
+    // plugin-level override where the resolver actually looks for it.
+    const context = createRuntimeContext({ directory: root, wopalHome: home });
+    const pluginPrompts = join(context.pluginRoot, "prompts");
+    mkdirSync(pluginPrompts, { recursive: true });
+    const pluginTitle = join(pluginPrompts, "title.md");
+    writeFileSync(pluginTitle, "plugin-title");
+
+    try {
+      expect(createContextPrompts(context).loadTitlePrompt()).toBe(
+        "plugin-title",
+      );
+    } finally {
+      rmSync(pluginTitle, { force: true });
+    }
   });
 
   it("uses the inline default when neither level provides the file", () => {

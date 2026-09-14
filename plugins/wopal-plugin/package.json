@@ -28,6 +28,7 @@
   ],
   "files": [
     "dist",
+    "prompts",
     "README.md",
     "lICENSE"
   ],
