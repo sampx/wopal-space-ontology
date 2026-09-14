@@ -141,3 +141,60 @@ Any FAIL means the update is incomplete — fix and re-run until PASS. Include t
 ## Response After Completion
 
 Respond in the user's language with: file path; creation/update summary; suggested next step (product DESIGN → `/cupdate-roadmap`; standard project DESIGN → `/cupdate-agent-rules`; simplified → create Plan); verification result.
+
+## What a DESIGN Document Owns
+
+A DESIGN document answers "what is this system, and what are its boundaries".
+Everything else has another home. Before writing a section, check it against
+this list:
+
+| Belongs in DESIGN | Belongs elsewhere |
+|---|---|
+| Role, responsibility, ownership boundaries | Task breakdown → Plan |
+| Capability scope and its boundaries | Delivery progress → `GAPS.md` |
+| Module architecture and carrier paths | Implementation steps → Plan |
+| Technology choices and rationale | Operating commands an agent runs → `AGENTS.md` |
+| Interface contracts (routes, schemas, protocols) | Test procedure → `AGENTS.md` / test docs |
+| Data and state model, with owners | Acceptance evidence → Plan / review record |
+| Deployment architecture (what the pipeline is) | Deploy runbook (what the operator does) → `AGENTS.md` |
+
+Deployment mechanics are design content: image composition, file organization,
+configuration layout, rollback semantics. They describe the system and stay in
+the DESIGN. The *rules* an agent follows when deploying — which command to run,
+what must pass first — are operating rules and belong in `AGENTS.md`.
+
+## Distinguishing Concrete Facts from Intent
+
+A DESIGN states the target system. Its concrete facts — route tables, module
+paths, contract shapes — must match the repository, because a reader uses them
+to navigate real code. Its intent statements — what the product is for, what a
+surface will eventually carry — describe direction and may run ahead of the
+code.
+
+Distinguish the two when writing. A route table naming a path that does not
+exist is a defect. A capability description saying a surface carries a category
+of content the team has not produced yet is intent, and stays as written.
+
+When a fact and the code disagree, the code is the evidence. Fix the document
+to match reality, or report the divergence when fixing it would require a
+product decision. Two specific traps:
+
+- **Feature flags and module switches.** A document listing route `/blog/*`
+  while the module switch disables the blog describes a surface that is not
+  reachable. State the switch and what it gates, rather than presenting a
+  gated surface as live.
+- **Content that lives outside the repository.** A content collection backed by
+  a symlink, a vendored directory, or a submodule has its source elsewhere.
+  Naming it as an in-repo path sends the reader to the wrong place.
+
+## The Owner's Domain Knowledge Is a Ceiling, Not a Floor
+
+These rules are the floor. The document set also reflects how the owner thinks
+about the product, and that understanding is recorded across the documents
+themselves. Read the whole set before writing: the PRD's intent, the product
+DESIGN's architecture, the sibling project DESIGNs' contracts. A classification
+or boundary question is usually already answered by the material on disk.
+
+Asking the owner a question that the rules or the repository already answer
+wastes their attention and signals that the document set was not read. Ask only
+what genuinely requires their decision, and never ask twice.

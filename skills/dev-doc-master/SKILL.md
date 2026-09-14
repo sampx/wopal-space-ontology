@@ -70,7 +70,7 @@ This split means a document's structure is language-independent — a reader or 
 
 1. **Route**: identify the document type from the command or user request; load the matching reference.
 2. **Gather context**: read the existing target document, its parent/sibling documents, and the actual code (for updates). Never invent facts.
-3. **Discuss / plan**: guide discussion for new documents, or present the update plan for existing ones. Obtain explicit user confirmation before writing.
+3. **Decide, don't ask**: resolve every question the rules or the repository can answer by reading. `references/consistency.md` defines which document carries which kind of fact; the code is the evidence for concrete facts. Discuss with the user only what genuinely requires their decision — a product intent that is not settled, a scope call, or a direction change. Present that decision, not a survey of the options you could have resolved yourself.
 4. **Write**: produce the document from the template, applying the universal rules.
 5. **Verify**: run the quality checklist in the reference, then run the **mandatory quality gate**: `scripts/verify-docset.py <docs-dir> --main DESIGN.md`. The script scans the actual filesystem for sub-design enumeration, parent links, absolute paths, broken links, end-section duplication, process-state vocabulary, and missing dates. It must exit 0 before the update is reported complete. Check document-set consistency and the bidirectional index.
 6. **Report**: file path, change summary, quality-gate result (PASS/FAIL), and the whole affected document set (checked / aligned / needs follow-up).

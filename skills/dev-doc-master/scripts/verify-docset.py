@@ -116,22 +116,48 @@ def check_absolute_paths(doc_dir, report):
 
 
 def check_relative_links(doc_dir, report):
-    link_re = re.compile(r"\]\(([^)#]+?)(?:#[^)]*)?\)")
+    """Verify the document links that carry lineage resolve on disk.
+
+    Documents reference each other two ways: as a Markdown link
+    (`[text](./x.md)`) and as a backticked path (`` `./x.md` ``). Both are checked,
+    because the header lineage fields (`Parent`, `Parent Architecture`,
+    `Sub-DESIGNs`, `Product PRD`) use the backticked form and carry the most
+    load-bearing references in the set. Checking only the Markdown form leaves
+    exactly those links unverified.
+
+    Scope is deliberately narrow. A document body also mentions paths that are
+    not links at all: a repository-root path (`projects/x/docs/y.md`), a
+    runtime path inside a space (`.wopal/skills/...`), or a path inside another
+    repository (`packages/app/AGENTS.md`). Those resolve against a different
+    root than the document does, so a document-relative resolution reports them
+    as broken when they are correct. Only two forms are treated as links:
+
+    - Markdown link targets, which are always document-relative by convention.
+    - Backticked paths that begin with `./` or `../`, the explicit relative
+      form used throughout the header fields.
+
+    A backticked path with no leading `./` or `../` names something resolved
+    against some other root, and is left alone.
+    """
+    md_link_re = re.compile(r"\]\(([^)#]+?)(?:#[^)]*)?\)")
+    rel_tick_re = re.compile(r"`((?:\.{1,2}/)[^`\s]*?\.md)`")
+    errors = []
     for p in _doc_files(doc_dir):
         text = p.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
-            for target in link_re.findall(line):
-                if target.startswith(("http://", "https://", "mailto:", "#")):
+            targets = list(md_link_re.findall(line))
+            targets += rel_tick_re.findall(line)
+            for target in targets:
+                if not target or target.startswith(("http://", "https://", "mailto:", "#")):
                     continue
                 target = target.split("#")[0]
-                if not target:
-                    continue
-                if target.startswith("file://"):
-                    fail(report, f"{p.name}:{i}: file:// link {target}")
+                if not target or "://" in target or "*" in target:
                     continue
                 resolved = (p.parent / target).resolve()
                 if not resolved.exists():
-                    fail(report, f"{p.name}:{i}: broken link {target}")
+                    errors.append(f"{p.name}:{i}: broken link {target}")
+    for e in errors:
+        fail(report, e)
 
 
 # A link may be written as a backticked path (`./DESIGN.md`) or as a bare
@@ -175,8 +201,15 @@ def check_end_section(doc_dir, main_name, sub_files, report):
         end_links = {m.group(1) for m in _LINK_RE.finditer(end)}
 
         if p.name == main_name:
+            # Match the sub-design as a standalone link target, not as a
+            # substring of a longer path. `./DESIGN-foo.md` is the sub-design;
+            # `../other-repo/docs/DESIGN-foo.md` is a different document that
+            # happens to share a filename.
+            end_targets = {m.group(1) for m in _LINK_RE.finditer(end)}
+            end_targets |= {m.group(2) for m in _LINK_RE.finditer(end) if m.group(2)}
             for name in sub_files:
-                if name in end:
+                local = {f"./{name}", name}
+                if end_targets & local:
                     fail(report, f"{p.name}: sub-DESIGN {name} appears in the end section")
 
         for link in sorted(header_links & end_links):

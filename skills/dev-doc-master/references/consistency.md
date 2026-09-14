@@ -177,7 +177,7 @@ Every document-set update ends with an automated scan that must pass before the 
 1. Enumerate `DESIGN-*.md` on disk and diff against the main header's `Sub-DESIGNs` — bidirectional, exact match.
 2. Verify every sub-document header has `Parent: ./DESIGN.md`.
 3. Scan for absolute paths (`file:///`, `/Users/...`) — zero tolerance.
-4. Verify relative links resolve to existing files.
+4. Verify relative links resolve to existing files — both Markdown link targets and backticked `./`- or `../`-prefixed paths in header fields.
 5. Confirm the end section (`Reference Documents`) contains no sub-DESIGNs and no header documents.
 6. Scan for process-state vocabulary (已废弃, 已放弃, 迁移, 不再执行, 历史机制, deprecated, legacy, moved from).
 7. Confirm every touched document has a refreshed `Updated` date.
@@ -206,3 +206,58 @@ The completion response must state which related documents were checked, which w
 | Phase / Roadmap | PRD, product DESIGN, project DESIGNs, sub-DESIGNs |
 | README | Project DESIGN, AGENTS.md, actual code |
 | AGENTS.md | Project DESIGN, PRD, README, actual code |
+
+## Document Roles: What Belongs Where
+
+Every fact in a project has exactly one home. When an author is unsure which
+document should carry something, the answer follows from the document's role,
+not from where the content currently sits or how big the file is.
+
+| Document | Carries | Does not carry |
+|---|---|---|
+| PRD | Product intent, user problems, value proposition, scope | Architecture, module layout, technology choices |
+| DESIGN (product) | System layering, subsystem boundaries, runtime model, end-to-end flows, capability roadmap | Per-project internals, deployment mechanics, implementation status |
+| DESIGN (project) | Project role and boundaries, capability scope, module architecture, technology choices, interface contracts, data and state model | Another project's internals, delivery progress, task lists |
+| DESIGN (sub) | One architectural concern delegated by the main DESIGN — a contract, a protocol, a layering model, a subsystem | Concerns the main DESIGN keeps; cross-cutting reference tables |
+| Phase / Roadmap | Phase goal, scope grouping, gaps closed by id, phase-level completion criteria, execution order, residual risks | Gap detail (lives in `GAPS.md`), implementation steps (live in Plans) |
+| README | What the project is, how to run it, high-level capability map | Architecture contracts, rule detail, design decisions |
+| AGENTS.md | Rules an agent follows while working: commands, conventions, boundaries, verification requirements | Architecture narrative, contract definitions, design rationale |
+
+Two consequences follow.
+
+**Design content belongs in design documents; operating rules belong in the
+project spec.** A deployment mechanism — the image layout, the file
+organization, the rollback procedure — is design content and lives in the
+project DESIGN (or its distribution sub-DESIGN). The rule that an agent must
+run the build gate before deploying is a working rule and lives in `AGENTS.md`.
+The same fact often has both faces: the DESIGN states what the deploy pipeline
+*is*, and `AGENTS.md` states what an agent must *do* about it. Write both, each
+in its own home, rather than duplicating one into the other.
+
+**A document is classified by what it does, never by how it was named.**
+Renaming is part of classification, not a separate cosmetic step: a supporting
+document that turns out to carry one of the main DESIGN's own concerns is
+renamed to `DESIGN-<topic>.md`, given a `Parent` link, and enumerated in the
+main header. A document originally written under an ad-hoc name is still a
+sub-design if it carries architecture.
+
+## Scope Discipline for an Alignment Pass
+
+An alignment pass brings a document set into conformity with these rules. It is
+not a rewrite of the product.
+
+- **Fix what the rules govern.** Metadata vocabulary, classification, link
+  integrity, chapter numbering, target-state language, and document-set
+  consistency.
+- **Do not invent decisions.** Where the documents describe a product state
+  that has not been settled, record what the documents say and let the owner
+  settle it. An alignment pass that quietly picks a new paradigm has exceeded
+  its mandate.
+- **Resolve ambiguity from the code and the sibling documents first.** A
+  question answerable by reading the repository — which routes are gated, where
+  content actually lives, what a script's output path is — is answered by
+  reading, not by asking. Reserve questions for decisions only the owner can
+  make.
+- **Report the drift you find rather than silently normalizing it.** When the
+  documents and the code disagree about something the alignment pass should not
+  decide alone, fix what is clearly stale and report the rest.
