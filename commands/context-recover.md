@@ -2,7 +2,7 @@
 description: Recover context after compaction
 ---
 
-I just compacted your context. Immediately execute the recovery protocol, then continue work.
+I just compacted your context. Immediately execute the recovery protocol, report the restored state in the user's preferred language, then continue work.
 
 <CRITICAL_RULE>
 1. Re-read important files from the compaction summary, especially plans, workflow specs, and reference documents (prioritize by importance, load up to 3 files; read more on demand if needed).
