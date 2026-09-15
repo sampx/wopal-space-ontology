@@ -9,7 +9,7 @@
 
 ## Runtime Assembly (wopal-plugin)
 
-### ASSEMBLY-G3: Arsenal scan and capability listing not implemented (P0)
+### ONT-G1: Arsenal scan and capability listing not implemented (P0)
 
 **Current**: 插件无武器库概念，无能力清单工具。技能与规则的物理清单只存在于各自模块的内部扫描结果中。
 
@@ -23,7 +23,7 @@
 - [ ] `wopal_capability_list` 无参数返回技能、规则、MCP 三类清单
 - [ ] 每项含名称、描述与物理路径
 
-### ASSEMBLY-G4: `wopal_task` lacks capability assembly parameters (P0)
+### ONT-G2: `wopal_task` lacks capability assembly parameters (P0)
 
 **Current**: `wopal_task` 只接受 `description` / `prompt` / `agent`。子会话创建后以 `promptAsync` 的 `tools` 参数传递工具开关。
 
@@ -37,7 +37,7 @@
 - [ ] 装配参数只接受名称，插件构造权限规则
 - [ ] 装配在会话创建时确定，上下文压缩后仍生效
 
-### ASSEMBLY-G5: Rule injection not assembled per session (P0)
+### ONT-G3: Rule injection not assembled per session (P0)
 
 **Current**: 规则注入按角色名与提示词关键词匹配（`hooks/rule-injector.ts`、`rules/matcher.ts`），无会话级装配概念。
 
