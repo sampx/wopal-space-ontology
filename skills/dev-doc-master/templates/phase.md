@@ -11,15 +11,7 @@
 
 ## Goal
 
-One sentence describing the product capability to be delivered in this phase (cross-project perspective). The goal names the capability steps this phase advances, not a list of activities.
-
-## Advancing
-
-Name the Capability Roadmap rows this phase advances, and the step each reaches. This makes the phase-to-map trace a checkable fact rather than a claim. Which rows appear is decided per phase — an early phase typically moves most dimensions, a focused phase names one or two. A row the phase does not move is simply absent; there is no exclusion list.
-
-```
-<capability dimension> → <target step> | <capability dimension> → <target step>
-```
+One sentence describing the product capability to be delivered in this phase (cross-project perspective). The goal names the capability this phase delivers, not a list of activities.
 
 ## Scope
 
