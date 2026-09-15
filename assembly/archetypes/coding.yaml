@@ -22,14 +22,12 @@ skills:
   - df-implement-review
   - dev-doc-master
   - git-worktrees
-  - customize-opencode
   - skill-creator
 
 # 声明该空间加载的规则
 rules:
   - typescript
   - python
-  - business-rules
 
 # 声明该空间加载的命令
 commands:
