@@ -26,8 +26,11 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 1. **local main 是能力唯一真相源**：共享能力不维护空间私有版本；空间的独有提交是待贡献的进化，不是长期分叉。
 2. **`space sync` 定序：先上行、后下行**：先汇入空间独有进化，再 fast-forward 到 local main 最新，最终两分支指向同一提交。
 3. **正常推进一律 fast-forward**：空间分支必须可对齐时才能推进；有待贡献提交时先贡献，有未提交修改时先处理工作区。
-4. **冲突在隔离临时 worktree 中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
+4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
+6. **默认执行，不设审批门控**：`space sync` 由 agent 按用户意图调用。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
+7. **空间自有能力在 sync 前自动纳管**：装配区内的未跟踪文件由 `space sync` 纳入版本控制并扩展稀疏范围，防止下行范围重算将其移除；`.gitignore` 过滤敏感文件。
+8. **范围重算保留空间自有部分**：下行按装配单重算稀疏范围时，范围 = 装配单声明 ∪ 空间自有文件；装配定义类基础文件始终包含。
 
 ## Self-Evolution Loop
 
@@ -69,16 +72,16 @@ Evolver 专职海关与提议-实施权责分立，空间运行中产生的能�
 
 | 命令 | 方向 | 职责 |
 |------|------|------|
-| `space status` | — | 只读：落后 / 待贡献 / 装配状态 |
-| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本 |
-| `space capability add/remove` | — | 增删本空间装配的能力，重新物化；可贡献为类型装配单 |
+| `space status` | — | 只读：落后 / 待贡献 / 装配状态 / 待纳管的游离文件 |
+| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；默认执行，`--dry-run` 仅预览 |
+| `space capability add/remove` | — | 增删装配单中的能力，立即重新物化；改动随 sync 上行，同类型空间在各自下次 sync 跟进 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
-`space sync` 遵循先预览后执行：dry-run 展示将贡献与更新的清单，用户确认后 `--confirm` 执行。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
+`space sync` 默认执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳管的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
 
-`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么。
+`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么。装配单中不存在的能力不走本命令：用户直接放入装配区，由 `space sync` 纳管上行进入能力池，此后可被任意空间装配。
 
 空间内日常能力进化通过 Evolver 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 

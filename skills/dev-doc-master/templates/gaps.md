@@ -11,14 +11,14 @@
 
 ### <PREFIX>-G1: <title> (P0)
 
-**Current**:
+**Current**: <the situation as a user meets it today — what they cannot do, must work around, or feel as inconsistent. Plain language; no internal modules, functions or file paths.>
 
-**Target**:
+**Target**: <the delivered experience once this gap closes — what a user will be able to do. Plain language, faithful to the design.>
 
-**Design**:
+**Design**: <path to the document carrying the solution>
 
 **Exit**:
-- [ ]
+- [ ] <observable outcome a reader can confirm without reading the source>
 
 ### <PREFIX>-G2: <title> (P1)
 

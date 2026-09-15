@@ -87,24 +87,31 @@ Each gap is a `###` section with a stable title and four labelled parts. The lab
 ```markdown
 ### CLI-G3: `space sync` missing, legacy commands not removed (P0)
 
-**Current**: What the implementation actually does today, with concrete carriers — file paths, function names, command names.
+**Current**: A user can only push revisions in one direction, and there is no way to preview
+what a sync would do before running it. Two older commands cover fragments of this job
+and are still what users reach for.
 
-**Target**: What the design says the system does.
+**Target**: One `space sync` command moves work both ways — staging the space's own changes
+upward first, then pulling the latest downward — with a preview before anything is applied.
+The two older commands are gone, so there is one obvious command to run.
 
-**Design**: Where the solution is documented.
+**Design**: `./DESIGN.md` (Space Lifecycle).
 
 **Exit**:
-- [ ] verifiable closing criterion
-- [ ] verifiable closing criterion
+- [ ] Running `space sync` without confirming shows a preview and changes nothing
+- [ ] Running it on a space with uncommitted edits stops and says so
+- [ ] The two older commands no longer exist
 ```
 
-**Current** is grounded in the code. Name the actual carriers: the module, the function, the command. A current paragraph that could be written without opening the code is a sign the gap was not verified, and an unverified gap sends planning in the wrong direction.
+The gap is written for a reader who does not have the code open. It describes **what a user can observe and what they will be able to do** — not the shape of the implementation.
 
-**Target** comes from the design document and stays faithful to it. If the design and the implementation disagree about what *should* be, that is a design question — resolve it in DESIGN first, then record the gap.
+**Current** states the situation as it presents itself to a user of the product: what they cannot do, what they have to work around, what behaves inconsistently. It is grounded in verified reality, so every claim traces back to a real observation — but the evidence shapes the claim, it does not become the claim. If a paragraph reads as a summary of source files (`function X at path Y is called by Z`), it has been written for the wrong reader: rewrite it as the user-visible consequence. Naming a command or an option is fine, because users interact with those by name; naming internal modules, functions, or file paths is not.
+
+**Target** comes from the design document and stays faithful to it. It describes the delivered experience — what a user will be able to do once the gap closes, phrased so that someone who has never read the design can picture the outcome. If the design and the implementation disagree about what *should* be, that is a design question — resolve it in DESIGN first, then record the gap.
 
 **Design** points at the document that carries the solution, by its own name. The reader follows it for the full contract; the gap entry does not restate it.
 
-**Exit** lists the criteria that close the gap, as checkboxes. They describe delivery facts, not implementation steps, and each is independently verifiable. The checkboxes are the closing criteria, not a progress tracker: the gap is removed once all of them are met and its Plan reaches `done`. They are not hand-maintained in place.
+**Exit** lists the criteria that close the gap, as checkboxes. Each describes an **observable outcome** — something a person can run, watch, or check, and then agree on whether it happened. "The command no longer has a hand-written JSON branch" is not an Exit criterion; it states a code shape, and only an author reading the source can confirm it. "The command's error response matches what `capability list` advertises" is, because it names an observation. Delivery facts, not implementation steps, and each independently verifiable. The checkboxes are the closing criteria, not a progress tracker: the gap is removed once all of them are met and its Plan reaches `done`. They are not hand-maintained in place.
 
 Priority is recorded in the entry title as `(P0)` / `(P1)`, so that a reader scanning headings sees the ordering without opening each gap.
 
@@ -200,8 +207,9 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 - [ ] Every gap closes within a single project; work spanning multiple projects is split into one gap per project
 - [ ] No `About This Document` or `Numbering` prose section in the body — the document goes straight from the header to its topic groups
 - [ ] Every gap has the four labelled parts: `Current` / `Target` / `Design` / `Exit`
-- [ ] Every `Current` names concrete code carriers (file, function, command)
-- [ ] Every `Target` traces back to a statement in the design document
+- [ ] Every `Current` describes a user-observable situation; internal modules, functions and file paths do not appear in it
+- [ ] Every `Target` traces back to a statement in the design document and is phrased as a delivered experience
+- [ ] Every `Exit` describes an observable outcome, not a code shape — a reader can confirm it without reading the source
 - [ ] Every `Design` names the document carrying the solution
 - [ ] Every `Exit` is a checkbox list of verifiable closing criteria
 - [ ] Priority marked in each entry title

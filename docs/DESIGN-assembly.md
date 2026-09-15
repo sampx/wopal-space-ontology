@@ -157,14 +157,39 @@ CLI 读取骨架后按以下规则消费：
 
 空间内正常修改与提交，进化经 `space sync` 汇入 local main。
 
+### Capability Name Resolution
+
+装配单以**能力名**声明能力（如 `skills: [dev-flow]`），物化前解析为仓库内路径。解析按类目尝试候选形态，取第一个存在者：
+
+| 类目 | 候选形态 | 例 |
+|------|----------|-----|
+| `skills` | `<cat>/<name>` | `dev-flow` → `skills/dev-flow/` |
+| `rules` | `<cat>/<name>`、`<cat>/<name>.md` | `typescript` → `rules/typescript.md` |
+| `commands` | `<cat>/<name>`、`<cat>/<name>.md` | `commit` → `commands/commit.md`；`wopal` → `commands/wopal/` |
+| `agents` | `<cat>/<name>`、`<cat>/<name>.md` | `wopal` → `agents/wopal.md` |
+| `plugins` | `<cat>/<name>`、`<cat>/<name>.md` | `wopal-plugin` → `plugins/wopal-plugin.md` |
+
+`commands` 与 `agents` 同时存在文件形态与目录形态，因此候选顺序不能按类目固定，须逐项探测。名称无法解析为任何存在路径时 fail fast，报告名称、类目与 ontology source。
+
+### Sparse Materialization Mechanics
+
+物化使用 Git `sparse-checkout`（non-cone 模式，支持文件级路径），机制约束如下：
+
+- **基础定义始终物化**：装配单（`assembly/archetypes/<type>.yaml`）、骨架（`assembly/schemas/<schema>.yaml`）、模板（`assembly/templates/`）与仓库根 `.gitignore` 无条件包含在稀疏范围内。
+- **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
+- **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
+- **工作区外新增需显式扩展范围**：用户在装配区新增文件后，须将其纳入稀疏范围（`sparse-checkout add`），否则后续范围重算（如下行同步）会将其从磁盘移除。`space sync` 的游离文件纳管负责此步骤。
+
 ## Two-Layer Assembly Records
 
 装配记录分两层，各司其职：
 
-1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。
-2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配。由 CLI 初始化并维护，用户通过 `wopal space capability add/remove` 增删能力，不手工编辑。
+1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。`space capability add/remove` 修改本层。
+2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配，含装配单声明的能力与空间自有能力两类。由 CLI 维护，不手工编辑。
 
 装配物化使用 Git `sparse-checkout`：空间 worktree 只物化装配单选中的路径，共享中央仓库对象库，不复制历史。
+
+**能力来源与收敛路径**：装配单声明的能力来自能力池。池中不存在的自有能力由用户直接放入装配区，`space sync` 上行后进入 local main，自此成为池中能力，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。空间自有能力仅存在于上行之前，不存在长期的"空间私有能力"状态。
 
 ### Space Assembly Snapshot Structure
 
@@ -202,7 +227,10 @@ CLI 读取骨架后按以下规则消费：
 | `assembledAt` | 装配时间，ISO 8601 |
 | `capabilities` | 实际装配的能力清单，按类目分组 |
 
-`capabilities` 与类型装配单的关系是**实例与模板**：装配单声明该类型的默认组合，快照记录本空间的实际组合。用户执行 `space capability add/remove` 后，快照更新为实际状态，与装配单产生差异——这个差异正是空间私有定制，经 `space sync` 上行时作为进化汇入。
+`capabilities` 与类型装配单的关系是**实例与模板**：装配单声明该类型的默认组合，快照记录本空间的实际组合。两者在两个方向上产生差异：
+
+- **装配单新增能力**（`space capability add`）：装配单与快照同时更新，同类型其他空间在各自下次 `space sync` 时跟进。
+- **空间自有能力**（用户直接向装配区放入池中不存在的文件）：仅记录于快照，不写入装配单；`space sync` 上行后进入能力池，此后可经装配单被其他空间引用。
 
 `source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
 
