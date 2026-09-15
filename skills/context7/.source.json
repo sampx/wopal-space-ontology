@@ -1,0 +1,10 @@
+{
+  "name": "context7",
+  "description": "Retrieve up-to-date documentation for software libraries, frameworks, and components via the Context7 API. This skill should be used when looking up documentation for any programming library or framework, finding code examples for specific APIs or features, verifying correct usage of library functions, or obtaining current information about library APIs that may have changed since training.",
+  "source": "intellectronica/agent-skills@context7",
+  "sourceUrl": "https://github.com/intellectronica/agent-skills.git",
+  "skillPath": "/skills/context7",
+  "downloadedAt": "2026-03-26T08:05:38.241Z",
+  "skillFolderHash": "c7ab574e006997d98e8a2d8fb7a1db0d2477b180",
+  "commit": "9f7f750cdb158316fb57fcce755f7530fe1118e2"
+}
