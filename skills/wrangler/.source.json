@@ -1,0 +1,18 @@
+{
+  "name": "wrangler",
+  "description": "Cloudflare Workers CLI for deploying, developing, and managing Workers, KV, R2, D1, Vectorize, Hyperdrive, Workers AI, Containers, Queues, Workflows, Pipelines, and Secrets Store. Load before running wrangler commands to ensure correct syntax and best practices. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.",
+  "source": "cloudflare/skills@wrangler",
+  "sourceUrl": "https://github.com/cloudflare/skills.git",
+  "skillPath": "/skills/wrangler",
+  "downloadedAt": "2026-08-04T04:59:17.132Z",
+  "skillFolderHash": "45cc198b2aad3f06e8abf91333f55fbe7579f659",
+  "commit": "30553f89ae1ef1e3c2917cd09d72dac992bb4e9a",
+  "lastScannedAt": "2026-08-04T04:59:20.215Z",
+  "lastScanStatus": "pass",
+  "lastScanRiskScore": 0,
+  "lastScanSummary": {
+    "critical": 0,
+    "warning": 0,
+    "passed": 13
+  }
+}
