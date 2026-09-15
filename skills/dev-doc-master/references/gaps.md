@@ -47,13 +47,27 @@ There is exactly one `GAPS.md` per project. Topics are grouped inside it under `
 
 The ontology worktree places its `GAPS.md` at `.wopal/docs/GAPS.md`, following the same rule: beside its `DESIGN.md`.
 
+## Granularity and Project Boundary
+
+A gap, a Plan, and a task inside that Plan are three views of the same thing: a unit of work that can be delivered and verified on its own. They therefore share one boundary rule.
+
+**One gap is one build block.** A gap covers a single functional module that closes as a unit — the same unit a Plan would carry as one task. Splitting one module's work across several gaps produces entries that can only be completed together, so each depends on the others and none is plannable alone. Merging unrelated modules into one gap produces an entry no single Plan can close.
+
+The test: **could this be handed to one implementer as one piece of work, and verified by one set of Exit criteria?** If yes, it is one gap. If part of it could land while the rest waits on different work, it is two.
+
+Gaps in the same project whose fixes touch the same code path are usually one gap. Sharing a source file is not by itself a reason to merge — a project's command surface may live in one file while its commands remain independent deliverables — but sharing the code path that must change is.
+
+**A gap never spans projects.** The boundary is hard. When a target requires changes in more than one repository, that is not one gap with shared ownership; it is one gap per project, each carrying what its own repository must deliver. Neither half can be closed by the other, and a gap that names two owners stalls.
+
+This applies exactly as it does to Plans and tasks: a Plan belongs to one project, and a task inside it belongs to that Plan. A gap that would need two repositories to close has crossed a boundary the work cannot cross — split it at the project line, then order the halves by their real dependency.
+
 ## Numbering
 
 Gap identifiers are `<PREFIX>-G<n>`: a three-letter project prefix, a literal `-G`, and a sequential number. Examples: `CLI-G1`, `ONT-G3`, `ELL-G1`.
 
 **Prefix.** The prefix is the owning project's three-letter abbreviation, and one document uses exactly one prefix. The prefix rule exists to answer a single question — which project closes this gap — so it stays at the project level and never encodes an area, topic, or document concern. `CLI-G<n>` belongs to wopal-cli, `ELL-G<n>` to ellamaka, `ONT-G<n>` to the ontology repository.
 
-**Ownership follows the fix.** A gap belongs to the project whose code must change to close it. When closing the gap requires changes in more than one project, that is not one gap with a shared owner — split it into one gap per project, each carrying the part of the work its own repository must implement. A gap that names two owners cannot be closed by either one alone, so it stalls; the split is what makes each half plannable.
+**Ownership follows the fix.** A gap belongs to the project whose code must change to close it — the boundary rule in Granularity and Project Boundary, applied to the identifier. One document uses one prefix, so the prefix encodes that owner and nothing else.
 
 **Sequence.** Numbers run in one sequence per document and increment by one. A new gap takes the next free number regardless of which topic group it lands in.
 
@@ -205,6 +219,7 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 - [ ] Every identifier follows `<PREFIX>-G<n>`; the prefix is the owning project's three-letter abbreviation, and the document uses exactly one prefix
 - [ ] No number is reused or renumbered
 - [ ] Every gap closes within a single project; work spanning multiple projects is split into one gap per project
+- [ ] Every gap is one build block — deliverable and verifiable as one unit, matching the granularity of a Plan task; no gap requires another gap to complete
 - [ ] No `About This Document` or `Numbering` prose section in the body — the document goes straight from the header to its topic groups
 - [ ] Every gap has the four labelled parts: `Current` / `Target` / `Design` / `Exit`
 - [ ] Every `Current` describes a user-observable situation; internal modules, functions and file paths do not appear in it
