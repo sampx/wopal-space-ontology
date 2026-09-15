@@ -15,7 +15,7 @@ One sentence describing the product capability to be delivered in this phase (cr
 
 ## Advancing
 
-Name explicitly which Capability Roadmap rows this phase advances, and to which step. This makes the phase-to-map traceability a checkable fact rather than a claim.
+Name the Capability Roadmap rows this phase advances, and the step each reaches. This makes the phase-to-map trace a checkable fact rather than a claim. Which rows appear is decided per phase — an early phase typically moves most dimensions, a focused phase names one or two. A row the phase does not move is simply absent; there is no exclusion list.
 
 ```
 <capability dimension> → <target step> | <capability dimension> → <target step>
@@ -27,10 +27,6 @@ A concise summary list of product capabilities to be delivered in this phase, so
 
 - **CLI distribution** — Node SEA release packaging → public release carrier → installer one-click install. Owner: wopal-cli
 - **ellamaka distribution** — artifact branding + 4-platform matrix + GitHub Release. Owner: ellamaka
-
-## Out of Scope
-
-- Capabilities or projects explicitly excluded from this product phase
 
 ## Gap Inventory
 

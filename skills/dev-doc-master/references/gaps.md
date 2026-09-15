@@ -14,6 +14,24 @@ The document has three surfaces:
 - **Topic groups** (`##`) holding the gap entries, one topic per architectural area or document concern.
 - **Gap entries** (`###`), each carrying `Current` / `Target` / `Design` / `Exit`.
 
+## What Counts as a Gap
+
+A gap is a statement about the **design**, not about the code's quality. Three situations qualify:
+
+1. **The design requires something the implementation does not have.** The carrier is absent entirely.
+2. **The design changed and the implementation has not followed.** The carrier exists but implements a superseded contract.
+3. **The design declares the area experimental.** An experimental mechanism is a design that has not closed — the shape is sketched but not settled. Recording it as a gap is what puts it on the roadmap to convergence; without an entry it stays experimental indefinitely, because nothing owns the work of settling it.
+
+The third case is easy to overlook because the design text is present and reads as intentional. It is intentional — the design names a direction. It is still unfinished, and an unfinished design is exactly what a gap tracker exists to surface.
+
+### What Is Not a Gap
+
+An implementation defect is not a gap. When the design is clear, the feature is implemented, and the implementation has a bug, a missing branch, or a rough edge, the distance being measured is between the code and its own intent — not between the design and the code. That belongs in an **Issue**, tracked through the issue workflow, where it reaches an engineer with the context to fix it.
+
+The test is one question: **is the design satisfied in outline?** If the design's contract is present in the implementation and the problem is that it behaves incorrectly or incompletely in some path, it is an issue. If the contract itself is absent, or present in a superseded shape, or still experimental, it is a gap.
+
+The distinction matters because the two routes end differently. A gap closes when a Plan implements the missing contract; an issue closes when a defect is fixed. Filing a defect as a gap produces a Plan whose scope is one bug, and a tracker that fills with entries no design analysis can resolve. Filing an unimplemented contract as an issue loses it among defects, where no phase planning will find it.
+
 ## Naming and Location
 
 The file is named `GAPS.md` and lives in the project's `docs/` directory, beside the `DESIGN.md` it measures against.
@@ -31,15 +49,19 @@ The ontology worktree places its `GAPS.md` at `.wopal/docs/GAPS.md`, following t
 
 ## Numbering
 
-Gap identifiers are `<PREFIX>-G<n>`: a project or topic prefix, a literal `-G`, and a sequential number. Examples: `CLI-G1`, `ONT-G3`, `ASSEMBLY-G5`, `ELL-G1`.
+Gap identifiers are `<PREFIX>-G<n>`: a three-letter project prefix, a literal `-G`, and a sequential number. Examples: `CLI-G1`, `ONT-G3`, `ELL-G1`.
 
-**Prefix.** The prefix identifies the owning project or topic. A single-prefix document uses the project name (`CLI-G<n>`). A document that tracks several distinct areas uses one prefix per area, and the prefix alone carries the meaning: `ASSEMBLY-G<n>` is runtime assembly, `ELL-G<n>` is desktop and onboarding. A reader never has to look up what a prefix means — it is the area name.
+**Prefix.** The prefix is the owning project's three-letter abbreviation, and one document uses exactly one prefix. The prefix rule exists to answer a single question — which project closes this gap — so it stays at the project level and never encodes an area, topic, or document concern. `CLI-G<n>` belongs to wopal-cli, `ELL-G<n>` to ellamaka, `ONT-G<n>` to the ontology repository.
 
-**Sequence.** Numbers run independently per prefix and increment by one. `CLI-G1`, `CLI-G2`, `CLI-G3` are the first three CLI gaps; `ASSEMBLY-G1` starts its own sequence.
+**Ownership follows the fix.** A gap belongs to the project whose code must change to close it. When closing the gap requires changes in more than one project, that is not one gap with a shared owner — split it into one gap per project, each carrying the part of the work its own repository must implement. A gap that names two owners cannot be closed by either one alone, so it stalls; the split is what makes each half plannable.
+
+**Sequence.** Numbers run in one sequence per document and increment by one. A new gap takes the next free number regardless of which topic group it lands in.
 
 **Immutability.** Once assigned, an identifier is never reused and never renumbered. A closed gap leaves its number retired, so references in plans, issues, and commits stay resolvable forever. A gap that supersedes a closed one takes a new number.
 
 The numbering record is the document's own git history. A retired number is visible in the commit that removed the entry; there is no separate ledger to maintain, and no `Numbering` section in the document body.
+
+**Renumbering an existing document.** When a document's prefixes predate this rule — area prefixes such as `ASSEMBLY-G1` in a single-project file, or the same prefix shared across two projects — normalize them in one pass: pick the owning project's abbreviation, apply it to every entry, and rewrite the sequence so numbers run in one order. The Phase document's gap inventory and any active Plan referencing the old identifiers are updated in the same change.
 
 ## Header
 
@@ -173,7 +195,9 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 - [ ] Header uses `Design Source`, not `Parent Architecture`
 - [ ] `Design Source` points at a formal document (`Active`), never a draft
 - [ ] `Updated` date is current
-- [ ] Every identifier follows `<PREFIX>-G<n>`; no number is reused or renumbered
+- [ ] Every identifier follows `<PREFIX>-G<n>`; the prefix is the owning project's three-letter abbreviation, and the document uses exactly one prefix
+- [ ] No number is reused or renumbered
+- [ ] Every gap closes within a single project; work spanning multiple projects is split into one gap per project
 - [ ] No `About This Document` or `Numbering` prose section in the body — the document goes straight from the header to its topic groups
 - [ ] Every gap has the four labelled parts: `Current` / `Target` / `Design` / `Exit`
 - [ ] Every `Current` names concrete code carriers (file, function, command)
@@ -183,6 +207,8 @@ Do not add a `Status` field, an "in progress" marker, or a "completed" note. A P
 - [ ] Priority marked in each entry title
 - [ ] End section is reference-only and does not repeat header documents
 - [ ] No design decisions recorded as gaps — those belong in DESIGN
+- [ ] No implementation defects recorded as gaps — a satisfied contract with a bug is an issue
+- [ ] Every experimental design area is recorded, so it has an owner to carry it to convergence
 - [ ] No status field or "in progress" marker on any gap — presence or absence is the status
 - [ ] Every gap was found by the bounded enumeration in Gap Discovery, not by impression — the search range is stated and diffable
 - [ ] Every finding was reconciled against existing gaps' full `Exit` lists before a new identifier was minted
