@@ -1,6 +1,6 @@
 # DESIGN — wopal-plugin Overall Design
 
-> **Status**: Draft
+> **Status**: Active
 > **Updated**: 2026-09-14
 > **Parent**: `./DESIGN.md`（ontology overall design: Plugin System and Configuration sections）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
