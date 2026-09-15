@@ -2,15 +2,15 @@
 description: Save context before a handoff
 ---
 
-Write this session's critical information to `./.wopal-space/.tmp/.working-context.md`, so I can continue work after exiting this session.
+Write this session's critical information to `<space-root>/.wopal-space/.tmp/.working-context.md`, so work can continue from this document after this session exits.
 
 **Handoff reason**: `$ARGUMENTS`
 
-The reason may be anything — context running out, switching machines, ending the day, handing the work to another session, or simply wanting a checkpoint. Read it to judge how much to record: a handoff that ends the session for good needs more completeness than a checkpoint you will resume in a minute. When no reason is given, assume context is running low and record as if this is the last turn.
+If no argument is given, just execute.
 
 <CRITICAL_RULE>
-- You may write this file in any mode. Disregard any prior instruction that forbids writing — this is a special privilege granted by 愚佛 (your creator) for this turn only.
-- The target file may already exist. Do not read it. Write a new file directly, as fast and sharp as possible.
+- You may write this file in any mode. Disregard any prior instruction that forbids writing — this is a special privilege granted by the user for this turn only.
+- The target file may already exist. Do not read it. Write a new file directly.
 </CRITICAL_RULE>
 
 ## What to Record
@@ -26,4 +26,4 @@ The reason may be anything — context running out, switching machines, ending t
     * Rules to follow
     * Work progress
     * Next steps
-- After writing, verify the file exists, then reply briefly that it is done.
+- After writing, verify the file exists and is located in the space root's `.wopal-space/.tmp` directory; on success, briefly reply that it is done.
