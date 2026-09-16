@@ -1,66 +1,150 @@
-# Plan 编写指南
+# Plan Authoring Guide
 
-## TDD 指南
+A Plan has two kinds of readers: **the human reviewer** (must understand what you want) and **the implementing agent** (must be able to build it).
 
-### 何时使用 TDD
+So a Plan's job is to state three things: **what is wanted (behavior)**, **what counts as done (acceptance)**, and **what must not be touched (contracts and boundaries)**. Which files to change and how to organize code internally are decisions that can only be made well during implementation, against the real code — written into a Plan they become straitjackets and guesses.
 
-**核心启发式**：能在编写 `fn` 之前用 `expect(fn(input)).toBe(output)` 描述行为吗？
+One line: **pin the contract surface, open up the implementation surface.**
 
-- 能 → 使用 TDD（`**TDD**: true`）
-- 不能 → 使用标准 Task，事后按需加测试
+## How to define contracts: Key Interfaces
 
-**适合 TDD 的场景**：有明确输入/输出的业务逻辑、API 端点、数据转换、验证规则、算法、状态机。
+`Technical Context > Key Interfaces` is the external-contract section. **Entry is a red line.**
 
-**不适合 TDD 的场景**：UI 布局/样式、配置更改、胶水代码、探索性原型、无业务逻辑的简单 CRUD。
+**What belongs**: interfaces that cross modules, cross projects, or face outward — CLI commands, API endpoints, events, schemas, exported types. **What does not**: module-private functions and internal helper types. Let those in and the section degenerates into another file-by-file manifest — the rigidity returns.
 
-### TDD Task 写法示例
+**How precise**: signature + error codes + key semantics (idempotency, versioning, failure behavior). Write them in the project's own language — TS interface, Python type, JSON Schema all work, as code blocks.
+
+**One criterion**: if a downstream consumer could write their calling code and compatibility tests from this section alone, the contract is defined. If not, it isn't finished.
+
+**Binding force**: an implementing agent that needs to change a signature or error code here must report back and revise the Plan first — silent changes are forbidden. Write N/A when the Plan has no external contract.
+
+**Example**:
+
+```typescript
+/** Registers a Plan execution. Repeated calls with the same execution ID
+ *  return the same result; no double execution. */
+interface BeginExecution {
+  request:  { executionId: string; planId: string }
+  response: { status: 'started' | 'already-running'; revision: string }
+  errors:
+    | 'APPROVAL_EXPIRED'   // approval no longer valid, re-review needed
+    | 'DEPENDENCY_PENDING' // upstream not delivered
+}
+```
+
+## How to pin outcomes: the two-beat AC
+
+You cannot write future test commands at Plan time (the test files do not exist yet) — that is reality, not a defect. The two-beat scheme pins outcomes by separating the *right to define* from the *right to prove*:
+
+**Beat 1 (at Plan-writing time)**: each AC = behavioral criterion + pass standard. Write "what observable behavior the system shows, and what you see when it passes". Criterion-style entries are legal — no guessing future file names.
+
+There is exactly one standard for a good beat-1 entry: **can this AC catch a bad implementation?** Ask yourself: if the agent cuts corners or gets it wrong, will this criterion fail? An AC that passes no matter what ("feature works", "build passes") is decoration — beyond submit validation, df-plan-review watches for these too.
+
+**Beat 2 (at implementation RED stage)**: the implementing agent turns each AC into a real command and **writes it back into the Plan in place** (becoming things like `python -m pytest tests/runner/ -v` all green).
+
+**complete hard gate**: the script enforces it — a checked AC must carry a real command; a criterion-style AC cannot pass complete checked. Definition lives in the Plan (the behavior list is reviewable); proof lives in the tests (all green is the only pass). No gap in between.
+
+**Evolution example**:
+
+```markdown
+Beat 1 (at Plan-writing time):
+1. [ ] Runner consistency tests all green, no interactive hang in the background
+2. [ ] Repeated begin with the same execution ID returns the same result, no double execution
+
+Beat 2 (after RED-stage write-back):
+1. [x] `python -m pytest tests/runner/consistency/ -v` all green (interactive hang covered by test_no_stdin_hang)
+2. [x] `python -m pytest tests/runner/test_idempotent_begin.py -v` all green
+```
+
+## How to split Tasks: behavior groups, not files
+
+**One Task = one cohesive Behavior set + a full RED→GREEN→REFACTOR + an independently runnable Verify.**
+
+Three granularity questions:
+
+1. Do these Behaviors share the same test set? (share → same Task)
+2. Does it fit in one fae's context for a single delegation? (no → split)
+3. Can the Verify run independently? (no → the boundary is drawn wrong, re-split)
+
+Behavior groups are a **requirements-side** concept — clear at Plan time. Files are an **implementation-side** concept — unclear at Plan time. That mismatch was the root of the old format's rigidity; change the splitting dimension and the rigidity disappears.
+
+Tasks no longer carry a Files field. Where to start → Pre-read (points at files that actually exist); step rhythm → Changes; actually touched → backfilled in Done (the single source of truth); coarse-grained scope → the Plan-level Affected Files table. Small tasks with enumerable footprints (bug fixes, single-point adjustments) need no premature file list either — write the real paths in the Affected Files table.
+
+## How to write TDD
+
+### Behavior is a spec, not a description
+
+Behavior (required when TDD=true) is a testable behavior spec; format is free: input→output mappings, Given/When/Then, all fine. The criterion: **the implementing agent can turn each Behavior into a failing test without guessing.** A Behavior you cannot write a test for is not yet specified — fix the Behavior, not the standard.
+
+```markdown
+**Behavior**:
+- valid_email("user@example.com") → true
+- valid_email("") → false
+- valid_email("no-at-sign") → false
+```
+
+### Changes entry 1 is always RED
+
+The numbered-list format is unchanged (no checkboxes), but entry 1 now has a fixed meaning — turn all Behaviors into failing tests:
+
+```markdown
+**Changes**:
+1. RED: turn the Behaviors above into failing tests and confirm they fail
+2. GREEN: implement the email validator until all tests pass
+3. REFACTOR: extract the regex constant (if needed)
+```
+
+### Full TDD Task example
 
 ```markdown
 **Verification Intent**: AC#1, AC#2
 
 **Behavior**:
-输入 → 输出映射：
 - valid_email("user@example.com") → true
 - valid_email("") → false
 - valid_email("no-at-sign") → false
 
-**Files**: `src/validators/email.py`, `tests/test_email_validator.py`
-
 **Pre-read**: `src/validators/pattern.py`
 
 **Design**:
-分三阶段实现（RED → GREEN → REFACTOR）：
-1. RED：编写测试覆盖上述 Behavior 中的输入/输出映射，运行测试确认失败
-2. GREEN：实现 email 验证函数，最小代码使测试通过
-3. REFACTOR：提取正则常量，清理实现（如需）
+Add an email validator, reusing the regex style of pattern.py.
+Errors return false instead of throwing (callers render; exception flow does not fit).
 
 **TDD**: true
 
 **Changes**:
-1. 创建 `tests/test_email_validator.py`，编写 3 个测试用例覆盖 Behavior
-2. 在 `src/validators/email.py` 实现 `valid_email()` 函数
-3. 提取 `EMAIL_REGEX` 常量，消除硬编码
+1. RED: turn the Behaviors above into failing tests and confirm they fail
+2. GREEN: implement valid_email() until all tests pass
+3. REFACTOR: extract the EMAIL_REGEX constant (if needed)
 
-**Verify**:
-`python -m pytest tests/test_email_validator.py -v` 全部 pass
+**Verify**: `python -m pytest tests/ -v` all passing
 
 **Done**:
-任务产出：email 验证函数含 3 个测试用例，RED→GREEN→REFACTOR 三阶段完成
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤执行, 并确认结果符合预期（必须由实施 Agent 勾选）
+Task output: email validation function + 3 test cases
+Actually touched files: (backfilled after implementation)
+- [ ] The implementing agent has completed all steps of development and verification.
 ```
 
-### TDD 关键字段
+### When to use TDD
 
-| 字段 | TDD 下的要求 |
-|------|-------------|
-| **Behavior** | 必填且详细。列出具体的输入/输出映射 |
-| **Design** | 按 RED → GREEN → REFACTOR 三阶段描述 |
-| **Changes** | 三步对应三阶段，编号列表 |
-| **Verify** | 运行测试命令，确认全部通过 |
+**Core heuristic**: can you describe the behavior as `expect(fn(input)).toBe(output)` before writing `fn`? Yes → TDD; no → standard Task, add tests afterwards as needed.
 
-### TDD 提交建议
+- **Fits**: business logic with clear input/output, API endpoints, data transforms, validation rules, algorithms, state machines
+- **Does not fit**: UI layout/styling, config changes, glue code, exploratory prototypes, simple CRUD with no business logic
 
-TDD Task 按阶段提交（每个阶段一个提交，代码在 feature 分支）：
+### TDD stage discipline
+
+| Stage | Problem | Handling |
+|------|------|------|
+| RED | Test did not fail | Feature may already exist or the test is wrong — investigate before continuing |
+| GREEN | Test did not pass | Debug the implementation, iterate until green; do not jump to refactoring |
+| REFACTOR | Test failed | Undo the refactor, retry with smaller steps |
+
+**A RED that does not fail is the most common trap**: it means the test does not actually cover the intended behavior — fix it before continuing.
+
+### TDD commit advice
+
+Commit per stage (one commit per stage, code on the feature branch):
 
 ```
 test(scope): add failing test for email validation
@@ -68,298 +152,218 @@ feat(scope): implement email validation
 refactor(scope): extract regex to constant
 ```
 
-- RED 阶段提交：测试存在且失败
-- GREEN 阶段提交：最小实现使测试通过
-- REFACTOR 阶段提交：仅在有实际改进时提交
-- 每个 Task 完成后勾选 Plan 中对应 Done checkbox（Plan 文件在空间仓库，独立提交）
+Tick the corresponding Done checkbox in the Plan after each Task (the Plan file lives in the space repo and commits separately).
 
-### TDD 错误处理
+## Task field quick reference
 
-| 阶段 | 问题 | 处理 |
+| Field | Required | Notes |
 |------|------|------|
-| RED | 测试没有失败 | 功能可能已存在或测试有误，调查后再继续 |
-| GREEN | 测试没有通过 | 调试实现，持续迭代直到通过，不要跳到重构 |
-| REFACTOR | 测试失败 | 撤销重构，用更小的步骤重试 |
+| **Verification Intent** | yes | AC#N; which acceptance entries this behavior group answers for |
+| **Behavior** | yes when TDD=true | Testable spec, directly translatable into a failing test |
+| **Pre-read** | yes | Files to read before implementing; N/A if unneeded |
+| **Design** | yes | Approach, key ideas, constraints — intent stated clearly, not file-by-file dictates |
+| **TDD** | yes | true/false; false needs a reason |
+| **Changes** | yes | Numbered list; entry 1 is always RED |
+| **Verify** | yes | Executable command; exit 0 required before ticking Done |
+| **Done** | yes | Output summary + actually-touched files + checkbox |
 
-**RED 不失败是最常见的陷阱**：意味着测试没有真正覆盖预期行为，必须修复后才能继续。
+## The Agent Verification / User Validation boundary
 
----
+### Agent Verification (everything automatable)
 
-## Task 字段格式速查
+Everything verifiable automatically goes here: tests, lint, typecheck, static checks, scriptable behavior assertions. Two-beat scheme above. Cross-Task verifications go at the end of the list, marked "(cross-Task)".
 
-**Behavior**（TDD=true 时）：
-```
-输入 → 输出映射：
-- valid_email("user@example.com") → true
-- valid_email("") → false
-```
+Purely descriptive entries are forbidden: ❌ "build passes" / "feature works" / "no errors" — criteria must be able to catch a bad implementation.
 
-**Design**：
-```
-技术方案、关键实现思路、需要注意的约束。
-至少写 2-3 句话，不能留空。
-```
+### User Validation (only what the user can verify)
 
-**Changes**（禁止 checkbox）：
-```
-1. 创建 tests/test_xxx.py
-2. 实现 xxx 函数
-3. 提取常量
-```
+Carries only items **the user must execute and observe by hand**: UI/UX, interaction feel, business flows, visual confirmation.
 
-**Verify**：
-```
-`cd projects/xxx && pnpm test:run` 全部通过
-```
+**Mandatory double question before writing into UV**:
 
----
+1. Can an agent verify this automatically? → Yes: **UV forbidden**; put it in Agent Verification
+2. Must the user execute and observe it manually? → No: **UV forbidden**
 
-## Agent Verification 规则
+**Four mandatory elements per scenario**:
 
-Agent Verification 承载所有可自动化的验证项（包括单 Task 内验证和跨 Task 集成验证）。
-
-**可识别的命令模式**：`rg`, `grep`, `find`, `cat`, `ls`, `python`, `node`, `bash`, `pytest`, `npm test`, `bun test`, `cargo test`, `go test`, `cargo build`, `tsc`, `npm run build`, `flow.sh`, `git`, `gh`
-
-**禁止的纯描述性条目**：❌ "代码构建通过" / "单元测试通过" / "功能正常" / "无报错"
-
-**正确格式**：
-```markdown
-- [ ] `rg -c '### Architecture Context' templates/plan.md` ≥ 1（Architecture Context 子节存在）
-- [ ] `python -m pytest tests/ -v` 全部 pass
-```
-
-**跨 Task 验证**：放在 Agent Verification 列表末尾，标注"（跨 Task）"。
-
----
-
-## User Validation 规则
-
-User Validation 只承载**必须由用户手动执行并观察**的验证项：UI / UX、交互体验、业务流程、视觉确认。
-
-**边界判定（写入 UV 前强制二连问）**：
-1. Agent 能否自动验证此项？（测试 / lint / typecheck / 静态检查 / 可脚本断言的行为）→ **能，禁止列入 UV**，放入 Agent Verification。
-2. 此项是否必须用户手动执行并观察？→ **否，禁止列入 UV**。
-
-可自动验证的内容必须全部进入 Agent Verification；只有两道都指向"必须用户手动"的项才允许列入 User Validation。
-
-**环境完整性（每个场景必备四要素）**：
-| 要素 | 要求 | 反例（不合格） |
+| Element | Requirement | Bad example (fails) |
 |---|---|---|
-| 验证环境 | 引用项目规范中的验证机制章节或脚本入口；项目规范缺失时必须先补入项目 AGENTS.md | 只写"启动应用" |
-| 启动命令 | 一条用户可直接复制执行的真实命令，含必要环境变量 | "运行命令观察输出" |
-| 通过判据 | 用户可观察到的具体可断言结果 | "确认行为正确" / "行为一致" |
-| 失败反馈 | 失败时用户提供什么（日志路径、diff 输出） | 缺失 |
+| Validation environment | Reference the mechanism section in project specs or the script entry | Just "start the app" |
+| Launch command | One real command the user can copy-paste, env vars included | "Run the command and observe" |
+| Pass criteria | A specific, assertable observable result | "Confirm behavior is correct" |
+| Failure feedback | What the user provides on failure (log path, diff output) | Missing |
 
-**验证机制沉淀义务**：若本次验证依赖某个环境/机制（沙箱、测试模式、端口、隔离 home），而项目 AGENTS.md 尚未记录，必须先补入项目规范再引用，禁止在 Plan 里只出现一次后遗失。
+If a mechanism the validation depends on is not yet documented in the project's AGENTS.md, add it to the project spec first, then reference it — never let it appear once in a Plan and be lost.
 
-**正确场景**：
+**Correct scenario example**:
+
 ```markdown
-#### Scenario 1: 引导流程无回归
-- Goal: 确认引导向导各步骤行为与改动前一致
-- 验证环境: 项目 AGENTS.md「验证机制」章节（ELLAMAKA_TEST_ONBOARDING 沙箱模式）
-- Precondition: 沙箱模式（WOPAL_HOME=/tmp/wopal-onboarding-sandbox），无需构建
-- 启动命令: `ELLAMAKA_TEST_ONBOARDING=1 ./scripts/dev.sh desktop`
+#### Scenario 1: onboarding flow regression-free
+- Goal: Confirm each wizard step behaves as before the change
+- 验证环境: AGENTS.md "validation mechanisms" section (ELLAMAKA_TEST_ONBOARDING sandbox mode)
+- Precondition: sandbox mode (WOPAL_HOME=/tmp/wopal-onboarding-sandbox), no build needed
+- Launch command: `ELLAMAKA_TEST_ONBOARDING=1 ./scripts/dev.sh desktop`
 - User Actions:
-  1. 走一遍引导流程：系统检查 → 安装 CLI → 配置 AI provider
-  2. 观察各步骤提示与状态
-- 通过判据: 各步骤正常推进、无新增报错、界面无 `[object Object]` 文本
-- 失败反馈: 附 `logs/dev/<scope>/ellamaka-dev-desktop.log` 与 `git diff -w` 输出
+  1. Walk the onboarding flow: system check → install CLI → configure AI provider
+  2. Watch prompts and status at each step
+- Pass criteria: steps advance normally, no new errors, no `[object Object]` text in the UI
+- Failure feedback: attach `logs/dev/<scope>/ellamaka-dev-desktop.log` and `git diff -w` output
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [ ] The user has completed the validation above and confirmed the results
 ```
 
-`plan check` 在 `submit` 或 `approve` 时自动验证 User Validation 中存在至少一个场景和最终确认 checkbox，且场景含可执行命令。checkbox 在人工验收完成前保持未勾选；`verify --confirm` 只接受用户已勾选的结果。
+## Metadata rules
 
----
+`Project Path`, `Project Type`, `Target Project` are looked up from the space's `STRUCTURE.md`:
 
-## Metadata 填写规则
+1. Determine the domain from the code paths involved (ontology / projects / contents / ...)
+2. Match path/type/repo in `STRUCTURE.md` frontmatter or tables
+3. Fill in the mapping:
 
-Metadata 中的项目信息（`Project Path`、`Project Type`、`Target Project`）必须从空间的 `STRUCTURE.md` 查询。
-
-**填写步骤**：
-1. 根据 Plan 涉及的代码路径判断属于哪个域（ontology / projects / contents / ...）
-2. 在 `STRUCTURE.md` frontmatter 或表格中匹配对应的 path/type/repo
-3. 填写映射：
-
-| STRUCTURE.md type | Project Type | Project Path 示例 |
+| STRUCTURE.md type | Project Type | Project Path example |
 |---|---|---|
 | `ontology-worktree` | ontology-worktree | `.wopal/` |
 | `projects` | projects | `projects/<name>/` |
 | `contents` | contents | `contents/<name>/` |
 
-**常见错误**：
-- 把子目录（如 `.wopal/plugins/wopal-plugin/`）当作项目根路径 — 应取 worktree 根 `.wopal/`
-- 把 ontology worktree 归为普通项目 — 它是独立 repo 的 worktree
+Common mistakes: treating a subdirectory (e.g. `.wopal/plugins/wopal-plugin/`) as the project root — use the worktree root `.wopal/`; classifying an ontology worktree as a normal project — it is a worktree of an independent repo.
 
----
+## Plans, phases, and Gaps
 
-## Plan 与阶段、Gap 的关系
+Plans add no Gap-related metadata fields. The phase–Gap relationship is carried naturally by product phase documents; a Plan only states its phase in Goal or Context.
 
-Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶段文档天然承载，Plan 只需在 Goal 或 Context 中写明所属阶段即可。
+- **Plan phase**: the `Phase` metadata field (inherited from the Issue body). A phase splits into multiple Plans by scope area; the phase's `Related Plans` table is the aggregate view.
+- **Phase table registration**: only Plans linked to a phase (metadata carrying `Product` + `Phase`) trigger phase-doc sync at archive — `archive` locates the row by the ` · <plan-name>` suffix of the slot label and writes `done`. Format spec in dev-doc-master skill `references/phase.md`.
+- **Unlinked Plans** get no phase-doc handling at archive (skipped silently, no warnings, no errors). Ordinary feature/fix/refactor Plans neither need nor should write `Product`/`Phase`, and never invent rows in phase tables.
+- **Gaps**: the single source of truth is the project's `GAPS.md`. Plans reference the Gap identifier they close (e.g. `CLI-G3`) in Goal or Context without copying the description. When a Plan reaches `done` and its Exit criteria hold, the entry is removed from `GAPS.md` (the number retires, never reused).
 
-**Plan 归属阶段**：Plan 的 `Phase` 元数据字段（从 Issue body 继承）记录所属产品阶段。一个阶段按 scope area 拆出多个 Plan，阶段的 `Related Plans` 表是聚合视图。
+## Delegation prompt format
 
-**阶段表登记**：仅**关联了阶段（Plan 元数据携带 `Product` + `Phase`）**的 Plan 才在归档时触发阶段文档 `Related Plans` 表的状态同步——`archive` 依据槽位行标签末尾的 ` · <plan-name>`（如 `P-A: 空间初始化与装配物化 · feature-space-materialize-assembly`）定位行并自动写入 `done`，格式规范见 dev-doc-master 技能 `references/phase.md`。
-
-**未关联阶段的 Plan 归档时不做任何阶段文档处理**（`archive` 直接跳过，不警告不报错）。普通功能/修复/重构 Plan 不需要、也不应该为了触发同步而补写 `Product`/`Phase` 元数据，更不允许为它们在阶段表中凭空建行——阶段表只跟踪阶段拆分的 Plan，保持同步逻辑零额外复杂度。
-
-**Plan 与 Gap**：Gap 明细的唯一真相源是项目 `GAPS.md`。Plan 在 Goal 或 Context 中引用它要关闭的 Gap 标识（如 `CLI-G3`），不复制 Gap 描述。
-
-**Gap 关闭时机**：Plan 达到 `done` 且其 Exit 判据全部满足时，从 `GAPS.md` 删除对应 Gap 条目（编号退役，不复用）。阶段文档的 Gap 清单随条目消失而收敛。Gap 不设 status 字段——Plan 的状态已经表明它正在被处理。
-
----
-
-## 委派 prompt 格式
-
-**Plan 驱动任务**（推荐）：
+**Plan-driven task** (recommended):
 
     ## Plan
-    读取 Plan 文件，按 Task <N> 执行：
-    <Plan 文档绝对路径>
+    Read the Plan file and execute Task <N>:
+    <absolute path to the Plan document>
 
-    ## 上下文
-    - 实施工作路径: 项目目录绝对路径 (worktree 绝对路径)
-    - 实施基线: Plan Metadata 中 Base Commit（集成分支 HEAD，approve 时记录）。
-      worktree 创建于此基线之上，fae 的提交均以该 commit 为起点
-    - 每完成一个 task 的实施和验证, commit git
-    - 遵循项目和模块开发规范 (AGENTS.md)
-    - <仅在 Plan 之外需要额外强调的事项，无则省略>
+    ## Context
+    - Working path: project directory absolute path (worktree absolute path)
+    - Implementation baseline: Base Commit from Plan Metadata (integration branch HEAD, recorded at approve)
+    - Implementation freedom: Behaviors, Key Interfaces contracts, and boundaries are hard constraints; file organization, internal APIs, and test structure are yours to decide on the latest code
+    - AC write-back: at the RED stage, turn each AC into a real command and update the Plan's Agent Verification in place
+    - Commit git after each task's implementation and verification
+    - Follow project and module development specs (AGENTS.md)
+    - <Only extra emphases beyond the Plan; omit if none>
 
-    ## 完成标准
-    - <简要列出关键验证点>
-
-    ## Task Report
-    完成时输出：Goal/Accomplished/Files/Status
-
-**无 Plan 的临时任务**：
-
-    ## 目标
-    <一句话>
-
-    ## 上下文
-    - 项目路径: /path/to/file
-
-    ## 步骤
-    1. 读取相关文件
-    2. 修改文件
-    3. 运行验证
-
-    ## 完成标准
-    - 功能验证通过
+    ## Completion criteria
+    - <key verification points, briefly>
 
     ## Task Report
-    完成时输出：Goal/Accomplished/Files/Status
+    On completion output: Goal/Accomplished/Files/Status
 
-**原则**：有 Plan 时 Plan 是单一信息源，prompt 不重复 Plan 内容。
+**Ad-hoc task without a Plan**:
 
-### 委派 prompt 必含项
+    ## Goal
+    <one line>
 
-每次委派 fae 执行 Plan Task 时，prompt 末尾必须附加：
+    ## Context
+    - Project path: /path/to/file
 
-    完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），Plan 文件路径：<空间仓库绝对路径>
-    禁止修改 Plan Status 元数据（Status/Worktree/Base Commit 等由 flow.sh 脚本管理）
+    ## Steps
+    1. Read the relevant files
+    2. Modify files
+    3. Run verification
 
-缺少此指令 = fae 不会主动更新 Plan，导致 Done 全部遗漏。
+    ## Completion criteria
+    - Feature verification passes
 
----
+    ## Task Report
+    On completion output: Goal/Accomplished/Files/Status
 
-## 常见错误 TOP 5
+**Principle**: with a Plan, the Plan is the single source of information; the prompt never duplicates Plan content.
 
-| Error | 原因 | Fix |
+### Mandatory delegation prompt addition
+
+Every fae delegation for a Plan Task must append this at the end:
+
+    After completion, edit the corresponding Task's Done checkbox (- [ ] → - [x]) in the Plan file, and backfill the "actually touched files" list inside Done. Plan file path: <space-repo absolute path>
+    Never modify Plan Status metadata (Status/Worktree/Base Commit etc. are managed by flow.sh)
+
+Omitting this = fae never updates the Plan, and every Done is missed.
+
+## Top 5 common errors
+
+| Error | Cause | Fix |
 |-------|------|-----|
-| `missing Design` | 跳过了 Design 字段 | 补 `**Design**:` + 实施方案 |
-| `TDD=true requires Behavior` | 有 TDD 标记但没写 Behavior | 补 `**Behavior**:` + 输入→输出映射 |
-| `Changes must not use checkbox` | Changes 用了 `- [ ] Step N:` | 改为编号列表 `1. 2. 3.` |
-| `Agent Verification: no executable commands` | AC 写了纯描述 | 改为 `` `rg -c 'pattern' file` ≥ 1 `` 格式 |
-| `placeholder: 'TBD'` | 残留占位符 | 替换为实际内容或删除该行 |
+| `missing Design` | Skipped the Design field | Add `**Design**:` + implementation design |
+| `TDD=true requires Behavior` | TDD flag set but no Behavior | Add the testable behavior spec |
+| `Changes must not use checkbox` | Changes used `- [ ] Step N:` | Numbered list `1. 2. 3.`, entry 1 always RED |
+| `AC checked but carries no executable command` | Criterion-style AC checked straight through complete | Write the real command back into the AC entry at the RED stage before checking |
+| `placeholder: 'TBD'` | Leftover placeholder | Replace with real content or delete the line |
 
----
+## Validation and advancement
 
-## 验证与推进
+- `submit` / `approve` run `plan check` automatically; no manual run needed
+- `approve` is not a first check — it is the node that enters "awaiting user review"
+- If `approve` is blocked by validation → fix the Plan and re-run `approve`
 
-- `submit` / `approve` 自动运行 `plan check` 校验，无需手动执行
-- `approve` 不是第一次检查，而是进入"等待用户评审方案"的节点
-- 如果 `approve` 被校验拦下，修好 Plan 后重新执行 `approve`
+## Plan naming rules
 
----
+The Plan name is the authoritative identifier used to derive feature branches. Names must be lean — Issue titles are free text; Plan names and branch names must be short.
 
-## Plan 命名规范
-
-Plan name 是权威标识，用于派生 feature 分支。命名必须精简——Issue title 可以自由书写，但 Plan name 和分支名必须短。
-
-### 命名结构
+### Naming structure
 
 ```
-<issue_number>-<type>-<slug>
+<issue_number>-<type>-<slug>     # Issue-driven
+<type>-<slug>                    # no Issue
 ```
 
-无 Issue 模式：
+- `type` uses standard values (feature/fix/enhance/refactor/docs/test/chore/perf), fully spelled
+- No `scope` segment — scope already shows up in `--project` and the slug
 
-```
-<type>-<slug>
-```
+### Slug rules
 
-- `type` 使用标准值（feature/fix/enhance/refactor/docs/test/chore/perf），保持全拼
-- 不设 `scope` 段——scope 信息已体现在 `--project` 和 slug 中，独立成段只会拉长名称
+- slug = **1-2 core nouns**, kebab-case, **≤ 20 chars**
+- Drop verb phrases and articles; keep the noun core
+- Truncate or rewrite when too long; never copy the issue title
 
-### slug 精简规则
-
-slug 是命名的核心，质量取决于生成时的克制：
-
-- slug = **1-2 个核心名词**，kebab-case，**≤ 20 chars**
-- 去掉动词短语（`implement`/`add`/`support`/`handle` 等）和冠词，只留名词核心
-- 超长时必须截断或改写，禁止照搬 issue title 或描述
-
-| 啰嗦（禁止） | 精简（目标） |
+| Verbose (forbidden) | Lean (target) |
 |--------------|--------------|
 | `implement-multi-space-chat-projector-sync` | `chat-projector-sync` |
 | `add-skills-remove-command` | `skills-remove` |
 | `support-handling-expired-tokens` | `token-expiry` |
 
-### 示例
+### Plan directory rules
 
-`flow.sh plan new 110 --type feature --slug chat-projector-sync` → `110-feature-chat-projector-sync`
+- New Plans must be created or located via `flow.sh plan ...`; never hand-write files
+- `--project` is a required parameter
+- All projects live under `.wopal-space/plans/<project>/`
 
-### Plan 目录规则
+## Branch naming rules
 
-- 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件
-- `--project` 是必填参数，Plan 目录由其决定
-- 所有项目统一存放在 `.wopal-space/plans/<项目名>/`
-
-## 分支命名规范
-
-feature 分支从最终确定的 Plan name 派生，必须**有界**——禁止无长度上限的拼接：
+Feature branches derive from the Plan name and must be bounded — no unbounded concatenation:
 
 ```
-<project>-<issue>-<type>-<slug截断>
+<project>-<issue>-<type>-<slug-truncated>
 ```
 
-总长超过 55 chars 时，截断 slug 并追加 4-char 哈希兜底唯一性（仍可逆映射回 Plan）：
+Past 55 chars total, truncate the slug and append a 4-char hash:
 
 ```
 <project>-<issue>-<type>-<slug-head>-<hash4>
 ```
 
-Worktree 目录 = branch。分支名承载"唯一且可映射回 Plan"的职责，不是 Plan name 的全文复刻。
+Worktree directory = branch. The branch name carries "unique and mappable back to the Plan" — it is not a full-text copy of the Plan name.
 
----
+## Branch ownership
 
-## 分支归属详细说明
-
-Plan 在不同阶段归属于不同分支。
-
-### 阶段归属
-
-| 阶段 | 归属分支 | Plan 状态 | 说明 |
+| Stage | Branch | Plan status | Notes |
 |------|---------|----------|------|
-| `planning` | 集成分支（main 或 space/<name>） | `planning` | Plan 基线在集成分支上提交 |
-| `approve --confirm` | 集成分支 → 创建 feature 分支 | `executing` | 先在集成分支提交 executing + Worktree 元数据，再创建 worktree |
-| 实施（executing） | feature 分支 | `executing` | 实施在 feature 分支的 worktree 中进行 |
-| `complete` | feature 分支 | `verifying` | Plan-only 提交活动 Plan（脏实施树报错退出） |
-| 用户验证 | feature 分支 | `verifying` | 用户在 feature 分支上验证实施结果 |
-| `verify --confirm` | 集成分支 | `done` | Plan-only 提交到集成分支 |
-| `archive` | 集成分支 | 归档 | 移至 done/，清理 worktree |
+| `planning` | integration branch (main or space/<name>) | `planning` | Plan baseline committed on the integration branch |
+| `approve --confirm` | integration branch → create feature branch | `executing` | Commit executing + Worktree metadata on the integration branch first, then create the worktree |
+| Implementation (executing) | feature branch | `executing` | Implementation happens in the feature branch's worktree |
+| `complete` | feature branch | `verifying` | Plan-only commit of the active Plan (dirty implementation tree aborts) |
+| User validation | feature branch | `verifying` | The user validates on the feature branch |
+| `verify --confirm` | integration branch | `done` | Plan-only commit to the integration branch |
+| `archive` | integration branch | archived | Moved to done/, worktree cleaned up |
 
-### Plan-only commit 原则
-
-生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent（fae）负责。脚本在遇到脏实施树时报错退出，而非代为提交代码。
+**Plan-only commit principle**: lifecycle scripts commit only Plan status changes, never implementation code. Code commits belong to the implementing agent (fae). Scripts abort on a dirty implementation tree rather than committing code on its behalf.

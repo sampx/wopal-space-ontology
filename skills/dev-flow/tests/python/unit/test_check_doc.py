@@ -102,8 +102,17 @@ class TestCheckAgentVerification(unittest.TestCase):
         return (CHECK_DOC_DIR / name).read_text(encoding='utf-8')
 
     def test_ac_no_commands(self):
+        # Two-beat AC, beat 1: criterion-style entries without commands are
+        # valid at submit. The no-command fixture must pass cleanly now.
         errors = check_agent_verification(self._fixture("plan-new-ac-no-commands.md"))
-        self.assertTrue(any("command" in e.lower() for e in errors), f"{errors}")
+        self.assertEqual(errors, [])
+
+    def test_ac_without_checkbox_entries_rejected(self):
+        # Beat 1 still owns this: a section with no checkbox entries at
+        # all has nothing verifiable — submit rejects it.
+        content = "### Agent Verification\n\nplain prose, no checkbox\n"
+        errors = check_agent_verification(content)
+        self.assertTrue(any("checkbox" in e.lower() for e in errors), f"{errors}")
 
     def test_ac_after_impl(self):
         errors = check_agent_verification(self._fixture("plan-new-ac-after-impl.md"))

@@ -14,203 +14,126 @@ description: >
 
 # df-plan-review — Plan Correctness Review
 
-**Your question is not "is this Plan well-formed" — it is "if the Plan were executed literally, by whoever implements it, would it work, and would it deliver the stated goal".**
+**You judge one thing: if someone follows this Plan as written, will the work succeed and deliver the stated goal?**
 
-## Position: what the script owns vs what you own
+## What you own vs what the script owns
 
-`flow.sh plan check` already gates determinate form: field presence, placeholder text, TDD↔Behavior pairing, checkbox shape, AC command presence, User Validation structure, status and Project Path validity. Re-checking any of that is waste and produces noise.
+`flow.sh plan check` already gates form: field presence, placeholder text, TDD↔Behavior pairing, checkbox shape, AC command presence, User Validation structure, status validity. Re-checking any of that is waste and produces noise.
 
-Your scope is **closure**: the things a regex cannot compute — whether the parts of this Plan actually fit together and fit reality.
-
-| The script decides | You decide |
-|---|---|
-| Fields exist and are shaped right | The parts **reference each other correctly** (every consumer has a producer) |
-| A command string is present | The claim behind the command is **true against the real repo** |
-| The Plan is internally parseable | The Plan is **consistent with its design docs and project rules** |
-| ACs exist | Every AC is **owned by a task**, and the plan is **executable by whoever implements it** |
-| — | Executing it **achieves the Goal**, not a shadow of it |
+Your scope is what a regex cannot compute — whether the parts of this Plan fit together, fit reality, and add up to the goal.
 
 If the Plan is fine, say so quickly and stop. This review is invoked deliberately, not for ceremony.
 
-## Cost discipline
+## The three questions
 
-Plan review has a reputation for burning time and returning noise. Guard against both.
+Every failure that survives `plan check` belongs to one of these:
 
-- **Read once, then probe.** Read the Plan top to bottom with line numbers. Extract claims into a checklist. Only then run targeted commands — never re-read the Plan repeatedly between probes.
-- **Probe, do not survey.** Every check below names the probe pattern that settles it. Prefer `rg`, `sed -n 'Np'`, `test -e`, `git cat-file` over opening files. Do not read source files beyond the specific lines a claim concerns.
-- **Never read whole large documents.** To confirm a section exists, `rg -n '^## Section Name' doc.md`. To confirm a line, `sed -n 'Np' file`. That is the entire need.
-- **Cap the probing.** Roughly 15–25 targeted commands covers a normal Plan. Multi-module High-complexity plans may need more; a small Plan needs fewer.
-- **Say what you did not verify.** An unverified claim is not a defect. List it under `Unverified` and move on. Never convert "I didn't check" into a finding.
-- **Do not do the implementer's job.** No designing missing pieces, no writing the fix — point at the gap and state what would close it.
+| | Question | Catches |
+|---|---|---|
+| Q1 | Do the parts of the Plan fit together? | files nobody produces, symbols nobody creates, ACs nobody owns, order contradicting dependencies |
+| Q2 | Are the Plan's statements about the repo true? | stale paths, wrong anchors, false counts, silent clashes with design docs, commands that can't run |
+| Q3 | Will executing it deliver the goal? | goal parts without tasks, decisions quietly shrunk, ACs that prove nothing |
 
-## Input contract
+A verdict requires all three questions attempted. A Blocker on one question is not permission to skip the others.
 
-You need: the Plan path, and the workspace root. Everything else you can discover.
+## Input
 
-- If the prompt carries `review_type: plan`, the Plan path, a Base Commit or reference revision, and a focus list — use them.
-- If the prompt omits context, still proceed: read the Plan, resolve the target project from its Metadata (`Project Path`), and state any assumption you had to make in the report.
-- **If the Plan has a Worktree** (field present in Metadata), the activity copy of the Plan lives *inside the worktree*, not on the integration branch — read status and checkboxes there. Code probes must respect the declared revision.
+You need the Plan path and the workspace root; everything else you can discover.
 
-## The Six Checks
+- If the prompt carries `review_type: plan`, a Plan path, a Base Commit, and a focus list — use them.
+- If the prompt omits context, still proceed: read the Plan, resolve the target project from its `Project Path` metadata, and state the assumptions you had to make in the report.
+- **If the Plan declares a Worktree**, the live copy lives inside that worktree, not on the integration branch — read status and checkboxes there, and probe code at the worktree's HEAD.
 
-Run all six. Each closes a specific failure class that survives `plan check`.
+## How to work: read once, three lists, then verify
 
----
+Efficiency is part of review quality — a review that burns time returns noise. Work in two passes:
 
-### C1 — Artifact Closure
+**Pass 1 — read the Plan once, with line numbers.** While reading, fill three lists you will work from later:
 
-**Question**: Do the Plan's file lists agree with each other — Tasks ↔ `Affected Files` — with no gaps in either direction?
+1. **Facts** — every concrete claim about the repo: counts, paths, line ranges, doc sections, IDs, commands, flags, "file is new", "file is removed".
+2. **Symbols** — every code-like name in backticks, with the task that uses it and the task that should create it.
+3. **Files** — every path mentioned anywhere, and where: `## Affected Files` row, `Pre-read`, `Changes`, test path.
 
-**Why**: The `Files` field is what the implementer is allowed to touch; the `Affected Files` table is the plan's scope contract. When they disagree, either work happens off-contract, or declared scope is never delivered.
+**Pass 2 — answer the questions from the lists.** Q1 and Q3 need nothing but the Plan itself. Only Q2 touches the repo; batch its commands and run them together. Do not re-read the Plan between checks — each return to the Plan costs more than it saves.
 
-**Probe**: Build the two sets mechanically, then diff them:
-- files named in each Task's `**Changes**` and `**Files**`
-- file paths in the `## Affected Files` table
-- cross-check each row's declared operation against reality: a row declaring a newly created file that already exists, or a row declaring deletion of a file that is absent
+Verify, don't survey: `test -e` for paths, `sed -n 'Np'` for line anchors, `rg -n` for sections and symbols, `git cat-file` for revisions. Never read a whole design doc to confirm one section. A normal Plan should settle in roughly 15–25 commands; a multi-module Plan may need more, a small one fewer.
 
-**Severity**:
-- File edited by a Task but absent from that Task's `Files` → **WARNING**
-- File in a Task's `Files` but absent from `Affected Files` → **WARNING**
-- Row in `Affected Files` with no task producing it → **BLOCKER**
-- Same-wave file overlap where the Plan claims parallel execution → **BLOCKER**; where the Plan explicitly says waves are dependency layers, not parallel batches → **INFO** (read the Plan's own statement about what waves mean before judging this)
+Claims you cannot settle go under `Unverified` — never inflated into findings.
 
----
+## Q1 — Do the parts of the Plan fit together?
 
-### C2 — Symbol Closure
+Four checks, all from the Plan itself.
 
-**Question**: Does every symbol a later Task consumes have a producer in an earlier Task — and is that producer actually declared?
+1. **Behaviors are owned.** Every entry in Agent Verification must be referenced by some Task's `Verification Intent` — or explicitly marked cross-task. A criterion no task owns is never proven. Also check placement: anything an agent can verify mechanically (tests, lint, typecheck, scriptable checks) belongs in Agent Verification; sitting in User Validation means the Plan pushes automatable work onto the user.
+2. **Symbols have producers.** Every code-like name a task *uses* must be created by an earlier task, spelled exactly the same. Cross-task plans break at the seams: Task 2 "registers five error codes A–E", Task 4 "fails fast with `TEMPLATE_MISSING`" — a name nobody ever declared. This is the highest-yield check in the whole review: purely mechanical, done in one pass right after reading, and invisible to form validators.
+3. **Behavior specs are real.** For every TDD task, each Behavior must be testable as written — an implementing agent could turn it into a failing test without guessing. Vague descriptions ("works correctly") are unspecified behavior: the implementation agent gets no spec to build against and the RED stage has nothing to fail on. Changes entry 1 must be the RED step (Behaviors → failing tests).
+4. **Order matches dependencies.** Every consumer comes after its producer in the declared order. Overlapping work between tasks is a conflict only under declared parallel execution; if the Plan states waves are sequential dependency layers, overlap is the Plan's own design, not a defect.
 
-**Why**: Cross-task plans fail most often at the seams: a task calls a function, error code, interface, flag, constant, fixture, or env var that no earlier task creates. The plan reads fine; execution hits an undefined symbol.
+**Files are expected scope, not a contract.** The `Files` field may hold estimates or N/A, backfilled with actuals at Done; the `Affected Files` table is the expected footprint. Do NOT audit these lists for exact agreement — file-level precision belongs to implementation time, and the Plan intentionally does not pretend to know it. Only flag: an `Affected Files` row declaring an operation that is already false (a "new" file that exists, a "delete" of a file that is absent) — stale premises worth a WARNING — and declared parallel execution that overlaps files (BLOCKER).
 
-**Probe**: Extract the identifiers each Task consumes (names in backticks that are code-like: function and method calls, constants in upper snake case, exported types, CLI flags, env vars), then locate the producing declaration. Confirm the exact spelling matches on both sides.
+Severity: symbol used with no producer → **BLOCKER**; producer spelled differently → **BLOCKER**; producer in a later wave → **BLOCKER**; file overlap under claimed parallel execution → **BLOCKER**. AC owned by nobody → **WARNING**; untestable Behavior claimed as spec → **WARNING**; automatable check sitting in User Validation → **WARNING**; human-observation check claimed as agent-verifiable → **WARNING**; stale file-operation premise → **WARNING**.
 
-**Severity**:
-- Consumed symbol with no declared producer anywhere in the Plan → **BLOCKER**
-- Producer declared but with a different name/spelling than the consumer expects → **BLOCKER**
-- Symbol produced by a Task in a later wave than its consumer → **BLOCKER**
-- Producer exists but the Plan never states where it is registered/exported, and that matters for wiring → **WARNING**
+## Q2 — Are the Plan's statements about the repo true?
 
----
+Plans are written against a mental model of the code. When that model is stale, every task built on it inherits the error — and it surfaces mid-execution, after the budget is spent. The repo is the only authority.
 
-### C3 — Fact Verification
+Settle each fact claim mechanically. Never wave a claim through because it "looks right":
 
-**Question**: Are the Plan's factual claims about the repository actually true at the revision it targets?
+| Claim | Check |
+|---|---|
+| "36 capabilities" | count them in the source of truth |
+| "`src/x.ts` exists" | `test -e` / `ls` |
+| "`file.ts:619-669`" | `sed -n '619p'` at the stated revision — small drift is fine, landing on the wrong construct is not |
+| "§3 of DESIGN.md says X" | `rg -n '^#{2,3} ' doc` |
+| "D-12" / "issue #45" | find the ID in its source of truth |
+| "run `flow.sh verify`" | does the command exist, does it take that flag |
+| "create new file F" | does F already exist |
+| "delete file F" | does F exist |
 
-**Why**: Plans are written against a mental model of the code. When that model is stale, every task built on it inherits the error — and the error surfaces only mid-execution, after context is spent.
+**State the revision you checked against** — Base Commit, worktree HEAD, or integration HEAD. A finding without a revision rots the moment anyone commits. If the Plan declares a worktree, check facts at the worktree's HEAD, not the integration branch.
 
-**Probe**: Treat every concrete assertion as a claim to be checked. Mechanical claims must be checked mechanically:
-- **Counts** ("36 capabilities", "8 skills") → count them in the source of truth
-- **Paths / filenames** → `test -e` / `ls`
-- **Line anchors** ("`file.ts:619-669`") → `sed -n 'Np' file` at the target revision
-- **Document sections cited** → `rg -n '^#{2,3} Section' doc.md`
-- **Referenced IDs** (decision markers such as `D-xx`, project gap or issue IDs) → confirm they exist in their source of truth
-- **Commands and flags** named in ACs → confirm the command exists and accepts those arguments
-- **Existing-vs-new** classifications → confirm files declared as newly created do not already exist, and files declared for deletion do
+Then check agreement: the Plan cites design docs, `AGENTS.md`, existing interfaces as its basis. For each decision the Plan makes, find what the authority says and compare. Three classes of divergence:
 
-**Quote the revision you verified against** (Base Commit, worktree HEAD, or integration HEAD). A finding without a revision rots the moment anyone commits.
+- **Acknowledged** — the Plan says it changes the doc, defers with a reason, or justifies the deviation → a decision, not a defect.
+- **Silent** — diverges without saying so → a contract broken without negotiation.
 
-**Severity**:
-- Load-bearing claim that is false — the change is justified *because* of it → **BLOCKER**
-- Descriptive drift that does not change the work (anchor off by a few lines in a large file) → **WARNING**
-- Cosmetic drift (a count stated loosely, ordering difference with no effect) → **INFO**
-- Claim you could not settle from the workspace → `Unverified`, **not** a finding
+Establish which document is authoritative *for the model this Plan implements* before calling a conflict — older docs sometimes describe a superseded state.
 
----
+Severity: a false premise the Plan leans on → **BLOCKER**; a false claim a task would wrongly build on → **BLOCKER**; divergence breaking a stated safety/security constraint → **BLOCKER**; an AC command that cannot run in the stated environment → **BLOCKER**. Drift with no effect on the work → **WARNING**; silent divergence from a doc or rule → **WARNING**; cosmetic drift (loose count, ordering) → **INFO**; couldn't settle → `Unverified`, never a finding.
 
-### C4 — Agreement Consistency
+## Q3 — Will executing it deliver the goal?
 
-**Question**: Does the Plan respect the authoritative documents it sits under — or does it silently diverge from them?
+The expensive failure: a Plan that passes every check and still under-delivers. Four angles.
 
-**Why**: A Plan executes against design docs, project rules, and existing conventions. Silent divergence means the deliverable contradicts a contract nobody re-negotiated.
+1. **Goal covered.** Split the Goal into its parts. Each part needs a task. A part with no task is an intention, not a plan.
+2. **Decisions delivered.** For each `D-xx`, the tasks deliver what the decision states — not a shadow of it. Watch for shrink words: "v1", "simplified", "static for now", "hardcoded", "placeholder", "stub", "not wired to", "for now". Two tests, in order: does the shrink contradict the Goal or a decision, and is the shrink explicitly sanctioned by a `D-xx` or scope statement (e.g. "this Plan delivers the static layer, dynamic later")? Only a *silent* shrink is a finding — phased delivery is legitimate when the Plan says so.
+3. **ACs that can fail.** Under the two-beat scheme, beat-1 entries are criterion-style — that is legal (the real command is written back at the RED stage). What you own: if the feature were broken, would the criterion catch it? An AC that passes either way — "file exists" for a behavior claim, or one that restates the change — is decoration, not verification. A criterion-style AC missing a behavioral pass standard (no observable outcome stated) cannot catch anything.
+4. **Handoff possible.** Could the implementer start from this Plan + declared `Pre-read` alone? Interfaces and outputs of earlier tasks must be named, not implied ("calls `parseConfig()` returning `ParsedConfig`" is ready; "uses the shape from Task 2" is not). The bar is "can a competent implementer proceed" — flag only where the missing information would cause a wrong turn.
 
-**Probe**:
-1. Collect the authorities the Plan names in Technical Context / Pre-read (design docs, `AGENTS.md`, existing interfaces).
-2. For each design decision the Plan makes, locate the corresponding statement in those authorities.
-3. Where they disagree, decide the class: **updated** (Plan says it changes the doc), **deferred** (Plan explicitly declares it out of scope with a reason), or **silent** — a divergence neither acknowledged nor justified.
+Severity: goal part with no task → **BLOCKER**; decision quietly reduced → **BLOCKER** (deliver it, or state the phase explicitly); AC that can't fail → **WARNING**; task not startable from Plan alone → **WARNING**. Shrink sanctioned by the Plan's own words → not a finding.
 
-**Severity**:
-- Silent divergence from a design doc or project rule → **WARNING** (needs explicit adoption: update the doc, defer with reason, or justify the deviation)
-- Divergence that would break a stated safety or security constraint → **BLOCKER**
-- Divergence where the Plan explicitly acknowledges and justifies it → **not a finding** (that is a decision, not a defect)
+## Don't flag these
 
----
+- **Form** — field shape, formatting, placeholder style, checkbox layout. `plan check` owns it and it passed.
+- **Sanctioned decisions** — anything a `D-xx` or scope statement authorizes. Disagreeing is not a finding.
+- **Product intent** — business choices belong to the Plan owner. A requirement that looks wrong goes under `Requirement Questions`, not Blocker/Warning.
+- **Taste** — "I would have structured it differently", naming opinions, alternative designs.
+- **Unverifiable worries** — "might not handle X" with no evidence from the Plan or repo. Verify it or drop it.
+- **Plan size** — task count, file count, wave count are never defects. Context budget is managed per task; a large cohesive Plan is normal. Recommend splitting only when deliverable groups have no dependencies and could be verified independently — and never as a Blocker.
 
-### C5 — Executability & Handoff
+A finding must cite both sides — where the Plan says it, and the reality that contradicts it. Without that, it is at most Info.
 
-**Question**: Can each Task actually be executed — by whoever implements it, working only from the Plan — and is every AC owned?
+## Verdict and report
 
-**Why**: The Plan is what the implementer receives; whoever executes a Task sees the Plan and the files it names, not the author's unwritten context. A Task that only makes sense with that unwritten context will stall, improvise, or drift.
+```
+PASS   — no Blocker, no Warning
+REVISE — no Blocker, at least one Warning
+BLOCK  — at least one Blocker
+```
 
-**Probe**:
-- **AC ownership**: every AC in `### Agent Verification` is referenced by at least one Task's `Verification Intent`. Cross-task ACs are marked as such. ACs that no task owns are unverified acceptance criteria.
-- **AC placement**: each criterion sits in the right bucket. Anything an agent can verify mechanically (test, lint, typecheck, static check, scriptable behavior) belongs in Agent Verification — if it appears under User Validation, the Plan is pushing automatable work onto the user. Anything needing human observation must not sit in Agent Verification as a bare claim.
-- **Handoff readiness**: for each Task, ask whether whoever implements it, knowing only this Plan + declared `Pre-read`, can start. Check that referenced interfaces/types/outputs of earlier tasks are named, not implied.
-- **Ordering**: declared dependency order matches the wave/dependency table; no consumer precedes its producer; the declared execution mode (shared worktree sequential, or parallel) matches the file-conflict reality.
-- **Runnability**: AC commands can execute in the environment the Plan declares (right project root, right script names, right tooling), and any setup they need is itself a step in the Plan.
+`Unverified` never changes the verdict.
 
-**Severity**:
-- AC owned by no task → **WARNING** (state which ones; cross-task ACs must be marked)
-- AC command cannot run as written in the declared environment → **BLOCKER**
-- Automatable verification placed in User Validation → **WARNING** (it will waste the user's time on what an agent should prove)
-- Human-observation-only criterion claimed as agent-verifiable → **WARNING**
-- Task not startable from Plan + declared Pre-read alone (undefined dependency on author context) → **WARNING**
-- Declared order contradicts declared dependencies (consumer before producer) → **BLOCKER**
-
----
-
-### C6 — Goal Fidelity
-
-**Question**: If this executes as written, does it deliver the Goal — or a reduced version of it?
-
-**Why**: The most expensive failure is a Plan that passes every check and still under-delivers: goal components without tasks, decisions quietly shrunk to "v1", ACs that cannot falsify anything.
-
-**Probe**:
-1. Decompose `## Goal` into components; confirm each has covering task(s).
-2. For each `D-xx` in Key Decisions, confirm the tasks deliver what the decision states — not a shadow version with reduction language (`v1`, "simplified", "static for now", "NOT wired to", "placeholder", "for now").
-3. For each AC, ask what failure it would catch. An AC that passes whether or not the feature works is decoration.
-
-**Severity**:
-- Goal component with no covering task → **BLOCKER**
-- Decision reduced without the Plan saying so → **BLOCKER** (either deliver it, or split it out explicitly)
-- Reduction language that is **sanctioned by the Plan's own decision text** → **not a finding**
-- AC that cannot fail (asserts existence rather than behavior, or restates the change) → **WARNING**
-- Missing falsifiability where `plan check` already required a command → **WARNING**, not BLOCKER (the script owns command presence; you own whether it proves anything)
-
----
-
-## Split Assessment (replaces size thresholds)
-
-Plan count thresholds do not exist here, because context budget is managed **per Task**, not per Plan — a large cohesive Plan is normal. Size alone is never a blocker.
-
-Recommend splitting only when the deliverable genuinely decomposes — at least two of:
-- Two or more groups of deliverables with **no dependency** between the groups
-- Each group could be **verified independently** (its own acceptance story)
-- Tasks cannot be handed off cleanly because they share too much in-flight state
-
-A large-but-cohesive Plan is correct. If the Plan itself documents a single-plan decision (e.g. a `D-xx` explaining why it is not split), that call has been made — do not re-litigate it. **Never raise size as a Blocker.**
-
-## False-Positive Calibration
-
-Most review noise comes from flagging things that are not defects. Do not flag:
-
-- **Form** — field shape, formatting, placeholder style, checkbox layout. That is `plan check`'s job and it already passed.
-- **Sanctioned decisions** — anything a `D-xx` or an explicit scope statement authorizes. Disagreeing with a decision is not a finding.
-- **Product intent** — business logic belongs to the user and the agent orchestrating this work, not to the reviewer. If a requirement looks wrong, put it in `Requirement Questions`, not Blocker/Warning.
-- **Preference** — "I would have structured it differently", alternative designs, naming taste, or abstraction opinions.
-- **Unverifiable concerns** — "this might not handle X" with no evidence from the Plan or the repo. Either verify it or leave it out.
-- **Scope you were not asked to cover** — codebase-wide quality, other projects' debt, existing conventions you were not reviewing.
-
-A finding must cite both sides: the Plan location and the reality that contradicts it. Without that, it is at most Info.
-
-## Completeness Gate
-
-**All six checks must be attempted before any verdict.** At review start, create one TodoWrite item per check and mark them complete as you go — one `in_progress` at a time. Do not emit a verdict while any check is pending.
-
-If you run out of budget, do not fake completion: emit the report with an explicit `UNCOVERED CHECKS` section naming what was not done and why.
-
-## Output Contract
-
-Verdicts are the dev-flow standard — `PASS` / `REVISE` / `BLOCK` — so the report plugs into existing gates.
+At review start, build one todo item per question (Q1/Q2/Q3) and mark them off as you go. All three must be done before any verdict. Out of budget, do not fake completion: emit the report with an explicit `UNCOVERED CHECKS` section naming what was not done and why.
 
 ```markdown
 # Plan Review — {plan-name}
@@ -224,12 +147,12 @@ Verdicts are the dev-flow standard — `PASS` / `REVISE` / `BLOCK` — so the re
 ## Blocker
 ### B-01: {issue title}
 - Plan location: `{plan}.md:{line}`
-- Reality: `{file}:{line}` / `{command output}` — {why this contradicts the Plan}
+- Reality: `{file}:{line}` or `{command output}` — {why this contradicts the Plan}
 - Impact: {how execution fails}
 - Fix direction: {what to add or change}
 
 ## Warning
-{same format as Blocker; Impact may be omitted}
+{same format; Impact may be omitted}
 
 ## Info
 {one line each}
@@ -247,72 +170,44 @@ Verdicts are the dev-flow standard — `PASS` / `REVISE` / `BLOCK` — so the re
 {only when a check could not be completed}
 ```
 
-**Verdict rule**: any Blocker → `BLOCK`; only Warnings → `REVISE`; no findings → `PASS`. `Unverified` items never change the verdict.
+`PASS` requires a short `Positive Findings` section — what was checked and how. A bare PASS asks the reader to take the verdict on faith, which defeats the purpose of a review.
 
-`PASS` requires a short positive section: state what was verified and how, so the reader can trust the verdict rather than take it on faith. A `PASS` with nothing verified is worse than no review.
+## After the verdict
 
-## Evidence Standard
-
-- Blocker / Warning must carry a locatable citation: Plan line + the reality it conflicts with (file:line, command output, or document line).
-- Info may be a single line.
-- Claims you could not settle go under `Unverified` — never inflate them into findings, never hide them.
-
-## After the Verdict
-
-- **`REVISE` / `BLOCK`**: the revised Plan must be re-reviewed before it is treated as clean — a fix applied without re-verification is not a fix. Reuse the same review session (reply), so prior findings and their resolutions stay in context; opening a fresh reviewer loses that.
-- **`PASS`**: this is an input to whoever requested the review, not an automatic gate. It does not authorize `approve`, it does not replace `plan check`, and it does not change the execution status of a Plan mid-flight.
-- **Scope note**: reviewing a Plan does not authorize editing it. Findings go back to the owner.
-
-## Anti-patterns
-
-**Do NOT**:
-- Re-run or duplicate `plan check`'s form validation
-- Read source files broadly, or read whole design docs — probe them
-- Flag size, count, or file-number thresholds
-- Re-litigate decisions the Plan explicitly made and justified
-- Treat "I would design it differently" as a defect
-- Emit a finding without citing both the Plan and the reality
-- Do the fixing, designing, or implementing
-- Reach a verdict with checks still pending
-
-**DO**:
-- Read the Plan once, fully, with line numbers
-- Check every concrete claim against the repo at the stated revision
-- Follow every cross-task symbol to its producer
-- Diff the Plan's own file lists against each other
-- Ask what each AC would catch if the feature were broken
-- State the revision you verified against, and what you could not verify
+- **`REVISE` / `BLOCK`**: the revised Plan must be re-reviewed before it is treated as clean — a fix applied without re-verification is not a fix. Reuse the same review session (reply), so prior findings stay in context.
+- **`PASS`**: input to whoever requested the review, not an automatic gate. It does not authorize `approve`, does not replace `plan check`, and does not change the execution status of a Plan mid-flight.
+- Reviewing does not authorize editing. Findings go back to the owner.
 
 ## References
 
-Load the rubric when the check needs its detailed procedure, probe cookbook, or a worked example:
+Load the rubric when a question needs its full procedure, the severity table, or a worked example:
 
-- `references/review-rubric.md` — per-check procedures, probe cookbook, severity calibration, worked examples (including real defect shapes to recognize)
+- `references/review-rubric.md` — three-list building, per-question procedures, command cookbook, severity calibration, worked examples (real defect shapes to recognize)
 
 ## Examples
 
-### Example 1 — Symbol closure (Blocker)
+### Example 1 — Symbol with no producer (Blocker)
 
 A Plan's Task 4 states a failure branch "fails fast with `TEMPLATE_MISSING`". Task 2 lists the five error codes it registers; the name is not among them. Nothing in the Plan ever declares that code.
 
 ```yaml
 finding:
-  check: C2_symbol_closure
+  check: Q1_symbols
   severity: blocker
-  plan_line: "{plan}.md:{line}"
+  plan_location: "{plan}.md:{line}"
   reality: "error codes registered at {plan}.md:{line}; TEMPLATE_MISSING absent from that list"
   fix: "add the code to the registration task, or reference an existing code"
 ```
 
-### Example 2 — Fact verification (Blocker, load-bearing)
+### Example 2 — False premise (Blocker)
 
 A Plan's premise is "the schema path no longer exists in the ontology, so initialization always fails". Probing the cited file at the stated revision shows the path is still read by one call site the Plan does not mention — the premise is incomplete, and a task built on it would leave that path live.
 
 ```yaml
 finding:
-  check: C3_fact_verification
+  check: Q2_facts
   severity: blocker
-  plan_line: "{plan}.md:{line}"
+  plan_location: "{plan}.md:{line}"
   reality: "{file}:{line} still reads the old path"
   revision: "{commit}"
   fix: "name the remaining call site in scope, or remove it in a task"

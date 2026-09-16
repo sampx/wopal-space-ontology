@@ -45,6 +45,7 @@ Current architecture description.
 - Precondition: Plan created.
 - User Actions:
   1. Check Plan structure.
+- 启动命令: `echo smoke-check`
 - Expected Result: Plan fails validation.
 
 - [ ] 用户已完成上述功能验证并确认结果符合预期

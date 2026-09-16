@@ -23,7 +23,7 @@ class ValidationError(Exception):
 TASK_PATTERN = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
 
 DESIGN_PAT = r'\*\*Design\*\*:\s*\n(.*?)(?:\*\*TDD\*\*:|^###|^##|\Z)'
-BEHAVIOR_PAT = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Files\*\*:|\Z)'
+BEHAVIOR_PAT = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Pre-read\*\*:|\n\*\*Design\*\*:|\Z)'
 TDD_PAT = r'\*\*TDD\*\*:\s*(true|false)'
 DONE_PAT = r'\*\*Done\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
 CHANGES_PAT = r'\*\*Changes\*\*:\s*\n(.*?)(?:\*\*Verify\*\*:|^###|^##|\Z)'
@@ -149,9 +149,22 @@ def check_agent_verification(content: str) -> list[str]:
     if not section:
         return issues
 
-    has_cmd = any(re.search(p, section) for p in COMMAND_PATTERNS)
-    if not has_cmd and not re.search(r'`[^`]+`', section):
-        issues.append("Agent Verification: no executable commands found")
+    # Two-beat AC, beat 1 (submit): entries are behavioral pass criteria.
+    # Concrete commands are NOT required yet — they are written back at the
+    # RED stage (beat 2, gated by check_acceptance_criteria). What submit
+    # does own: the section must contain at least one checkbox entry, and
+    # no empty placeholder entries.
+    entries = re.findall(r'^\s*(?:\d+\.\s*|-\s+)\[[ x]\]\s*(.+)$', section, re.MULTILINE)
+    if not entries:
+        issues.append(
+            "Agent Verification: no checkbox entries found — each AC must be "
+            "a checkbox with a behavioral pass criterion"
+        )
+        return issues
+
+    for entry in entries:
+        if _strip_md(entry).strip() in ("", "N/A"):
+            issues.append("Agent Verification: empty AC entry")
 
     return issues
 
@@ -235,6 +248,23 @@ def check_acceptance_criteria(plan_file: str) -> None:
             "Agent Verification not completed:\n"
             + "\n".join(unchecked)
         )
+
+    # Two-beat AC, beat 2 (complete): a checked entry claims the criterion
+    # is verified — it must have been written back as a real executable
+    # command at the RED stage. A criterion-style entry still checked in
+    # prose means the evidence was never materialized.
+    checked = re.findall(
+        r'^\s*(?:\d+\.\s*|-\s+)\[[ x]\]\s*(.+)$', section, re.MULTILINE
+    )
+    for entry in checked:
+        if not any(re.search(p, entry) for p in COMMAND_PATTERNS) \
+                and not re.search(r'`[^`]+`', entry):
+            raise ValidationError(
+                "Agent Verification entry checked but carries no executable "
+                "command — write the real command back before checking "
+                "(two-beat AC, beat 2):\n"
+                f"  {entry}"
+            )
 
 
 def check_step_completion(plan_file: str) -> None:

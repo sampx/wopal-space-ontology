@@ -48,8 +48,19 @@
 
 ### Key Interfaces
 
-<!-- 关键类型/接口定义、模块间契约。 -->
-<关键接口定义>
+<!--
+  对外契约章（硬约束）。入册门槛：跨模块、跨项目、对外的接口——CLI 命令、
+  API 端点、事件、schema、导出的类型。模块内部私有函数禁止入册。
+
+  定义到什么程度：签名 + 错误码 + 关键语义（幂等/版本/失败行为），
+  用项目自己的语言写（TS interface / Python type / JSON Schema 均可）。
+
+  判据：下游能只凭这一节写出消费方代码和兼容测试，才算定准。
+
+  约束力：入册即红线。实施中要改这里的签名或错误码，必须先回报修订
+  Plan，禁止静默改。没有对外契约时写 N/A。
+-->
+<契约定义，无则 N/A>
 
 ## In Scope
 
@@ -66,9 +77,13 @@
 
 ## Affected Files
 
+<!--
+  预计涉及范围，不是施工清单。实施中允许偏离：实施 Agent 按实际
+  实现调整文件选择，Done 时在 Task 内记录实际触碰的文件。
+-->
 | Component | Files | Operation | Role |
 |-----------|-------|-----------|------|
-| <component> | `file1`, `file2` | 修改/创建/删除 | <在此变更中的作用> |
+| <component> | `file1`, `file2` | 修改/创建/删除 | <在此变更中的作用>
 
 ## Acceptance Criteria
 
@@ -76,9 +91,19 @@
 
 ### Agent Verification
 
-<!-- 每条必须写可执行命令。禁止纯描述。详见 plan-guide.md。 -->
-1. [ ] <可执行命令 1：如 `rg -c '### Architecture Context' templates/plan.md` ≥ 1>
-2. [ ] <可执行命令 2：如 `python -m pytest tests/ -v` 全部 pass>
+<!--
+  两拍制（Two-beat AC）：
+  第一拍（Plan 阶段，现在写）：每条 = 行为判据 + 通过标准。写"系统
+  表现出什么可观察行为、看到什么算过"，允许判据式（不用猜未来
+  的测试文件名）。判据必须可判定——能抓住坏实现，不能怎么写都能过。
+  第二拍（RED 阶段，实施时回填）：实施 Agent 把每条 AC 落成真实
+  命令（如 `python -m pytest tests/xxx/ -v` 全绿），原地更新本节。
+  已勾选的 AC 必须是命令式，否则 complete 会被拦下。
+
+  每条必须映射回 Task 的 Verification Intent。
+-->
+1. [ ] <行为判据 + 通过标准，如「runner 一致性测试全绿，后台无交互死等」>
+2. [ ] <行为判据 + 通过标准>
 
 ### User Validation
 
@@ -106,20 +131,33 @@
 
 ## Implementation
 
-<!-- 每个 Task 按字段顺序排列（TDD 驱动）。详细指导见 plan-guide.md。 -->
+<!--
+  Task 拆分维度：行为组，不是文件。一个 Task = 一组高内聚 Behavior +
+  完整的 RED→GREEN→REFACTOR + 独立可跑的 Verify。
+  粒度三问：这组 Behavior 共享同一批测试吗？一次委派一个 fae 上下文
+  装得下吗？Verify 能独立执行吗？
+
+  Plan 阶段写清行为规格和设计意图；文件路径、内部 API、测试组织
+  由实施 Agent 在最新代码上决定。详细指导见 plan-guide.md。
+-->
 
 ### Task 1: Task Title
 
 **Verification Intent**: <引用的 Agent Verification 条目编号，如 AC#1, AC#3>
 
-**Behavior**: <预期行为描述。TDD 驱动：在 Design 之前定义"什么是对的"。非代码 Task 描述预期状态变化>
-
-**Files**: `path/to/file`
+**Behavior**: 
+<!--
+  可测试的行为规格（TDD=true 时必填，写法自由：输入→输出映射、
+  Given/When/Then 均可）。判据：实施 Agent 能不猜地把每条 Behavior
+  直接写成一个失败测试。写不出测试的 Behavior = 没写清楚。
+-->
+- <给定条件/输入 → 可观察结果，如 valid_email("user@example.com") → true>
+- <边界/失败行为，如 缺凭证 → readiness 在建 worktree 前失败>
 
 **Pre-read**: <实施前需阅读的文件路径，无必要可写 N/A>
 
 **Design**:
-<!-- 完整实施设计（必填）。在 Behavior 之后。 -->
+<!-- 完整实施设计（必填）：技术方案、关键思路、约束。设计意图和边界写清楚；不规定到每个文件怎么改。 -->
 <完整实施设计>
 
 **TDD**: true
@@ -127,17 +165,23 @@
 <!-- true：代码 Task，Behavior 必填；false：非代码 Task，需说明理由。 -->
 
 **Changes**:
-<!-- 编号列表格式，禁止 checkbox。 -->
-1. <具体改动点 1>
-2. <具体改动点 2>
+<!-- 
+  编号列表格式，禁止 checkbox。
+  第 1 条固定语义：把本 Task 全部 Behavior 落成失败测试并确认失败（RED）。
+  后续条目描述 GREEN/REFACTOR 的意图，不逐文件铺陈。
+-->
+1. RED：将上述 Behavior 全部落成失败测试并确认失败
+2. <GREEN：实现至测试全绿的关键步骤>
+3. <REFACTOR：如需清理>
 
 **Verify**:
 <!-- 可执行命令。Agent 必须运行看到 exit 0 后才能勾选 Done。 -->
-<验证命令，如 `rg -c 'pattern' file` ≥ 1>
+<验证命令，如 `cd projects/xxx && pnpm test:run` 全部通过>
 
 **Done**:
 <!-- 任务产出说明 + 要求委派的子 agent 实施后勾选, 每完成一个 task  后提交 git。 -->
 任务产出：<一句话描述本 Task 产出>
+实际触碰文件：<实施后回填实际修改的文件列表>
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
