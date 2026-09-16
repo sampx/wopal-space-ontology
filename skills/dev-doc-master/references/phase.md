@@ -15,7 +15,8 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 - The phase document carries no capability-roadmap trace. The Goal states what capability the phase delivers, in product language; the Capability Roadmap in the product DESIGN already answers where each dimension stands. A duplicated trace costs maintenance and drifts from the map it copies.
 - Phases are registered, not predicted. Register a phase when a line of evolution starts to converge — do not pre-declare future phases to fill out a roadmap.
 - The phase document is an **index and a tracking surface**, not a second gap tracker. Gap detail lives in the project `GAPS.md`; the phase lists which gaps it closes by identifier, title, priority, and design pointer.
-- The phase document does not track execution status. Plan status is owned by the dev-flow state machine and surfaced through the `Related Plans` table.
+- The phase document does not track execution status. Plan status is owned by the dev-flow state machine and surfaced through the `Related Plans` table. The dev-flow `archive` command updates the `Status` cell automatically — it locates the row by the plan name embedded in the row label, so hand-editing the status is forbidden.
+- The `Related Plans` table format is the 5-column form `| Plan | Range | Gaps | Project | Status |`. Each row label carries the plan linkage: `P-A: 标题 · feature-plan-name`. The `Range` and `Gaps` columns are the phase's tracking surface for scope and gap ownership; the `Status` column is machine-owned by dev-flow and must never be maintained by hand. Rows whose Plan has not yet been created keep the label without the `· plan` suffix — the suffix is appended when the Plan is registered against the slot.
 - When its scope areas have hard dependencies, the phase declares the internal execution order (`Execution Order`). This is capability-line dependency, which the Plan decomposition consumes; it is not a task list.
 - The phase document describes the target state only. It carries no completion log, no "what was already done" narrative, and no reference to work that preceded the phase. A phase that is complete moves to `phases/done/`; that move is the record.
 - The Phase document is written continuously during discussion — each step's output is written directly into the living document.
@@ -62,7 +63,7 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 - [ ] Completion Criteria carries only cross-gap delivery facts
 - [ ] `Execution Order` present only when scope areas have hard dependencies; it states capability-line dependency and reasons, never a task list or schedule
 - [ ] No completion log, no "already done" narrative, no reference to work preceding the phase
-- [ ] Related Plans table has no hand-maintained status beyond what dev-flow owns
+- [ ] Related Plans table uses the 5-column form (`Plan | Range | Gaps | Project | Status`) and every registered row label carries the ` · plan-name` suffix; status is never hand-maintained (dev-flow `archive` owns it)
 - [ ] Risks only contains items without a design solution, each with explicit why
 - [ ] References does not repeat header documents
 - [ ] Associated design documents updated per design reference
@@ -70,7 +71,7 @@ A phase is cut from the product DESIGN's Capability Roadmap: a batch of capabili
 
 ## Guide Plan Decomposition
 
-Once the Phase document is ready, guide the user to create Plans for each scope area, following dev-flow skill standards. A Plan names the phase it belongs to in its own body; the phase's `Related Plans` table is the aggregate view. The phase document does not track execution status itself — Plan status is tracked by the dev-flow state machine.
+Once the Phase document is ready, guide the user to create Plans for each scope area, following dev-flow skill standards. A Plan names the phase it belongs to in its own body; the phase's `Related Plans` table is the aggregate view. When a Plan is created for a slot, append ` · <plan-name>` to the slot's row label in the table — this is the machine linkage the dev-flow `archive` command uses to update the row's `Status` cell automatically. The phase document does not track execution status itself — Plan status is tracked by the dev-flow state machine.
 
 ## Response After Completion
 

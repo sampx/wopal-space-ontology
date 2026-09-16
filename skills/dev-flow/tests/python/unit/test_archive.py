@@ -46,6 +46,29 @@ def _make_phase_doc(path: Path, rows: list[tuple[str, str, str]]) -> None:
     path.write_text("".join(lines))
 
 
+def _make_phase_doc_v5(path: Path, rows: list[tuple[str, str, str, str, str]]) -> None:
+    """Write a phase doc with a 5-column Related Plans table.
+
+    Matches the P2 phase doc format: Plan | Range | Gaps | Project | Status.
+    The Status cell may be empty (plan not yet archived).
+
+    Args:
+        path: File path to write.
+        rows: List of (plan_id, range, gaps, project, status) tuples.
+    """
+    lines = [
+        "# Phase Title\n\n",
+        "Some intro text.\n\n",
+        "## Related Plans\n\n",
+        "| Plan | Range | Gaps | Project | Status |\n",
+        "|------|-------|------|---------|--------|\n",
+    ]
+    for plan_id, range_text, gaps, proj, status in rows:
+        lines.append(f"| {plan_id} | {range_text} | {gaps} | {proj} | {status} |\n")
+    lines.append("\nOther content.\n")
+    path.write_text("".join(lines))
+
+
 class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
     """Tests for _update_phase_doc_plan_status."""
 
@@ -193,6 +216,135 @@ class TestUpdatePhaseDocPlanStatus(unittest.TestCase):
         mock_warn.assert_called_once()
         warn_msg = str(mock_warn.call_args[0][0])
         self.assertIn("No Related Plans table found", warn_msg)
+        mock_ok.assert_not_called()
+
+    # ---- Issue #228: phase doc glob is case-sensitive ----
+
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
+    def test_phase_glob_case_insensitive(self, mock_ok, mock_warn, mock_info):
+        """Phase 'P2' (uppercase) must find a doc named with lowercase 'p2'.
+
+        Regression: Plan metadata stores Phase as 'P2' while the phase doc
+        is wopal-space-p2-*.md — the old case-sensitive glob never matched.
+        """
+        phases = self._create_phase_dir()
+        doc = phases / "wopal-space-p2-capability-assembly.md"
+        _make_phase_doc(doc, [
+            ("wopal-cli", "feature-space-materialize-assembly", "planning"),
+        ])
+
+        result = _update_phase_doc_plan_status(
+            self.ws_root, "feature-space-materialize-assembly", "wopal-space", "P2",
+        )
+
+        self.assertIsNotNone(result)
+        mock_ok.assert_called_once()
+        content = doc.read_text()
+        self.assertIn(
+            "| wopal-cli | feature-space-materialize-assembly | done |", content
+        )
+        mock_warn.assert_not_called()
+
+    # ---- Issue #228: 5-column table (Plan | Range | Gaps | Project | Status) ----
+
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
+    def test_v5_table_updates_status_by_inline_plan_name(self, mock_ok, mock_warn, mock_info):
+        """5-column P2-style table: row identified by inline plan name
+        ('P-A: 空间初始化与装配物化 · feature-space-materialize-assembly'),
+        Status column updated, Range/Gaps/Project columns preserved.
+        """
+        phases = self._create_phase_dir()
+        doc = phases / "wopal-space-p2-capability-assembly.md"
+        _make_phase_doc_v5(doc, [
+            (
+                "P-A: 空间初始化与装配物化 · feature-space-materialize-assembly",
+                "本体安装取回装配定义，space init 按类型装配单物化",
+                "CLI-G2, CLI-G1, CLI-G12",
+                "wopal-cli",
+                "",
+            ),
+            (
+                "P-B: 同步与能力命令面",
+                "space sync 双向对齐、space status 回答同步与装配状态",
+                "CLI-G3, CLI-G9",
+                "wopal-cli",
+                "",
+            ),
+        ])
+
+        result = _update_phase_doc_plan_status(
+            self.ws_root, "feature-space-materialize-assembly", "wopal-space", "P2",
+        )
+
+        self.assertIsNotNone(result)
+        mock_ok.assert_called_once()
+        content = doc.read_text()
+        # Status cell set to done, everything else untouched
+        self.assertIn(
+            "| P-A: 空间初始化与装配物化 · feature-space-materialize-assembly "
+            "| 本体安装取回装配定义，space init 按类型装配单物化 "
+            "| CLI-G2, CLI-G1, CLI-G12 | wopal-cli | done |", content
+        )
+        self.assertIn(
+            "| P-B: 同步与能力命令面 | space sync 双向对齐、space status 回答同步"
+            "与装配状态 | CLI-G3, CLI-G9 | wopal-cli |  |", content
+        )
+        mock_warn.assert_not_called()
+
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
+    def test_v5_table_empty_status_cell_replaced(self, mock_ok, mock_warn, mock_info):
+        """Empty Status cell in a 5-column row is filled with 'done'."""
+        phases = self._create_phase_dir()
+        doc = phases / "wopal-space-p2-capability-assembly.md"
+        _make_phase_doc_v5(doc, [
+            (
+                "P-A: 空间初始化与装配物化 · feature-space-materialize-assembly",
+                "range",
+                "gaps",
+                "wopal-cli",
+                "",
+            ),
+        ])
+
+        result = _update_phase_doc_plan_status(
+            self.ws_root, "feature-space-materialize-assembly", "wopal-space", "P2",
+        )
+
+        self.assertIsNotNone(result)
+        content = doc.read_text()
+        self.assertIn("| wopal-cli | done |", content)
+
+    @patch("commands.archive.log_info")
+    @patch("commands.archive.log_warn")
+    @patch("commands.archive.log_success")
+    def test_v5_table_row_without_plan_name_not_matched(self, mock_ok, mock_warn, mock_info):
+        """Row lacking the inline plan name must NOT be updated.
+
+        Until a Plan is registered against a phase slot (plan name appended
+        to the row label), archive must warn instead of guessing.
+        """
+        phases = self._create_phase_dir()
+        doc = phases / "wopal-space-p2-capability-assembly.md"
+        _make_phase_doc_v5(doc, [
+            ("P-B: 同步与能力命令面", "space sync 双向对齐", "CLI-G3", "wopal-cli", ""),
+        ])
+
+        result = _update_phase_doc_plan_status(
+            self.ws_root, "future-plan-name", "wopal-space", "P2",
+        )
+
+        self.assertIsNone(result)
+        mock_warn.assert_called_once()
+        warn_msg = str(mock_warn.call_args[0][0])
+        self.assertIn("future-plan-name", warn_msg)
+        content = doc.read_text()
+        self.assertNotIn("done", content)
         mock_ok.assert_not_called()
 
 

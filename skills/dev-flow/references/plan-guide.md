@@ -199,6 +199,10 @@ Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶�
 
 **Plan 归属阶段**：Plan 的 `Phase` 元数据字段（从 Issue body 继承）记录所属产品阶段。一个阶段按 scope area 拆出多个 Plan，阶段的 `Related Plans` 表是聚合视图。
 
+**阶段表登记**：仅**关联了阶段（Plan 元数据携带 `Product` + `Phase`）**的 Plan 才在归档时触发阶段文档 `Related Plans` 表的状态同步——`archive` 依据槽位行标签末尾的 ` · <plan-name>`（如 `P-A: 空间初始化与装配物化 · feature-space-materialize-assembly`）定位行并自动写入 `done`，格式规范见 dev-doc-master 技能 `references/phase.md`。
+
+**未关联阶段的 Plan 归档时不做任何阶段文档处理**（`archive` 直接跳过，不警告不报错）。普通功能/修复/重构 Plan 不需要、也不应该为了触发同步而补写 `Product`/`Phase` 元数据，更不允许为它们在阶段表中凭空建行——阶段表只跟踪阶段拆分的 Plan，保持同步逻辑零额外复杂度。
+
 **Plan 与 Gap**：Gap 明细的唯一真相源是项目 `GAPS.md`。Plan 在 Goal 或 Context 中引用它要关闭的 Gap 标识（如 `CLI-G3`），不复制 Gap 描述。
 
 **Gap 关闭时机**：Plan 达到 `done` 且其 Exit 判据全部满足时，从 `GAPS.md` 删除对应 Gap 条目（编号退役，不复用）。阶段文档的 Gap 清单随条目消失而收敛。Gap 不设 status 字段——Plan 的状态已经表明它正在被处理。

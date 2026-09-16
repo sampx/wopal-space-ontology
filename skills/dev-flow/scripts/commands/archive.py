@@ -73,6 +73,48 @@ _PHASE_TABLE_HEADER = "| Project | Plan | Status |"
 _PHASE_TABLE_SEP = "|---------|------|--------|"
 
 
+def _split_table_row(stripped: str) -> list[str]:
+    """Split a markdown table row into cell values, preserving empty cells.
+
+    '| a | b |  |' → ['a', 'b', ''] — empty cells are kept so column
+    indices stay aligned with the header (filtering them would shift
+    columns when a trailing Status cell is empty).
+
+    Args:
+        stripped: Stripped table row line.
+
+    Returns:
+        List of cell values (whitespace-trimmed).
+    """
+    cells = [c.strip() for c in stripped.split("|")]
+    # split("|") on "| a | b |" → ['', ' a ', ' b ', '']; drop edge empties
+    return cells[1:-1]
+
+
+def _find_plan_status_columns(lines: list[str]) -> tuple[int, int, int] | None:
+    """Locate the Related Plans table header by column names.
+
+    Scans table rows (lines starting with '|') until one contains both
+    'Plan' and 'Status' columns — supports the 3-column template
+    (Project | Plan | Status) and the 5-column phase format
+    (Plan | Range | Gaps | Project | Status) in any column order.
+
+    Args:
+        lines: Document lines.
+
+    Returns:
+        (header_idx, plan_col, status_col), or None when no such table exists.
+    """
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = _split_table_row(stripped)
+        if "Plan" in cells and "Status" in cells:
+            return i, cells.index("Plan"), cells.index("Status")
+    return None
+
+
 def _update_phase_doc_plan_status(
     workspace_root: Path,
     plan_name: str,
@@ -94,8 +136,11 @@ def _update_phase_doc_plan_status(
         log_warn(f"Phases directory not found: {phases_dir}")
         return None
 
-    # Find matching phase doc(s) — prefer exact match, then glob
-    candidates = sorted(phases_dir.glob(f"*{phase}*.md"))
+    # Find matching phase doc(s) — case-insensitive name match, so
+    # Phase 'P2' finds wopal-space-p2-*.md
+    candidates = sorted(
+        p for p in phases_dir.glob("*.md") if phase.lower() in p.name.lower()
+    )
 
     if not candidates:
         log_warn(f"No phase doc found for product={product}, phase={phase}")
@@ -106,38 +151,42 @@ def _update_phase_doc_plan_status(
     content = phase_doc_path.read_text()
     lines = content.splitlines(keepends=True)
 
-    header_idx = None
-    for i, line in enumerate(lines):
-        if line.strip() == _PHASE_TABLE_HEADER:
-            header_idx = i
-            break
-
-    if header_idx is None:
+    located = _find_plan_status_columns(lines)
+    if located is None:
         log_warn(f"No Related Plans table found in {phase_doc_path.name}")
         return None
+    header_idx, plan_col, status_col = located
 
-    # Walk rows after separator
+    # Skip the separator row (|---|) after the header
+    first_row = header_idx + 1
+    next_line = lines[first_row].strip() if first_row < len(lines) else ""
+    if next_line and set(next_line) <= set("-|: "):
+        first_row += 1
+
+    # Walk rows until blank line or next non-table line
     updated = False
-    for i in range(header_idx + 2, len(lines)):
+    for i in range(first_row, len(lines)):
         raw = lines[i]
         # Stop at blank line or next non-table line
         stripped = raw.strip()
         if not stripped or not stripped.startswith("|"):
             break
 
-        # Parse table row cells
-        cells = [c.strip() for c in stripped.split("|")]
-        # cells from split on "| a | b | c |" → ['', ' a ', ' b ', ' c ', '']
-        # Filter empty edge cells
-        cells = [c for c in cells if c != ""]
-        if len(cells) < 3:
+        cells = _split_table_row(stripped)
+        if len(cells) <= max(plan_col, status_col):
             continue
 
-        plan_cell = cells[1]
-        if plan_cell == plan_name:
-            # Replace Status column (last cell) with new_status
-            old_status = cells[2]
-            lines[i] = raw.replace(old_status, new_status, 1)
+        plan_cell = cells[plan_col]
+        # Match by exact plan name (3-column form) or by inline plan name
+        # suffix (5-column form: "P-A: 标题 · feature-plan-name")
+        if plan_cell == plan_name or plan_cell.endswith(f"· {plan_name}"):
+            parts = stripped.split("|")
+            # parts[0] is the leading empty from split; column j ↔ parts[j+1]
+            parts[status_col + 1] = f" {new_status} "
+            new_line = "|".join(parts)
+            if raw.endswith("\n") and not new_line.endswith("\n"):
+                new_line += "\n"
+            lines[i] = new_line
             updated = True
             break
 

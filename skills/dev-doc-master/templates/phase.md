@@ -69,10 +69,21 @@ When the scope areas can proceed independently, omit this section. It describes 
 
 ## Related Plans
 
-The tracking surface for this phase. Plans are created per scope area through dev-flow; their status is owned by the dev-flow state machine, never maintained by hand here.
+The tracking surface for this phase. Plans are created per scope area through dev-flow; their status is owned by the dev-flow state machine and updated by `archive`, never maintained by hand here.
 
-| Project | Plan | Status |
-|---------|------|--------|
+Each row registers one Plan against its slot; the row label carries the plan linkage so `archive` can update the row automatically:
+
+```
+| Plan | Range | Gaps | Project | Status |
+|------|-------|------|---------|--------|
+| <slot>: <scope area> · <plan-name> | <what this plan delivers, one line> | <gaps closed by this plan> | <owner project> | |
+```
+
+- `<slot>`: phase slot identifier (e.g. `P-A`), matching the `Execution Order` naming.
+- ` · <plan-name>`: appended when the Plan is created and registered against the slot. Before registration the row label is `<slot>: <scope area>` only.
+- `Range`: one-line statement of what the Plan delivers (scope slice).
+- `Gaps`: the gap identifiers this Plan closes.
+- `Status`: filled automatically by dev-flow `archive` on Plan archive; keep it empty by hand.
 
 ## Risks
 
