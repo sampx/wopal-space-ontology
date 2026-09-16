@@ -99,6 +99,10 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - Structured fields via `data` object, field names in snake_case; do not interpolate into message
 - Error logs must carry `{ err: error }`; logging only `error.message` is forbidden
 - sessionID format: `formatSessionID(sessionID, isTask)` → `<last10chars>(main|task)`
+- Module-level loggers are process-wide singletons, but one process hosts several runtimes (one per space); their destination must NOT be frozen at import time — it follows the serving runtime
+  - `createPluginRuntime` must call `bindLoggerRuntime(context, env, config)` while assembling a runtime; falling back to the process environment happens only when unbound
+  - While bound, singleton call sites write to that runtime's `logDir`; unbound, they land in the global `<WOPAL_HOME>/logs` and a space instance logs to the wrong file
+  - `src/logger-runtime-binding.test.ts` is the regression guard covering binding, fallback, and last-writer-wins routing
 
 ### Path Resolution
 

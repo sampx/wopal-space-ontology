@@ -99,6 +99,10 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 - 结构化字段用 `data` 对象传递，字段命名 snake_case；禁止拼接到 message
 - 错误日志必须携带 `{ err: error }`，禁止只记 `error.message`
 - sessionID 格式：`formatSessionID(sessionID, isTask)` → `<last10chars>(main|task)`
+- 模块级 logger 是进程级单例，但一个进程可承载多个 runtime（每空间一个）；其写入目标**不得在 import 时冻结**，必须跟随当前 runtime
+  - `createPluginRuntime` 组装 runtime 时必须调用 `bindLoggerRuntime(context, env, config)` 绑定目标；未绑定时才回退到进程环境
+  - 绑定后单例调用点写入该 runtime 的 `logDir`；未绑定会落到全局 `<WOPAL_HOME>/logs`，使空间实例的日志写错位置
+  - `src/logger-runtime-binding.test.ts` 是回归守卫，断言绑定/回退/最后写入生效三种路由
 
 ### 路径解析
 

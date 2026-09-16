@@ -182,6 +182,13 @@ interface LoggerConfiguration {
   config?: ResolvedLogConfig
 }
 
+/** Either a fixed configuration or a resolver invoked at each call. */
+type ConfigurationSource = LoggerConfiguration | (() => LoggerConfiguration)
+
+function resolveConfiguration(source: ConfigurationSource): LoggerConfiguration {
+  return typeof source === "function" ? source() : source
+}
+
 function writeLine(line: string, configuration: LoggerConfiguration): void {
   const logFile = getLogFile(configuration.context, configuration.environment, configuration.config)
   if (!logFile) return
@@ -224,9 +231,10 @@ function log(
   level: string,
   levelNum: number,
   moduleName: string,
-  configuration: LoggerConfiguration,
+  source: ConfigurationSource,
   ...args: [string] | [Record<string, unknown>, string]
 ): void {
+  const configuration = resolveConfiguration(source)
   if (!shouldLog(levelNum, moduleName, configuration.environment, configuration.config)) return
 
   let data: Record<string, unknown>
@@ -268,21 +276,21 @@ export interface LoggerInstance {
 
 function createLogger(
   moduleName: string,
-  configuration: LoggerConfiguration = { environment: process.env },
+  source: ConfigurationSource = { environment: process.env },
 ): LoggerInstance {
   return {
     trace: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("trace", LEVELS["trace"]!, moduleName, configuration, ...args),
+      log("trace", LEVELS["trace"]!, moduleName, source, ...args),
     debug: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("debug", LEVELS["debug"]!, moduleName, configuration, ...args),
+      log("debug", LEVELS["debug"]!, moduleName, source, ...args),
     info: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("info", LEVELS["info"]!, moduleName, configuration, ...args),
+      log("info", LEVELS["info"]!, moduleName, source, ...args),
     warn: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("warn", LEVELS["warn"]!, moduleName, configuration, ...args),
+      log("warn", LEVELS["warn"]!, moduleName, source, ...args),
     error: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("error", LEVELS["error"]!, moduleName, configuration, ...args),
+      log("error", LEVELS["error"]!, moduleName, source, ...args),
     fatal: (...args: [string] | [Record<string, unknown>, string]) =>
-      log("fatal", LEVELS["fatal"]!, moduleName, configuration, ...args),
+      log("fatal", LEVELS["fatal"]!, moduleName, source, ...args),
   }
 }
 
@@ -321,11 +329,51 @@ export function createPluginLoggers(
 // Module logger singletons
 // ---------------------------------------------------------------------------
 
-export const coreLogger: LoggerInstance = createLogger("core")
-export const rulesLogger: LoggerInstance = createLogger("rules")
-export const taskLogger: LoggerInstance = createLogger("task")
-export const memoryLogger: LoggerInstance = createLogger("memory")
-export const contextLogger: LoggerInstance = createLogger("context")
+/**
+ * Runtime installed by the composition root (`createPluginRuntime`).
+ *
+ * The module-level loggers are process-wide singletons but a single process can
+ * host several runtime instances (one per space). Their destination therefore
+ * cannot be frozen at import time — it must follow the runtime that is actually
+ * serving. Without a binding the singletons fall back to the process
+ * environment, which for a space instance resolved to the global
+ * `<WOPAL_HOME>/logs` file instead of the space's own log dir.
+ *
+ * Last writer wins: the composition root binds as it assembles each runtime.
+ */
+let boundRuntime: (() => LoggerConfiguration) | undefined
+
+function singletonConfiguration(): LoggerConfiguration {
+  return boundRuntime?.() ?? { environment: process.env }
+}
+
+/**
+ * Point the module-level loggers at a runtime's log destination.
+ *
+ * Called by `createPluginRuntime`; tests call it directly to exercise routing.
+ */
+export function bindLoggerRuntime(
+  context: RuntimeContext,
+  environment: RuntimeEnvironment = process.env,
+  config?: ResolvedLogConfig,
+): void {
+  boundRuntime = () => ({
+    context,
+    environment,
+    ...(config !== undefined ? { config } : {}),
+  })
+}
+
+/** Drop the runtime binding; singletons fall back to the process environment. */
+export function resetLoggerRuntime(): void {
+  boundRuntime = undefined
+}
+
+export const coreLogger: LoggerInstance = createLogger("core", singletonConfiguration)
+export const rulesLogger: LoggerInstance = createLogger("rules", singletonConfiguration)
+export const taskLogger: LoggerInstance = createLogger("task", singletonConfiguration)
+export const memoryLogger: LoggerInstance = createLogger("memory", singletonConfiguration)
+export const contextLogger: LoggerInstance = createLogger("context", singletonConfiguration)
 
 // ---------------------------------------------------------------------------
 // Utility — formatSessionID (migrated from debug.ts)

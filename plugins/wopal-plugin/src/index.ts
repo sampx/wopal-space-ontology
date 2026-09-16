@@ -12,7 +12,11 @@ import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
-import { createPluginLoggers, type PluginLoggers } from "./logger.js";
+import {
+  bindLoggerRuntime,
+  createPluginLoggers,
+  type PluginLoggers,
+} from "./logger.js";
 import { SimpleTaskManager } from "./tasks/simple-task-manager.js";
 import { MonitorEngine } from "./monitor/monitor-engine.js";
 import { createMainSessionMonitorStrategy } from "./monitor/main-session-monitor.js";
@@ -71,11 +75,17 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
     fallbackEnvironment: env,
   });
   const { logLevel, logFile, logModules } = config.config;
-  const loggers = createPluginLoggers(context, env, {
+  const logConfig = {
     ...(logLevel !== undefined ? { level: logLevel } : {}),
     ...(logFile !== undefined ? { file: logFile } : {}),
     ...(logModules !== undefined ? { modules: logModules } : {}),
-  });
+  };
+  const loggers = createPluginLoggers(context, env, logConfig);
+  // Module-level singletons (`contextLogger` and friends) are process-wide but
+  // the process can host several runtimes; point them at this runtime's log
+  // destination so singleton call sites land in this space's log, not the
+  // global `<WOPAL_HOME>/logs` file.
+  bindLoggerRuntime(context, env, logConfig);
   const prompts = createContextPrompts(context, loggers.context);
   return Object.freeze({ context, env, loggers, prompts, config });
 }
