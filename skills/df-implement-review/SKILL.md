@@ -1,16 +1,34 @@
 ---
 name: df-implement-review
-description: |
-  Review implementation results for goal achievement and code quality. Supports both Plan-backed review and planless diff review. ⚠️ MUST use when:
-  (1) Wopal delegates rook to review fae implementation output, (2) Prompt contains "review_type: implementation",
-  (3) Prompt contains changed code file list or Plan path + implementation scope, (4) Any code review request from Wopal.
-  🔴 Trigger even when user does not explicitly mention "review" if the task involves verifying implementation results.
-  This skill is rook-exclusive (only rook agent can load it).
+description: >
+  Review code changes and implementation work — determine whether the
+  delivered result actually does what it claims and whether the code is
+  sound. Use when the user asks to review, check, or verify code changes, a
+  commit, a pull request, or a finished implementation — typically at
+  sign-off before commit or merge, for example "review this change", "check
+  whether this implementation is correct", "review my PR". Do not use for
+  reviewing a Plan (use `df-plan-review`), re-running tests or lint,
+  running builds, or fixing code.
 ---
 
-# df-implement-review — Implementation Review Skill
+# df-implement-review — Implementation Correctness Review
 
-Review implementation results to verify explicit goals when they exist and to scan for technical defects and debt.
+**Your question is not "do the tests pass" — it is "if this change ships as written, does it deliver what it claims, and is it sound code".**
+
+## Position: what the mechanical gates own vs what you own
+
+Tests, lint, typecheck, and CI already gate form: the suite runs, the code compiles, formatting passes, static checks are clean. Re-checking any of that is waste and produces noise.
+
+Your scope is **what those gates cannot see** — whether the change is real, complete, reachable, and safe under the scenarios its users will actually hit.
+
+| The mechanical gates decide | You decide |
+|---|---|
+| Tests pass | Whether the tests **prove the claimed behavior** |
+| The code compiles and lints | Whether the changed code is **correct, reachable, and safe** |
+| The diff is syntactically valid | Whether the diff **delivers the declared goal**, not a reduced version |
+| — | Whether everything declared was **actually delivered** |
+
+If the change is sound, say so quickly and stop. This review is invoked deliberately, not for ceremony.
 
 ## Review Modes
 
@@ -18,367 +36,357 @@ Determine the mode before reviewing:
 
 | Mode | Trigger | Primary responsibility |
 |------|---------|------------------------|
-| **Plan-backed review** | Prompt includes Plan path, explicit truths, or must_haves | Verify implementation against explicit truths + scan technical defects |
-| **Planless diff review** | Prompt includes changed files, working tree diff, commit, or commit range but no Plan | Review the supplied changes for technical defects and debt only |
+| **Plan-backed review** | Prompt includes a Plan path, explicit truths, or acceptance criteria | Verify the implementation against those truths + full technical scan |
+| **Planless diff review** | Prompt includes a change carrier (changed files, working tree diff, commit, or range) but no Plan | Review the supplied changes for technical quality only |
 
-**Critical rule**: In planless diff review, do **NOT** infer product requirements from your own taste. Business logic belongs to the user and Wopal unless the prompt explicitly requests business-logic review.
+**Critical rule**: in planless diff review, do **NOT** infer product requirements from your own taste. Business logic belongs to the change owner unless the prompt explicitly requests business-logic validation (`business_logic_review: requested`).
 
-## Core Review Scope
+If both a Plan and a carrier are supplied, use the carrier as the evidence base and the Plan as the specification — that is Plan-backed review.
 
-Your core scope in code review is:
+## Cost discipline
 
-| Category | What to look for |
-|----------|------------------|
-| **bug / regression** | Logic errors, missing edge-case handling, broken branches, type/runtime mismatches, silent regressions |
-| **security** | Injection, XSS, unsafe deserialization, missing validation, accidental secret exposure |
-| **tests** | Missing coverage for changed behavior, skipped/placeholder assertions, weak assertions, redundant tests that fail to protect behavior |
-| **duplication / extraction** | Repeated logic that should reasonably be extracted into shared helpers/modules because it creates maintenance drift or bug risk |
-| **conventions** | Violations of `AGENTS.md`, local project rules, established patterns, or required config/typing/logging conventions |
-| **general debt** | TODO/FIXME stubs, placeholders, dead code, fake dynamic behavior, brittle wiring |
+Review has a reputation for burning time and returning noise. Guard against both.
 
-### Out of Scope by Default
+- **Read once, then probe.** Build the review set first (the diff, the changed files), then run targeted commands — do not re-read the same files between probes.
+- **Probe, do not survey.** Prefer `rg`, `sed -n 'Np'`, `git diff`, `git show` over opening whole files. Read just enough of the surrounding context — imports, callers, tests — to judge the change.
+- **Scale to the diff.** A small diff needs a handful of probes; a multi-module change needs more. Never read the whole repository to understand one hunk.
+- **Say what you did not verify.** An unverified claim is not a defect. Put it under `Needs Human` with the reason, and move on.
+- **Do not do the implementer's job.** No fixes, no redesign — point at the gap and state what would close it.
 
-Do **not** treat these as defects unless the prompt explicitly asks for them:
+## Input contract
 
-- Product preference disagreements
-- Business logic choices that may simply be intentional
-- "I would design this feature differently"
-- Pure style nits with no maintainability or correctness consequence
-- Premature abstraction when duplication is too small to justify extraction
+You need: the **change carrier** and the project root. When Plan-backed, also the Plan path. Everything else you can discover.
 
-## Serious Logic Risks (Discuss, Don’t Default-Block)
+The prompt may carry these fields — use them when present:
+
+- `review_type: implementation` — identifies this review mode
+- `project_path` — root of the project under review
+- **Working tree**: `change_scope: working_tree`, plus a changed file list or an explicit instruction to review `git diff` / `git diff --cached`
+- **Committed changes**: `commit: <hash>` or `commit_range: <A>..<B>`, plus `background`
+- Plan path, when the review verifies against a Plan
+- `business_logic_review: requested`, when product logic must be judged
+
+**For committed changes, review the commit or range diff** — never rely on file paths alone; a path list does not tell you what changed.
+
+If the prompt omits context, proceed with the narrowest defensible scope — the working tree changes under the stated project path — and state the assumption in the report.
+
+## The Six Checks
+
+Run all six. Each closes a failure class that survives the mechanical gates.
+
+---
+
+### C1 — Goal & Truth Verification
+
+**Question**: Does the code prove every explicit claim the implementation is supposed to deliver?
+
+**Why**: A change can pass its tests and still be a stub, an orphaned file, or a reduced version of the goal. Tests prove what they assert — not what the Plan promised.
+
+**Probe**: Extract the claims — Plan truths and acceptance criteria in Plan-backed mode; the change's own stated intent (description, commit message) in planless mode. For each claim, walk the four levels:
+
+1. **Exists** — the artifact is present at the expected path
+2. **Substantive** — it is a real implementation, not a stub (C3 catalogues the patterns)
+3. **Wired** — it is imported, registered, or called — reachable from an entry point
+4. **Functional** — it behaves correctly when invoked; this level usually needs runtime observation
+
+Levels 1–3 settle statically. Level 4 that cannot be settled from code becomes `Needs Human`, not a defect.
+
+**Severity**:
+- Claimed artifact missing from the change → **BLOCKER**
+- Artifact exists but is a stub → **BLOCKER**
+- Artifact is real but never reachable (not imported, registered, or called) → **WARNING**; **BLOCKER** when reachability itself is the claim
+- Level 4 not provable statically → `Needs Human`, not a finding
+- Planless mode with no stated intent → note that intent was not stated; rely on C2–C6
+
+---
+
+### C2 — Scope Completeness
+
+**Question**: Does the delivered change match the declared scope, in both directions?
+
+**Why**: Under-delivery hides behind "the rest will follow". Undeclared changes hide coupling or unrelated work that nobody asked to review.
+
+**Probe**: Build the actual scope from the carrier (`git diff --name-only`, `git show --stat`) and the declared scope from the Plan's file lists or the change description. Diff them both ways. Confirm deletions and renames match the declaration.
+
+**Severity**:
+- Declared deliverable absent from the diff, where a claim depends on it → **BLOCKER**
+- Declared item absent but not load-bearing → **WARNING**
+- Diff touches files outside the declared scope → **WARNING** (discover whether the coupling is necessary — if so, the report says the declaration was stale, not that the code is wrong)
+- Unannounced deletion or rename → **WARNING**
+
+---
+
+### C3 — Substance & Wiring
+
+**Question**: Is every changed artifact a real implementation — and is it connected to the rest of the system?
+
+**Why**: The most common way a change looks done without being done is placeholder code that satisfies types, tests, and reviewers' expectations. The second most common is real code that nothing calls.
+
+**Probe**: Sweep the changed files for the stub patterns (full catalogue in the rubric): comment stubs, placeholder text, empty implementations, log-only handlers, fake-dynamic values, empty event handlers, unconsumed async results, shell models. Then check wiring for every new artifact — imported and used, registered and routed, exported and consumed, state and rendered.
+
+**Severity**:
+- Stub occupying a claimed behavior → **BLOCKER**
+- New module, component, or route never imported, registered, or used → **WARNING**
+- Reduction sanctioned by a Plan decision (for example, an explicit "static layer first") → **not a finding**
+- TODO / FIXME on a non-critical path → **INFO**
+
+---
+
+### C4 — Defect & Security Scan
+
+**Question**: Is the changed code correct and safe under the scenarios its users will actually hit?
+
+**Why**: Tests cover what someone thought to assert. Defects live in the branches, inputs, and timings nobody asserted.
+
+**Probe**: Walk each hunk and ask the failure question — what input, state, or timing makes this wrong? Check error paths, async handling, boundary values, and type/runtime seams. For security, find the trust boundaries: user input reaching queries, storage, rendering, or shells; secrets; authorization gaps.
+
+**Severity**:
+- Defect with a concrete failure scenario, or an exploitable security hole → **BLOCKER**
+- Plausible risk with a concrete scenario ("in Z scenario leads to Y") → **WARNING**
+- No concrete scenario — do not report; if it must be checked by hand, `Needs Human`
+
+---
+
+### C5 — Test Integrity
+
+**Question**: Do the tests prove the behavior they claim to protect?
+
+**Why**: Tests are the strongest evidence a change provides — and the easiest to fake. Skipped tests, circular proofs, and placeholder assertions look like coverage and prove nothing.
+
+**Probe**: When tests changed or a behavior is claimed, map each changed behavior to its covering tests, then inspect the assertions. Sweep for the broken patterns: skipped/disabled tests, circular proofs, placeholder assertions, weak assertions, missing assertions, redundant tests with no distinct protection.
+
+**Severity**:
+- Tests for a claimed behavior are all skipped or disabled → **BLOCKER**
+- Circular proof (expected values generated by the system under test) → **BLOCKER**
+- Placeholder assertions (`expect(true).toBe(true)`) → **BLOCKER**
+- A test file with no assertions at all → **WARNING**
+- All assertions in a file are weak (existence only) → **WARNING**; a single weak assertion → **INFO**
+- Changed branch untested → **WARNING**
+
+---
+
+### C6 — Conventions & Debt
+
+**Question**: Does the change respect the project's rules — and leave the codebase no worse than it found it?
+
+**Why**: Every project has standing contracts (`AGENTS.md`, established patterns) and a debt budget. A change that ignores the first or grows the second costs the next contributor.
+
+**Probe**: Read the project's `AGENTS.md` and local rules; check the changed files against them. Scan for duplication that creates real drift cost, dead code, and brittle wiring.
+
+**Severity**:
+- Violates a stated safety or security constraint → **BLOCKER**
+- Violates conventions or breaks an established pattern → **WARNING**
+- Duplication already diverging, or likely to → **WARNING**
+- Dead code, commented-out blocks, or TODOs → **INFO**; **WARNING** when they mask a claimed behavior
+- Taste-level preferences → **not a finding**
+
+---
+
+## Serious Logic Risks (Discuss, Don't Default-Block)
 
 If you discover a **plausible severe logic risk** while reviewing code, report it in a separate section: `Serious Logic Risks (Discuss with User)`.
 
 Use this section only when all are true:
 
 1. You have concrete `file:line` evidence
-2. The scenario is severe enough to matter (e.g. irreversible destructive behavior, major data corruption, severe user harm)
+2. The scenario is severe enough to matter (for example, irreversible destructive behavior, major data corruption, severe user harm)
 3. The issue may still be requirement-driven or intentional, so you cannot safely classify it as a technical defect by yourself
 
-**Default rule**: Serious logic risks do **not** affect PASS / REVISE / BLOCK unless:
-- the prompt explicitly requests business-logic validation, or
-- an explicit Plan truth is contradicted.
+**Default rule**: serious logic risks do **not** affect the verdict unless the prompt explicitly requests business-logic validation, or an explicit Plan truth is contradicted.
 
----
+## False-Positive Calibration
 
-## Output Structure
+Most review noise comes from flagging things that are not defects. Do not flag:
 
-```markdown
-# 审查报告
+- **Form and mechanical state** — tests, lint, typecheck, and CI already own it
+- **Product preference** — business logic belongs to the change owner; use `Requirement Questions`
+- **Style nits** with no maintainability or correctness consequence
+- **"I would have designed it differently"** — alternative designs, naming taste, abstraction opinions
+- **Unverifiable worries** — "this might not handle X" with no scenario. Either ground it or leave it out
+- **Scope you were not asked to review** — pre-existing debt in untouched files, other modules
+- **Sanctioned reductions** — a Plan decision that authorizes a phased delivery is a decision, not a defect
 
-## 概要
-- 审查类型: Code
-- 判定: PASS | REVISE | BLOCK
-- 统计: Blocker N / Warning N / Info N
-
-## Blocker
-### B-01: {Issue Title}
-- 位置: `path/to/file:line`
-- 代码: `{具体代码片段}`
-- 问题: {为什么阻碍目标达成}
-- 修复建议: {具体可执行的修复方案}
-
-## Warning
-{Warning 项，格式同 Blocker}
-
-## Info
-{Info 项，可省略 file:line}
-
-## Serious Logic Risks (Discuss with User)
-{Only for severe logic risks that need Wopal + user discussion. Do not use this section for ordinary preferences.}
-
-## Requirement Questions
-{Only for requirement ambiguity or product choices that cannot be judged from code alone.}
-
-## Positive Findings
-- {已验证通过的亮点项}
-
-## UNCOVERED STEPS / NEEDS_HUMAN
-{Only when context/time constraints prevented full coverage}
-```
-
----
-
-## Evidence Rules
-
-**Blocker requirements**:
-1. Location: `file:line`
-2. Code snippet: ≥ 1 line
-3. Problem: Explain the concrete technical failure, regression, security issue, or severe debt
-4. Fix: Concrete action (not "optimize", but "change to Y command")
-
-**Warning requirements**:
-1. Location: `file:line`
-2. Code snippet: present
-3. Problem: Risk scenario (not "might have issue", but "in Z scenario leads to Y")
-
-**Info can omit**: Location and code, but must be specific suggestion
-
-**Serious Logic Risk requirements**:
-1. Location: `file:line`
-2. Code snippet: present
-3. Severe scenario: specific harm if the logic is indeed wrong
-4. Why discussion is needed: explain why this may still be requirement-defined rather than an objective bug
-
----
-
-## Workflow
-
-1. **Determine review mode** — Plan-backed or planless diff review
-2. **Build exact scope** — Use `files_to_read`, working tree diff, commit, or commit range from prompt
-3. **Read context** — Load changed files plus relevant `AGENTS.md` / local config when needed
-4. **If Plan-backed** — Extract explicit truths and verify them with the four-level model
-5. **Scan all supplied changes** — bug / regression / security / duplication / conventions / debt
-6. **Run test quality audit** — Check coverage, weak assertions, skipped tests, circular proofs, redundant tests
-7. **Consolidate findings** — Continue scanning after the first Blocker; do not stop early
-8. **Determine verdict** — Based on technical findings only
-9. **Output structured report** — With evidence anchors and separate discussion-only sections when needed
+A finding must cite both the location and the evidence that supports it. Without that, it is at most Info.
 
 ## Completeness Gate
 
-**CRITICAL: All workflow steps MUST be completed before outputting any report.**
+**All six checks must be attempted before any verdict.** At review start, create one TodoWrite item per check and mark them complete as you go — one `in_progress` at a time. Do not emit a verdict while any check is pending.
 
-1. **At review start**, create TodoWrite items for each step:
-   - `[ ] 1. Determine mode + exact scope`
-   - `[ ] 2. Read all changed files / diffs`
-   - `[ ] 3. Plan truth verification` (only when Plan-backed)
-   - `[ ] 4. Technical scan — bug/security/duplication/conventions/debt`
-   - `[ ] 5. Test quality audit`
-   - `[ ] 6. Consolidated report — all findings gathered`
+**Do not stop after the first Blocker.** A Blocker means severity, not permission to skip the remaining files.
 
-2. **During review**, mark only ONE `in_progress` at a time. Mark `completed` immediately after step-specific work is done.
+If you run out of budget, do not fake completion: emit the report with an explicit `UNCOVERED STEPS` section naming what was not done and why.
 
-3. **FORBIDDEN** to output final report (PASS / REVISE / BLOCK) while any step is still pending or in_progress. Wopal uses your todo completion rate to track review progress.
+## Output Contract
 
-4. **FORBIDDEN** to stop after the first serious issue. A Blocker means severity, not permission to skip the remaining files.
+Verdicts are the dev-flow standard — `PASS` / `REVISE` / `BLOCK` — so the report plugs into existing gates.
 
-5. **Context low fallback**: If context is running out → output a partial report with an explicit `UNCOVERED STEPS` section.
+```markdown
+# Implementation Review — {scope label}
 
----
+## Summary
+- Review type: Implementation (Plan-backed | Planless diff)
+- Verdict: PASS | REVISE | BLOCK
+- Counts: Blocker N / Warning N / Info N / Needs-human N
+- Reviewed: {Plan path / commit / commit range / working tree}
 
-## Test Quality Audit (Critical)
+## Blocker
+### B-01: {issue title}
+- Location: `{file}:{line}`
+- Evidence: `{code snippet or command output}`
+- Impact: {what fails, and under which scenario}
+- Fix direction: {what to change}
 
-Tests often hide the biggest debt. Check:
+## Warning
+{same format as Blocker; Impact may be omitted}
 
-| Pattern | Why it's debt | Check |
-|---------|---------------|-------|
-| Skipped/disabled tests | Requirements not proven | `grep` tool: `pattern: 'skip\(|xit|xdescribe|\.skip|@pytest\.mark\.skip|t\.Skip'` |
-| Circular proofs | System generates its own expected values | Read test file, check if expected values come from the same system under test |
-| Placeholder assertions | `expect(true).toBe(true)` — always passes | `grep` tool: `pattern: 'expect\(true\)|expect\(false\)|expect\(1\)|expect\("test"\)'` |
-| Weak assertions | Only check existence, not behavior | `grep` tool: `pattern: 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull'` |
-| Missing assertions | No assertions in test file | `grep` tool: `pattern: 'expect|assert'` — zero hits = empty test shell |
-| Redundant tests | Many tests repeat the same happy path without protecting changed branches | Read changed tests and look for repeated assertions that do not cover distinct behavior |
+## Info
+{one line each}
 
-In planless review, ask: does the changed behavior have enough tests to catch regression? In all modes, ask: are the tests proving behavior, or just creating noise?
+## Serious Logic Risks (Discuss with User)
+{only severe logic risks that may be requirement-driven}
 
-**Blocker if**: Test file exists for requirement but all tests are skipped/disabled or assertions are placeholders.
+## Requirement Questions
+{only requirement ambiguity or product choices that cannot be judged from code alone}
 
-**Warning if**: Coverage for the changed branch is missing, or tests are obviously duplicated while key branches remain untested.
+## Needs Human
+- {item} — why only human observation can settle it
 
----
+## Positive Findings
+- {verified item: state how it was verified, so the reader can trust the conclusion}
 
-## Duplication / Extraction Audit
+## UNCOVERED STEPS
+{only when steps could not be completed}
+```
 
-Flag duplication only when it creates real maintenance cost or drift risk.
+**Verdict rule**: any Blocker → `BLOCK`; otherwise any Warning → `REVISE`; otherwise `PASS`. `Needs Human` items and findings outside the technical scope never change the verdict.
 
-Good reasons to flag:
-- The same validation / parsing / retry / branching logic appears in multiple places in the reviewed scope
-- The duplicated logic is already diverging or likely to diverge
-- A shared helper/module would clearly reduce bug risk or future edit cost
+A `PASS` requires a short positive section: state what was checked and how, so the reader can trust the verdict rather than take it on faith. A `PASS` with nothing verified is worse than no review.
 
-Do **not** flag:
-- Tiny repetition with no meaningful maintenance cost
-- Straight-line call sequences that would become less readable if abstracted
-- Pure taste-driven "could be cleaner" remarks without operational risk
+## Evidence Standard
 
----
+- **Blocker / Warning** must carry a locatable citation: `file:line`, the code or command output, and the concrete failure scenario. A Blocker's fix direction must be actionable — not "optimize", but "change X to Y".
+- **Info** may be a single line.
+- Items you could not settle go under `Needs Human` — never inflate them into findings, never hide them.
 
-## Depth Modes
+## After the Verdict
 
-| Mode | When to use | What it checks |
-|------|-------------|----------------|
-| `standard` | Default | Goal verification + pattern scanning |
-| `deep` | Complex changes | Cross-file call chains + import graph + type consistency |
+- **`REVISE` / `BLOCK`**: the fix must be re-reviewed before the result is treated as clean — a fix applied without re-verification is not a fix. Reuse the same review session (reply), so prior findings and their resolutions stay in context; opening a fresh reviewer loses that.
+- **`PASS`**: this is an input to whoever requested the review, not an automatic gate. It does not authorize merge or completion, and it does not replace the mechanical gates.
+- **Scope note**: reviewing does not authorize editing. Findings go back to the implementer.
 
-Prompt should specify `depth: standard | deep`. Default to `standard`.
+## Anti-patterns
 
----
+**Do NOT**:
+- Re-run or duplicate what the suite, lint, and CI have already established
+- Infer product requirements from your own taste, especially in planless mode
+- Flag style preferences as warnings
+- Stop after the first Blocker
+- Emit a finding without location and evidence
+- Claim level-4 functional verification from static reading
+- Do the fixing, designing, or implementing
+- Reach a verdict with checks still pending
+
+**DO**:
+- Read the actual diff and changed files, not summaries
+- Walk every explicit claim through the four levels: exists → substantive → wired → functional
+- Diff the delivered scope against the declared scope, both ways
+- Audit tests whenever tests or behavior changed
+- Probe call sites before calling something unwired or unused
+- State what you could not verify
 
 ## References
 
-For detailed verification patterns, stub detection, and test audit procedures:
+Load the rubric when a check needs its detailed procedure, pattern catalogue, or a worked example:
 
-**@references/review-rubric.md**
-
-Key sections:
-- 四层验证模型 (存在 → 实质性 → 已连接 → 功能性)
-- 通用存根模式 (注释/TODO/占位符/空实现/假动态)
-- 前端组件 & API 路由模式 (实质性检查 + 连接检查)
-- 数据库 Schema & Hooks 存根
-- 测试质量审计 (跳过/循环/占位/弱断言/缺失)
-- 审查清单 & 判定参考
-
----
+- `references/review-rubric.md` — per-check procedures, stub and defect pattern catalogues, test-integrity audit, severity calibration, worked examples
 
 ## Examples
 
-### Example 1: Goal Verification
+### Example 1 — Goal verification (Blocker)
 
-**Plan truth**: "User can send a message"
+A Plan truth states "the user can send a message". The handler was implemented:
 
-**Code found**:
 ```typescript
 // components/Chat.tsx:45
 const handleSubmit = (e) => {
   e.preventDefault()
-  console.log(data)  // Only logs
+  console.log(data)
 }
 ```
 
-**Finding**:
-- **B-01**: Message submission not implemented
-- 位置: `components/Chat.tsx:45-47`
-- 代码: `console.log(data)`
-- 问题: Handler only logs, no API call → goal "send message" not achieved
-- 修复建议: Add `fetch('/api/messages', { method: 'POST', body: data })`
-
----
-
-### Example 2: Stub Detection
-
-**Plan truth**: "Messages are fetched from database"
-
-**Code found**:
-```typescript
-// api/messages/route.ts:12
-export async function GET() {
-  return Response.json([])  // Empty array, no DB query
-}
+```yaml
+finding:
+  check: C1_goal_verification
+  severity: blocker
+  location: "components/Chat.tsx:45-47"
+  evidence: "handleSubmit only logs; no request is made"
+  impact: "the claimed behavior 'send a message' does not exist; levels 2-4 all fail at once"
+  fix: "add the request call, or implement the real submission path"
 ```
 
-**Finding**:
-- **B-02**: API returns hardcoded empty data
-- 位置: `api/messages/route.ts:12`
-- 代码: `return Response.json([])`
-- 问题: No database query, always returns empty → goal "fetch from database" not achieved
-- 修复建议: Add `const messages = await prisma.message.findMany()` before return
+### Example 2 — Wiring gap (Warning)
 
----
+A component fetches data but never consumes the response; the rendered output is static:
 
-### Example 3: Planless duplication warning
-
-**Code found**:
 ```typescript
-// src/a.ts
-const normalized = input.trim().toLowerCase()
-if (!normalized) throw new Error("empty")
-
-// src/b.ts
-const normalized = input.trim().toLowerCase()
-if (!normalized) throw new Error("empty")
+// components/Inbox.tsx:12
+useEffect(() => {
+  fetch('/api/messages')
+}, [])
+return <div>No messages</div>
 ```
 
-**Finding**:
-- **W-03**: Input normalization duplicated across modules
-- 位置: `src/a.ts:1-2`, `src/b.ts:1-2`
-- 代码: `const normalized = input.trim().toLowerCase()`
-- 问题: Shared validation logic is duplicated in multiple paths → future rule changes can drift and create inconsistent behavior
-- 修复建议: Extract a shared helper such as `normalizeInput()` if both modules are meant to follow the same rule
+```yaml
+finding:
+  check: C3_wiring
+  severity: warning
+  location: "components/Inbox.tsx:12-15"
+  evidence: "the fetch result is never awaited, stored, or rendered; the markup is static"
+  impact: "the UI always shows 'No messages' regardless of API state"
+  fix: "consume the response into state and render from it, or remove the fetch if not needed"
+```
 
----
+### Example 3 — Test integrity (Blocker)
 
-### Example 4: Serious logic risk (discussion only)
+```typescript
+// tests/chat.test.ts:5-9
+describe('Chat', () => {
+  it.skip('sends a message', () => { ... })
+  it('renders', () => {
+    expect(true).toBe(true)
+  })
+})
+```
 
-**Code found**:
+```yaml
+finding:
+  check: C5_test_integrity
+  severity: blocker
+  location: "tests/chat.test.ts:5-9"
+  evidence: "the only test of the claimed behavior is skipped; the remaining assertion is a placeholder"
+  impact: "the claimed behavior is not proven by any test, while the suite still reports green"
+  fix: "enable the test with a real assertion on the request, or replace it with one that fails when the behavior breaks"
+```
+
+### Example 4 — Serious logic risk (discussion only)
+
 ```typescript
 // src/jobs/purge.ts:18
 await deleteAllUserContent(userId)
 ```
 
-**Finding**:
-- **Serious Logic Risk**: Purge job may irreversibly delete all user content
-- 位置: `src/jobs/purge.ts:18`
-- 代码: `await deleteAllUserContent(userId)`
-- 风险场景: If this job is triggered by a soft-expiry rule instead of an explicit destructive action, user data could be lost permanently
-- 讨论原因: Whether this behavior is correct depends on product policy, which is not explicit in the prompt
-
----
-
-### Example 5: Test Quality Audit
-
-**Test file**: `tests/chat.test.ts`
-
-**Code found**:
-```typescript
-describe('Chat', () => {
-  it.skip('sends message', () => { ... })  // Skipped
-  it('renders', () => {
-    expect(true).toBe(true)  // Placeholder assertion
-  })
-})
+```yaml
+finding:
+  check: serious_logic_risk
+  severity: discussion
+  location: "src/jobs/purge.ts:18"
+  evidence: "purge job irreversibly deletes all user content"
+  impact: "if this job is triggered by a soft-expiry rule instead of an explicit destructive action, data is lost permanently"
+  fix: "confirm the trigger policy with the owner before treating this as a defect"
 ```
 
-**Finding**:
-- **B-03**: Test suite disabled for critical requirement
-- 位置: `tests/chat.test.ts:5-7`
-- 代码: `it.skip('sends message', ...)`
-- 问题: Requirement "send message" has skipped test → not proven by tests
-- 修复建议: Enable test with real assertions: `expect(mockFetch).toHaveBeenCalledWith('/api/messages')`
+### Example 5 — Not a finding (calibration)
 
----
+Two small modules each trim and lowercase an input before validating it. The duplication is four lines and the rules are expected to stay identical.
 
-## Critical Rules
-
-**ALWAYS**:
-- Read actual code files, not just SUMMARY.md claims
-- Check four levels when explicit truths exist: exists → substantive → wired → functional
-- Include `file:line` evidence for Blocker/Warning
-- Run test quality audit when tests exist
-- Finish the whole scan before issuing the final verdict
-
-**NEVER**:
-- Trust "completed" without code evidence
-- Flag style preferences as warnings
-- Critique business logic preferences unless explicitly asked or backed by a Plan
-- Skip test quality audit
-- Stop after the first blocker
-- Report findings without concrete location
-
----
-
-## Integration with rook
-
-This skill is loaded by rook agent. Workflow:
-
-1. Wopal delegates rook with `review_type: implementation`
-2. Rook reads prompt and loads this skill
-3. Rook follows workflow above
-4. Rook outputs PASS / REVISE / BLOCK verdict
-5. Wopal acts on verdict (continue / request fix / escalate)
-
-**Revision loop limit**: Max 3 rounds of REVISE/BLOCK per implementation.
-
----
-
-## Quick Reference
-
-| Verdict | Condition |
-|---------|-----------|
-| **PASS** | All truths verified, no Blocker, Warning ≤ 2 |
-| **REVISE** | Warning ≥ 3 or Info ≥ 5, no Blocker |
-| **BLOCK** | ≥ 1 Blocker found within technical scope |
-
-| Evidence Level | Required for |
-|----------------|--------------|
-| `file:line + code snippet` | Blocker, Warning |
-| Specific description | Info |
-
-| Test Debt Pattern | Severity |
-|-------------------|----------|
-| All tests skipped/disabled | Blocker |
-| Circular/placeholder assertions | Blocker |
-| Missing assertions | Warning |
-| Weak assertions (existence only) | Info |
-
-`Serious Logic Risks` and `Requirement Questions` do **not** change the verdict by default.
+**Correct handling**: no finding. The extraction is too small to justify a shared helper; taste-level "could be cleaner" remarks are not defects. Report under `Positive Findings` if useful.

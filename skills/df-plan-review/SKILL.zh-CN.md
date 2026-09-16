@@ -1,14 +1,11 @@
 ---
 name: df-plan-review
 description: |
-  Plan 语义审查：验证一个 Plan 按字面执行后是否真能成立——审正确性，不审形式（形式由 `flow.sh plan check` 负责）。
+  审查执行前的方案/Plan——如果有人严格照它执行，行得通吗？能达成目标吗？
 
-  触发场景：
-  - 用户要求检查、验证或审查一个 Plan（如"检查方案"、"看看这个 plan"）
-  - 高风险 Plan 执行前：Complexity: High、跨模块影响、破坏性改动或迁移类工作
-  - 明确要求做执行前的正确性门禁
+  使用场景：用户要求审查、检查或验证一个 Plan 或实施方案，尤其是高风险工作（迁移、重构、跨模块改动、破坏性操作）。例如"帮我审一下这个方案"、"看看这个 Plan 行不行"、"验证一下实施计划"。
 
-  跳过场景：常规 Plan。`flow.sh submit` 会自动运行 `plan check` 且不委派审查者——不要审查每一个 Plan。
+  不适用：常规 Plan（提交时已有自动检查）、代码审查（用 `df-implement-review`）、编写方案。
 ---
 
 # df-plan-review — Plan 正确性审查

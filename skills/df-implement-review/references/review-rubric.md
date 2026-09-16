@@ -1,447 +1,665 @@
-# Implementation Review Rubric
+# Implementation Review Rubric — Detailed Procedures
 
-审查方法论与问题模式参考。rook 只使用 `read` / `glob` / `grep` / `lsp` 等只读工具。
+Procedures for the six correctness checks. Load this when a check needs its full method, a pattern catalogue, or severity calibration.
 
-> 本源文件提炼自 WSF `verification-patterns.md` 的四层验证模型、存根模式与连接检测方法论。
+**Purpose reminder**: this review answers "does this change really deliver, and is it sound code". It does not audit form — tests, lint, typecheck, and CI own form and have already passed.
+
+Contents:
+1. [Reading the Change](#1-reading-the-change)
+2. [C1 Goal & Truth Verification](#2-c1--goal--truth-verification)
+3. [C2 Scope Completeness](#3-c2--scope-completeness)
+4. [C3 Substance & Wiring](#4-c3--substance--wiring)
+5. [C4 Defect & Security Scan](#5-c4--defect--security-scan)
+6. [C5 Test Integrity](#6-c5--test-integrity)
+7. [C6 Conventions & Debt](#7-c6--conventions--debt)
+8. [Severity Calibration](#8-severity-calibration)
+9. [Worked Examples](#9-worked-examples)
+10. [Report Skeleton](#10-report-skeleton)
 
 ---
 
-## 核心原则
+## 1. Reading the Change
 
-**存在 ≠ 实现**。文件存在不意味着功能有效。rook 必须逐层验证：
+Build the review set first: the diff (`git diff`, `git diff --cached`, `git show <hash>`, or `git diff <A>..<B>`), the changed file list, and — when Plan-backed — the Plan's claims. Read once; then probe.
 
-1. **存在** — 预期路径下有文件
-2. **实质性** — 内容是真实实现，不是占位符
-3. **已连接** — 已接入系统其他部分（import → use → render）
-4. **功能性** — 调用时实际工作（通常需人工验证）
+Keep three working lists as you read:
 
-1-3 层 rook 可独立完成。第 4 层标注为 `NEEDS_HUMAN`。
+1. **Claims** — every explicit deliverable or acceptance criterion the change is supposed to satisfy.
+2. **Artifacts** — every new or modified file, symbol, route, component, or schema element, with where it is consumed.
+3. **Flags** — anything that smells of a stub, a wiring gap, or a missing test, to verify in the sweeps.
+
+Do not alternate between reading and probing; each return to a file costs more than the probe saved.
+
+Note the review mode from the start. In planless mode, the change's own stated intent (description, commit message) is the only spec — everything else belongs to C2–C6.
 
 ---
 
-## 通用存根模式
+## 2. C1 — Goal & Truth Verification
 
-以下模式无论语言和文件类型，均表明占位符代码。
+### Why the check exists
 
-### 基于注释的存根
+Tests prove what they assert, not what was promised. A change can be green and still be a stub, an orphaned file, or a reduced version of the goal. This check compares the promise against the artifact, level by level.
+
+### Procedure
+
+1. **Extract claims.**
+   - Plan-backed: every truth in the Plan, every acceptance criterion, and the stated Goal.
+   - Planless: the change's stated intent — description, commit message, or an explicit instruction in the review prompt. If none exists, say so and skip to C2.
+2. **Locate each artifact** the claim depends on: the file, function, route, component, or schema element.
+3. **Walk the four levels** for each:
+
+| Level | Question | How to settle |
+|---|---|---|
+| 1. Exists | Is the artifact present at the expected path? | `ls`, `rg --files`, `git show --stat` |
+| 2. Substantive | Is it a real implementation, not a stub? | read the code; C3 catalogues the patterns |
+| 3. Wired | Is it imported, registered, or called — reachable from an entry point? | trace call sites: `rg <symbol>` across the project |
+| 4. Functional | Does it behave correctly when invoked? | static reasoning where possible; otherwise `Needs Human` |
+
+4. **Adjudicate reductions.** When the artifact delivers less than the claim (reduced scope, deferred branch, a `v1` of the stated goal), check whether a Plan decision sanctions it. Sanctioned → note it, not a finding. Silent → BLOCKER.
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Claimed artifact missing from the change | BLOCKER |
+| Artifact is a stub | BLOCKER |
+| Artifact real but never reachable | WARNING; BLOCKER when reachability is the claim |
+| Silent reduction of a claimed deliverable | BLOCKER |
+| Reduction sanctioned by a Plan decision | not a finding |
+| Level 4 not provable statically | `Needs Human` — not a finding |
+| Planless mode, no stated intent | note intent was not stated; proceed with C2–C6 |
+
+### Level-4 discipline
+
+Level 4 is "it actually works when invoked". Do not claim it from static reading. What static reading can settle: obviously correct logic over the inputs the claim names. What it cannot: runtime behavior, timing, rendering, external integrations, real data. Those go under `Needs Human` with the exact observation a human should make.
+
+Level-4 items typically needing human observation:
+
+- Visual appearance and layout
+- End-to-end user flow usability
+- Real-time behavior (WebSocket / SSE / streaming)
+- External service integrations (payments, mail, third-party APIs)
+- Error message clarity and helpfulness
+- Responsive / mobile behavior
+- Accessibility
+
+---
+
+## 3. C2 — Scope Completeness
+
+### Why the check exists
+
+Declared scope and delivered scope are written at different moments and drift. Under-delivery hides behind "the rest will follow". Over-delivery hides unrelated work and undeclared coupling.
+
+### Procedure
+
+1. **Build the delivered set** from the carrier: `git diff --name-status`, `git show --stat`.
+2. **Build the declared set** from the Plan's file lists or the change description.
+3. **Diff both directions:**
+   - `declared − delivered` → promised work that is missing
+   - `delivered − declared` → work performed outside the declaration
+4. **Sanity-check operations.** Deletions and renames must match what was declared; unexpected deletions are how entire features disappear quietly.
+5. **Judge each diff item.** A declared item missing is BLOCKER only when a claim depends on it. An extra file is WARNING unless the coupling is necessary — if it is, the finding is that the declaration was stale, not that the code is wrong.
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Declared deliverable absent, and a claim depends on it | BLOCKER |
+| Declared item absent, not load-bearing | WARNING |
+| Changed files outside the declared scope | WARNING |
+| Unannounced deletion or rename | WARNING |
+
+---
+
+## 4. C3 — Substance & Wiring
+
+### Why the check exists
+
+The most common way a change looks done without being done is placeholder code that satisfies types and expectations. The second most common is real code nothing calls.
+
+### Part A — Stub sweep
+
+Sweep the changed files for these patterns. Presence is a signal, not a verdict: classify with the surrounding context.
+
+**Comment stubs**
 
 ```javascript
 // TODO: implement later
 // FIXME: this is broken
-// XXX: hack
 // HACK: temporary
 // PLACEHOLDER
-
-// ...
-/* ... */
-
-# ... (Python/Shell)
+// ... (an empty body where logic belongs)
 ```
 
-rook 用 `grep` 工具检查，pattern: `(TODO|FIXME|XXX|HACK|PLACEHOLDER|\.\.\.)`
+Probe: `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER' <changed files>`
 
-### 占位符文本
+**Placeholder text**
 
 ```
-"placeholder"
-"lorem ipsum"
-"coming soon"
-"under construction"
-"TBD"
-"Not implemented"
+"placeholder"   "lorem ipsum"   "coming soon"   "under construction"
+"TBD"           "Not implemented"
 ```
 
-rook 用 `grep` 工具检查，pattern: `(placeholder|lorem ipsum|coming soon|under construction|TBD|not implemented)`
+Probe: `rg -ni 'placeholder|lorem ipsum|coming soon|under construction|TBD|not implemented' <changed files>`
 
-### 空实现
+**Empty implementations**
 
 ```javascript
-return null
-return undefined
-return {}
-return []
+return null   return undefined   return {}   return []
 ```
 
 ```python
-pass
-return None
-return {}
-return []
+pass   return None   return {}   return []
 ```
 
-rook 用 `grep` 工具检查，pattern: `(return null|return undefined|return \{\}|return \[\])`
+Probe: `rg -n 'return null|return undefined|return \{\}|return \[\]' <changed files>`
 
-### 仅日志函数
+Caution: honest empty returns exist. Classify by whether a caller or claim depends on real content.
+
+**Log-only handlers**
 
 ```javascript
 function handler(data) {
-  console.log(data)   // ← 仅日志，无实际逻辑
+  console.log(data)          // logs, does nothing
 }
 ```
 
-### 假动态真硬编码
+Probe: read each handler body; a body that only logs or only forwards has no behavior.
+
+**Fake-dynamic values**
 
 ```jsx
-// 应来自 state/props，实为硬编码
+// Should come from state/props, hardcoded instead
 <div>Message 1</div>
-<div>Message 2</div>
-
-// ID 应为动态生成
-const id = "fixed-id"
-
-// 计数应为计算结果
-const count = 3
-
-// 显示值应为格式化结果
-const price = "$9.99"
+const id = "fixed-id"        // should be generated
+const count = 3              // should be computed
+const price = "$9.99"        // should be formatted
 ```
 
----
+Classify by the claim: if the behavior must be dynamic and the value is fixed, BLOCKER; if the value is legitimately fixed, not a finding.
 
-## 前端组件模式
-
-### 实质性检查
-
-以下均为存根，应被标记为 Blocker（若目标要求该组件有实际功能）：
+**Frontend shells**
 
 ```jsx
-// 空壳
 return <div>Component</div>
-return <div>Placeholder</div>
 return <p>Coming soon</p>
 return <div>{/* TODO */}</div>
-
-// 空返回
 return null
 return <></>
 
-// 空事件处理器
-onClick={() => {}}
-onChange={() => console.log('clicked')}
-onSubmit={(e) => e.preventDefault()}     // 仅阻止默认行为
+onClick={() => {}}                       // empty handler
+onChange={() => console.log('clicked')}  // log-only handler
+onSubmit={(e) => e.preventDefault()}     // only blocks default
 ```
 
-**rook 检查方法**：
-1. `read` 组件文件，扫描 return 语句
-2. 检查 JSX 是否包含实质性元素（`className`, `onClick`, 动态表达式 `{...}`）
-3. 检查是否使用 props 或 state（`props.X`, `useState`, `{variable}`）
+Check that the component renders substantive elements — dynamic expressions, state or prop usage, wired handlers.
 
-### 连接检查：组件 → API
-
-组件渲染了，但数据从哪来？
-
-```jsx
-// ✅ 正确：组件调用 API 获取数据
-useEffect(() => {
-  fetch('/api/messages').then(r => r.json()).then(setMessages)
-}, [])
-
-// ❌ 问题：fetch 存在但响应未消费
-fetch('/api/messages')  // 无 await，无 .then，无赋值
-
-// ❌ 问题：fetch 被注释掉
-// fetch('/api/messages').then(r => r.json()).then(setMessages)
-```
-
-**rook 检查方法**：
-- 用 `grep` 工具在组件文件中搜索 `fetch\(|axios\.|useSWR|useQuery`
-- 用 `read` 确认调用是否被 await/消费/未被注释
-- 若组件需要数据但无 API 调用 → Warning
-
-### 连接检查：状态 → 渲染
-
-状态变量存在，但 JSX 里用了吗？
-
-```jsx
-// ❌ 状态存在但未渲染
-const [messages, setMessages] = useState([])
-return <div>No messages</div>    // 永远显示"无消息"
-
-// ❌ 渲染了错误的状态
-const [messages, setMessages] = useState([])
-return <div>{otherData.map(...)}</div>   // 用的是别的变量
-```
-
-**rook 检查方法**：用 `read` 比对 useState 变量名与 JSX `{...}` 中的引用。
-
----
-
-## API 路由模式
-
-### 实质性检查
-
-以下均为存根：
+**API route shells**
 
 ```typescript
-// 空响应
 export async function GET() {
-  return Response.json([])           // 空数组，无 DB 查询
+  return Response.json([])              // static empty, no data source
 }
-
 export async function POST() {
-  return new Response()              // 空响应体
+  return new Response()                 // empty body
 }
-
-// 占位符消息
-export async function PUT() {
-  return Response.json({ message: "Not implemented" })
-}
-
-// 仅日志
 export async function POST(req) {
   console.log(await req.json())
-  return Response.json({ ok: true }) // 无实际处理
+  return Response.json({ ok: true })    // logs and acknowledges, never processes
 }
 ```
 
-### 连接检查：API → 数据库
-
-API 路由返回数据，但数据从哪来？
-
-```typescript
-// ✅ 正确：查询数据库并返回结果
-export async function GET() {
-  const messages = await prisma.message.findMany()
-  return Response.json(messages)
-}
-
-// ❌ 查询了但未返回结果
-await prisma.message.findMany()
-return Response.json({ ok: true })   // 返回静态值，不是查询结果
-
-// ❌ 查询未 await（返回 Promise 不是数据）
-const messages = prisma.message.findMany()
-return Response.json(messages)       // 返回的是 Promise 对象
-```
-
-**rook 检查方法**：
-- 用 `grep` 工具在路由文件中搜索 `prisma\.|db\.|query\(|findMany|create|update|delete`
-- 用 `read` 确认查询结果是否被 await 且被 return
-
-### 输入验证
-
-API 是否校验了输入？若 POST/PUT 路由直接使用 `req.json()` 不作任何校验 → Warning。
-
-```typescript
-// ✅ 有校验
-const body = schema.parse(await req.json())
-
-// ❌ 无校验
-const body = await req.json()
-// 直接使用 body.field...  未验证字段存在性/类型
-```
-
-**rook 检查方法**：用 `grep` 工具搜索 `schema\.parse|validate|zod|yup|joi`。
-
----
-
-## 数据库模式存根
-
-若变更包含数据库 schema 文件（`schema.prisma` / `schema.ts` / `*.sql`）：
+**Database schema stubs**
 
 ```prisma
-// ❌ 空壳模型
-model User {
-  id String @id
-  // TODO: add fields
-}
-
-// ❌ 仅 id + 一个字段
 model Message {
   id      String @id
   content String
-  // 缺少: createdAt, userId, chatId
-}
-
-// ❌ 缺少关键关系
-model Order {
-  id     String @id
-  // 缺少: userId, items (relation), total, status, createdAt
+  // missing: createdAt, userId, chatId and the relations that use them
 }
 ```
 
-**rook 检查方法**：`read` schema 文件，检查每个模型是否有 ≥ 3 个业务字段、相应关系是否定义。
+Check every model against the claim: the fields and relations the behavior needs must exist.
 
----
-
-## 自定义 Hooks/工具存根
+**Hook / utility stubs**
 
 ```typescript
-// ❌ 空壳 hook
 export function useAuth() {
   return { user: null, login: () => {}, logout: () => {} }
 }
-
-// ❌ 仅日志 hook
-export function useCart() {
-  const [items, setItems] = useState([])
-  return { items, addItem: () => console.log('add'), removeItem: () => {} }
-}
-
-// ❌ 硬编码返回
 export function useUser() {
-  return { name: "Test User", email: "test@example.com" }
+  return { name: "Test User", email: "test@example.com" }   // hardcoded
 }
 ```
 
-**rook 检查方法**：`read` hooks 文件，检查返回值和函数体是否有实质逻辑（调用 API、操作 state、副作用）。
+Check that the returned functions and values do real work — call APIs, touch state, produce effects.
+
+### Part B — Wiring checks
+
+For every new artifact, verify all three links of its chain:
+
+1. **Declared → imported**: `rg <symbol>` — is it imported where it is used?
+2. **Imported → used**: is the import actually referenced, not merely present?
+3. **Used → reachable**: does some entry point (route, render tree, CLI, job runner) lead to it?
+
+Pattern-specific checks:
+
+**Component → data source.** Data-fetching calls must be awaited, consumed, and rendered (or otherwise used):
+
+```jsx
+// Consumed
+useEffect(() => { fetch('/api/messages').then(r => r.json()).then(setMessages) }, [])
+
+// Not consumed: no await, no .then, no assignment
+fetch('/api/messages')
+
+// Commented out
+// fetch('/api/messages').then(r => r.json()).then(setMessages)
+```
+
+**State → render.** A state variable that should drive output must actually appear in the output:
+
+```jsx
+const [messages, setMessages] = useState([])
+return <div>No messages</div>            // renders a constant, not the state
+return <div>{otherData.map(...)}</div>   // renders the wrong variable
+```
+
+**API → storage.** A query must be awaited and its result returned, not discarded:
+
+```typescript
+const messages = await prisma.message.findMany()
+return Response.json(messages)           // correct
+
+await prisma.message.findMany()
+return Response.json({ ok: true })       // queries, then discards
+
+const messages = prisma.message.findMany()
+return Response.json(messages)           // returns the promise, not the data
+```
+
+**Route → registration.** A new route, command, or job must be registered where the framework or runner discovers it.
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Stub occupying a claimed behavior | BLOCKER |
+| New module, component, or route never imported, registered, or used | WARNING |
+| Real artifact reachable only through dead code | WARNING |
+| Empty return that the claim depends on | BLOCKER |
+| Empty return that is honest (no dependency) | not a finding |
+| TODO / FIXME on a non-critical path | INFO |
 
 ---
 
-## 测试质量审计
+## 5. C4 — Defect & Security Scan
 
-测试是目标达成的重要证据。不能只看测试是否存在，要审测试是否真的证明了什么。
+### Why the check exists
 
-### 跳过/禁用的测试
+Tests cover what someone thought to assert. Defects live in the branches, inputs, and timings nobody asserted. Security holes live at trust boundaries the tests never cross.
+
+### Part A — Defect sweep
+
+Walk each hunk and ask the failure question: **what input, state, or timing makes this wrong?**
+
+High-yield areas:
+
+- **Error paths** — failures swallowed, errors logged but not propagated, cleanup skipped on the error branch
+- **Async handling** — missing `await`, floating promises, race conditions, unhandled rejections, ordering assumptions
+- **Boundary values** — empty collections, zero, negative, very large, off-by-one in ranges and slices
+- **Type/runtime seams** — parsed input trusted as typed, `as` casts over unvalidated data, nullability assumptions
+- **State transitions** — re-entrancy, double-submission, partially applied updates, rollback on failure
+- **Comparison logic** — `==` vs `===` semantics, falsy checks over values that can legitimately be falsy
+
+Report only findings with a concrete scenario. "Could be wrong" is not a finding.
+
+### Part B — Security sweep
+
+Find the trust boundaries and check each:
+
+- **Injection** — user input reaching queries, shell commands, or templates unparameterized
+- **XSS** — unescaped interpolation into rendered output, `dangerouslySetInnerHTML` equivalents
+- **Unsafe deserialization** — untrusted payloads passed to parsers with code-execution surface
+- **Missing validation** — request bodies used before validation; schema validation present but bypassed
+- **Authorization gaps** — new routes or handlers missing the auth check their siblings have
+- **Secret exposure** — credentials in code, committed files, logs, or error messages
+
+Probe: `rg -n 'eval\(|dangerouslySetInnerHTML|innerHTML|exec\(|spawn\(' <changed files>`; check every new POST/PUT handler for validation before use.
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Defect with a concrete failure scenario | BLOCKER |
+| Exploitable security hole (injection, XSS, missing auth, leaked secret) | BLOCKER |
+| Plausible risk with a concrete scenario ("in Z scenario leads to Y") | WARNING |
+| Missing input validation on a public surface | WARNING |
+| Concern with no concrete scenario | do not report |
+
+---
+
+## 6. C5 — Test Integrity
+
+### Why the check exists
+
+Tests are the strongest evidence a change provides — and the easiest to fake. A green suite proves nothing if the tests that matter are skipped, circular, or vacuous.
+
+### Procedure
+
+1. **Map behavior to tests.** For each behavior the change claims, find the test(s) that cover it. A claimed behavior with no covering test → WARNING (BLOCKER when the Plan requires tests).
+2. **Inspect the assertions.** Read what each test actually asserts, not what its name says.
+3. **Sweep for broken patterns** (below).
+
+### Broken patterns
+
+**Skipped / disabled tests**
 
 ```typescript
-it.skip('sends message', () => { ... })
-it.skip('renders correctly')
-describe.skip('Chat', () => { ... })
+it.skip('sends a message', () => { ... })
 xit('loads data')
 xdescribe('Messages')
+describe.skip('Chat', () => { ... })
 ```
 
 ```python
 @pytest.mark.skip
-def test_send():
-    ...
+def test_send(): ...
 ```
 
 ```go
 t.Skip("not implemented")
-t.SkipNow()
 ```
 
-**判定**：若某需求对应的测试全部被跳过/禁用 → Blocker。
+Probe: `rg -n 'skip\(|xit|xdescribe|\.skip|@pytest\.mark\.skip|t\.Skip' <changed test files>`
+Verdict: a claimed behavior whose only tests are skipped → BLOCKER.
 
-### 循环证明
+**Circular proofs**
 
-系统生成期望值，再用同一个系统验证——什么都没证明。
+The system generates the expected value and the same system verifies it:
 
 ```typescript
-// ❌ 循环证明
-const expected = generateOutput(input)   // 被测函数
-const actual = generateOutput(input)     // 同一函数
-expect(actual).toEqual(expected)          // 自己证明自己
-
-// ❌ 系统自己生成期望数据
-const expected = await system.createTestData()
-const actual = await system.getData()
-expect(actual).toEqual(expected)
+const expected = generateOutput(input)   // the function under test
+const actual = generateOutput(input)     // same function
+expect(actual).toEqual(expected)         // proves nothing
 ```
 
-**判定**：循环证明 → Blocker。
+Verdict: BLOCKER.
 
-### 占位断言
-
-永远通过的断言，无论实现如何变化都不会失败。
+**Placeholder assertions**
 
 ```typescript
 expect(true).toBe(true)
 expect(false).toBe(false)
 expect(1).toBe(1)
-expect("test").toBe("test")
 ```
 
-**rook 检查方法**：用 `grep` 工具搜索 `expect\(true\)|expect\(false\)|expect\(1\)|expect\("test"\)`。
+Probe: `rg -n 'expect\(true\)|expect\(false\)|expect\(1\)|expect\("test"\)' <changed test files>`
+Verdict: BLOCKER.
 
-**判定**：占位断言 → Blocker。
-
-### 弱断言（仅检查存在性）
+**Weak assertions**
 
 ```typescript
 expect(result).toBeDefined()
 expect(component).toBeTruthy()
 expect(data).not.toBeNull()
-expect(response).toBeTruthy()
 ```
 
-只检查"东西存在"，不检查"值对不对"。以下为强断言对比：
+They check existence, not value:
 
 ```typescript
-// ❌ 弱断言
+// weak
 expect(result).toBeDefined()
-
-// ✅ 强断言
-expect(result).toEqual({ id: 1, name: 'test', email: 'test@example.com' })
-expect(result.id).toBe(1)
+// strong — asserts the actual behavior
+expect(result).toEqual({ id: 1, name: 'test' })
 expect(result.items).toHaveLength(3)
 ```
 
-**判定**：单个弱断言 → Info。若某测试文件中所有断言均为弱断言 → Warning。
+Probe: `rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' <changed test files>`
+Verdict: a single weak assertion → INFO; every assertion in a file weak → WARNING.
 
-### 缺少断言
+**Missing assertions**
 
-测试文件存在，但内部没有任何 `expect` / `assert` 语句。
+A test file or test case with no `expect` / `assert` at all — the shell runs and reports green.
 
-**rook 检查方法**：用 `grep` 工具对测试文件搜索 `expect|assert`，命中数为 0 → 测试为空壳。
+Probe: `rg -c 'expect|assert' <test file>` — zero → WARNING.
 
-**判定**：缺少断言 → Warning。
+**Redundant tests**
 
----
+Many tests repeating the same happy path while distinct branches remain untested. Read the changed tests and check whether each protects a different behavior.
 
-## 审查清单
+Verdict: WARNING when key branches are untested; otherwise none.
 
-rook 完成文件读取后，逐项回答以下问题：
+### Judgement note
 
-### 目标验证
-
-- [ ] 从 Plan 提取了目标（goal / must_haves.truths）
-- [ ] 每个目标对应的文件是否存在（Level 1）
-- [ ] 每个文件是否有实质实现，不是存根（Level 2）
-- [ ] 每个文件是否接入系统（import → use → render，Level 3）
-- [ ] 标注需要人工功能验证的项（Level 4）
-
-### 存根扫描
-
-- [ ] 检查 TODO/FIXME/PLACEHOLDER 注释
-- [ ] 检查 "coming soon" / "not implemented" 占位文本
-- [ ] 检查 `return null` / `return {}` / `return []` 空实现
-- [ ] 检查硬编码 ID/计数/显示值（假动态）
-- [ ] 检查空事件处理器（`onClick={() => {}}`）
-- [ ] 检查 API 返回占位符数据（空数组、静态消息）
-- [ ] 若涉及 schema，检查模型是否有空壳
-
-### 测试质量
-
-- [ ] 检查跳过的测试（`skip` / `xit` / `xdescribe`）
-- [ ] 检查循环证明（`expected = same_system(...)`）
-- [ ] 检查占位断言（`expect(true).toBe(true)`）
-- [ ] 检查弱断言（仅 `toBeDefined` / `toBeTruthy`）
-- [ ] 检查测试文件是否缺少断言
+The bar is "does the test fail when the behavior breaks". A test that would still pass with the feature removed is decoration, regardless of how thorough it looks. When coverage exists but you cannot tell whether a test would catch a regression, read the assertion and the code path it exercises — do not count test names.
 
 ---
 
-## 判定参考
+## 7. C6 — Conventions & Debt
 
-| 情形 | 判定 |
-|------|------|
-| 目标对应的文件缺失 | Blocker |
-| 目标对应的文件是存根 | Blocker |
-| 安全漏洞（硬编码密钥、eval、XSS） | Blocker |
-| 测试全部跳过 / 循环证明 / 占位断言 | Blocker |
-| 文件未接入系统（存在但孤立） | Warning |
-| API 无输入校验 | Warning |
-| 测试全是弱断言 | Warning |
-| TODO/FIXME 标记（非关键路径） | Info |
-| 单个弱断言 | Info |
-| 硬编码 ID/文本（非目标要求动态的场景） | Info |
+### Why the check exists
+
+Projects have standing contracts — `AGENTS.md`, established patterns, safety rules — and a debt budget. A change that ignores the first or grows the second costs the next contributor.
+
+### Procedure
+
+1. **Read the project's rules.** `AGENTS.md` at the project root (and directory-level ones if present). Check the changed files against every applicable rule.
+2. **Check pattern consistency.** Does the change follow the established pattern for its kind — error handling, logging, configuration, typing, module structure?
+3. **Scan for growth of debt.**
+
+### Duplication / extraction
+
+Flag duplication only when it creates real maintenance cost or drift risk:
+
+- The same validation / parsing / retry / branching logic appears in multiple places in the reviewed scope
+- The duplicated logic is already diverging or likely to diverge
+- A shared helper would clearly reduce bug risk or future edit cost
+
+Do **not** flag tiny repetition with no meaningful cost, or straight-line sequences that would become less readable if abstracted.
+
+### Dead code / brittle wiring
+
+- Code unreachable from any entry point → WARNING when it masks a claimed behavior, else INFO
+- Commented-out blocks left behind → INFO
+- Config or wiring that silently disagrees with what the code reads → WARNING
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Violates a stated safety or security constraint | BLOCKER |
+| Violates conventions or breaks an established pattern | WARNING |
+| Duplication already diverging, or likely to | WARNING |
+| Dead code masking a claimed behavior | WARNING |
+| Commented-out blocks, stale TODOs | INFO |
+| Taste-level preferences | not a finding |
 
 ---
 
-## 人工验证指引
+## 8. Severity Calibration
 
-以下情况 rook 应标注 `NEEDS_HUMAN`，而非自行判断：
+Four classes, defined by what the reader should do:
 
-- 视觉外观是否正确
-- 用户流程是否完整可用
-- WebSocket / SSE 实时行为
-- 外部服务集成（Stripe、邮件）
-- 错误消息是否清晰有帮助
-- 移动端响应式
-- 无障碍性
+| Class | Meaning | Test to apply |
+|---|---|---|
+| **BLOCKER** | The change cannot ship as written | "If this ships, is it broken or dishonest?" |
+| **WARNING** | It ships, but with risk, a gap, or unproven claims | "Will this cost rework or hide a defect?" |
+| **INFO** | Improvement worth knowing, no action required | "Would a reasonable author shrug?" |
+| **Needs Human** | Only runtime or human observation can settle it | "Can I not verify this statically?" |
+
+Deliberately absent: **warning-count thresholds**. A verdict follows from severity, not from counting: any Blocker → BLOCK, else any Warning → REVISE, else PASS.
+
+### Calibration drills
+
+| Situation | Correct verdict |
+|---|---|
+| Handler logs the payload but the claim is "processes the message" | BLOCKER (stub occupying a claim) |
+| Function exists, correctly written, but no call site anywhere | WARNING (unwired) |
+| The only test of a claimed behavior is skipped | BLOCKER |
+| Test asserts `expect(true).toBe(true)` | BLOCKER |
+| A test checks `toBeDefined` plus two strong value assertions | no finding (single weak assertion inside a strong test is INFO at most) |
+| Four-line input normalization duplicated, rules expected to stay identical | no finding |
+| Duplicated validation that has already diverged between two call sites | WARNING |
+| Query executed, result discarded, static `{ ok: true }` returned | BLOCKER (the claim depends on the data) |
+| Deletion of a helper that turns out to still be imported (build would catch it) | no finding — CI owns build breakage |
+| Concern about visual appearance of a changed component | `Needs Human`, not a finding |
+| "I would have structured this module differently" | no finding |
 
 ---
 
-*本文件为 `df-implement-review` SKILL.md 的参考附件。rook 通过 `@references/review-rubric.md` 加载。*
+## 9. Worked Examples
+
+### Example A — Stub caught by the level walk
+
+**Plan claim**: "Messages are fetched from the database". The route exists:
+
+```typescript
+// api/messages/route.ts:8
+export async function GET() {
+  return Response.json([])
+}
+```
+
+**Probe**: level 2 — read the body; no query. Level 3 would pass (the route is registered), level 4 could pass for an empty system.
+
+**Finding**:
+```yaml
+check: C1_goal_verification
+severity: blocker
+location: "api/messages/route.ts:8-10"
+reality: "the handler returns a constant; no data source is consulted"
+impact: "the claim 'fetched from the database' is false at level 2; the endpoint cannot serve real data"
+fix: "query the store and return its result, as the claim requires"
+```
+
+### Example B — Wiring gap caught at level 3
+
+**Change**: a new `MarkdownRenderer` component, fully implemented, with tests.
+
+**Probe**: `rg MarkdownRenderer src/` — it appears only in its own file and its test. The message list still renders plain text.
+
+**Finding**:
+```yaml
+check: C3_wiring
+severity: warning
+location: "components/MarkdownRenderer.tsx:1"
+reality: "no import or usage outside its own module and test"
+impact: "the component is unreachable from the app; the rendering improvement is not actually delivered to users"
+fix: "render messages through the new component in the message list, or remove the component if premature"
+```
+
+### Example C — Circular proof in tests
+
+**Change**: a parser plus tests.
+
+**Probe**: read the assertions.
+
+```typescript
+const expected = parse(input)
+const actual = parse(input)
+expect(actual).toEqual(expected)
+```
+
+**Finding**:
+```yaml
+check: C5_test_integrity
+severity: blocker
+location: "tests/parser.test.ts:14-16"
+reality: "expected and actual both come from the parser under test; any output, correct or not, compares equal"
+impact: "the test cannot fail for the behavior it claims to protect"
+fix: "assert against independent expected values written by hand"
+```
+
+### Example D — Duplication, correctly NOT reported
+
+**Change**: two new handlers each trim and normalize an email before validating it. The rules are four lines and stable.
+
+**Correct handling**: no finding. The extraction would not measurably reduce bug risk. If the reviewer is tempted to flag it, the rubric says: flag duplication only when it creates real maintenance cost or drift risk.
+
+### Example E — Defect with a concrete scenario
+
+**Change**: an update endpoint.
+
+**Probe**: check the boundary values.
+
+```typescript
+// api/profile/route.ts:22
+const { name } = await req.json()
+await db.updateUser(userId, name)     // name may be undefined; no validation
+```
+
+**Finding**:
+```yaml
+check: C4_defect_scan
+severity: warning
+location: "api/profile/route.ts:22-23"
+reality: "name is read from the body with no validation and written directly; a request without name writes undefined over the stored value"
+impact: "in the scenario 'client omits the field', the user's stored name is corrupted"
+fix: "validate the body before writing, and reject requests missing required fields"
+```
+
+### Example F — Serious logic risk, discussion only
+
+**Change**: a purge job.
+
+```typescript
+// src/jobs/purge.ts:18
+await deleteAllUserContent(userId)
+```
+
+**Finding**: severe and irreversible, but whether it is correct depends on a product policy not stated in the prompt — report under `Serious Logic Risks (Discuss with User)`; it does not change the verdict.
+
+---
+
+## 10. Report Skeleton
+
+```markdown
+# Implementation Review — {scope label}
+
+## Summary
+- Review type: Implementation (Plan-backed | Planless diff)
+- Verdict: PASS | REVISE | BLOCK
+- Counts: Blocker N / Warning N / Info N / Needs-human N
+- Reviewed: {Plan path / commit / commit range / working tree}
+
+## Blocker
+### B-01: {title}
+- Location: `{file}:{line}`
+- Evidence: `{snippet}` / {output}
+- Impact: {failure mode}
+- Fix direction: {what to change}
+
+## Warning
+{as above}
+
+## Info
+{one line each}
+
+## Serious Logic Risks (Discuss with User)
+{severe risks that may be requirement-driven}
+
+## Requirement Questions
+{requirement ambiguity only}
+
+## Needs Human
+- {item} — observation needed: {what to look at}
+
+## Positive Findings
+- {verified item — state how it was verified}
+
+## UNCOVERED STEPS
+{only when steps could not be completed}
+```
+
+### Verdict decision
+
+- Any Blocker → `BLOCK`
+- No Blocker, at least one Warning → `REVISE`
+- Nothing but Info (or nothing) → `PASS`
+- `Needs Human`, `Serious Logic Risks`, and `Requirement Questions` never change the verdict by default
+
+### Positive Findings is mandatory on PASS
+
+A `PASS` must say what was checked and how — for example: "diffed delivered scope against declared scope both ways; walked every claimed behavior through exists/substantive/wired; swept changed files for stub patterns; audited changed tests for skipped/circular/placeholder assertions". A bare `PASS` asks the reader to take your word for it, which defeats the purpose of a review.

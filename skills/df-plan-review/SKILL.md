@@ -1,13 +1,15 @@
 ---
 name: df-plan-review
 description: >
-  Semantic Plan review: verify a Plan will actually work if executed as
-  written — correctness, not form (form belongs to `flow.sh plan check`).
-  Trigger: check/verify/review a Plan; a high-stakes Plan before execution
-  (Complexity: High, cross-module, destructive, migration); an explicit
-  pre-execution correctness gate.
-  Skip: routine Plans — `flow.sh submit` runs `plan check` and delegates no
-  reviewer, so do not review every Plan.
+  Review a Plan before it is executed — if someone follows it literally,
+  will it work, and will it deliver the stated goal? Use when the user asks
+  to review, check, or verify a Plan or implementation plan before
+  execution — especially risky work such as migration, refactoring,
+  cross-module changes, or destructive operations, for example "review this
+  plan", "check whether this plan will work", "verify the implementation
+  plan". Do not use for routine Plans that are already auto-checked on
+  submission, for reviewing code (use `df-implement-review`), or for
+  writing plans.
 ---
 
 # df-plan-review — Plan Correctness Review
