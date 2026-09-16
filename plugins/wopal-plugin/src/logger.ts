@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
-import { homedir } from "os"
+import { resolveWopalHome } from "./paths.js"
 import type { RuntimeContext } from "./runtime-context.js"
 import type { RuntimeEnvironment } from "./runtime-environment.js"
 
@@ -67,7 +67,7 @@ export function getLogFile(
   }
   if (configured) return configured
   if (context) return join(context.logDir, "wopal-plugin.log")
-  const wopalHome = environment.WOPAL_HOME ?? join(homedir(), ".wopal")
+  const wopalHome = resolveWopalHome(environment.WOPAL_HOME)
   return join(wopalHome, "logs", "wopal-plugin.log")
 }
 

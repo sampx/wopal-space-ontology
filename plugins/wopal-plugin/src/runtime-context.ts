@@ -1,6 +1,6 @@
-import { homedir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { resolveWopalHome } from "./paths.js";
 
 export interface RuntimeContext {
   readonly wopalHome: string;
@@ -25,7 +25,7 @@ export interface RuntimeContextInput {
 }
 
 export function createRuntimeContext(input: RuntimeContextInput): RuntimeContext {
-  const wopalHome = input.wopalHome ?? join(homedir(), ".wopal");
+  const wopalHome = resolveWopalHome(input.wopalHome);
   const context: RuntimeContext = {
     wopalHome,
     directory: input.directory,

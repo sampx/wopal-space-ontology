@@ -100,6 +100,14 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - Error logs must carry `{ err: error }`; logging only `error.message` is forbidden
 - sessionID format: `formatSessionID(sessionID, isTask)` → `<last10chars>(main|task)`
 
+### Path Resolution
+
+- `WOPAL_HOME` must be normalised through `resolveWopalHome()` (`src/paths.ts`) before it becomes a path; never feed it straight into `path.join`
+  - the env value can be the literal, unexpanded `~/.wopal`; `join("~/.wopal", "logs")` yields a *relative* path that resolves against the process cwd and grows a junk `~/` directory inside the plugin package
+  - normalisation expands a leading `~`, absolutises, and falls back to `<home>/.wopal` for empty values
+- Test runs pin `WOPAL_HOME` to a temp directory (absolute) globally via `src/test-setup.ts`; a test that overrides it must restore that isolated value
+- `src/test-isolation.test.ts` is the regression guard asserting writes land outside both the plugin cwd and the real `~/.wopal`
+
 ### Module Boundaries
 
 - **tasks**: `SimpleTaskManager` periodic monitoring must register via `MonitorStrategy` into `MonitorEngine`

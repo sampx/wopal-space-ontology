@@ -7,7 +7,7 @@
 import * as lancedb from "@lancedb/lancedb";
 import { makeArrowTable } from "@lancedb/lancedb";
 import { memoryLogger, type LoggerInstance } from "../logger.js";
-import { homedir } from "os";
+import { resolveWopalHome } from "../paths.js";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
 import { randomUUID } from "crypto";
@@ -23,10 +23,12 @@ import {
 // Re-export types for backward compatibility
 export type { Memory, MemoryInput, MemoryCategory, QueryType } from "./types.js";
 
-export function getDefaultMemoryDbPath(
-  wopalHome = process.env.WOPAL_HOME || join(homedir(), ".wopal"),
-): string {
-  return join(wopalHome, "storage", "memory");
+export function getDefaultMemoryDbPath(wopalHome?: string): string {
+  return join(
+    resolveWopalHome(wopalHome ?? process.env.WOPAL_HOME),
+    "storage",
+    "memory",
+  );
 }
 
 /** LanceDB connection and table manager */

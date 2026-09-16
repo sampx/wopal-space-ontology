@@ -100,6 +100,14 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 - 错误日志必须携带 `{ err: error }`，禁止只记 `error.message`
 - sessionID 格式：`formatSessionID(sessionID, isTask)` → `<last10chars>(main|task)`
 
+### 路径解析
+
+- `WOPAL_HOME` 一律经 `resolveWopalHome()`（`src/paths.ts`）归一化后才能转成路径，禁止直接喂给 `path.join`
+  - 环境中的值可能是未展开的字面量 `~/.wopal`；`join("~/.wopal", "logs")` 得到**相对**路径，会按进程 cwd 解析，在插件目录内长出垃圾 `~/` 目录
+  - 归一化负责：展开前导 `~` → 绝对化 → 空值兜底 `<home>/.wopal`
+- 测试全局由 `src/test-setup.ts` 把 `WOPAL_HOME` 钉到临时目录（绝对路径）；测试若自行改写必须恢复到该隔离值
+- `src/test-isolation.test.ts` 是回归守卫，断言写入路径既不在插件 cwd 内、也不在真实 `~/.wopal` 内
+
 ### 模块边界
 
 - **tasks**：`SimpleTaskManager` 周期性监控必须通过 `MonitorStrategy` 注册到 `MonitorEngine`

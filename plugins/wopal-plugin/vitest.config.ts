@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'scripts/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist'],
+    setupFiles: ['./src/test-setup.ts'],
     testTimeout: 15000,
     threads: false,  // Sequential execution to avoid singleton state pollution
     coverage: {

@@ -5,15 +5,17 @@
  * Each field is designed to be consumed by downstream processes.
  */
 
-import { homedir } from "os";
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, readdirSync } from "fs";
 import { contextLogger } from "../logger.js";
+import { resolveWopalHome } from "../paths.js";
 
-export function getSessionContextDir(
-  wopalHome = process.env.WOPAL_HOME || join(homedir(), ".wopal"),
-): string {
-  return join(wopalHome, "storage", "session_context");
+export function getSessionContextDir(wopalHome?: string): string {
+  return join(
+    resolveWopalHome(wopalHome ?? process.env.WOPAL_HOME),
+    "storage",
+    "session_context",
+  );
 }
 
 /**
