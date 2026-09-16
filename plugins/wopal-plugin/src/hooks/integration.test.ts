@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import path from "path";
 import os from "os";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
-import { resetSessionState, getSeedCount, upsertSessionState, getSessionStateSnapshot } from "../test-helpers.js"
+import { resetSessionState, getSeedCount, upsertSessionState, getSessionStateSnapshot, enableRulesInjection } from "../test-helpers.js"
 
 // Test directories - initialized in setupTestDirs
 let testDir: string;
@@ -113,6 +113,7 @@ Do this always`,
 
     const originalHome = process.env.HOME;
     process.env.HOME = testDir;
+      enableRulesInjection(process.env.WOPAL_HOME!);
 
     const { default: pluginDef } = await import("../index.js");
       const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -171,6 +172,7 @@ keywords:
 
     const originalHome = process.env.HOME;
     process.env.HOME = testDir;
+      enableRulesInjection(process.env.WOPAL_HOME!);
 
     const { default: pluginDef } = await import("../index.js");
       const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -331,6 +333,7 @@ Use React best practices for components.`,
 
       const originalHome = process.env.HOME;
       process.env.HOME = testDir;
+      enableRulesInjection(process.env.WOPAL_HOME!);
 
       const { default: pluginDef } = await import("../index.js");
       const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -518,6 +521,7 @@ Follow testing best practices.`,
 
       const originalHome = process.env.HOME;
       process.env.HOME = testDir;
+      enableRulesInjection(process.env.WOPAL_HOME!);
 
       const { default: pluginDef } = await import("../index.js");
       const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);

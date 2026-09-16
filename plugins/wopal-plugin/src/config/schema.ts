@@ -22,6 +22,11 @@ export const wopalPluginConfigSchema = z.object({
       options: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
+  rules: z
+    .object({
+      enabled: z.boolean(),
+    })
+    .default({ enabled: false }),
   memory: z
     .object({
       enabled: z.boolean(),

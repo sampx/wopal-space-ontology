@@ -15,7 +15,7 @@ Canonical references:
 | Module | Responsibility | Disable Switch |
 |--------|---------------|----------------|
 | Global (`index.ts`) | Load .env, load config, register Hooks/Tools | None |
-| Rules (`rules/`) | Rule discovery → condition matching → system prompt injection | None (always enabled) |
+| Rules (`rules/`) | Rule discovery → condition matching → user message injection | `wopal.rules.enabled` — opt-in, default `false` |
 | Memory (`memory/`) | LanceDB storage, semantic retrieval, memory injection | `wopal.memory.enabled` (master), `wopal.memory.injection` (injection only) — config `wopal` node |
 | Task (`tasks/`) | Non-blocking sub-sessions, state monitoring, bidirectional communication, concurrency control | None |
 | Monitor (`monitor/`) | Periodic scheduling engine, unified strategy management | None |
@@ -125,8 +125,9 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - **New tool**: Create file in `tools/`, register in `tools/index.ts` `createWopalTools()`; task tools use `wopal_task_*` prefix
 - **New memory category**: Add in `memory/categories.ts`; identifier in English, importance 0-1
 - **New monitoring strategy**: Implement `MonitorStrategy` interface, register with `MonitorEngine`
-- **New environment variable**: `WOPAL_` prefix + `UPPER_SNAKE_CASE`; must sync to debug switch table and `loadWopalEnv()`
-- **New HookContext field**: Must be optional (`?: boolean`, default `true`) for backward compatibility
+- **New environment variable**: `WOPAL_` prefix + `UPPER_SNAKE_CASE`; must sync to the debug switch table. Feature switches belong in config, not env
+- **New config node**: Add to `src/config/schema.ts` with an explicit default; document it in section 8
+- **New HookContext field**: Must be optional (`?: boolean`) for backward compatibility. Default `true` for capability gates that preserve existing behavior; default must be `false` for opt-in switches (e.g. `rulesInjectionEnabled`)
 
 ### Naming Conventions
 
@@ -184,6 +185,7 @@ Feature switches and connection settings live in the `wopal` node of the three-l
 
 | Node | Fields | Notes |
 |------|--------|-------|
+| `rules` | `enabled` | Default `false`. Opt-in: rule discovery and injection run only when set to `true` |
 | `memory` | `enabled`, `injection` | Default both `true`; `injection=false` stops auto-injection but keeps `memory_manage` and search |
 | `context` | `enabled` | Default `true`; gates title generation, auto-recovery, and distillation; compaction always on |
 | `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR` referencing process.env / `.env` files; never store plaintext keys |

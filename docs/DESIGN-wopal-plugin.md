@@ -20,7 +20,7 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 
 | 能力域 | 拥有的目标能力 | 边界 |
 |--------|----------------|------|
-| 规则注入 | 规则文件发现、条件匹配、系统提示词注入 | 不定义规则内容 |
+| 规则注入 | 规则文件发现、条件匹配、用户消息注入 | 不定义规则内容 |
 | 任务委派 | 非阻塞子会话启动、状态监控、双向通信、并发控制、进程清理 | 不管理任务业务逻辑 |
 | 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD | 不持有记忆数据 |
 | 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储、蒸馏（preview → confirm） | 不改变模型行为 |
@@ -49,7 +49,7 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 |------|------|--------|
 | Runtime（`runtime-*`） | 空间根解析、配置加载、日志器构建、环境合并 | — |
 | Resources | LLM / Embedding 客户端共享资源，按模块依赖初始化 | — |
-| Rules（`rules/`） | 规则发现 → 条件匹配 → 格式化注入 | 默认启用 |
+| Rules（`rules/`） | 规则发现 → 条件匹配 → 格式化注入 | `enabled`（默认关闭，opt-in） |
 | Memory（`memory/`） | LanceDB 存储、语义检索、自动注入、CRUD | `enabled`、`injection` |
 | Context（`hooks/`, `context/`） | 会话摘要、压缩恢复、标题生成、蒸馏 | `enabled` |
 | Task（`tasks/`） | 子会话启动、状态监控、双向通信、并发控制 | 始终启用 |
@@ -78,7 +78,9 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 
 ### Rules Module
 
-Rules 模块发现全局（`~/.wopal/rules`）与空间（`<space>/.wopal/rules`）两级规则文件，按 Agent 作用域与关键词条件匹配，通过 `messages.transform` 注入系统提示词。规则发现发生在插件初始化时，注入发生在每条消息周期。Rules 默认启用，不暴露独立配置开关。
+Rules 模块发现全局（`~/.wopal/rules`）与空间（`<space>/.wopal/rules`）两级规则文件，按 Agent 作用域与关键词条件匹配，通过 `messages.transform` 注入用户消息。规则发现发生在插件初始化时，注入发生在每条消息周期。
+
+模块拥有开关 `wopal.rules.enabled`，**默认 `false`（关闭）**。开关为 opt-in：关闭时规则发现整体跳过，不产生注入。理由：规则注入直接占用每轮上下文预算，且规则体系依赖项目与语言约束，适合由使用方显式开启而非全局默认生效。
 
 ### Memory Module
 
@@ -212,6 +214,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 "wopal": {
   "llm":       { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_LLM_API_KEY" },
   "embedding": { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_EMBEDDING_API_KEY" },
+  "rules":     { "enabled": false },
   "memory":    { "enabled": true, "injection": true },
   "context":   { "enabled": true },
   "logLevel":  "info"

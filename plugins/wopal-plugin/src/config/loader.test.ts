@@ -252,6 +252,7 @@ describe("loadWopalConfig", () => {
       "memory.enabled": "default",
       "memory.injection": "default",
       "context.enabled": "default",
+      "rules.enabled": "default",
     });
   });
 });

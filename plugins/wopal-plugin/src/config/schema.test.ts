@@ -35,8 +35,21 @@ describe("wopalPluginConfigSchema", () => {
     expect(result.context).toEqual({ enabled: true });
   });
 
+  it("defaults rules injection to disabled (opt-in switch)", () => {
+    const result = wopalPluginConfigSchema.parse({});
+    expect(result.rules).toEqual({ enabled: false });
+  });
+
+  it("accepts an explicit rules opt-in", () => {
+    const result = wopalPluginConfigSchema.parse({
+      rules: { enabled: true },
+    });
+    expect(result.rules).toEqual({ enabled: true });
+  });
+
   it("exposes the same defaults as the exported default config", () => {
     expect(defaultWopalPluginConfig.memory).toEqual({ enabled: true, injection: true });
     expect(defaultWopalPluginConfig.context).toEqual({ enabled: true });
+    expect(defaultWopalPluginConfig.rules).toEqual({ enabled: false });
   });
 });

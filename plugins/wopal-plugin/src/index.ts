@@ -128,17 +128,23 @@ const openCodeRulesPlugin = async (
     "Effective wopal config loaded",
   );
 
-  // Rules are always enabled — no config switch (DESIGN §4.2)
-  const ruleFiles: DiscoveredRule[] = await discoverRuleFiles(
-    undefined,
-    rulesLogger,
-    {
+  // Rules injection is opt-in: config `wopal.rules.enabled` defaults to false,
+  // so discovery is skipped entirely unless the switch is turned on.
+  const rulesInjectionEnabled = runtime.config.config.rules.enabled === true;
+  let ruleFiles: DiscoveredRule[] = [];
+  if (rulesInjectionEnabled) {
+    ruleFiles = await discoverRuleFiles(undefined, rulesLogger, {
       wopalHome: runtimeCtx.wopalHome,
       ...(runtimeCtx.wopalSpaceRoot
         ? { wopalSpaceRoot: runtimeCtx.wopalSpaceRoot }
         : {}),
-    },
-  );
+    });
+  } else {
+    coreLogger.info(
+      { module: "rules", reason: "disabled_by_config" },
+      "Rules injection disabled",
+    );
+  }
 
   // Resource layer initialization — memory resources depend on memory.enabled,
   // LLM resource depends on context.enabled (dependency-driven minimal set).
@@ -254,6 +260,7 @@ const openCodeRulesPlugin = async (
     capabilities: {
       memoryInjectionEnabled: runtime.config.config.memory.injection,
       contextEnabled,
+      rulesInjectionEnabled,
     },
     ...(contextEnabled && resources.llm
       ? {

@@ -17,6 +17,11 @@ export interface RuleMessageInjectorContext {
   taskManager?: { findBySession: (sessionID: string) => unknown } | undefined;
   childSessionCache: Map<string, boolean> | undefined;
   rulesLogger: LoggerInstance;
+  /**
+   * Rules injection is opt-in: gated on `capabilities.rulesInjectionEnabled === true`
+   * (config `wopal.rules.enabled`, default false). Absent means disabled.
+   */
+  capabilities?: { rulesInjectionEnabled?: boolean };
 }
 
 export async function injectRulesToMessage(
@@ -25,6 +30,7 @@ export async function injectRulesToMessage(
   messages: MessageWithInfo[],
   lastUserMsg: MessageWithInfo | undefined,
 ): Promise<void> {
+  if (!ctx.capabilities?.rulesInjectionEnabled) return;
   if (!lastUserMsg) return;
 
   const userPrompt = extractLatestUserPrompt(messages);

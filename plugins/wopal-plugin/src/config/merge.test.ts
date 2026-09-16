@@ -18,6 +18,7 @@ describe("mergeConfigs", () => {
       llm: { baseUrl: "u1", model: "m1" },
       memory: { enabled: true, injection: false },
       context: { enabled: true },
+      rules: { enabled: false },
     });
   });
 
@@ -99,10 +100,12 @@ describe("mergeConfigs", () => {
     expect(merged.config).toEqual({
       memory: { enabled: true, injection: true },
       context: { enabled: true },
+      rules: { enabled: false },
     });
     expect(merged.sources["memory.enabled"]).toBe("default");
     expect(merged.sources["memory.injection"]).toBe("default");
     expect(merged.sources["context.enabled"]).toBe("default");
+    expect(merged.sources["rules.enabled"]).toBe("default");
   });
 
   it("preserves optional branch absence and does not fabricate sources for them", () => {

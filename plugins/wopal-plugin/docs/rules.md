@@ -1,6 +1,20 @@
 # Wopal Rules
 
-This document explains how to use Wopal Rules to inject custom instructions into agent messages. Rules are automatically discovered and injected via messages.transform hook, enabling keyword-based rule filtering with agent scope support.
+This document explains how to use Wopal Rules to inject custom instructions into agent messages. Rules are discovered and injected via messages.transform hook, enabling keyword-based rule filtering with agent scope support.
+
+## Enabling Rules Injection
+
+Rules injection is **opt-in and disabled by default**. Turn it on in the `wopal` node of the three-layer settings (`$WOPAL_HOME/config/settings.jsonc`, `<space>/.wopal/config/settings.jsonc`, or `settings.local.jsonc`):
+
+```jsonc
+{
+  "wopal": {
+    "rules": { "enabled": true }
+  }
+}
+```
+
+While `wopal.rules.enabled` is `false` (the default), rule discovery is skipped entirely — no rule files are scanned and nothing is injected.
 
 ## Rule Files
 
@@ -69,10 +83,11 @@ Rules without keywords are **skipped**. There is no "unconditional" injection. E
 
 ## How Rules are Loaded and Injected
 
-1. **Discovery**: Plugin scans `~/.wopal/rules/` and `.wopal/rules/` recursively at initialization
-2. **Agent Filtering**: Agent-scoped rules are filtered based on current agent name
-3. **Keyword Matching**: Only rules whose keywords match the user prompt are selected
-4. **Injection**: Matching rules are formatted and injected as synthetic parts into user messages via `messages.transform` hook
+1. **Enablement**: `wopal.rules.enabled` must be `true`; otherwise steps 2-5 are skipped entirely
+2. **Discovery**: Plugin scans `~/.wopal/rules/` and `.wopal/rules/` recursively at initialization
+3. **Agent Filtering**: Agent-scoped rules are filtered based on current agent name
+4. **Keyword Matching**: Only rules whose keywords match the user prompt are selected
+5. **Injection**: Matching rules are formatted and injected as synthetic parts into user messages via `messages.transform` hook
 
 ## Rule Matching Examples
 

@@ -23,6 +23,7 @@ import type { MemoryInjectorContext } from "./memory-injection-utils.js";
 export interface HookCapabilities {
   memoryInjectionEnabled?: boolean; // Default true
   contextEnabled?: boolean; // Default true; gates LLM-driven context abilities (D-04)
+  rulesInjectionEnabled?: boolean; // Default FALSE; rules injection is opt-in (wopal.rules.enabled)
 }
 
 export interface HookContextOptions {
@@ -67,7 +68,11 @@ export interface HookContext {
   systemSnapshots: Map<string, string[]>;
   systemMetadataMap: Map<string, SystemPromptMetadata>;
   systemInjectionsMap: Map<string, string[]>;
-  capabilities: { memoryInjectionEnabled: boolean; contextEnabled: boolean };
+  capabilities: {
+    memoryInjectionEnabled: boolean;
+    contextEnabled: boolean;
+    rulesInjectionEnabled: boolean;
+  };
   generateSessionTitle:
     | ((summary: string) => Promise<{ title?: unknown }>)
     | undefined;
@@ -96,6 +101,8 @@ export function createHookContext(opts: HookContextOptions): HookContext {
     capabilities: {
       memoryInjectionEnabled: opts.capabilities?.memoryInjectionEnabled ?? true,
       contextEnabled: opts.capabilities?.contextEnabled ?? true,
+      // Default off: absent capabilities must not enable rules (opt-in switch).
+      rulesInjectionEnabled: opts.capabilities?.rulesInjectionEnabled ?? false,
     },
     generateSessionTitle: opts.generateSessionTitle,
   };
@@ -138,6 +145,7 @@ export function createAllHooks(ctx: HookContext): AllHooksResult {
       taskManager: ctx.taskManager,
       childSessionCache: ctx.childSessionCache,
       rulesLogger: ctx.rulesLogger,
+      capabilities: ctx.capabilities,
     },
     memoryMessageCtx: {
       memoryInjectorCtx: {

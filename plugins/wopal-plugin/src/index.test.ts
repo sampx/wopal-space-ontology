@@ -8,6 +8,7 @@ import {
   setSessionStateLimit,
   getSessionStateIDs,
   upsertSessionState,
+  enableRulesInjection,
 } from "./test-helpers.js";
 
 let testDir: string;
@@ -105,6 +106,7 @@ Do this always`,
 
     const originalHome = process.env.HOME;
     process.env.HOME = testDir;
+    enableRulesInjection(process.env.WOPAL_HOME!);
 
     const { default: pluginDef } = await import("./index.js");
     const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -141,6 +143,59 @@ Do this always`,
       );
       const rulesText = syntheticParts.map((p: any) => p.text).join("\n");
       expect(rulesText).toContain("Test Rule");
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
+  it("does not inject rules by default (wopal.rules.enabled defaults to false)", async () => {
+    writeFileSync(
+      path.join(globalRulesDir, "rule.md"),
+      `---
+keywords:
+  - "hello"
+---
+
+# Test Rule
+Do this always`,
+    );
+
+    const originalHome = process.env.HOME;
+    process.env.HOME = testDir;
+
+    const { default: pluginDef } = await import("./index.js");
+    const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
+
+    try {
+      const hooks = await plugin({
+        client: {} as any,
+        project: {} as any,
+        directory: testDir,
+        worktree: testDir,
+        $: {} as any,
+        serverUrl: new URL("http://localhost:3000"),
+      });
+
+      const messagesTransform = hooks[
+        "experimental.chat.messages.transform"
+      ] as any;
+      const result = await messagesTransform(
+        {},
+        {
+          messages: [
+            {
+              role: "user",
+              info: { sessionID: "test-ses-default-off", role: "user" },
+              parts: [{ type: "text", text: "hello world" }],
+            },
+          ],
+        },
+      );
+
+      const syntheticParts = (result.messages[0].parts as any[]).filter(
+        (p: any) => p.synthetic,
+      );
+      expect(syntheticParts).toHaveLength(0);
     } finally {
       process.env.HOME = originalHome;
     }
@@ -620,11 +675,13 @@ interface ConfigSwitches {
   memoryEnabled?: boolean;
   memoryInjection?: boolean;
   contextEnabled?: boolean;
+  rulesEnabled?: boolean;
 }
 
 function buildTestConfig(switches: ConfigSwitches): LoadedConfig {
   return {
     config: {
+      rules: { enabled: switches.rulesEnabled ?? false },
       memory: {
         enabled: switches.memoryEnabled ?? true,
         injection: switches.memoryInjection ?? true,
