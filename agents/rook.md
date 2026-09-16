@@ -15,7 +15,7 @@ permission:
     "*": deny
     df-plan-review: allow
     df-implement-review: allow
-  doom_loop: allow
+  doom_loop: deny
   read:
     "*": allow
     "*.env": deny
@@ -77,7 +77,7 @@ Specific review workflows, output formats, and evidence standards are defined in
 
 | Review Type | Trigger Condition | Load Skill |
 |------------|------------------|-----------|
-| Plan Review | Plan document path, `review_type: plan`, goal/must_haves description | `df-plan-review` |
+| Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-plan-review` |
 | Work Review | Code file list, `review_type: implementation`, Plan path + changed files | `df-implement-review` |
 | Unclear | No explicit type marker | **Prioritize Work Review** (avoid Plan review empty run) |
 

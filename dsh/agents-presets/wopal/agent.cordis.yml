@@ -418,7 +418,7 @@
 
           | Review Type | Trigger Condition | Load Skill |
           |------------|------------------|-----------|
-          | Plan Review | Plan document path, `review_type: plan`, goal/must_haves description | `df-plan-review` |
+          | Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-plan-review` |
           | Code Review | Code file list, `review_type: implementation`, Plan path + changed files | `df-implement-review` |
           | Unclear | No explicit type marker | **Prioritize Code Review** (avoid Plan review empty run) |
 
