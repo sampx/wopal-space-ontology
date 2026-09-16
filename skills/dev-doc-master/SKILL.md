@@ -1,27 +1,28 @@
 ---
 name: dev-doc-master
 description: >
-  Author and maintain the product/project documentation set — PRD, DESIGN
-  (main and sub), Phase/Roadmap, README, BUSINESS_RULES, and GAPS — and
+  Author and maintain the product documentation set — PRD, DESIGN
+  (main and sub), Phase/Roadmap, BUSINESS_RULES, and GAPS — and
   keep the set consistent with the repository. Use when the user asks to
   create, update, split, or align any of these documents, or when
   document-set consistency needs checking (header vs reference links,
   bidirectional sub-document index, cross-document alignment), for example
   "write a PRD", "update the design doc", "split this design", "create a
-  phase doc", "update the README", "business rules", or any /cupdate-*
-  request. Do not use for writing development Plans (use dev-flow) or for
-  reviewing implementation code (use df-implement-review).
+  phase doc", "business rules", or any /cupdate-* request. Do not use for
+  writing development Plans (use dev-flow), for reviewing implementation
+  code (use df-implement-review), or for creating or updating a project
+  README (use space-master).
 ---
 
 # dev-doc-master — Development Documentation Master
 
-Authoring and maintenance workflow for the product/project documentation set: PRD, DESIGN (main + sub), Phase/Roadmap, README, and BUSINESS_RULES. This skill owns the rules and templates; the `/cupdate-*` commands are thin entries that route here.
+Authoring and maintenance workflow for the product documentation set: PRD, DESIGN (main + sub), Phase/Roadmap, and BUSINESS_RULES. This skill owns the rules and templates; the `/cupdate-*` commands are thin entries that route here. Project README authoring lives in the `space-master` skill.
 
 ## When to Use
 
-- Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, project README, or project BUSINESS_RULES.
+- Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, or project BUSINESS_RULES.
 - Split an oversized main document into topic sub-documents.
-- Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ README ↔ BUSINESS_RULES ↔ AGENTS.md).
+- Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ BUSINESS_RULES ↔ AGENTS.md).
 - Record or update project gaps between design target state and implementation (`GAPS.md`).
 
 ## Document Set and Routing
@@ -32,7 +33,6 @@ Authoring and maintenance workflow for the product/project documentation set: PR
 | Product / Project DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` / `templates/design-project.md` |
 | Sub-DESIGN | (via `/cupdate-design`) | `references/design.md` | `templates/design-sub.md` |
 | Phase | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
-| Project README | `/cupdate-readme` | `references/readme.md` | (inline in `references/readme.md`) |
 | Project GAPS | (no command) | `references/gaps.md` | `templates/gaps.md` |
 | Project BUSINESS_RULES | `/cupdate-br` | `references/business-rules.md` | `templates/business-rules.md` |
 | AGENTS.md | `/cupdate-agent-rules` | space-master skill | space-master skill templates |
@@ -47,7 +47,7 @@ Read `references/consistency.md` for the full text. In short:
 - **Relative links only**: all document links are relative to the repository root or the document's directory. Absolute paths are forbidden (docs are committed to git and shared).
 - **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). The end section carries reference-only material. A document is never listed twice — an entry in both zones makes the obligation unreadable.
 - **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `Parent: ./DESIGN.md`. Bidirectional index must match actual files.
-- **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, README, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
+- **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
 - **Target-state writing**: documents describe the target state only — what the system is, what exists, who owns it. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", or "migration" notes. When a capability is owned elsewhere, state the ownership, not the move.
 - **Gap detail has one home**: gap detail lives in the project `GAPS.md`. A Phase document lists the gaps its scope closes by identifier, title, priority, and design pointer — it never restates Current / Target / Exit.
 - **A gap is a design statement, an issue is a code defect**: a gap records an unimplemented design contract, a design change the code has not followed, or an experimental design area awaiting convergence. A satisfied contract with a bug is an issue, not a gap. Every gap belongs to exactly one project — work spanning projects is split so each half is closable on its own. Method: `references/gaps.md` (What Counts as a Gap).
@@ -89,4 +89,4 @@ This split means a document's structure is language-independent — a reader or 
 
 ## Document-Set Consistency (always)
 
-Updating a PRD affects DESIGN and Phase. Updating a main DESIGN affects sub-DESIGNs. Updating a Phase affects PRD and DESIGNs. Updating README affects DESIGN and AGENTS.md. The completion response must state which related documents were checked, aligned, or still need a follow-up update.
+Updating a PRD affects DESIGN and Phase. Updating a main DESIGN affects sub-DESIGNs. Updating a Phase affects PRD and DESIGNs. The completion response must state which related documents were checked, aligned, or still need a follow-up update.

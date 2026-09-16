@@ -8,6 +8,7 @@ description: |
   - 空间结构维护：space init/status、.wopal 目录结构、装配模型、空间如何运行与配置
   - 空间能力编写：命令、规则、技能、模板的编写与修改规范
   - AGENTS.md 编写：创建或更新项目级/目录级 AGENTS.md
+  - README 编写：创建或更新项目级 README.md
   - 技能生命周期：安装、扫描、移除
   - 意图不明确、不确定用哪个流程/技能时，作为总纲路由到正确技能
 
@@ -34,6 +35,7 @@ description: |
 
 - **本体运维**：同步、贡献、提升、PR 全流程——运行模式、贡献路径、范围判定、PR 拆分、同步门禁
 - **AGENTS.md 维护**：创建/更新项目级或目录级 AGENTS.md——规则审计、内容边界、工作流
+- **README 维护**：创建/更新项目级 README.md——面向人类的项目入口文档，按空间能力条件性对齐文档集
 - **技能维护**：技能生命周期——安装、扫描、移除
 
 ---
@@ -174,6 +176,17 @@ wopal ontology contribute --include "a/**,b/**" --message "<message>" --confirm
 
 **完整规范**（内容边界、工作流、质量清单）见 `references/agents-md-maintenance.md`。命令 `/cupdate-agent-rules` 仅作入口引导，不承载规范。
 
+## README 维护
+
+创建或更新项目级 `README.md` 时，按以下规范开展工作：
+
+1. **能力感知先行**：读取 `.wopal-space/space-meta.json` 的空间类型（`type`）与已装配技能（`capabilities.skills`）；元数据缺失时探测文件系统（是否存在 `docs/`、`DESIGN.md`、`AGENTS.md`）。文档集对齐仅在空间装配了相关文档集技能时执行，未装配则跳过，绝不假设。
+2. **更新前出计划**：展示完整优化方案（目标文件路径、一句话项目描述、模块/核心命令概览、增删改章节、规范文档引用），获用户确认后才动笔
+3. **先中文审核版，后英文正式版**：用户偏好语言非英文时，先生成 `README.<locale>.md` 供审核；确认后更新正式英文 `README.md`
+4. **命令必须验证**：安装/运行/开发命令一律从 package 与配置文件核实，绝不猜测
+
+**完整规范**（能力感知、模板、质量清单）见 `references/readme-maintenance.md`。命令 `/cupdate-readme` 仅作入口引导，不承载规范。
+
 ---
 
 ## 技能维护
@@ -209,3 +222,4 @@ wopal skills remove <name> --force       # 从空间移除
 | `references/ontology-maintenance.md` | 中央能力池模型与模式契约、状态信号解读矩阵、按文件类型的冲突处理、远程分支清理、贡献范围与 PR 拆分流程 |
 | `references/skills-maintenance.md` | 完整生命周期细节、安全扫描检查项、质量评估标准 |
 | `references/agents-md-maintenance.md` | AGENTS.md 维护完整规范：内容边界、规则审计判据、工作流、质量清单 |
+| `references/readme-maintenance.md` | README 维护完整规范：能力感知、语言版本规则、模板、质量清单 |

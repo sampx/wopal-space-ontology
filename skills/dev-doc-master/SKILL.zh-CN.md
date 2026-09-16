@@ -1,22 +1,22 @@
 ---
 name: dev-doc-master
 description: |
-  编写与维护产品/项目的开发文档集——PRD、DESIGN（主文档与子文档）、阶段/Roadmap、README、BUSINESS_RULES、GAPS——并保持文档集与仓库实际一致。
+  编写与维护产品文档集——PRD、DESIGN（主文档与子文档）、阶段/Roadmap、BUSINESS_RULES、GAPS——并保持文档集与仓库实际一致。
 
-  使用场景：用户要求创建、更新、拆分或对齐其中任何文档，或需要检查文档集一致性（头部链接 vs 末尾引用、子文档双向索引、跨文档对齐），例如"写方案文档"、"更新设计文档"、"拆分设计文档"、"创建阶段文档"、"更新 README"、"业务规则"、"差距文档"，或任何 /cupdate-* 命令。
+  使用场景：用户要求创建、更新、拆分或对齐其中任何文档，或需要检查文档集一致性（头部链接 vs 末尾引用、子文档双向索引、跨文档对齐），例如"写方案文档"、"更新设计文档"、"拆分设计文档"、"创建阶段文档"、"业务规则"、"差距文档"，或任何 /cupdate-* 命令。
 
-  不适用：编写开发 Plan（用 dev-flow）或审查实施代码（用 df-implement-review）。
+  不适用：编写开发 Plan（用 dev-flow）、审查实施代码（用 df-implement-review）、创建或更新项目 README（用 space-master）。
 ---
 
 # dev-doc-master — 开发文档规范与维护
 
-产品/项目文档集的编写与维护工作流：PRD、DESIGN（主 + 子）、阶段/Roadmap、README、BUSINESS_RULES。本技能拥有规则与模板；`/cupdate-*` 命令是薄入口，全部路由到这里。
+产品文档集的编写与维护工作流：PRD、DESIGN（主 + 子）、阶段/Roadmap、BUSINESS_RULES。本技能拥有规则与模板；`/cupdate-*` 命令是薄入口，全部路由到这里。项目 README 编制归 space-master 技能。
 
 ## 使用时机
 
-- 创建或更新产品 PRD、产品 DESIGN、项目 DESIGN、阶段文档、roadmap、项目 README 或项目 BUSINESS_RULES。
+- 创建或更新产品 PRD、产品 DESIGN、项目 DESIGN、阶段文档、roadmap 或项目 BUSINESS_RULES。
 - 把过大的主文档按主题拆分为子文档。
-- 变更后对齐文档集（PRD ↔ DESIGN ↔ Phase ↔ README ↔ BUSINESS_RULES ↔ AGENTS.md）。
+- 变更后对齐文档集（PRD ↔ DESIGN ↔ Phase ↔ BUSINESS_RULES ↔ AGENTS.md）。
 - 记录或更新设计目标态与实现之间的项目差距（`GAPS.md`）。
 
 ## 文档集与路由
@@ -27,7 +27,6 @@ description: |
 | 产品 / 项目 DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` / `templates/design-project.md` |
 | 子 DESIGN | （经由 `/cupdate-design`） | `references/design.md` | `templates/design-sub.md` |
 | 阶段 | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
-| 项目 README | `/cupdate-readme` | `references/readme.md` | （内联于 `references/readme.md`） |
 | 项目 GAPS | （无命令） | `references/gaps.md` | `templates/gaps.md` |
 | 项目 BUSINESS_RULES | `/cupdate-br` | `references/business-rules.md` | `templates/business-rules.md` |
 | AGENTS.md | `/cupdate-agent-rules` | space-master 技能 | space-master 技能模板 |
@@ -42,7 +41,7 @@ description: |
 - **只用相对链接**：所有文档链接相对于仓库根或文档所在目录。禁止绝对路径（文档提交进 git 并共享）。
 - **头部 = 必须，末尾 = 参考**：头部链接只放本文档必须遵循的文档（父文档、兄弟文档）。末尾章节放仅参考的材料。一份文档绝不出现两次——同时出现在两个区域会让义务无法解读。
 - **主文档罗列子文档**：无后缀主文档头部枚举其全部 `DESIGN-<topic>.md` / `PRD-<topic>.md` 子文档；每个子文档头部通过 `Parent: ./DESIGN.md` 指回。双向索引必须与实际文件一致。
-- **文档集一致性**：更新一份文档绝不是孤立的。审查整个文档集（PRD、DESIGN 主/子、Phase、README、AGENTS.md），对齐每个受影响的文档。完成回复中报告受影响的文档集。
+- **文档集一致性**：更新一份文档绝不是孤立的。审查整个文档集（PRD、DESIGN 主/子、Phase、AGENTS.md），对齐每个受影响的文档。完成回复中报告受影响的文档集。
 - **目标态写作**：文档只描述目标态——系统是什么、存在什么、谁拥有它。禁止过程态描述：不写 "deprecated"、"legacy"、"moved from X"、"old path"、"migration" 之类的说明。能力归他处所有时，陈述归属，而非迁移。
 - **差距明细只有一个家**：差距明细存在于项目 `GAPS.md`。阶段文档只按标识、标题、优先级、设计指针列出其范围关闭的差距——绝不复述 Current / Target / Exit。
 - **差距是设计陈述，Issue 是代码缺陷**：差距记录未实现的设计契约、代码未跟随的设计变更、或等待收敛的实验性设计领域。契约已满足但存在 bug 是 Issue，不是差距。每个差距恰好属于一个项目——跨项目工作被拆分，使每一半都能独立关闭。方法见 `references/gaps.md`（What Counts as a Gap）。
@@ -84,4 +83,4 @@ description: |
 
 ## 文档集一致性（始终）
 
-更新 PRD 影响 DESIGN 与 Phase。更新主 DESIGN 影响子 DESIGN。更新 Phase 影响 PRD 与 DESIGN。更新 README 影响 DESIGN 与 AGENTS.md。完成回复必须说明哪些关联文档被检查、被对齐、或仍需跟进更新。
+更新 PRD 影响 DESIGN 与 Phase。更新主 DESIGN 影响子 DESIGN。更新 Phase 影响 PRD 与 DESIGN。完成回复必须说明哪些关联文档被检查、被对齐、或仍需跟进更新。
