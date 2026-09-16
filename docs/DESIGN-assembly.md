@@ -242,21 +242,20 @@ CLI 读取骨架后按以下规则消费：
 | 层级 | 文件 | 作用域 | Git 跟踪 | 职责 |
 |------|------|--------|----------|------|
 | 全局 | `~/.wopal/config/settings.jsonc` | 所有空间 | 否 | 跨空间共享的 provider、model、全局功能开关 |
-| 空间级（公共）| `.wopal/config/settings.jsonc` | 当前空间 | 是 | 空间共享的 ellamaka 与插件配置，随仓库传播 |
+| 空间级（公共）| `.wopal/config/settings.jsonc` | 当前空间 | 是 | 空间共享的 ellamaka 运行配置，随仓库传播 |
 | 空间级（私有）| `.wopal/config/settings.local.jsonc` | 当前空间 | 否（git 忽略）| 覆盖公共默认值的本地开发者配置 |
 
 CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随 space 分支经 `space sync` 汇入 central main，任何实例相关内容写入都会污染中央能力池。
 
 ### Plugin Assembly Layers
 
-插件分两类，装配方式不同：
+插件装配由装配单驱动，空间级配置承载物化结果：
 
 | 类别 | 承载文件 | 分发方式 |
 |------|---------|---------|
-| 全空间通用插件 | `.wopal/config/settings.jsonc` | 随 main 分发，人工维护 |
-| 空间特有插件 | 空间根 `settings.local.jsonc` | CLI 按装配单生成，git 忽略 |
+| 空间插件 | 空间级 `.wopal/config/settings.local.jsonc` | CLI 按装配单生成，git 忽略，可再生 |
 
-通用插件（如 `wopal-plugin`、`dsh-adapter`）写入 `settings.jsonc`，所有空间一致。空间特有插件按装配单生成到 `settings.local.jsonc`，该文件可再生——换机器后重新按装配单装配即恢复。
+共享 `settings.jsonc` 不硬编码插件引用。装配单的 `plugins` 字段是插件声明的唯一真相源：CLI 在 `space init` 与 `space capability add/remove` 时读取装配单，把插件引用生成到空间级 `settings.local.jsonc`。该文件可由 CLI 再生——换机器后重新按装配单装配即恢复，因此不进入版本控制。
 
 插件在 settings 中的引用使用相对空间 config 目录的路径（`../plugins/<name>`），使同一份配置在所有空间与机器上一致。
 
@@ -269,7 +268,7 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 | `assembly/` | 装配定义 | 装配单、骨架与模板本身是物化源头，不参与物化 |
 | `prompts/` | wopal-plugin | 插件运行时的提示词资产，随插件分发；插件目录与用户级同名文件可覆盖，源码内保留默认值 |
 | 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
-| `config/settings.jsonc` | 空间配置 | 全空间通用配置，随 main 分发 |
+| `config/settings.jsonc` | 空间配置 | 空间共享运行配置，随 main 分发；不承载插件引用 |
 
 ## Permission Ownership and User Override
 
