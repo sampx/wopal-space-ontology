@@ -1,22 +1,6 @@
 {
   "ellamaka": {
-    "default_agent": "wopal",
     "autoupdate": true,
-    "instructions": [
-      ".wopal-space/STRUCTURE.md",
-      ".wopal-space/REGULATIONS.md",
-      ".wopal-space/memory/USER.md",
-      ".wopal-space/memory/MEMORY.md"
-    ],
-    "plugin": [
-      [
-        "../plugins/dsh-adapter/index.ts",
-        {
-          "sandbox": { "enabled": true, "mode": "workspace-write" }
-        }
-      ],
-      "../plugins/wopal-plugin/src/index.ts"
-    ],
     "permission": {
       "external_directory": {
         "*": "ask",
@@ -35,22 +19,6 @@
         "wopal *": "allow",
         "bash -n *": "allow"
       }
-    }
-  },
-  "tui": {
-    "plugin": [
-      [
-        "../plugins/tui-ellamaka/index.tsx",
-        {
-          "enabled": true,
-          "label": "WOPALSPACE"
-        }
-      ]
-    ],
-    "attention": {
-      "enabled": true,
-      "notifications": true,
-      "sound": true
     }
   }
 }
