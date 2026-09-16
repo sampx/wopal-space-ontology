@@ -1,6 +1,16 @@
 ---
 name: dev-doc-master
-description: Author and maintain a project's development documentation set. MUST load when the user asks to create or update a PRD, DESIGN, design document, sub-design, phase document, roadmap, project README, BUSINESS_RULES, or GAPS document; when a document needs splitting into topic sub-documents; or when document-set consistency needs checking (header vs reference links, bidirectional sub-document index, cross-document alignment). Triggers include "write a PRD", "update the design doc", "split this design", "create a phase doc", "update the README", "business rules", "写方案文档", "更新设计文档", "拆分设计文档", "创建 PRD", "更新 README", "业务规则", "差距文档", or any request to author or align project documentation. Also covers the /cupdate-* command family.
+description: >
+  Author and maintain the product/project documentation set — PRD, DESIGN
+  (main and sub), Phase/Roadmap, README, BUSINESS_RULES, and GAPS — and
+  keep the set consistent with the repository. Use when the user asks to
+  create, update, split, or align any of these documents, or when
+  document-set consistency needs checking (header vs reference links,
+  bidirectional sub-document index, cross-document alignment), for example
+  "write a PRD", "update the design doc", "split this design", "create a
+  phase doc", "update the README", "business rules", or any /cupdate-*
+  request. Do not use for writing development Plans (use dev-flow) or for
+  reviewing implementation code (use df-implement-review).
 ---
 
 # dev-doc-master — Development Documentation Master
