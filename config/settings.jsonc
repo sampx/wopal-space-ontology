@@ -1,6 +1,6 @@
 {
   "ellamaka": {
-    "autoupdate": true,
+    "autoupdate": "notify",
     "permission": {
       "external_directory": {
         "*": "ask",
