@@ -322,6 +322,7 @@ After `complete` the agent must:
 - [ ] Merge feature → integration branch (scenarios 1-3; skip in scenario 4)
 - [ ] Run `flow.sh verify <issue> --confirm`
 - [ ] Run `flow.sh archive <issue>`
+- [ ] Close the gaps the Plan delivered: remove each Gap entry whose Plan has reached `done` from the target project's `GAPS.md` (removal, not checkbox-ticking — a gap entry disappears when closed; commit in the project repo)
 
 The agent must not:
 - [ ] Merge or verify --confirm without user confirmation
@@ -342,6 +343,8 @@ Worktree scenarios (1-3) also require the feature branch merged; the script dete
 verify --confirm records `Final Commit` (post-merge integration HEAD) into Plan metadata, closing the loop with the approve-time `Base Commit`.
 
 The script commits a Plan-only commit on the integration branch (`verifying` → `done`).
+
+Reaching `done` closes the gaps the Plan's Gaps column names. In the same closing pass, the agent removes those Gap entries from the project's `GAPS.md` — the file is a live tracker of open divergence only, so closed entries are deleted rather than ticked; if the removal empties the file, the file itself goes. The change commits in the project repo.
 
 ### F. Archive
 
@@ -405,6 +408,7 @@ Precondition: Plan status = `done`. The script archives the Plan, cleans the wor
 - **Ticking criterion-style ACs past complete** — the AC must have its real command written back (beat 2) before it can be checked; the script blocks command-less checked entries
 - **Being rushed by `complete` errors into back-ticking** — verify empirically right after rook PASS, not at `complete`
 - **Ticking User Validation on the user's behalf** — that checkbox belongs to the user
+- **Leaving closed gap entries in `GAPS.md`** — a Plan reaching `done` closes its Gaps; delete the entries instead of ticking them, and remove the whole file when the last gap goes
 - **Pushing automatable verification to the user** — UV only holds items agents cannot verify and the user must observe; tests/lint/typecheck go to Agent Verification
 - **UV scenarios without a launch command** — every scenario needs a copy-pasteable command and assertable criteria; document missing mechanisms in the project spec first
 - **grep/glob for Plans** — use `flow.sh plan <name>` or `flow.sh plan status <name>`
