@@ -257,6 +257,8 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 
 共享 `settings.jsonc` 不硬编码插件引用。装配单的 `plugins` 字段是插件声明的唯一真相源：CLI 在 `space init` 与 `space capability add/remove` 时读取装配单，把插件引用生成到空间级 `settings.local.jsonc`。该文件可由 CLI 再生——换机器后重新按装配单装配即恢复，因此不进入版本控制。
 
+**插件条目只含路径引用，零内联配置。** 插件引用生成时只写路径（如 `["../plugins/dsh-adapter"]`），不携带 options——条目是纯装配事实，保证可再生。插件的行为配置统一放 settings 的 `wopal.pluginConfig.<插件名>` 节，走配置继承链（用户全局默认 → 空间覆写）。装配单可以为插件声明默认配置（`configDefaults`），CLI 装配时把默认值补丁写进 `wopal.pluginConfig` 节而不是内联进条目——默认值与用户调整都落在继承链上，设置面板与 `wopal config schema` 因此天然覆盖插件配置。
+
 插件在 settings 中的引用使用相对空间 config 目录的路径（`../plugins/<name>`），使同一份配置在所有空间与机器上一致。
 
 ## Assets Outside the Manifest
