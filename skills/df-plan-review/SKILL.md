@@ -123,6 +123,18 @@ Severity: goal part with no task → **BLOCKER**; decision quietly reduced → *
 
 A finding must cite both sides — where the Plan says it, and the reality that contradicts it. Without that, it is at most Info.
 
+## Review budget — at most 2 rounds
+
+Every review session has a hard budget: **the initial review plus at most one re-review (2 verdicts total), then the review closes.** Reviews burn real subscription tokens on both sides — a salami-slicing review cycle that dribbles out one or two findings per round is the most expensive way to reach the same verdict, and it is prohibited.
+
+To make 2 rounds enough:
+
+1. **First review must be exhaustive.** Run all three questions (Q1/Q2/Q3) to completion and report *every* finding you have in one report, including borderline ones you would otherwise "save for later". A report that holds back findings to drip-feed in later rounds is defective service, not thoroughness. Depth per finding matters; withholding findings does not.
+2. **On re-review, sweep for regressions AND leftovers, then close.** The re-review verifies the fixes and simultaneously checks the whole Plan again — anything you find in this round is final. There is no round 3 to raise what you missed.
+3. **Owner-side duty (Wopal)**: when delegating a review or a re-review, state this budget explicitly in the prompt (e.g. "review budget: 2 rounds max — list ALL findings in this round; no further rounds will occur"). A re-review prompt that does not carry the budget notice invites the drip-feed failure.
+
+If the second round still ends at BLOCK, the review closes with the findings reported — do not keep cycling. The Plan owner decides: fix and re-delegate a *fresh* review (new session), or accept the documented risk. Re-delegating a fresh review after closure is legitimate; silently extending the same session to round 3+ is not.
+
 ## Verdict and report
 
 ```

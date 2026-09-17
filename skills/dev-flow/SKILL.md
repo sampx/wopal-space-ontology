@@ -122,7 +122,7 @@ The full git commit sequence of a Plan (feature branch view):
 2. **Human authorization gates**: both `approve --confirm` and `verify --confirm` require explicit user authorization.
 3. **Scripts never touch project code**: `flow.sh` commands do not commit implementation code, but manage their own infrastructure (worktrees, feature branches). `complete` aborts on a dirty tree.
 4. **Plan path**: Plan files live in the space repo at `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. The Plan path given to fae must be the space-repo absolute path; fae edits that file to tick Done checkboxes and never touches Plan Status metadata.
-5. **rook gate**: implementation review (before complete) must be delegated to rook; rook PASS is required to advance; at most 3 revision rounds. Plan quality is gated by the built-in `plan check` at submit — rook does not review Plans.
+5. **rook gate**: implementation review (before complete) must be delegated to rook; rook PASS is required to advance; **review budget: at most 2 rounds — the first review must list ALL findings in one report, one re-review at most, then the review closes** (see the review-budget section in df-plan-review). Plan quality is gated by the built-in `plan check` at submit — rook does not review Plans.
 6. **Plan language and structure**: Plan body in the user's preferred language, section headings in English (matching the template). Never mix Chinese and English headings.
 
 ## Plan Task field requirements
@@ -250,6 +250,7 @@ When the user approves a Plan, the agent must pick the correct mode from their i
 
 **Delegation notes**:
 - Implementation → fae; review → rook
+- **Review budget in every rook prompt**: state it explicitly — "review budget: 2 rounds max; list ALL findings in this round (including borderline ones); no further rounds". First review must be exhaustive; the re-review (verify fixes + full re-sweep) is final
 - **Context reuse**: after fae/rook finish, prefer `reply` to continue the session; never `finish` then re-spawn. Precondition: subtask context < 50%
 - Reuse chain: fae IDLE → reply rook to review → rook REVISE → reply fae to fix → fae fix IDLE → reply rook to re-review → rook PASS → finish both tasks
 - rook contract format in agents-collab; rook loads df-implement-review itself
@@ -401,7 +402,7 @@ Precondition: Plan status = `done`. The script archives the Plan, cleans the wor
 - **Skipping rook review before complete** — implementation review is a mandatory gate
 - **Manual `plan check` then submit** — redundant; `flow.sh submit` already runs `plan check`
 - **Skipping `submit` before user review** — the Plan must reach `reviewing` first, or approval cannot proceed to implementation
-- **Forcing complete after rook BLOCK** — revise and re-review; at most 3 rounds
+- **Forcing complete after rook BLOCK** — revise and re-review; **review budget: 2 rounds max** (first review lists ALL findings; one re-review; then the review closes — after that, report to the user, who decides whether to start a fresh review)
 - **Re-spawning rook for re-review** — after fae fixes, `wopal_task_reply` the original rook task; a fresh session loses the review context and wastes tokens
 - **Checkbox/code divergence** — no ticking before the code is committed; no code revert after ticking. Both must be in place before `complete`
 - **Ticking ACs without actually verifying** — run commands and check outputs; ticking from memory = serious dereliction

@@ -120,7 +120,7 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 2. **人类授权门**：`approve --confirm` 和 `verify --confirm` 都需要用户明确授权，禁止未经授权执行。
 3. **脚本不操作项目代码**：`flow.sh` 命令不提交实施代码，但管理自身创建的基础设施（worktree、feature 分支）。`complete` 遇脏树报错退出。
 4. **Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。委派实施时给 fae 的 Plan 路径必须是空间仓库的绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
-5. **rook 门禁**：实施审查（complete 前）必须委派 rook，rook PASS 才能推进，最多 3 轮修订。Plan 质量由 `submit` 内置 `plan check` 自动校验把关，不委派 rook 审 Plan。
+5. **rook 门禁**：实施审查（complete 前）必须委派 rook，rook PASS 才能推进。**评审预算：最多 2 轮——首次评审必须一次性列全所有 finding，最多 1 次复审，之后评审关闭**（见 df-plan-review 的评审预算章节）。Plan 质量由 `submit` 内置 `plan check` 自动校验把关，不委派 rook 审 Plan。
 6. **Plan 语言与结构**：Plan 文档正文使用用户偏好语言编写，章节标题保持英文（与模板一致）。禁止混用中英文标题。
 
 ## Plan Task 字段要求
@@ -248,6 +248,7 @@ flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围�
 
 **委派要点**：
 - 实施 → fae；审查 → rook
+- **每个 rook prompt 必须写明评审预算**：明确声明「评审预算：最多 2 轮；本轮一次性列全所有 finding（含边缘发现），不会有下一轮补漏」。首次评审必须穷尽；复审（验证修复 + 全量重扫）即终局
 - **上下文复用原则**：fae/rook 完成后，优先 `reply` 续审或修复，禁止 `finish` 后新开。前提：子任务上下文 < 50%
 - 复用链路：fae IDLE → reply rook 续审 → rook REVISE → reply fae 修复 → fae fix IDLE → reply rook 续审 → rook PASS → finish 两个 task
 - rook 契约格式见 agents-collab；rook 自行加载 df-implement-review 技能
@@ -396,7 +397,7 @@ flow.sh archive <issue>
 - **跳过 rook 审查直接 complete** — 实施审查是强制门禁，complete 前必须委派 rook
 - **手动 `plan check` 再 submit** — 冗余步骤；`flow.sh submit` 已自动运行 `plan check` 校验，不合格会被拒绝，直接 submit 即可
 - **跳过 `submit` 直接请用户评审** — 请用户评审 Plan 前必须先 `flow.sh submit` 推进到 `reviewing`。跳过 submit 会让 Plan 停在 `planning`，用户审批后无法直接进入实施
-- **rook BLOCK 后强行 complete** — 必须修订后重审，最多 3 轮
+- **rook BLOCK 后强行 complete** — 必须修订后重审；**评审预算最多 2 轮**（首次列全所有 finding + 1 次复审即关闭；之后上报用户，由用户决定是否新开会话重审）
 - **rook 复审新开 task** — rook 返回 REVISE/BLOCK → fae 修复后，必须 `wopal_task_reply` 续审原 rook task，禁止 `finish` 后新开。新开会话丢失审查上下文，浪费 token
 - **checkbox 与代码脱节** — 代码未提交就勾选 Done/AC checkbox，或勾选后代码被回退。代码在 feature 分支提交，checkbox 在空间仓库提交，两者独立但必须在 `complete` 前全部完成
 - **未实际验证就勾选 AC** — 必须运行命令、检查输出，凭记忆打勾 = 严重失职
