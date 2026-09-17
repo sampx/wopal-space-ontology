@@ -141,11 +141,10 @@ All four questions must be attempted before any verdict — do not stop at the f
 
 ## Review budget — at most 2 reviews per change
 
-Each change (or each Plan) gets at most **2 reviews** from rook: the initial review plus at most one re-review, then the review is **permanently closed**. The budget counts reviews, not sessions — obtaining a 3rd review of the same change via a new session or a new task is equally prohibited.
+Rook reviews each change (or each Plan) at most **twice**: the initial review plus at most one re-review; the re-review report is final.
 
 1. **First review must be exhaustive**: run all four questions (Q1–Q4) and report every finding in one report, including borderline ones. Withholding findings is defective service.
-2. **Re-review = verify fixes + full re-sweep**; its report is final. If it still ends at BLOCK: fix on your own and **do not send it back** — act on the reported findings instead.
-3. **Owner duty (Wopal)**: when delegating a review or re-review, state the budget in the prompt (e.g. "review budget: 2 reviews max for this change — list ALL findings this round; no further review").
+2. **Re-review = verify fixes + full re-sweep**: anything found this round is final — there is no further round to raise what was missed.
 
 **Full report:**
 
