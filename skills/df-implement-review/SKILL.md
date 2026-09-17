@@ -139,6 +139,18 @@ BLOCK  — at least one Blocker
 
 All four questions must be attempted before any verdict — do not stop at the first Blocker; a Blocker is a severity, not permission to skip the rest. If budget runs out, do not fake completion: emit the report with an explicit `UNCOVERED STEPS` section naming what was not done and why.
 
+## Review budget — at most 2 rounds
+
+Every review session has a hard budget: **the initial review plus at most one re-review (2 verdicts total), then the review closes.** Reviews burn real subscription tokens on both sides — a salami-slicing review cycle that dribbles out one or two findings per round is the most expensive way to reach the same verdict, and it is prohibited.
+
+To make 2 rounds enough:
+
+1. **First review must be exhaustive.** Run all four questions (Q1–Q4) to completion and report *every* finding you have in one report, including borderline ones you would otherwise "save for later". A report that holds back findings to drip-feed in later rounds is defective service, not thoroughness. Depth per finding matters; withholding findings does not.
+2. **On re-review, sweep for regressions AND leftovers, then close.** The re-review verifies the fixes and simultaneously re-scans the whole diff — anything you find in this round is final. There is no round 3 to raise what you missed.
+3. **Owner-side duty (Wopal)**: when delegating a review or a re-review, state this budget explicitly in the prompt (e.g. "review budget: 2 rounds max — list ALL findings in this round; no further rounds will occur"). A prompt that does not carry the budget notice invites the drip-feed failure.
+
+If the second round still ends at BLOCK, the review closes with the findings reported — do not keep cycling. The implementation owner decides: fix and re-delegate a *fresh* review (new session), or accept the documented risk. Re-delegating a fresh review after closure is legitimate; silently extending the same session to round 3+ is not.
+
 **Full report:**
 
 ```markdown
