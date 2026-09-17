@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-16
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -231,6 +231,14 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 5. 可从代码直接获得的信息不污染长期记忆层。
 
 ---
+
+## Plan Workflow Contract
+
+开发流程由 dev-flow 拥有：planning → reviewing → approved → executing → verifying → done。approve 保存语义版本绑定的用户授权并停留 approved；显式 begin 在实际环境准备后进入 executing。计划批准、图构建和排期均不创建 worktree。通用 Provider 提供规范化 Plan 描述、审批与幂等 prepare/begin，时间与服务归 Wopal CLI。
+
+Plan 支持 outcome-driven 与 detailed 格式。前者固定目标、范围、依赖、公开契约和可验证完成条件，内部文件与实施步骤由 Agent 根据最新代码确定；所有校验/审查/完成入口遵循相同 profile 语义。上游成果变化时细化实现，目标/权限/依赖契约变化时重新评审。
+
+跨项目边界遵循 [Plan Orchestration](../../docs/products/wopal-space/DESIGN-plan-orchestration.md)。ontology 装配发布 Provider 能力与版本，CLI 不复制工作流状态机，技能不依赖调度器才能独立使用。
 
 ## Reference Documents
 
