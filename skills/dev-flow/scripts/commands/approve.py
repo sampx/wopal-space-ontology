@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn, log_step

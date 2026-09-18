@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 # issue.py - Issue domain operations for dev-flow
 #
-# Merged from domain/issue/ (title.py, body.py, link.py, sync.py)
-#
 # Provides:
-#   Title: extract_scope, extract_type, validate_issue_title, build_title
+#   Title: extract_scope, extract_type, validate_issue_title
 #   Body: build_structured_issue_body
-#   Link: build_repo_blob_url
 #   Sync: sync_status_label, sync_plan_to_issue_body, ensure_issue_labels,
 #         sync_status_label_group, sync_type_label_group, sync_project_label_group,
 #         ensure_label_exists, plan_status_to_issue_label
@@ -19,8 +16,6 @@ from pathlib import Path
 from lib.github import get_issue_labels
 from labels import plan_type_to_issue_label, normalize_plan_type
 
-# Lazy imports for plan module to avoid circular dependency
-# plan.py imports build_repo_blob_url from this module
 def _get_plan_functions():
     """Lazy import plan module functions to break circular import."""
     import plan as _plan
@@ -133,26 +128,6 @@ def validate_issue_title(title: str) -> None:
         raise ValidationError(
             f"Title too long: {len(title)} chars (max 72)"
         )
-
-
-def build_title(type_: str, scope: str, description: str) -> str:
-    """Build Issue title from components.
-
-    Args:
-        type_: Issue type (e.g., "feat", "fix")
-        scope: Scope string (e.g., "cli")
-        description: Description string
-
-    Returns:
-        Formatted Issue title string
-    """
-    return f"{type_}({scope}): {description}"
-
-
-# ============================================
-# Body (from body.py)
-# ============================================
-
 def _render_section(heading: str, content: str, fallback: str = None) -> str:
     """Render a single issue section with consistent formatting."""
     if content:
@@ -246,28 +221,6 @@ def build_structured_issue_body(**kwargs) -> str:
 
     return body
 
-
-# ============================================
-# Link (from link.py)
-# ============================================
-
-def build_repo_blob_url(repo: str, repo_path: str, branch: str = "main") -> str:
-    """Build GitHub blob URL for a repository path.
-    
-    Args:
-        repo: Repository in owner/repo format (e.g., "sampx/wopal-space")
-        repo_path: Path within the repository
-        branch: Branch name (default: "main")
-        
-    Returns:
-        Full GitHub blob URL
-    """
-    return f"https://github.com/{repo}/blob/{branch}/{repo_path}"
-
-
-# ============================================
-# Sync (from sync.py)
-# ============================================
 
 # Status label group (4-state model)
 STATUS_LABELS = ["status/planning", "status/in-progress", "status/verifying", "status/done"]

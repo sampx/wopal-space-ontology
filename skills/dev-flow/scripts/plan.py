@@ -5,7 +5,7 @@
 #   Metadata: get_plan_field, get_plan_project, get_plan_project_path,
 #             get_plan_type, get_plan_issue, get_plan_status,
 #             set_plan_field, get_plan_worktree, set_plan_worktree
-#   Project:  resolve_project_type, resolve_project_info, resolve_project_repo,
+#   Project:  resolve_project_info, resolve_project_repo,
 #             resolve_project_path, ProjectType
 #   Naming:   validate_plan_name, make_plan_name
 #   Body:     build_issue_body_from_plan, build_plan_link_for_issue
@@ -17,7 +17,6 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-import glob
 from enum import Enum
 from pathlib import Path
 
@@ -51,32 +50,6 @@ def get_plan_field(plan_path: str, field_name: str) -> str:
         return match.group(1).strip()
     
     return ""
-
-
-def parse_metadata(plan_path: str) -> dict:
-    """Parse all metadata fields from a Plan file into a dict.
-
-    Args:
-        plan_path: Path to Plan markdown file
-
-    Returns:
-        Dict with all metadata fields (Status, Type, Target Project, etc.)
-    """
-    path = Path(plan_path)
-    if not path.exists():
-        return {}
-
-    content = path.read_text()
-
-    metadata = {}
-    for match in re.finditer(r'^\- \*\*([^*]+)\*\*:\s*(.+)$', content, re.MULTILINE):
-        key = match.group(1).strip()
-        value = match.group(2).strip()
-        metadata[key] = value
-
-    return metadata
-
-
 def get_plan_project(plan_path: str) -> str:
     """Extract Target Project from Plan metadata."""
     return get_plan_field(plan_path, "Target Project")
@@ -195,17 +168,6 @@ def _get_wopal_repo_name(workspace_root: Path) -> str | None:
         pass
 
     return None
-
-
-def resolve_project_type(project_name: str, workspace_root: Path | None = None) -> ProjectType:
-    """Resolve project type from workspace structure."""
-    if workspace_root:
-        repo_name = _get_wopal_repo_name(workspace_root)
-        if repo_name and repo_name == project_name:
-            return ProjectType.ONTOLOGY_WORKTREE
-    return ProjectType.STANDARD
-
-
 def resolve_project_info(project_name: str, workspace_root: Path) -> tuple[ProjectType, str | None]:
     """Resolve project type and workspace-relative path."""
     repo_name = _get_wopal_repo_name(workspace_root)

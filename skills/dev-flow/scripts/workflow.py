@@ -8,8 +8,8 @@
 #
 # Provides:
 #   Constants: PLAN_STATES, STATUS_PLANNING, STATUS_REVIEWING, STATUS_EXECUTING, STATUS_VERIFYING, STATUS_DONE
-#   State machine: is_valid_state, is_valid_transition, get_next_state,
-#                   parse_plan_status, get_state_order, get_status_display,
+#   State machine: is_valid_state, is_valid_transition,
+#                   parse_plan_status, get_status_display,
 #                   plan_status_to_issue_label
 #   Status update: update_plan_status
 #   Guard helpers: guard_status, format_suggestion, resolve_space_repo
@@ -69,22 +69,6 @@ def is_valid_transition(from_state: str | None, to_state: str) -> bool:
         return True
 
     return (from_state, to_state) in VALID_TRANSITIONS
-
-
-def get_next_state(command: str) -> str | None:
-    """Get next state based on command."""
-    command_state_map = {
-        "plan": STATUS_PLANNING,
-        "submit": STATUS_REVIEWING,
-        "approve": STATUS_EXECUTING,
-        "complete": STATUS_VERIFYING,
-        "verify": STATUS_DONE,
-        "archive": None,
-    }
-
-    return command_state_map.get(command)
-
-
 def parse_plan_status(plan_path: str) -> str | None:
     """Parse current status from Plan file.
 
@@ -107,16 +91,6 @@ def parse_plan_status(plan_path: str) -> str | None:
         return status
 
     return None
-
-
-def get_state_order(state: str) -> int:
-    """Get order number for state (1-5)."""
-    try:
-        return PLAN_STATES.index(state) + 1
-    except ValueError:
-        return 0
-
-
 def get_status_display(state: str) -> dict:
     """Get display info for a status."""
     state_info = {

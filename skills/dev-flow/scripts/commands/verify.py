@@ -21,7 +21,6 @@ import argparse
 import json
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn

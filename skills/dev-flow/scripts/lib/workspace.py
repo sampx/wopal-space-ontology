@@ -6,7 +6,6 @@
 #   - detect_space_repo: Parse owner/repo from workspace root's git remote URL
 #   - get_ontology_main_repo: Resolve ontology main repository from .wopal/.git file
 
-import os
 import re
 from pathlib import Path
 

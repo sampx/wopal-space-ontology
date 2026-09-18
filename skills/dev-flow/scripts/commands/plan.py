@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 import json
 import re
 from pathlib import Path

@@ -19,8 +19,6 @@ from workflow import (
     PLAN_STATES,
     is_valid_state,
     is_valid_transition,
-    get_next_state,
-    get_state_order,
     get_status_display,
     plan_status_to_issue_label,
     STATUS_REVIEWING,
@@ -144,18 +142,7 @@ class TestReviewingState(unittest.TestCase):
     def test_same_state_reviewing_allowed(self):
         self.assertTrue(is_valid_transition("reviewing", "reviewing"))
 
-    def test_get_state_order_reviewing(self):
-        self.assertEqual(get_state_order("reviewing"), 2)
 
-    def test_get_state_order_executing_shifted(self):
-        """executing order shifts from 2 to 3 after reviewing insertion."""
-        self.assertEqual(get_state_order("executing"), 3)
-
-    def test_get_state_order_verifying_shifted(self):
-        self.assertEqual(get_state_order("verifying"), 4)
-
-    def test_get_state_order_done_shifted(self):
-        self.assertEqual(get_state_order("done"), 5)
 
 
 class TestGetStatusDisplayReviewing(unittest.TestCase):
@@ -176,11 +163,6 @@ class TestPlanStatusToIssueLabelReviewing(unittest.TestCase):
         self.assertEqual(plan_status_to_issue_label("reviewing"), "status/planning")
 
 
-class TestGetNextStateSubmit(unittest.TestCase):
-    """Test get_next_state for submit command."""
-
-    def test_submit_maps_to_reviewing(self):
-        self.assertEqual(get_next_state("submit"), "reviewing")
 
 
 class TestFormatSuggestionReviewing(unittest.TestCase):

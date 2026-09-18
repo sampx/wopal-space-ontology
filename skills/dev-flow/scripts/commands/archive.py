@@ -22,7 +22,6 @@ import argparse
 import os
 import subprocess
 import re
-import glob as glob_mod
 from pathlib import Path
 from datetime import date
 

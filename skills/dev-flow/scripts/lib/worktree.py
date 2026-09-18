@@ -5,9 +5,7 @@
 # Uses lib/workspace.py for workspace detection (not .workspace.md).
 #
 # Provides:
-#   - scan_projects: Scan workspace for git projects
 #   - create_worktree: Create a git worktree
-#   - list_worktrees: List worktrees filtered by base path
 #   - remove_worktree: Remove a git worktree (with --force fallback)
 #   - delete_branch: Delete a local branch (with -D fallback)
 #   - clean_worktree: One-stop cleanup (remove_worktree + delete_branch)
@@ -336,34 +334,6 @@ def resolve_active_plan(
         repo_relative_plan_path=main_loc.repo_relative_path,
         branch_context="integration",
     )
-
-
-def scan_projects(workspace_root: Path) -> list[str]:
-    """Scan workspace root for git project directories.
-
-    Uses os.listdir to scan subdirectories, detecting those containing .git.
-    Does not depend on .workspace.md.
-
-    Args:
-        workspace_root: Workspace root path
-
-    Returns:
-        List of project directory names (not full paths)
-    """
-    projects = []
-    if not workspace_root.is_dir():
-        return projects
-
-    for entry in os.listdir(workspace_root):
-        entry_path = workspace_root / entry
-        if entry_path.is_dir():
-            git_path = entry_path / ".git"
-            if git_path.exists():
-                projects.append(entry)
-
-    return sorted(projects)
-
-
 def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path:
     """Create a git worktree for a project.
 
@@ -407,58 +377,6 @@ def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path
             )
 
     return worktree_path
-
-
-def list_worktrees(worktree_base: Path, project: str | None = None) -> list[str]:
-    """List worktrees filtered by base path.
-
-    Args:
-        worktree_base: Base directory where worktrees are stored
-        project: Optional project name to filter by
-
-    Returns:
-        List of worktree paths (as strings)
-    """
-    # Find a git repo to run 'git worktree list' from
-    # walk up from worktree_base to find a git repo
-    search_dir = worktree_base
-    git_dir = None
-    for parent in [search_dir] + list(search_dir.parents):
-        if (parent / ".git").exists():
-            git_dir = parent
-            break
-
-    if git_dir is None:
-        return []
-
-    result = subprocess.run(
-        ["git", "worktree", "list", "--porcelain"],
-        cwd=str(git_dir),
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        return []
-
-    # Parse porcelain output: each worktree is separated by blank lines
-    # Lines start with "worktree " followed by the path
-    worktrees = []
-    for line in result.stdout.strip().split('\n'):
-        if line.startswith("worktree "):
-            wt_path = line[len("worktree "):]
-            # Filter by worktree_base prefix
-            try:
-                wt = Path(wt_path)
-                if wt.is_relative_to(worktree_base) or str(wt).startswith(str(worktree_base)):
-                    if project is None or project in wt.name:
-                        worktrees.append(wt_path)
-            except (ValueError, OSError):
-                pass
-
-    return worktrees
-
-
 def _remove_empty_dirs(root: Path) -> bool:
     """Remove an empty directory skeleton bottom-up.
 
