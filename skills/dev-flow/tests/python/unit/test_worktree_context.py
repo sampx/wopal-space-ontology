@@ -119,53 +119,6 @@ class TestParseStructuredWorktree:
         assert ctx is not None
         assert ctx.branch == "feature/ont-42-slug"
 
-    def test_legacy_format_reads_project_type_from_metadata(self, tmp_path):
-        content = PLAN_TEMPLATE_ONTOLOGY + "- **Worktree**: feature/legacy-slug | .worktrees/legacy-path\n"
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-
-        assert ctx is not None
-        assert ctx.branch == "feature/legacy-slug"
-
-
-class TestParseLegacyWorktree:
-    """Test parsing legacy '- **Worktree**: branch | path' format."""
-
-    def test_parse_legacy_format(self, tmp_path):
-        content = PLAN_TEMPLATE + "- **Worktree**: feature/test-1-slug | .worktrees/gesp-feature-test-1-slug\n"
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-
-        assert ctx is not None
-        assert ctx.branch == "feature/test-1-slug"
-        assert ctx.path == Path(".worktrees/gesp-feature-test-1-slug")
-
-    def test_parse_legacy_invalid_no_pipe(self, tmp_path):
-        content = PLAN_TEMPLATE + "- **Worktree**: just-a-branch-no-path\n"
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-        assert ctx is None
-
-    def test_parse_legacy_empty_parts(self, tmp_path):
-        content = PLAN_TEMPLATE + "- **Worktree**:  | \n"
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-        assert ctx is None
-
-    def test_structured_takes_precedence_over_legacy(self, tmp_path):
-        """If both formats exist (shouldn't happen), structured wins."""
-        content = PLAN_TEMPLATE + """\
-- **Worktree**: legacy-branch | /legacy/path
-- **Worktree**:
-  - branch: structured-branch
-  - path: .worktrees/structured
-"""
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-
-        assert ctx is not None
-        assert ctx.branch == "structured-branch"
-        assert ctx.path == Path(".worktrees/structured")
 
 
 # -- Write tests (new 2-field format) -----------------------------------------
@@ -225,19 +178,6 @@ class TestWriteWorktreeContext:
         assert "enabled:" not in file_content
         assert "repo_root:" not in file_content
 
-    def test_write_replaces_legacy_format(self, tmp_path):
-        content = PLAN_TEMPLATE + "- **Worktree**: old-branch | /old/path\n"
-        plan = _write_plan(tmp_path, content)
-
-        result = write_worktree_context(
-            str(plan), "new-branch", ".worktrees/new",
-        )
-        assert result is True
-
-        meta = parse_worktree_meta(str(plan))
-        assert meta is not None
-        assert meta["branch"] == "new-branch"
-        assert meta["path"] == ".worktrees/new"
 
     def test_write_nonexistent_file_returns_false(self, tmp_path):
         result = write_worktree_context(
@@ -291,20 +231,9 @@ class TestParseWorktreeScopesToMetadata:
         assert ctx is not None
         assert ctx.branch == "feature/real-branch"
 
-    def test_legacy_placeholder_in_design_not_parsed(self, tmp_path):
-        """Legacy format placeholder in design section is ignored."""
-        content = (
-            PLAN_TEMPLATE_ONTOLOGY
-            + "\n## Design\n\n"
-            + "- **Worktree**: <branch> | <path>\n"
-        )
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-        assert ctx is None
-
 
 class TestParseOldFormatCompat:
-    """Old 9-field and legacy pipe formats must remain readable."""
+    """Old 9-field structured Worktree blocks remain readable."""
 
     def test_read_old_9_field_format(self, tmp_path):
         """Old Plans with 9-field Worktree block still parse correctly."""
@@ -326,14 +255,6 @@ class TestParseOldFormatCompat:
         assert meta["branch"] == "feature/old-1"
         assert meta["path"] == ".worktrees/gesp-old-1"
 
-    def test_read_legacy_pipe_format(self, tmp_path):
-        """Legacy pipe format still parses."""
-        content = PLAN_TEMPLATE + "- **Worktree**: legacy-branch | .worktrees/legacy\n"
-        plan = _write_plan(tmp_path, content)
-        meta = parse_worktree_meta(str(plan))
-        assert meta is not None
-        assert meta["branch"] == "legacy-branch"
-        assert meta["path"] == ".worktrees/legacy"
 
     def test_read_new_2_field_format(self, tmp_path):
         """New 2-field format parses correctly."""

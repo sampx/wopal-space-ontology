@@ -19,7 +19,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 |---|---|
 | `scripts/flow.sh` | CLI 入口，路由到 Python |
 | `scripts/flow.py` | argparse 主程序、子命令分发 |
-| `scripts/commands/` | 子命令实现 (submit, approve, complete, verify, plan, issue, sync, archive, decompose, reset) |
+| `scripts/commands/` | 子命令实现 (submit, approve, complete, verify, plan, issue, sync, archive, reset) |
 | `scripts/lib/` | 共享库 (git, github, project, workspace, worktree, logging) |
 | `templates/` | Plan 和 Issue 模板 |
 | `references/` | 命令参考、Plan 编写指南、故障处理 |
@@ -31,7 +31,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 |---|---|
 | 运行测试 | `python -m pytest tests/python/ -v` |
 | CLI 帮助 | `bash scripts/flow.sh <cmd> --help` |
-| Plan 校验 | `bash scripts/flow.sh plan <issue> --check` |
+| Plan 校验 | `bash scripts/flow.sh plan check <name-or-path>` |
 
 运行目录：`.wopal/skills/dev-flow/`
 

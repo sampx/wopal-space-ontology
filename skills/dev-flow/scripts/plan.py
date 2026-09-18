@@ -142,36 +142,14 @@ def set_plan_field(plan_path: str, field_name: str, field_value: str) -> bool:
 def get_plan_worktree(plan_path: str) -> dict | None:
     """Extract Worktree metadata from Plan file.
 
-    Supports:
-      1. New 2-field structured: - **Worktree**: with branch + path sub-fields
-      2. Old 9-field structured: - **Worktree**: with enabled, project_type, etc.
-      3. Legacy pipe format: - **Worktree**: branch | path
+    Supports the structured formats: - **Worktree**: with branch + path
+    sub-fields (new 2-field and old 9-field).
 
     Returns:
         {'branch': str, 'path': str} if found, None otherwise
     """
-    # Try structured format (new 2-field and old 9-field) first
     from lib.worktree import parse_worktree_meta
-    meta = parse_worktree_meta(plan_path)
-    if meta is not None:
-        return meta
-
-    # Fallback to legacy pipe format
-    raw = get_plan_field(plan_path, "Worktree")
-    if not raw:
-        return None
-
-    parts = raw.split('|', 1)
-    if len(parts) != 2:
-        return None
-
-    branch = parts[0].strip()
-    path = parts[1].strip()
-
-    if not branch or not path:
-        return None
-
-    return {'branch': branch, 'path': path}
+    return parse_worktree_meta(plan_path)
 
 
 def set_plan_worktree(plan_path: str, branch: str, path: str) -> bool:
@@ -310,7 +288,7 @@ def resolve_project_path(
         if git_root:
             return git_root
 
-    # Step 2: Backward compat fallback
+    # Step 2: Fallback to projects/<project_name>
     if project_name:
         candidate = workspace_root / "projects" / project_name
         git_root = _find_git_root(candidate)
@@ -524,7 +502,6 @@ def find_plan(input_ref: str, workspace_root: str | Path | None = None) -> str:
     """Smart plan lookup: find plan by Issue number OR plan name.
 
     Delegates to lib.project.find_plan() for path resolution.
-    Returns the plan file path as a string for backward compatibility.
     """
     if workspace_root is None:
         workspace_root = find_workspace_root()
@@ -536,8 +513,7 @@ def find_plan(input_ref: str, workspace_root: str | Path | None = None) -> str:
 def find_plan_by_name(plan_name: str, workspace_root: str | Path = None) -> str:
     """Find plan file by plan name.
 
-    Delegates to lib.project.find_plan() which handles new paths
-    and DEPRECATED legacy read-only fallback.
+    Delegates to lib.project.find_plan() for path resolution.
     """
     if workspace_root is None:
         workspace_root = find_workspace_root()
@@ -549,8 +525,7 @@ def find_plan_by_name(plan_name: str, workspace_root: str | Path = None) -> str:
 def find_plan_by_issue(issue_number: int, workspace_root: str | Path = None) -> str:
     """Find plan file by issue number.
 
-    Delegates to lib.project.find_plan() which handles new paths
-    and DEPRECATED legacy read-only fallback.
+    Delegates to lib.project.find_plan() for path resolution.
     """
     if workspace_root is None:
         workspace_root = find_workspace_root()

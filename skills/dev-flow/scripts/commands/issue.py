@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-# issue.py - Issue create/update commands for dev-flow
-#
-# Ported from scripts/cmd/issue.sh
+# issue.py - Issue management commands for dev-flow
 #
 # Commands:
 #   issue create --title "<title>" --project <name> [--type <type>] [options]
-#   issue update <issue> [options]
+#   issue edit <issue> [--title <title>] [--type <type>] [--project <name>]
+#                  [--body-file <path>] [--append <path>]
+#   issue close <issue>
+#   issue delete <issue>
+#   issue list [--project X] [--status Y] [--limit N]
+#   issue view <issue> [--json]
 
 from __future__ import annotations
 
@@ -20,9 +23,7 @@ from issue import (
     validate_issue_title,
     extract_type,
     ValidationError,
-)
-from issue import build_structured_issue_body
-from issue import (
+    build_structured_issue_body,
     ensure_label_exists,
     sync_type_label_group,
     sync_project_label_group,
@@ -86,127 +87,6 @@ def extract_project_from_labels(issue_info: dict) -> str:
             return name[8:]  # Remove "project/" prefix
     return ""
 
-
-# ============================================
-# Issue Body Update Helpers
-# ============================================
-
-def replace_issue_section(body: str, heading: str, content: str) -> str:
-    """Replace content of a section in issue body."""
-    section_marker = f"## {heading}"
-    lines = body.split("\n")
-    result_lines = []
-    in_section = False
-    replaced = False
-    
-    for line in lines:
-        if line == section_marker:
-            in_section = True
-            result_lines.append(line)
-            result_lines.append("")
-            if content:
-                result_lines.append(content)
-            replaced = True
-            continue
-        
-        if in_section and line.startswith("##") and not line.startswith("## " + heading):
-            # End of section
-            in_section = False
-            result_lines.append(line)
-            continue
-        
-        if in_section:
-            # Skip old content
-            continue
-        
-        result_lines.append(line)
-    
-    # If section not found and we have content, append it
-    if not replaced and content:
-        result_lines.append("")
-        result_lines.append(section_marker)
-        result_lines.append("")
-        result_lines.append(content)
-    
-    return "\n".join(result_lines)
-
-
-def format_list_items(raw_items: str) -> str:
-    """Format comma-separated items as markdown list."""
-    if not raw_items:
-        return ""
-    items = [item.strip() for item in raw_items.split(",") if item.strip()]
-    return "\n".join(f"- {item}" for item in items)
-
-
-def update_structured_issue_body(body: str, **kwargs) -> str:
-    """Update structured issue body with new field values."""
-    updated_body = body
-    
-    # Field to section mapping
-    field_to_section = {
-        "goal": "Goal",
-        "background": "Background",
-        "confirmed_bugs": "Confirmed Bugs",
-        "content_model_defects": "Content Model Defects",
-        "cleanup_scope": "Cleanup Scope",
-        "key_findings": "Key Findings",
-        "baseline": "Baseline",
-        "target": "Target",
-        "affected_components": "Affected Components",
-        "refactor_strategy": "Refactor Strategy",
-        "target_documents": "Target Documents",
-        "audience": "Audience",
-        "test_scope": "Test Scope",
-        "test_strategy": "Test Strategy",
-        "scope": "In Scope",
-        "out_of_scope": "Out of Scope",
-        "acceptance_criteria": "Acceptance Criteria",
-    }
-    
-    for field, section in field_to_section.items():
-        value = kwargs.get(field)
-        if not value:
-            continue
-        
-        # Format list fields
-        if field in ["scope", "out_of_scope", "affected_components", "target_documents"]:
-            content = format_list_items(value)
-        else:
-            content = value
-        
-        updated_body = replace_issue_section(updated_body, section, content)
-    
-    # Handle reference (Related Resources table)
-    reference = kwargs.get("reference")
-    if reference:
-        # Upsert Research row in Related Resources table
-        if "## Related Resources" in updated_body:
-            # Replace Research row
-            lines = updated_body.split("\n")
-            result_lines = []
-            in_resources = False
-            
-            for line in lines:
-                if line == "## Related Resources":
-                    in_resources = True
-                    result_lines.append(line)
-                    continue
-                
-                if in_resources and line.startswith("##") and not line.startswith("## Related Resources"):
-                    in_resources = False
-                    result_lines.append(line)
-                    continue
-                
-                if in_resources and "| Research |" in line:
-                    result_lines.append(f"| Research | {reference} |")
-                    continue
-                
-                result_lines.append(line)
-            
-            updated_body = "\n".join(result_lines)
-    
-    return updated_body
 
 
 # ============================================
@@ -323,36 +203,37 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
 
 
 # ============================================
-# issue update command
+# issue edit command
 # ============================================
 
-def cmd_issue_update(args: argparse.Namespace) -> int:
-    """Update structured GitHub Issue fields."""
-    print("[DEPRECATED] use issue write --body-file or --append instead", file=sys.stderr)
+def cmd_issue_edit(args: argparse.Namespace) -> int:
+    """Edit an existing Issue: title, type, project, and body.
+
+    Body modes:
+      --body-file  replace the whole body with file content
+      --append     append file content to the body end
+    """
     issue_number = args.issue_number
-    
     if not issue_number:
         log_error("Missing issue number")
         return 1
-    
+
     repo = detect_space_repo(find_workspace_root())
-    
-    # Get current issue info
+
+    # Fetch current issue for title/project fallback and append mode
     issue_info = get_issue_info(issue_number, repo)
     current_body = issue_info.get("body", "")
     current_title = issue_info.get("title", "")
-    
-    # Determine next title
+
+    # --- Determine next title ---
     next_title = args.title or current_title
-    
-    # Validate title
     try:
         validate_issue_title(next_title)
     except ValidationError as e:
         log_error(str(e))
         return 1
-    
-    # Determine next type
+
+    # --- Determine next type (for label sync) ---
     if args.type:
         try:
             next_type = normalize_plan_type(args.type)
@@ -362,147 +243,166 @@ def cmd_issue_update(args: argparse.Namespace) -> int:
     else:
         inferred = infer_issue_type_from_title(next_title)
         if not inferred:
-            log_error("Cannot determine issue type for update")
+            log_error("Cannot determine issue type")
             return 1
         next_type = inferred
-    
-    # Determine next project
-    next_project = args.project
-    if not next_project:
-        next_project = extract_project_from_labels(issue_info)
-    
-    # Build update kwargs
-    update_kwargs = {}
-    if args.goal:
-        update_kwargs["goal"] = args.goal
-    if args.background:
-        update_kwargs["background"] = args.background
-    if args.confirmed_bugs:
-        update_kwargs["confirmed_bugs"] = args.confirmed_bugs
-    if args.content_model_defects:
-        update_kwargs["content_model_defects"] = args.content_model_defects
-    if args.cleanup_scope:
-        update_kwargs["cleanup_scope"] = args.cleanup_scope
-    if args.key_findings:
-        update_kwargs["key_findings"] = args.key_findings
-    if args.baseline:
-        update_kwargs["baseline"] = args.baseline
-    if args.target:
-        update_kwargs["target"] = args.target
-    if args.affected_components:
-        update_kwargs["affected_components"] = args.affected_components
-    if args.refactor_strategy:
-        update_kwargs["refactor_strategy"] = args.refactor_strategy
-    if args.target_documents:
-        update_kwargs["target_documents"] = args.target_documents
-    if args.audience:
-        update_kwargs["audience"] = args.audience
-    if args.test_scope:
-        update_kwargs["test_scope"] = args.test_scope
-    if args.test_strategy:
-        update_kwargs["test_strategy"] = args.test_strategy
-    if args.scope:
-        update_kwargs["scope"] = args.scope
-    if args.out_of_scope:
-        update_kwargs["out_of_scope"] = args.out_of_scope
-    if args.reference:
-        update_kwargs["reference"] = args.reference
-    if args.acceptance_criteria:
-        update_kwargs["acceptance_criteria"] = args.acceptance_criteria
-    
-    # Update body
-    updated_body = update_structured_issue_body(current_body, **update_kwargs)
-    
-    # Update title and body
-    result = subprocess.run(
-        ["gh", "issue", "edit", issue_number, "--repo", repo,
-         "--title", next_title, "--body", updated_body],
-        capture_output=True,
-        text=True,
-    )
+
+    # --- Determine next project (for label sync) ---
+    next_project = args.project or extract_project_from_labels(issue_info)
+
+    # --- Resolve body ---
+    body_file = getattr(args, "body_file", None) or getattr(args, "append", None)
+    if body_file:
+        if not os.path.isfile(body_file):
+            log_error(f"File not found: {body_file}")
+            return 1
+
+        file_content = Path(body_file).read_text()
+        if not file_content.strip():
+            log_error("Source file is empty")
+            return 1
+
+        first_line = file_content.strip().split("\n")[0] if file_content.strip() else ""
+        if first_line and not first_line.startswith("#") and not first_line.startswith("-"):
+            log_warn("File does not start with heading or list item")
+
+        if getattr(args, "append", None):
+            trimmed = current_body.rstrip("\n")
+            new_body = (trimmed + "\n\n" + file_content) if trimmed else file_content
+            mode = "append"
+        else:
+            new_body = file_content
+            mode = "replace"
+        if not new_body.endswith("\n"):
+            new_body += "\n"
+    else:
+        # No body change: keep current body
+        new_body = current_body
+        mode = "body-unchanged"
+
+    # --- Run gh issue edit ---
+    gh_args = [
+        "gh", "issue", "edit", issue_number, "--repo", repo,
+        "--title", next_title, "--body", new_body,
+    ]
+    result = subprocess.run(gh_args, capture_output=True, text=True)
     if result.returncode != 0:
-        log_error(f"Failed to update issue #{issue_number}")
+        log_error(f"Failed to edit issue #{issue_number}")
         log_error(result.stderr)
         return 1
-    
-    # Sync type label
+
+    # --- Sync labels ---
     type_label = plan_type_to_issue_label(next_type)
     sync_type_label_group(issue_number, type_label, repo)
-    
-    # Sync project label
     if next_project:
         project_label = f"project/{next_project}"
         sync_project_label_group(issue_number, project_label, repo)
-    
-    log_success(f"Issue #{issue_number} updated")
+
+    log_success(f"Issue #{issue_number} updated (title/type/project + {mode})")
     return 0
 
 
 # ============================================
-# issue write command
+# issue close command
 # ============================================
 
-def cmd_issue_write(args: argparse.Namespace) -> int:
-    """Write to issue body (full replace or append)."""
+def cmd_issue_close(args: argparse.Namespace) -> int:
+    """Close an Issue in the space repo."""
     issue_number = args.issue_number
     if not issue_number:
         log_error("Missing issue number")
         return 1
-    
-    body_file = getattr(args, 'body_file', None) or getattr(args, 'append', None)
-    if not body_file:
-        log_error("Must specify --body-file or --append")
-        return 1
-    
-    if not os.path.isfile(body_file):
-        log_error(f"File not found: {body_file}")
-        return 1
-    
-    file_content = Path(body_file).read_text()
-    
-    # Check for empty file
-    if not file_content.strip():
-        log_error("Source file is empty")
-        return 1
-    
-    # Warning if file doesn't start with markdown-ish content
-    first_line = file_content.strip().split('\n')[0] if file_content.strip() else ''
-    if first_line and not first_line.startswith('#') and not first_line.startswith('-'):
-        log_warn("File does not start with heading or list item")
-    
+
     repo = detect_space_repo(find_workspace_root())
-    
-    if getattr(args, 'append', None):
-        # Append mode: read current body + append new content
-        issue_info = get_issue_info(issue_number, repo)
-        current_body = issue_info.get("body", "")
-        trimmed = current_body.rstrip('\n')
-        if trimmed:
-            new_body = trimmed + "\n\n" + file_content
-        else:
-            new_body = file_content
-        if not new_body.endswith('\n'):
-            new_body += '\n'
-    else:
-        # Replace mode
-        new_body = file_content
-        if not new_body.endswith('\n'):
-            new_body += '\n'
-    
     result = subprocess.run(
-        ["gh", "issue", "edit", issue_number, "--repo", repo, "--body", new_body],
+        ["gh", "issue", "close", issue_number, "--repo", repo],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        log_error(f"Failed to write to issue #{issue_number}")
+        log_error(f"Failed to close issue #{issue_number}")
         log_error(result.stderr)
         return 1
-    
-    mode = "append" if getattr(args, 'append', None) else "replace"
-    log_success(f"Issue #{issue_number} body updated ({mode})")
+
+    log_success(f"Issue #{issue_number} closed")
     return 0
 
 
+# ============================================
+# issue delete command
+# ============================================
+
+def cmd_issue_delete(args: argparse.Namespace) -> int:
+    """Delete an Issue in the space repo."""
+    issue_number = args.issue_number
+    if not issue_number:
+        log_error("Missing issue number")
+        return 1
+
+    repo = detect_space_repo(find_workspace_root())
+    result = subprocess.run(
+        ["gh", "issue", "delete", issue_number, "--repo", repo, "--yes"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        log_error(f"Failed to delete issue #{issue_number}")
+        log_error(result.stderr)
+        return 1
+
+    log_success(f"Issue #{issue_number} deleted")
+    return 0
+
+
+# ============================================
+# issue list command
+# ============================================
+
+def cmd_issue_list(args: argparse.Namespace) -> int:
+    """List open Issues from the space repo with repo URL.
+
+    Auto-detects the space repository (no manual --repo needed).
+    Supports --project and --status filtering.
+    """
+    workspace_root = find_workspace_root()
+    try:
+        repo = detect_space_repo(workspace_root)
+    except RuntimeError as e:
+        log_error(f"Failed to detect space repo: {e}")
+        return 1
+
+    projects = list(getattr(args, 'project', None) or [])
+    statuses = list(getattr(args, 'status', None) or [])
+    limit = getattr(args, 'limit', 50)
+
+    # Validate project names (same rule as issue create)
+    for p in projects:
+        if not re.match(r'^[a-z0-9-]+$', p):
+            log_error(f"Invalid project name: {p}")
+            log_error("Project name must be lowercase alphanumeric with hyphens")
+            return 1
+
+    # Validate status aliases (single authority in lib.github.STATUS_LABEL_MAP)
+    valid_statuses = set(STATUS_LABEL_MAP.keys())
+    for s in statuses:
+        if s.lower() not in valid_statuses:
+            log_error(
+                f"Invalid status: {s}. Allowed: {', '.join(sorted(valid_statuses))}"
+            )
+            return 1
+
+    issues = list_issues(
+        repo=repo,
+        state="open",
+        projects=projects,
+        statuses=statuses,
+        limit=limit,
+    )
+    if issues is None:
+        log_error(f"Failed to list issues in {repo}")
+        return 1
+
+    if not issues:
+        print(f"No open issues in {repo}.")
+        return 0
 # ============================================
 # issue list command
 # ============================================
@@ -628,30 +528,14 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     create_parser.add_argument("--body", help="Raw issue body")
     create_parser.add_argument("--body-file", help="Read issue body from file")
     
-    # issue update (deprecated - use issue write instead)
-    update_parser = issue_subparsers.add_parser("update", help="Update existing issue")
-    update_parser.add_argument("issue_number", nargs="?", help="Issue number to update")
-    update_parser.add_argument("--title", help="New issue title")
-    update_parser.add_argument("--type", help="New issue type")
-    update_parser.add_argument("--project", help="New project")
-    update_parser.add_argument("--goal", help="Update goal section")
-    update_parser.add_argument("--background", help="Update background section")
-    update_parser.add_argument("--confirmed-bugs", help="Update confirmed bugs section")
-    update_parser.add_argument("--content-model-defects", help="Update content model defects section")
-    update_parser.add_argument("--cleanup-scope", help="Update cleanup scope section")
-    update_parser.add_argument("--key-findings", help="Update key findings section")
-    update_parser.add_argument("--baseline", help="Update baseline section")
-    update_parser.add_argument("--target", help="Update target section")
-    update_parser.add_argument("--affected-components", help="Update affected components section")
-    update_parser.add_argument("--refactor-strategy", help="Update refactor strategy section")
-    update_parser.add_argument("--target-documents", help="Update target documents section")
-    update_parser.add_argument("--audience", help="Update audience section")
-    update_parser.add_argument("--test-scope", help="Update test scope section")
-    update_parser.add_argument("--test-strategy", help="Update test strategy section")
-    update_parser.add_argument("--scope", help="Update in-scope section")
-    update_parser.add_argument("--out-of-scope", help="Update out-of-scope section")
-    update_parser.add_argument("--reference", help="Update reference in Related Resources")
-    update_parser.add_argument("--acceptance-criteria", help="Update acceptance criteria section")
+    # issue edit
+    edit_parser = issue_subparsers.add_parser("edit", help="Edit existing issue")
+    edit_parser.add_argument("issue_number", nargs="?", help="Issue number to edit")
+    edit_parser.add_argument("--title", help="New issue title")
+    edit_parser.add_argument("--type", help="New issue type")
+    edit_parser.add_argument("--project", help="New project")
+    edit_parser.add_argument("--body-file", help="Replace issue body with file content")
+    edit_parser.add_argument("--append", help="Append file content to issue body")
     
     # issue list
     list_parser = issue_subparsers.add_parser("list", help="List open issues in space repo")
@@ -668,25 +552,29 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     view_parser.add_argument("--json", dest="json_flag", action="store_true",
                              help="Print raw JSON instead of formatted output")
 
-    # issue write
-    write_parser = issue_subparsers.add_parser("write", help="Write to issue body")
-    write_parser.add_argument("issue_number", nargs="?", help="Issue number")
-    write_parser.add_argument("--body-file", help="Replace issue body with file content")
-    write_parser.add_argument("--append", help="Append file content to issue body")
+    # issue close
+    close_parser = issue_subparsers.add_parser("close", help="Close an issue")
+    close_parser.add_argument("issue_number", nargs="?", help="Issue number to close")
+
+    # issue delete
+    delete_parser = issue_subparsers.add_parser("delete", help="Delete an issue")
+    delete_parser.add_argument("issue_number", nargs="?", help="Issue number to delete")
 
 
 def cmd_issue(args: argparse.Namespace) -> int:
     """Dispatch issue subcommand."""
     if args.issue_cmd == "create":
         return cmd_issue_create(args)
-    elif args.issue_cmd == "update":
-        return cmd_issue_update(args)
+    elif args.issue_cmd == "edit":
+        return cmd_issue_edit(args)
     elif args.issue_cmd == "list":
         return cmd_issue_list(args)
     elif args.issue_cmd == "view":
         return cmd_issue_view(args)
-    elif args.issue_cmd == "write":
-        return cmd_issue_write(args)
+    elif args.issue_cmd == "close":
+        return cmd_issue_close(args)
+    elif args.issue_cmd == "delete":
+        return cmd_issue_delete(args)
     else:
         log_error(f"Unknown issue subcommand: {args.issue_cmd}")
         return 1

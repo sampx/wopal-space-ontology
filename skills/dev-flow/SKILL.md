@@ -58,16 +58,17 @@ Full parameters and edge cases in `references/commands.md`.
 | Command | Scenario | Notes |
 |------|------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | Create Issue | `--body-file` is the main path |
+| `issue edit <issue> [--title] [--type] [--project] [--body-file] [--append]` | Edit an Issue | Title/type/project labels + body replace/append |
+| `issue close <issue>` | Close an Issue | Auto-detects the space repo |
+| `issue delete <issue>` | Delete an Issue | Auto-detects the space repo |
 | `issue list [--project X] [--status Y] [--limit N]` | List open Issues in the space repo | Auto-detects the repo, shows repo URL, filterable |
 | `issue view <issue> [--json]` | View a single Issue | Go straight to it when the number is known; `--json` outputs raw JSON |
-| `issue write <issue> --body-file <path>` | Replace Issue body wholesale | |
 | `sync <plan> [--body-only\|--labels-only]` | Plan → Issue sync | Mandatory after Plan content changes |
 
 ### Other
 
 | Command | Scenario | Notes |
 |------|------|------|
-| `decompose-prd <prd-path>` | Decompose PRD into Issues | `--dry-run` preview |
 | `reset <plan>` | Reset a Plan | Destructive; only on explicit user request |
 
 ## Mental model
@@ -412,7 +413,7 @@ Precondition: Plan status = `done`. The script archives the Plan, cleans the wor
 - **Leaving closed gap entries in `GAPS.md`** — a Plan reaching `done` closes its Gaps; delete the entries instead of ticking them, and remove the whole file when the last gap goes
 - **Pushing automatable verification to the user** — UV only holds items agents cannot verify and the user must observe; tests/lint/typecheck go to Agent Verification
 - **UV scenarios without a launch command** — every scenario needs a copy-pasteable command and assertable criteria; document missing mechanisms in the project spec first
-- **grep/glob for Plans** — use `flow.sh plan <name>` or `flow.sh plan status <name>`
+- **grep/glob for Plans** — use `flow.sh plan status <name>`
 - **`approve` without `--confirm`** — errors out; use `submit`
 - **Removing the worktree before verify-switch** — the script sequences it (remove then checkout); the agent never does it manually
 - **Deleting the feature branch after merge** — `archive` deletes it; `verify --confirm` detects merges by SHA, unaffected by branch deletion

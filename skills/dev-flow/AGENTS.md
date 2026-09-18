@@ -19,7 +19,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 |---|---|
 | `scripts/flow.sh` | CLI entry point, routes to Python |
 | `scripts/flow.py` | argparse main program, subcommand dispatch |
-| `scripts/commands/` | Subcommand implementations (submit, approve, complete, verify, plan, issue, sync, archive, decompose, reset) |
+| `scripts/commands/` | Subcommand implementations (submit, approve, complete, verify, plan, issue, sync, archive, reset) |
 | `scripts/lib/` | Shared libraries (git, github, project, workspace, worktree, logging) |
 | `templates/` | Plan and Issue templates |
 | `references/` | Command reference, plan guide, troubleshooting |
@@ -31,7 +31,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 |---|---|
 | Run tests | `python -m pytest tests/python/ -v` |
 | CLI help | `bash scripts/flow.sh <cmd> --help` |
-| Plan validation | `bash scripts/flow.sh plan <issue> --check` |
+| Plan validation | `bash scripts/flow.sh plan check <name-or-path>` |
 
 Working directory: `.wopal/skills/dev-flow/`
 

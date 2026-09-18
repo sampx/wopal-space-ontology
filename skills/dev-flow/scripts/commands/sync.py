@@ -197,8 +197,7 @@ def find_plan(input: str) -> str:
     """
     Find Plan by Issue number OR Plan name.
 
-    Delegates to lib.project.find_plan() for canonical path resolution
-    across new paths and DEPRECATED legacy read-only fallback.
+    Delegates to lib.project.find_plan() for canonical path resolution.
 
     Returns plan file path as string.
     """

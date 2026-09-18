@@ -10,7 +10,6 @@
 
 | 命令 | 说明 |
 |------|------|
-| `plan <issue>` | 创建或定位 Plan（裸命令，后向兼容） |
 | `plan new <issue>` | 创建新 Plan |
 | `plan status <plan-id>` | 查看 Plan 完整状态 |
 | `plan list [--issue]` | 列出活跃 Plan（`--issue` 含 GitHub Issues） |
@@ -27,22 +26,20 @@
 | 命令 | 说明 |
 |------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue（`--body-file` 为主路径） |
+| `issue edit <issue> [--title] [--type] [--project] [--body-file] [--append]` | 编辑 Issue（标题/类型/项目/body） |
+| `issue close <issue>` | 关闭 Issue |
+| `issue delete <issue>` | 删除 Issue |
 | `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue（含 repo URL，可按 project/status 过滤） |
-| `issue write <issue> --body-file <path>` | 全量替换 Issue body |
-| `issue write <issue> --append <path>` | 追加到 Issue body 末尾 |
-| `issue update <issue>` | ⚠️ **已废弃**，使用 `issue write` 替代 |
-| `decompose-prd <prd-path> [--dry-run]` | 从 PRD 拆分 Issue |
-| `decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]` | 从 ROADMAP.md Slices 表生成 Slice Issues |
+| `issue view <issue> [--json]` | 查看单个 Issue 详情 |
 
 ### Plan 子命令
 
 | 命令 | 说明 |
 |------|------|
-| `plan new <issue>` | 创建新 Plan，与裸 `plan <issue>` 等效 |
+| `plan new <issue>` | 从 Issue 创建新 Plan |
 | `plan status <plan-id>` | 查看 Plan 完整状态（metadata、Issue、worktree） |
 | `plan list` | 列出本地活跃 Plan |
 | `plan list --issue` | 列出活跃 Plan，含 GitHub Issues 合并展示 |
-| `plan <issue>` | 裸命令，后向兼容（自动创建或定位 Plan） |
 
 ### 其他命令
 
@@ -67,20 +64,37 @@ flow.sh issue create --title "add skills remove command" --project <name> --type
 
 `--body-file` 指向包含五段结构的 markdown 文件。不再支持 type-specific 参数（`--confirmed-bugs`、`--baseline` 等）——agent 在 body 文件的 `## Context` 中自由写入。
 
-### issue write
+### issue edit
 
-写入 Issue body（全量替换或追加）。
+编辑现有 Issue：标题、类型、项目标签与 body。
 
 ```bash
-flow.sh issue write <issue> --body-file <path>    # 全量替换 body
-flow.sh issue write <issue> --append <path>       # 追加到 body 末尾
+flow.sh issue edit <issue> --body-file <path>     # 全量替换 body
+flow.sh issue edit <issue> --append <path>        # 追加到 body 末尾
+flow.sh issue edit <issue> --title "fix(api): ..." # 改标题（自动同步 type/project 标签）
+flow.sh issue edit <issue> --type fix --project wopal-cli  # 改类型/项目标签
 ```
 
 **行为**：
 - `--body-file`：用文件内容替换整个 Issue body
 - `--append`：在现有 body 末尾追加文件内容，用 `\n\n` 分隔
+- `--title` / `--type` / `--project`：更新标题与对应标签（`type/*`、`project/*` 组自动同步）
 - 空文件或文件不存在时报错退出（exit 1）
 - 文件不以 `#` 或 `-` 开头时输出 warning
+- 不指定 body 参数时保持 body 不变，仅应用标题/类型/项目变更
+
+### issue close / delete
+
+关闭或删除 Issue（自动定位空间仓库，无需 `--repo`）。
+
+```bash
+flow.sh issue close <issue>     # 关闭 Issue
+flow.sh issue delete <issue>    # 删除 Issue（gh 会要求确认）
+```
+
+**行为**：
+- 通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`
+- Agent 关闭/删除 Issue 一律使用本命令，避免 `gh` 直连查错仓库
 
 ### issue list
 
@@ -120,14 +134,6 @@ flow.sh issue view 215 --json       # 原始 JSON（含全部 gh 字段）
 - Issue 不存在、仓库检测失败或 `gh` 调用失败时报错退出（exit 1）
 
 Agent 定位 Issue 的顺序：已知编号 → `issue view`；需要浏览/筛选 → `issue list`。两者均禁止手动 `gh issue view/list` 绕过脚本。
-
-### issue update（已废弃）
-
-```bash
-flow.sh issue update <issue> [options]
-```
-
-⚠️ 已废弃，使用 `issue write --body-file` 或 `--append` 替代。调用时输出 deprecated 警告。
 
 ### plan 子命令
 
@@ -228,19 +234,6 @@ git commit -m "feat(scope): <description> (#<issue>)"
 ```
 
 squash 合入后 verify 的 tree 相等判据原生识别已合并，无需手动干预。
-
-### decompose-prd
-
-```bash
-# 从 PRD 拆分 Issue（兼容旧模式）
-flow.sh decompose-prd projects/<project>/docs/PRD.md --dry-run   # 预览
-flow.sh decompose-prd projects/<project>/docs/PRD.md --project <name>  # 创建
-
-# 从 ROADMAP.md Slices 表生成 Slice Issues
-flow.sh decompose-prd --from ROADMAP.md [--product <name>] [--dry-run]
-```
-
-`--from ROADMAP.md` 模式解析 ROADMAP.md 中 `## Slices` 下的 markdown table，为每个 Slice 生成独立 Issue。Slices 表格式见 ROADMAP.md Slices 语法规范。`--product` 指定产品线名称，用于 Issue 标签和 body 元信息。
 
 ### reset（破坏性）
 

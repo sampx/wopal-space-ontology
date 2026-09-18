@@ -56,16 +56,17 @@ Plan 有两类读者：**评审的人**（要能看懂你要什么）和**实施
 | 命令 | 场景 | 说明 |
 |------|------|------|
 | `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue | `--body-file` 为主路径 |
+| `issue edit <issue> [--title] [--type] [--project] [--body-file] [--append]` | 编辑 Issue | 标题/类型/项目标签 + body 替换/追加 |
+| `issue close <issue>` | 关闭 Issue | 自动定位空间仓库 |
+| `issue delete <issue>` | 删除 Issue | 自动定位空间仓库 |
 | `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue | 自动检测仓库，显示 repo URL，可按 project/status 过滤 |
 | `issue view <issue> [--json]` | 查看单个 Issue 内容 | 已知编号时直接查看，无需先 list；`--json` 输出原始 JSON |
-| `issue write <issue> --body-file <path>` | 全量替换 Issue body | |
 | `sync <plan> [--body-only\|--labels-only]` | Plan → Issue 同步 | Plan 内容变更后必走 |
 
 ### 其他
 
 | 命令 | 场景 | 说明 |
 |------|------|------|
-| `decompose-prd <prd-path>` | 从 PRD 拆分 Issue | `--dry-run` 预览 |
 | `reset <plan>` | 重置 Plan | 破坏性，仅用户明确要求时使用 |
 
 ## 心智模型
@@ -406,7 +407,7 @@ flow.sh archive <issue>
 - **User Validation 越权代勾** — checkbox 勾选权在用户
 - **把可自动化验证推给用户** — UV 只放"Agent 无法自动 + 必须用户手动观察"的项；测试/lint/typecheck 等放 Agent Verification
 - **UV 场景无启动命令** — 每个场景必须有用户可直接复制的命令与可断言判据；依赖的验证机制缺失时先补入项目规范
-- **grep/glob 搜索 Plan** — 使用 `flow.sh plan <name>` 或 `flow.sh plan status <name>`
+- **grep/glob 搜索 Plan** — 使用 `flow.sh plan status <name>`
 - **`approve` 不带 `--confirm`** — 报错退出，使用 `submit` 提审
 - **verify-switch 前未先移除 worktree** — 脚本内已处理顺序（先 remove worktree 再 checkout），agent 不手动操作
 - **合并后手动删除 feature 分支** — 分支由 `archive` 自动删除。`verify --confirm` 通过 SHA 检测 merge 状态，分支删除不影响检测

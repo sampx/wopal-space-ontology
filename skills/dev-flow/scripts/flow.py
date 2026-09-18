@@ -1,8 +1,4 @@
-"""Flow CLI — Python entry point for dev-flow.
-
-Phase 0 skeleton: only provides --help and version; all subcommands
-will be dispatched here in later phases by switching the hybrid router.
-"""
+"""Flow CLI — Python entry point for dev-flow."""
 
 from __future__ import annotations
 
@@ -19,7 +15,6 @@ from commands.submit import register_submit_parser, cmd_submit
 from commands.complete import register_complete_parser, cmd_complete
 from commands.verify import register_verify_parser, cmd_verify
 from commands.plan import register_plan_parser, cmd_plan
-from commands.decompose import register_decompose_parser, cmd_decompose
 from commands.reset import register_reset_parser, cmd_reset
 from commands.verify_switch import run_verify_switch
 
@@ -63,9 +58,6 @@ def build_parser() -> argparse.ArgumentParser:
     # Register plan subcommand
     register_plan_parser(subparsers)
 
-    # Register decompose-prd subcommand (top-level alias)
-    register_decompose_parser(subparsers)
-
     # Register reset subcommand
     register_reset_parser(subparsers)
 
@@ -86,8 +78,11 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print("Available subcommands:")
         print("  issue create    Create a new GitHub Issue")
+        print("  issue edit      Edit an existing Issue (title/type/project/body)")
+        print("  issue close     Close an Issue")
+        print("  issue delete    Delete an Issue")
         print("  issue list      List open Issues in the space repo (with repo URL)")
-        print("  issue update    Update an existing GitHub Issue")
+        print("  issue view      View a single Issue by number")
         print("  sync            Sync Plan to Issue (body + labels)")
         print("  sync --body-only    Sync only Issue body")
         print("  sync --labels-only  Sync only Issue labels")
@@ -106,8 +101,6 @@ def main(argv: list[str] | None = None) -> int:
         print("  archive                      Archive a completed Plan")
         print("")
         print("Utility commands:")
-        print("  decompose-prd   Create Issues from PRD phases")
-        print("  decompose       Create Issues from PRD or ROADMAP.md slices")
         print("  reset           Reset Plan to planning status")
         print("")
         print("For detailed options: flow.sh <command> --help")
@@ -144,10 +137,6 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch plan subcommand
     if args.command == "plan":
         return cmd_plan(args)
-
-    # Dispatch decompose-prd / decompose subcommand
-    if args.command in ("decompose-prd", "decompose"):
-        return cmd_decompose(args)
 
     # Dispatch reset subcommand
     if args.command == "reset":

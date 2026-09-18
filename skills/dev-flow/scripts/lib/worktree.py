@@ -53,9 +53,7 @@ def _worktree_field_name(field: str) -> str:
 def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
     """Parse WorktreeContext from Plan metadata.
 
-    Supports two formats:
-    1. New structured format (indented list under Worktree heading)
-    2. Legacy format: "- **Worktree**: branch | path"
+    Supports the structured format (indented list under Worktree heading).
 
     Args:
         plan_path: Path to Plan markdown file
@@ -73,7 +71,7 @@ def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
     # Worktree placeholders in design/scope sections.
     metadata_section = _extract_metadata_section(content)
 
-    # Try new structured format first
+    # Parse the structured format
     ctx = _parse_structured_worktree(metadata_section)
     if ctx is not None:
         # Read project_type from Plan metadata if not in WorktreeContext
@@ -81,15 +79,6 @@ def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
             meta_type = _read_plan_project_type(metadata_section)
             if meta_type and meta_type != 'standard':
                 ctx.project_type = meta_type
-        return ctx
-
-    # Fallback to legacy format: "- **Worktree**: branch | path"
-    ctx = _parse_legacy_worktree(metadata_section)
-    if ctx is not None:
-        # Read project_type from Plan metadata
-        meta_type = _read_plan_project_type(metadata_section)
-        if meta_type:
-            ctx.project_type = meta_type
         return ctx
 
     return None
@@ -163,35 +152,10 @@ def _parse_structured_worktree(content: str) -> WorktreeContext | None:
         return None
 
 
-def _parse_legacy_worktree(content: str) -> WorktreeContext | None:
-    """Parse legacy '- **Worktree**: branch | path' format."""
-    pattern = r'^\- \*\*Worktree\*\*:\s*(.+)$'
-    match = re.search(pattern, content, re.MULTILINE)
-    if not match:
-        return None
-
-    raw = match.group(1).strip()
-    parts = raw.split('|', 1)
-    if len(parts) != 2:
-        return None
-
-    branch = parts[0].strip()
-    wt_path = parts[1].strip()
-
-    if not branch or not wt_path:
-        return None
-
-    return WorktreeContext(
-        branch=branch,
-        path=Path(wt_path),
-        project_type='standard',
-    )
-
-
 def write_worktree_context(plan_path: str, branch: str, path: str) -> bool:
     """Write minimal Worktree metadata to Plan file (branch + path only).
 
-    Replaces existing Worktree field (new or legacy format) with simplified block.
+    Replaces an existing structured Worktree field with the simplified block.
 
     Args:
         plan_path: Path to Plan markdown file
@@ -232,14 +196,6 @@ def write_worktree_context(plan_path: str, branch: str, path: str) -> bool:
         p.write_text(new_content)
         return True
 
-    # Try replacing legacy format
-    legacy_pattern = r'^\- \*\*Worktree\*\*:\s*.+$'
-    legacy_match = re.search(legacy_pattern, content, re.MULTILINE)
-    if legacy_match:
-        new_content = content[:legacy_match.start()] + new_block + content[legacy_match.end():]
-        p.write_text(new_content)
-        return True
-
     # No existing Worktree field — insert after Status field
     status_pattern = r'^\- \*\*Status\*\*:\s*.*$'
     status_match = re.search(status_pattern, content, re.MULTILINE)
@@ -255,7 +211,7 @@ def write_worktree_context(plan_path: str, branch: str, path: str) -> bool:
 def parse_worktree_meta(plan_path: str) -> dict | None:
     """Parse minimal Worktree metadata (branch + path) from Plan file.
 
-    Supports all formats: new 2-field, old 9-field structured, and legacy pipe.
+    Supports the structured format.
 
     Returns:
         {"branch": str, "path": str} if found, None otherwise.
@@ -532,11 +488,8 @@ def _remove_empty_dirs(root: Path) -> bool:
 def _find_worktree_path_by_branch(project_dir: Path, branch: str) -> Path | None:
     """Locate a worktree's real registered path via `git worktree list`.
 
-    The worktree directory name normally equals the branch, but legacy
-    worktrees may carry a project prefix the branch lacks (e.g. dir
-    'ellamaka-implement-workbench-chat-transcript' vs branch
-    'implement-workbench-chat-transcript'). The git registry is
-    authoritative; the branch-derived dir is only a fallback.
+    The git registry is authoritative; the branch-derived dir is only a
+    fallback.
 
     Args:
         project_dir: Path to the project's git root directory
@@ -585,9 +538,8 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
         RuntimeError: If removal fails and residual files remain
     """
     branch_slug = branch.replace("/", "-")
-    # Locate the real registered path first (git registry is authoritative;
-    # the dir name may not match the branch for legacy worktrees). Fall back
-    # to the branch-derived dir when the branch is not registered.
+    # Locate the real registered path first (git registry is authoritative).
+    # Fall back to the branch-derived dir when the branch is not registered.
     worktree_path = _find_worktree_path_by_branch(project_dir, branch)
     if worktree_path is None:
         # Worktree directory = branch (branch already contains the project prefix)
