@@ -10,7 +10,7 @@ Issue 创建、编写、同步的详细指导。核心规则见 SKILL.md。
 flow.sh issue create --title "add skills remove command" --project <name> --type feat
 ```
 
-**创建错误的 Issue 必须彻底删除**（`gh issue delete`），不能只是 close。用户不喜欢仓库里留垃圾记录。
+**创建错误的 Issue 必须彻底删除**（`flow.sh issue delete`），不能只是 close。用户不喜欢仓库里留垃圾记录。
 
 ## Issue 查询
 
@@ -105,6 +105,6 @@ flow.sh sync <issue> --body-only
 | 模式 | 触发词 | 流程 |
 |------|--------|------|
 | Issue 驱动 | Issue 号、"处理 issue"、"开发" | 先创建 Issue → 再出 Plan |
-| 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan --title ... --project ... --type ...` |
+| 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan new --title ... --project ... --type ...` |
 
 两者都是 dev-flow 流程，区别在于是否有 Issue 载体。

@@ -5,7 +5,7 @@
 | 错误 | 处理 |
 |------|------|
 | `Invalid transition` | 回到正确状态顺序执行 |
-| `Plan not found` | 先运行 `plan` |
+| `Plan not found` | 用 `flow.sh plan status <name>` 定位或 `plan new` 创建 |
 | `check-doc failed` | 修好 Plan 再 `approve` |
 | `Done completion failed` | 勾选所有 Task Done checkbox |
 | `Agent Verification failed` | 补齐 Agent Verification checkbox |
