@@ -49,5 +49,3 @@ package.json
 # config
 config/settings.local.jsonc
 
-# tmp
-wsf-file-manifest.json
