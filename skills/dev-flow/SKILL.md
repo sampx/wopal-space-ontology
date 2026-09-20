@@ -69,7 +69,7 @@ Full parameters and edge cases in `references/commands.md`.
 
 | Command | Scenario | Notes |
 |------|------|------|
-| `reset <plan>` | Reset a Plan | Destructive; only on explicit user request |
+| `reset <plan>` | Reset a Plan | Destructive; explicit user request only — never to dodge a validation-stage fix |
 
 ## Mental model
 
@@ -266,6 +266,18 @@ Violation pattern: code committed → skip `complete` → invite the user to "va
 
 After `complete` the Plan is `verifying`. `complete` prints the validation options and canonical-path git status; the agent must relay them fully and let the user choose. The agent never skips a scenario on its own.
 
+#### Rework during validation is authorized work, not a state-machine violation
+
+While a Plan is `verifying`, the user validates and **may legitimately ask for code changes, Plan changes, or both** — validation exposes problems, and fixing them is the normal closing loop. When that happens:
+
+- **Code changes are made on the feature branch** (or the integration branch in no-worktree mode), committed there, and readied for the user to re-validate. Do not ask for a fresh approval cycle; the Plan is already approved.
+- **Plan changes may touch Implementation, Tasks (add a Task for new work), Acceptance Criteria (add an AC for a new criterion), and User Validation scenarios.** Edit in place, then sync the Issue body (`flow.sh sync <plan> --body-only`) when the changed sections map to the Issue body. There is no re-`submit` and no re-approval gate — the state machine stays in `verifying`; `flow.sh verify --confirm` later records the final state.
+- **New work discovered during validation follows the same gates as any other work**: implement it with the same TDD discipline, verify it empirically, and keep the code/checkbox coupling intact. The ACs that cover the new work get checked when they pass, not before.
+- **The `approve` gate already happened.** Validation-stage authorization covers implementation and Plan edits inside the approved scope. If the user asks for a change that materially expands the Plan's goal or contract, say so and let them decide whether it belongs in this Plan or a new one.
+- **Never reset the Plan to force a re-approval.** `flow.sh reset` is a destructive operation for explicit user request only — it is not a tool for agents to "go back and redo" when validation surfaces a fix. Fix in place, in `verifying`, and continue.
+
+This is how the loop closes: implementation → review → validation → user-driven adjustments → confirm → done. The verification stage is a working stage, not a read-only one; treating every fix as needing a reset or re-approval is the failure mode to avoid.
+
 ##### Scenario 1: validate inside the worktree
 
 Condition: worktree exists and the project runs/tests independently inside it (no path dependencies).
@@ -415,6 +427,7 @@ Precondition: Plan status = `done`. The script archives the Plan, cleans the wor
 - **UV scenarios without a launch command** — every scenario needs a copy-pasteable command and assertable criteria; document missing mechanisms in the project spec first
 - **grep/glob for Plans** — use `flow.sh plan status <name>`
 - **`approve` without `--confirm`** — errors out; use `submit`
+- **Resetting a Plan to dodge a fix or bypass re-approval** — `flow.sh reset` is destructive and reserved for explicit user request only. Validation-stage fixes (code and Plan edits) proceed in place while the Plan stays in `verifying` — see section D. Never reset to "redo" or to force a fresh approval cycle
 - **Removing the worktree before verify-switch** — the script sequences it (remove then checkout); the agent never does it manually
 - **Deleting the feature branch after merge** — `archive` deletes it; `verify --confirm` detects merges by SHA, unaffected by branch deletion
 - **Creating or deleting branches manually** — the script owns the lifecycle: `approve --confirm` creates, `archive` deletes. The agent's only branch operation is merge, after explicit authorization

@@ -67,7 +67,7 @@ Plan 有两类读者：**评审的人**（要能看懂你要什么）和**实施
 
 | 命令 | 场景 | 说明 |
 |------|------|------|
-| `reset <plan>` | 重置 Plan | 破坏性，仅用户明确要求时使用 |
+| `reset <plan>` | 重置 Plan | 破坏性，仅用户明确要求时使用——禁止用于绕过验证阶段修复 |
 
 ## 心智模型
 
@@ -264,6 +264,18 @@ flow.sh sync <issue> --body-only    # 同步 Issue body（变更目标和范围�
 
 `complete` 后 Plan 状态为 `verifying`。`complete` 会输出验证选项和规范路径 git status，agent 必须将其完整传达给用户，由用户选择验证方式。Agent 不得自行决定跳过任何场景。
 
+#### 验证阶段返工是授权范围内的正常工作，不是状态机违规
+
+Plan 处于 `verifying` 时，用户验证过程中**完全可能要求改代码、改 Plan，或两者同时改**——验证本来就是用来暴露问题的，修复它们正是收尾闭环的一部分。此时：
+
+- **改代码**在 feature 分支上进行（no-worktree 模式在集成分支），提交后请用户重新验证。不需要重新走审批，Plan 已经批准过了
+- **改 Plan** 可以动 Implementation、Tasks（为新工作追加 Task）、Acceptance Criteria（为新判据追加 AC）、User Validation 场景。原位编辑；若改动章节会同步到 Issue body，用 `flow.sh sync <plan> --body-only` 同步 Issue。不需要重新 `submit`，也没有二次审批门——状态机停留在 `verifying`，之后由 `flow.sh verify --confirm` 记录终态
+- **验证阶段新发现的工作与任何工作遵循同样的门禁**：同样按 TDD 纪律实施、实证验证、维持代码与 checkbox 的耦合。覆盖新工作的 AC 在通过时才勾选
+- **`approve` 门禁已经发生过。** 验证阶段授权覆盖已批准范围内的实施与 Plan 编辑。如果用户要求的是实质性扩大 Plan 目标或契约面的变更，明确指出来，由用户决定它属于本 Plan 还是另开新 Plan
+- **永远不要用 reset 去强行重走审批。** `flow.sh reset` 是破坏性操作，仅在用户明确要求时使用——它不是 agent 在验证暴露修复项时"回退重做"的工具。在 `verifying` 状态下原位修复，继续推进
+
+这就是闭环的收拢方式：实施 → 审查 → 验证 → 用户驱动的调整 → 确认 → done。验证阶段是工作阶段，不是只读阶段；把每个修复都当作需要 reset 或重新审批的信号，才是要避免的失败模式。
+
 ##### 场景 1：工作树内验证
 
 条件：有 worktree，且项目在 worktree 目录内可独立运行/测试（无路径依赖）。
@@ -409,6 +421,7 @@ flow.sh archive <issue>
 - **UV 场景无启动命令** — 每个场景必须有用户可直接复制的命令与可断言判据；依赖的验证机制缺失时先补入项目规范
 - **grep/glob 搜索 Plan** — 使用 `flow.sh plan status <name>`
 - **`approve` 不带 `--confirm`** — 报错退出，使用 `submit` 提审
+- **用 reset 绕过修复或重新审批** — `flow.sh reset` 是破坏性操作，仅限用户明确要求。验证阶段的修复（代码与 Plan 编辑）在 Plan 保持 `verifying` 时原位进行——见 D 段。禁止用 reset"回退重做"或强行重走审批
 - **verify-switch 前未先移除 worktree** — 脚本内已处理顺序（先 remove worktree 再 checkout），agent 不手动操作
 - **合并后手动删除 feature 分支** — 分支由 `archive` 自动删除。`verify --confirm` 通过 SHA 检测 merge 状态，分支删除不影响检测
 - **手动创建或删除分支** — 分支生命周期由脚本独占：`approve --confirm` 创建，`archive` 删除。Agent 唯一的分支操作是 merge，且必须在用户明确授权之后执行
