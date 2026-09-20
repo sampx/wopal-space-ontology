@@ -23,6 +23,7 @@ skills:
   - dev-doc-master
   - git-worktrees
   - skill-creator
+  - agent-browser
 
 # 声明该空间加载的规则
 rules:
