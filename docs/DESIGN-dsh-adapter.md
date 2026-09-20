@@ -1,7 +1,7 @@
 # DESIGN — dsh-adapter Capability Mapping
 
 > **Status**: Draft
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-19
 > **Parent**: `./DESIGN.md`（ontology overall design: Plugin System section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -94,6 +94,27 @@ ellamaka 的 Agent 定义（`.wopal/agents/*.md` 的 `permission:` frontmatter�
 - MCP 工具按需单列（dsh MCP 机制另行评审）
 - 24 个 WSF 子代理（由 space-flow 分发，非本轮）
 - doom_loop / sandbox_escalation / external_directory：由 dsh 沙箱与审批层承接，不写进 preset
+
+---
+
+## Plugin SDK Contract
+
+dsh-adapter 消费 ellamaka fork 的插件契约层扩展，经 npm 包 `@wopal/ellamaka-plugin` 分发。本表之外的动态工具投影与沙箱桥接依赖这两个扩展面。
+
+### 运行时契约：插件依赖的 fork 扩展
+
+- `Hooks["tool.provider"]`：每次模型请求，引擎在 `ToolRegistry.tools()` 内触发该 hook，插件向 `output.tools` 投影当前工具集。dsh-adapter 在沙箱启用时注册 provider，从 `globalThis.__ellamakaDshContainer` 的 `tools.schemas()` 实时读取容器工具，按固定投影集合（`grep/glob/read/write/edit/str_replace_editor/bash`）覆盖同名内置工具。投影是请求级的：容器内挂载/卸载的工具在下一次请求生效，无需重启。沙箱关闭时插件不注册 provider，内置工具原样运行。
+- `ToolContext.extra`：每次工具调用，宿主经 `ctx.extra.sandboxMode` 透传本次请求的沙箱模式（`read-only` / `workspace-write`）。插件将其作为 `sandbox/mode` 事件种入 dsh session facade（LAST-wins），实现 per-message 沙箱模式选择。字段缺省时回退到空间级默认模式。
+
+### 依赖声明
+
+插件声明 `@wopal/ellamaka-plugin` 为直接依赖，版本跟随产品主版本。声明后运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致。
+
+插件依赖随其 package.json 分发，不再依赖同目录其他插件的依赖安装结果。
+
+### 与 fork 扩展的关系边界
+
+插件消费面是 `tool.provider` 与 `ToolContext.extra` 两项。`wopalSpaceRoot` 与 `systemMetadata`（会话转储链路）归属 `wopal-plugin`（见 `DESIGN-wopal-plugin.md`）。沙箱关闭时插件不消费任何扩展，行为等价于未加载。
 
 ---
 

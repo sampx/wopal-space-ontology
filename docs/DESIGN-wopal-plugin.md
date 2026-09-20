@@ -1,7 +1,7 @@
 # DESIGN — wopal-plugin Overall Design
 
 > **Status**: Active
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-19
 > **Parent**: `./DESIGN.md`（ontology overall design: Plugin System and Configuration sections）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -42,6 +42,30 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | 能力装配以会话级权限为注入通道 | 会话级权限能超越角色基线，且持久化于会话记录，压缩不失效 |
 | 装配参数只接受能力名称 | 权限规则由插件按能力类型构造，调用方不接触权限细节，装配参数不可能出现语法形态错误 |
 | Plugin instance 隔离 | 每个 instance 独立运行时上下文、配置、日志与资源 |
+
+## Plugin SDK Contract
+
+wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm 包 `@wopal/ellamaka-plugin` 分发。插件的运行时契约与依赖声明在此定义。
+
+### 运行时契约：插件依赖的 fork 扩展
+
+插件在两个运行时表面依赖 fork 扩展，这些字段由 fork 引擎注入、插件被动接收：
+
+- `PluginInput.wopalSpaceRoot`：插件入口断言 `PluginInput & { wopalSpaceRoot?: string }` 读取空间根。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
+- `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` 结构由插件在本地 `types.ts` 定义（与 fork 契约层同构），运行时值来自引擎注入。
+
+### 依赖声明
+
+插件声明 `@wopal/ellamaka-plugin` 为直接依赖，版本跟随产品主版本。声明后：
+
+- 不再复制 `SystemPromptMetadata` 等类型，从 `@wopal/ellamaka-plugin` 导入
+- 运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致
+
+依赖随插件 package.json 分发。空间级依赖安装在 `.wopal/` 的运行时 node_modules，由引擎的插件依赖收集机制统一安装。
+
+### 与 fork 扩展的关系边界
+
+插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前插件的消费面是 `wopalSpaceRoot` 与 `systemMetadata` 两项，`tool.provider` 与 `ToolContext.extra` 归属 `dsh-adapter`（见 `DESIGN-dsh-adapter.md`）。
 
 ## Module Architecture
 
