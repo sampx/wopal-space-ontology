@@ -1,7 +1,7 @@
 # GAPS — ontology Design vs Implementation Divergence
 
 > **Status**: Active
-> **Updated**: 2026-09-17
+> **Updated**: 2026-09-21
 > **Design Source**: `./DESIGN.md`（差距对照的设计真相源，子设计见其 Sub-DESIGNs）
 > **Companion**: 追踪 ontology 本体资产与 wopal-plugin 实现的目标态差距，逐项解决后关闭。
 
@@ -50,23 +50,6 @@
 - [ ] 特别为该会话指定的规则确实生效
 - [ ] 上下文重建后仍按该会话被赋予的能力渲染
 - [ ] 原有的关键词匹配与去重表现不变
-
----
-
-## Config Settings (Plugin Side)
-
-### ONT-G4: wopal-plugin 配置写入目标断裂，配置不生效（P0）
-
-**Current**: wopal-plugin 经 `loadWopalConfig` 读三层 JSONC 的 `wopal` 节（loader.ts），但历史上的写入端（onboarding `configure-memory`）写的是 `.env`——写的和读的不是同一个地方。插件行为配置（如 dsh-adapter 的沙箱选项）内联在插件条目 options 里，无继承、面板不可达、schema 不覆盖。
-
-**Target**: `wopal` 节的配置（memory/llm/embedding、`pluginConfig` 节）由 CLI 写入配置文件，插件只读不写；dsh-adapter 等本体生态插件的行为配置统一从 `wopal.pluginConfig.<插件名>` 节读取（配置加载器抽为共享模块供本体插件共用），插件条目不再携带内联 options。
-
-**Design**: `projects/wopal-cli/docs/DESIGN-config-cli.md`（Memory Config Move、插件配置注入）；`../../../docs/products/wopal-space/DESIGN-config-settings.md`
-
-**Exit**:
-- [ ] 插件读到的 `wopal` 节配置与 CLI 写入的值一致（含继承链合并结果）
-- [ ] dsh-adapter 从 `wopal.pluginConfig.dsh-adapter` 读沙箱配置，行为与原内联 options 等价
-- [ ] 配置加载模块可被本体生态插件共用，插件条目零内联配置
 
 ---
 
