@@ -178,18 +178,22 @@ CLI 读取骨架后按以下规则消费：
 - **基础定义始终物化**：装配单（`assembly/archetypes/<type>.yaml`）、骨架（`assembly/schemas/<schema>.yaml`）、模板（`assembly/templates/`）与仓库根 `.gitignore` 无条件包含在稀疏范围内。
 - **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
 - **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
-- **工作区外新增需显式扩展范围**：用户在装配区新增文件后，须将其纳入稀疏范围（`sparse-checkout add`），否则后续范围重算（如下行同步）会将其从磁盘移除。`space sync` 的游离文件纳管负责此步骤。
+- **有效范围三要素**：稀疏范围 = 当前装配单基线 ∪ `localState.added` − `localState.shadowed`（见 Two-Layer Assembly Records）。基线取**当前**装配单（使其他空间经 `capability add` 的变更在各自下次同步时生效），本地增量取空间快照的 `localState`。范围重算只在 `space sync` 下行时执行，结果仅取决于这三项，不随提交历史变化。
+- **范围外新增须记入本地状态**：用户在装配区新增路径后，须记入 `localState.added` 并纳入稀疏范围，否则后续范围重算会将其从磁盘移除。
+- **移除装配项用范围遮蔽，不提交删除**：用户移除装配单声明的能力路径时，记入 `localState.shadowed` 并从稀疏范围排除；内容保留在对象库与空间分支树中，不作为删除提交上行。
 
 ## Two-Layer Assembly Records
 
 装配记录分两层，各司其职：
 
 1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。`space capability add/remove` 修改本层。
-2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配，含装配单声明的能力与空间自有能力两类。由 CLI 维护，不手工编辑。
+2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配，含装配单声明的基线、空间新增与空间遮蔽三类。由 CLI 维护，不手工编辑。
 
-装配物化使用 Git `sparse-checkout`：空间 worktree 只物化装配单选中的路径，共享中央仓库对象库，不复制历史。
+装配物化使用 Git `sparse-checkout`：空间 worktree 只物化由装配单派生、经空间本地状态调整后的路径，共享中央仓库对象库，不复制历史。
 
-**能力来源与收敛路径**：装配单声明的能力来自能力池。池中不存在的自有能力由用户直接放入装配区，`space sync` 上行后进入 local main，自此成为池中能力，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。空间自有能力仅存在于上行之前，不存在长期的"空间私有能力"状态。
+**本地状态是空间私有事实**：`space-meta.json` 位于空间仓库内，不属于本体仓库，因此不会随 `space sync` 上行。它记录"本空间实际持有与不持有哪些路径"，是范围重算的唯一输入之一，跨同步持久稳定。
+
+**能力来源与收敛路径**：装配单声明的能力来自能力池。空间新增的自有路径在同步时上行进入 local main，自此成为池中资产，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。空间遮蔽是对装配单基线的本地收窄，只作用于本空间，不影响能力池与同类型其他空间。
 
 ### Space Assembly Snapshot Structure
 
@@ -206,11 +210,19 @@ CLI 读取骨架后按以下规则消费：
   },
   "assembledAt": "2026-09-14T10:30:00Z",
   "capabilities": {
-    "agents": ["wopal", "fae", "rook", "evolver"],
+    "agents": ["wopal", "fae", "rook", "maka"],
     "skills": ["dev-flow", "agents-collab"],
     "rules": ["typescript", "business-rules"],
     "commands": ["init", "commit"],
     "plugins": ["wopal-plugin"]
+  },
+  "localState": {
+    "added": [
+      { "path": "skills/newskill", "recordedAt": "2026-09-21T13:40:00Z" }
+    ],
+    "shadowed": [
+      { "path": "skills/dev-flow", "recordedAt": "2026-09-21T13:41:00Z" }
+    ]
   }
 }
 ```
@@ -219,20 +231,45 @@ CLI 读取骨架后按以下规则消费：
 
 | 字段 | 含义 |
 |------|------|
-| `version` | 快照结构版本，用于未来结构演进的兼容判定 |
+| `version` | 快照结构版本；`localState` 是向后兼容的字段扩充，不改版本号，读方缺失该字段时视为空 |
 | `type` | 空间类型，与装配单 `type` 一致 |
 | `schema` | 实际使用的骨架名，由装配单解析所得 |
 | `source.ontology` | 来源 ontology 名称 |
 | `source.revision` | 装配时的来源提交，供下行对齐判断 |
 | `assembledAt` | 装配时间，ISO 8601 |
-| `capabilities` | 实际装配的能力清单，按类目分组 |
+| `capabilities` | 装配单基线快照，按类目分组；物化时复制，此后不随空间本地变更 |
+| `localState.added` | 空间新增的仓库相对路径，含记录时间；范围重算时并入 |
+| `localState.shadowed` | 空间遮蔽的仓库相对路径，含记录时间；范围重算时排除 |
 
-`capabilities` 与类型装配单的关系是**实例与模板**：装配单声明该类型的默认组合，快照记录本空间的实际组合。两者在两个方向上产生差异：
+`capabilities` 是**物化时的基线副本**，`localState` 是其上的**本地增量**。三者的关系是：
 
-- **装配单新增能力**（`space capability add`）：装配单与快照同时更新，同类型其他空间在各自下次 `space sync` 时跟进。
-- **空间自有能力**（用户直接向装配区放入池中不存在的文件）：仅记录于快照，不写入装配单；`space sync` 上行后进入能力池，此后可经装配单被其他空间引用。
+```
+有效装配 = capabilities（装配单基线） ∪ localState.added − localState.shadowed
+```
+
+由此产生三类差异，各有不同的收敛路径：
+
+| 变更 | 记录位置 | 是否上行 local main | 收敛方式 |
+|------|----------|---------------------|----------|
+| **装配单新增能力**（`space capability add`） | `capabilities` 与装配单同步更新 | 是 | 同类型其他空间在各自下次 `space sync` 时跟进 |
+| **空间新增自有路径**（用户直接放入装配区） | 仅记入 `localState.added` | 是（内容上行，装配单不变） | 上行后成为池中资产，可经装配单被其他空间引用 |
+| **空间遮蔽基线能力**（用户移除装配单声明的路径） | 仅记入 `localState.shadowed` | 否 | 只收窄本空间范围；能力池与同类型空间不受影响 |
 
 `source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
+
+### Protected Paths
+
+装配运行所需的结构定义不可缺失：装配单（`assembly/archetypes/`）、骨架（`assembly/schemas/`）、模板（`assembly/templates/`）、仓库根 `.gitignore` 与空间根 `AGENTS.md`。这些路径的内容可自由修改并随同步上行，但**删除与重命名**会使空间无法物化。
+
+保护机制在写入侧实现，判据是"路径是否落在保护集合内"：
+
+| 操作 | 受保护路径 | 装配单声明的能力路径 | 其他路径 |
+|------|-----------|---------------------|----------|
+| 修改内容 | 允许，随同步上行 | 允许，随同步上行 | 允许，随同步上行 |
+| 删除 | 恢复 | 记入 `localState.shadowed` | 正常删除 |
+| 重命名 | 恢复 | 按遮蔽旧路径 + 新增新路径处理 | 正常重命名 |
+
+受保护路径的删除或重命名由写入命令在提交前从索引与工作区一并恢复，不产生提交。恢复使用路径级操作（`git restore --staged --worktree <path>`），不触碰用户的其他未提交改动。
 
 
 ## Configuration Layers and Write Authority
