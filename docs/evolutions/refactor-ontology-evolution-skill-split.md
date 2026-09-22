@@ -618,8 +618,8 @@ cd /Volumes/U500G/coding/wopal-workspace && wopal-dev space sync    # dry-run �
 
 **Done**:
 任务产出：交付决策闭环，路由判据固化。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+实际触碰文件：`skills/dev-flow/{SKILL.md,SKILL.zh-CN.md}`、`skills/space-master/{SKILL.md,SKILL.zh-CN.md}`（对象判据：本体能力资产 → `ontology-evolution`；`projects/` 代码仓库 → `dev-flow`）。交付决策经用户批准执行：`space sync --confirm` 上行 6 个提交至 local main（`f36c6fa`），空间分支与 local main 对齐。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
 
