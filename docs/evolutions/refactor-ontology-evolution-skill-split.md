@@ -100,6 +100,21 @@
 
 本提案的 `commit` / `check` 在前置检查中拦截此形态（见 Task 5）；命令之外的路径（用户直接跑 `git add -A`）无法覆盖，属于遗留风险。
 
+**XD-03: `.wopal` 稀疏位被整体清除两次（触发者未锁定，环境侧）**
+
+2026-09-22 两次观测到同一形态：`core.sparseCheckout=true` 与 patterns 完好，但全部 skip-worktree 位归零（159 → 0），范围外文件因磁盘无副本被 `git status` 报为 `D`（第一轮 160 条、第二轮 159 条，均未暂存、未进历史）。
+
+| 轮次 | 时间 | 现场旁证 |
+|---|---|---|
+| 1 | 13:15:36 | 与另一会话 `space sync --confirm` 完成同秒 |
+| 2 | 14:38–14:41 | 同一会话进程仍在后台活动 |
+
+指纹判据：与 9/20 的 `disable` 形态不同——config 未被关闭。隔离穷举显示，唯一能"清空全部位、同时保留 config 与 patterns"的原语是 `git read-tree <tree>`（或等价的整体 index 重写）。交互式与 `--porcelain` 两种 `git status`、`sparse-checkout set/add/reapply`、`merge --ff-only`、`reset --hard/--mixed`、`checkout/switch/restore/stash`、`worktree add/remove/prune`、`commit` 在等价环境下**均保留 S 位**；本提案实施会话执行的全部写操作已逐一复现并排除。
+
+**无直接证据锁定触发命令**，指向一个不在机制车道命令序列内的第三方 index 重写者。待办：以 index 写入监控（`fs_usage`）抓现行；`wopal-cli` 侧排查是否存在内部整体 index 重写路径。
+
+缓解已验证：`check` 的 `stranded_paths` 前置检查识别此形态，`git sparse-checkout reapply` 无损恢复（两轮恢复均以磁盘 checksum 逐字节比对，零内容变化）。
+
 ### Key Interfaces
 
 **`ontology-evolution` 的机制车道入口（脚本契约）**：
