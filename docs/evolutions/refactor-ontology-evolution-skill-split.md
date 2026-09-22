@@ -10,7 +10,7 @@
 - **Worktree**: `.worktrees/wopal-space-ontology-evolution-skill-split`
 - **Branch**: `wopal-space-ontology-evolution-skill-split`
 - **Base Commit**: `80202a5`（实施分支 rebase 后的 `space/wopal-workspace` HEAD；初始起点为 `00abb5e`）
-- **Final Commit**: (done 时记录)
+- **Final Commit**: 9f543dfda34b22e69a8533bc88a59239e826e132
 
 > **Bootstrap 说明**：本提案是本体进化流程的第一件产物，也是第一个落在 `docs/evolutions/` 的提案。设计已先行落在 `docs/DESIGN-evolution.md` 的 Capability Evolution Workflow 章节，本提案按该设计实施。流程的状态推进脚本尚未存在（正是本提案的交付物之一），因此由用户批准后按 Task 顺序执行，产出提交在 `wopal-space-ontology-evolution-skill-split` 分支上。
 
