@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-21
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: isolated
 - **Worktree**: `.worktrees/wopal-space-ontology-evolution-skill-split`
 - **Branch**: `wopal-space-ontology-evolution-skill-split`
