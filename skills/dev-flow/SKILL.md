@@ -7,7 +7,9 @@ description: >
   verifying plans, Plan lifecycle transitions
   (approve/complete/verify/archive), decomposing PRDs into Issues. Skip:
   spec-driven workflows, research/discussion/explanation only, small
-  ad-hoc changes that don't need an Issue or Plan.
+  ad-hoc changes that don't need an Issue or Plan. Ontology capability
+  assets (skills, rules, agents, commands, plugins, assembly under
+  `.wopal/`) belong to `ontology-evolution`, never here.
 ---
 
 # dev-flow — Issue / Plan Driven Development Workflow

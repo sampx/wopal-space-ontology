@@ -6,6 +6,8 @@ description: >
   Plan、检查 Plan、验证 Plan、Plan 生命周期推进
   (approve/complete/verify/archive)、从 PRD 拆分 Issue。不适用：规格驱动
   流程、纯研究/讨论/解释、不需要 Issue 或 Plan 的小改动。
+  本体能力资产（`.wopal/` 下的 skills、rules、agents、commands、
+  plugins、assembly）归 `ontology-evolution`，不走本流程。
 ---
 
 # dev-flow — Issue / Plan 驱动开发流程
