@@ -683,6 +683,36 @@ class TestCheck(SparseSpaceFixture):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("placeholder", result.stdout)
 
+    def test_check_ignores_angle_brackets_inside_code(self):
+        # A proposal that records the CLI contract writes `<name>` / `<state>`
+        # inside a fenced block or an inline span. That is documentation, not
+        # an unreplaced template placeholder — failing it would reject every
+        # proposal that documents its own commands.
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _fill_placeholders(self.proposal)
+        self.proposal.write_text(
+            self.proposal.read_text()
+            + "\n## Commands\n\n```\nevo.sh advance <name> --to <state>\n```\n"
+            + "\nInline `evo.sh check <name>` too.\n"
+        )
+        _git(self.wopal, "commit", "-qam", "document commands")
+
+        result = _run_evo(self.wopal, "check", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("placeholder", result.stderr)
+
+    def test_check_still_flags_a_real_placeholder_in_prose(self):
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _fill_placeholders(self.proposal)
+        self.proposal.write_text(
+            self.proposal.read_text() + "\nA real <unfilled> placeholder.\n"
+        )
+        _git(self.wopal, "commit", "-qam", "leave a placeholder")
+
+        result = _run_evo(self.wopal, "check", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("<unfilled>", result.stderr)
+
     def test_check_reports_ok_for_an_accepted_isolated_proposal(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
         _fill_placeholders(self.proposal)

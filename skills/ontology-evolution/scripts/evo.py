@@ -94,6 +94,20 @@ PROPOSAL_TEMPLATE = """# {name}
 # implemented. Derived from the template so the two can never drift apart.
 PLACEHOLDER_RE = re.compile(r"<[^<>\n]{1,80}>")
 
+_FENCED_CODE_RE = re.compile(r"```.*?```", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def _prose(text: str) -> str:
+    """The proposal text with code removed.
+
+    A placeholder is an authoring gap in prose. Angle brackets inside a
+    fenced block or an inline span are the CLI contract written down
+    (`evo.sh advance <name> --to <state>`); scanning the raw text would
+    fail every proposal that documents its own commands.
+    """
+    return _INLINE_CODE_RE.sub("", _FENCED_CODE_RE.sub("", text))
+
 
 def _placeholders() -> list[str]:
     seen: list[str] = []
@@ -826,7 +840,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     mode = proposal.get_field(path, "Mode") or ""
 
     if draft:
-        remaining = PLACEHOLDER_RE.findall(path.read_text())
+        remaining = PLACEHOLDER_RE.findall(_prose(path.read_text()))
         if remaining:
             notices.append(
                 f"stage is 'draft': {len(remaining)} placeholder(s) are "
@@ -838,7 +852,7 @@ def cmd_check(args: argparse.Namespace) -> int:
                 f"metadata: Mode is {mode or 'unset'!r}; "
                 "expected 'isolated' or 'quick'"
             )
-        for placeholder in PLACEHOLDER_RE.findall(path.read_text()):
+        for placeholder in PLACEHOLDER_RE.findall(_prose(path.read_text())):
             problems.append(f"content: unreplaced placeholder {placeholder}")
 
     space = _space_root(_root())
