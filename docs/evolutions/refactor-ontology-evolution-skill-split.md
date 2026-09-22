@@ -167,13 +167,13 @@ evo.sh archive <name>                   归档到 docs/evolutions/archived/
 
 ### Agent Verification
 
-1. [ ] 设计文档在 canonical 路径通过质量门：`python3 .wopal/skills/dev-doc-master/scripts/verify-docset.py .wopal/docs --main DESIGN.md` 退出 0；`Sub-DESIGNs` 索引与实际文件一致（6 个子设计）；三份文档 `Updated` 均为本次日期。
-2. [ ] 状态机行为可验证：`evo.sh new` 产出 `Stage: draft`；`advance --to accepted` 成功；`advance --to archived`（跳级）非零退出且文件未被修改；`draft→accepted→implementing→validating→archived` 逐级走通；脚本单测全绿。
-3. [ ] 稀疏隔离可复现：从 `.wopal` 派生 worktree 后，其 `sparse-checkout list` 与 `.wopal` 一致，范围外文件为 S 位且磁盘不可见；宿主仓库全程停留在 `main`。
-4. [ ] dev-flow 已无本体类型痕迹：`skills/dev-flow/` 内 `.py` 与 `.md` 文件的 `ontology-worktree` **字面**命中为 0（`__pycache__` 不计），且本体类型**符号**命中为 0（`ONTOLOGY_WORKTREE`、`ontology_worktree`、`_switch_ontology`、`_print_ontology_verification_guidance`、`get_ontology_main_repo`、`resolve_project_info`）；`ProjectType` 枚举仅剩 `standard`；dev-flow 测试套件全绿。**同时断言双向不误伤**：`assembly/templates/STRUCTURE.md` 与 `.wopal-space/STRUCTURE.md` 中的 `ontology-worktree`（空间组件类型）仍然存在，`skills/dev-flow/tests/` 中的 `space-ontology`（项目名）与 `project/ontology`（label）仍然存在。
-5. [ ] 技能文档明确交付终点：`SKILL.md` 写明 `space sync` / `ontology contribute` 由用户拍板，技能内无自动上行代码路径。
-6. [ ] 进化使者更名与边界调整：`agents/maka.md` 存在且自称 Maka、保留炼金术士设定；`agents/evolver.md` 与 LANG 旧名文件已消失；稀疏 pattern 含 `/agents/maka.md` 且不含 `evolver`；`edit` 为 `{"*": deny}` + 提案目录 `allow`；装配单 agents 名单为 `maka`；`agents/`、`skills/ontology-evolution/`、`assembly/`、`docs/DESIGN*.md` 内 `evolver` 引用为 0。
-7. [ ] 机制车道命令面可验证：`evo.sh accept <name>` 派生 `.worktrees/ontology-*` 隔离 worktree 并写入 Worktree/Branch/Base Commit 元数据，派生后 patterns 与 `.wopal` 一致、宿主仓库仍在 `main`；`--no-worktree` 时元数据标记快速模式且不创建 worktree；`evo.sh commit` 对范围外新文件先扩范围再提交（`--sparse` 不再是手工负担），隔离模式下提交后 space 分支已含该提交（`merge --squash`，`.wopal` status 干净、patterns 完好），且 `commit` 拒绝（a）索引含范围外文件而范围未扩（b）S 位缺失伴随大批 `D`（c）稀疏配置缺失；`evo.sh check` 检出上述危险形态并以非零退出报告；全部新增单测通过。
+1. [x] 设计文档在 canonical 路径通过质量门：`python3 .wopal/skills/dev-doc-master/scripts/verify-docset.py .wopal/docs --main DESIGN.md` 退出 0；`Sub-DESIGNs` 索引与实际文件一致（6 个子设计）；三份文档 `Updated` 均为本次日期。
+2. [x] 状态机行为可验证：`evo.sh new` 产出 `Stage: draft`；`advance --to accepted` 成功；`advance --to archived`（跳级）非零退出且文件未被修改；`draft→accepted→implementing→validating→archived` 逐级走通；脚本单测全绿。
+3. [x] 稀疏隔离可复现：从 `.wopal` 派生 worktree 后，其 `sparse-checkout list` 与 `.wopal` 一致，范围外文件为 S 位且磁盘不可见；宿主仓库全程停留在 `main`。
+4. [x] dev-flow 已无本体类型痕迹：`skills/dev-flow/` 内 `.py` 与 `.md` 文件的 `ontology-worktree` **字面**命中为 0（`__pycache__` 不计），且本体类型**符号**命中为 0（`ONTOLOGY_WORKTREE`、`ontology_worktree`、`_switch_ontology`、`_print_ontology_verification_guidance`、`get_ontology_main_repo`、`resolve_project_info`）；`ProjectType` 枚举仅剩 `standard`；dev-flow 测试套件全绿。**同时断言双向不误伤**：`assembly/templates/STRUCTURE.md` 与 `.wopal-space/STRUCTURE.md` 中的 `ontology-worktree`（空间组件类型）仍然存在，`skills/dev-flow/tests/` 中的 `space-ontology`（项目名）与 `project/ontology`（label）仍然存在。
+5. [x] 技能文档明确交付终点：`SKILL.md` 写明 `space sync` / `ontology contribute` 由用户拍板，技能内无自动上行代码路径。
+6. [x] 进化使者更名与边界调整：`agents/maka.md` 存在且自称 Maka、保留炼金术士设定；`agents/evolver.md` 与 LANG 旧名文件已消失；稀疏 pattern 含 `/agents/maka.md` 且不含 `evolver`；`edit` 为 `{"*": deny}` + 提案目录 `allow`；装配单 agents 名单为 `maka`；`agents/`、`skills/ontology-evolution/`、`assembly/`、`docs/DESIGN*.md` 内 `evolver` 引用为 0。
+7. [x] 机制车道命令面可验证：`evo.sh accept <name>` 派生 `.worktrees/ontology-*` 隔离 worktree 并写入 Worktree/Branch/Base Commit 元数据，派生后 patterns 与 `.wopal` 一致、宿主仓库仍在 `main`；`--no-worktree` 时元数据标记快速模式且不创建 worktree；`evo.sh commit` 对范围外新文件先扩范围再提交（`--sparse` 不再是手工负担），隔离模式下提交后 space 分支已含该提交（`merge --squash`，`.wopal` status 干净、patterns 完好），且 `commit` 拒绝（a）索引含范围外文件而范围未扩（b）范围被关闭（`core.sparseCheckout=false`）且 S 位缺失——实测唯一会把删除计入索引的形态；范围开启而仅位漂移时以强告警呈现（Task 5 隔离探针实证修正）（c）稀疏配置缺失；`evo.sh check` 检出上述危险形态并以非零退出报告；全部新增单测通过。
 
 ### User Validation
 
@@ -245,8 +245,8 @@ grep -q "draft → accepted → implementing → validating → archived" .wopal
 
 **Done**:
 任务产出：本体能力进化流程的设计真相源落定。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+实际触碰文件：`docs/DESIGN-evolution.md`（Capability Evolution Workflow 章节）、`docs/DESIGN.md`（分流决策与 Plan Workflow Contract）、`docs/DESIGN-capabilities.md`（Skill System 分工）；三份 `Updated` 刷新。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
 
