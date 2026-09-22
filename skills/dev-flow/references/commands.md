@@ -206,7 +206,7 @@ flow.sh complete <issue> --pr    # PR 路径（默认不走 PR）
 
 ### verify-switch
 
-切换工作空间到特性分支供用户验证。适用 standard 和 ontology-worktree 两种项目类型。
+切换工作空间到特性分支供用户验证。
 
 执行流程：
 1. 检查规范路径 git 状态（脏时输出 warning，不阻塞）
@@ -216,7 +216,7 @@ flow.sh complete <issue> --pr    # PR 路径（默认不走 PR）
 5. commit Plan 变更（保持特性分支 git 状态干净）
 6. 输出验证指引
 
-standard 项目规范路径为项目目录（如 `projects/<name>/`）；ontology-worktree 规范路径为 `.wopal/`。
+规范路径为项目目录（如 `projects/<name>/`）。
 
 ```bash
 # 切换到特性分支验证
@@ -227,7 +227,7 @@ flow.sh verify-switch <issue>
 
 ```bash
 cd <repo_root>
-git checkout main        # standard 项目；ontology-worktree 用 space/<name>
+git checkout main
 git merge --squash <feature_branch>   # 压成单个提交
 git commit -m "feat(scope): <description> (#<issue>)"
 # 或保留历史: git merge --no-ff <feature_branch>

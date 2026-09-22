@@ -242,46 +242,6 @@ class TestCompleteSameRepo:
         # Plan file should have verifying status
         assert "verifying" in plan_file.read_text()
 
-    def test_ontology_worktree_same_repo(self, tmp_path):
-        """Ontology worktree: skills + plan in one commit (D-07)."""
-        # Simulate .wopal repo
-        wopal = tmp_path / ".wopal"
-        _git_init(wopal)
-
-        # Create skills and plans dirs
-        skills_dir = wopal / "skills" / "dev-flow" / "scripts"
-        skills_dir.mkdir(parents=True)
-        plans_dir = wopal / "docs" / "plans"
-        plans_dir.mkdir(parents=True)
-
-        # Create plan file
-        plan_file = plans_dir / "phase2-test.md"
-        _make_plan_file(plan_file, status="executing")
-
-        # Track plan
-        subprocess.run(["git", "add", "."], cwd=str(wopal), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init plan"],
-                       cwd=str(wopal), capture_output=True)
-
-        initial_commits = _get_commit_count(wopal)
-
-        # Code changes in skills
-        (skills_dir / "new_module.py").write_text("# new module")
-
-        # Update Plan status
-        update_plan_status(str(plan_file), "verifying")
-
-        # Same-repo merge commit
-        commit_all(str(wopal), "feat: add new module")
-
-        # One commit with both code + Plan
-        assert _get_commit_count(wopal) == initial_commits + 1
-        files = _get_last_commit_files(wopal)
-        has_code = any("new_module.py" in f for f in files)
-        has_plan = any("phase2-test.md" in f for f in files)
-        assert has_code, f"Expected new_module.py in commit, got: {files}"
-        assert has_plan, f"Expected phase2-test.md in commit, got: {files}"
-
 
 class TestCompleteDifferentRepo:
     """Tests for different-repo complete: separate commits in each repo."""
@@ -378,31 +338,6 @@ class TestVerifyRepoAware:
         # Plan status is done
         assert "done" in plan_file.read_text()
 
-    def test_done_status_committed_to_ontology_repo(self, tmp_path):
-        """Plan status=done committed to ontology repo (not workspace)."""
-        wopal = tmp_path / ".wopal"
-        _git_init(wopal)
-        plans_dir = wopal / "docs" / "plans"
-        plans_dir.mkdir(parents=True)
-        plan_file = plans_dir / "phase2-test.md"
-        _make_plan_file(plan_file, status="verifying")
-
-        subprocess.run(["git", "add", "."], cwd=str(wopal), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init"],
-                       cwd=str(wopal), capture_output=True)
-
-        initial = _get_commit_count(wopal)
-
-        update_plan_status(str(plan_file), "done")
-        plan_location = resolve_plan_location(plan_file, tmp_path)
-        commit_paths(
-            str(plan_location.repo_root),
-            [plan_location.repo_relative_path],
-            "docs(plan): verify plan phase2-test",
-        )
-
-        assert _get_commit_count(wopal) == initial + 1
-
 
 # ============================================
 # Test: archive repo-aware git mv/commit
@@ -460,41 +395,6 @@ class TestArchiveRepoAware:
         # Archived file should exist
         assert archived_file.exists()
 
-    def test_archive_ontology_repo(self, tmp_path):
-        """Archive in ontology repo (D-06)."""
-        wopal = tmp_path / ".wopal"
-        _git_init(wopal)
-        plans_dir = wopal / "docs" / "plans"
-        plans_dir.mkdir(parents=True)
-        plan_file = plans_dir / "phase2-test.md"
-        _make_plan_file(plan_file, status="done")
-
-        subprocess.run(["git", "add", "."], cwd=str(wopal), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init"],
-                       cwd=str(wopal), capture_output=True)
-
-        initial = _get_commit_count(wopal)
-
-        # Archive
-        done_dir = plans_dir / "done"
-        done_dir.mkdir(parents=True)
-        archive_date = date.today().strftime("%Y%m%d")
-        archived_name = f"{archive_date}-phase2-test.md"
-        archived_file = done_dir / archived_name
-
-        plan_rel = str(plan_file.relative_to(wopal))
-        archived_rel = str(archived_file.relative_to(wopal))
-
-        subprocess.run(
-            ["git", "mv", plan_rel, archived_rel],
-            cwd=str(wopal), capture_output=True, check=True,
-        )
-        commit_paths(str(wopal), [archived_rel], "chore: archive plan phase2-test")
-
-        assert _get_commit_count(wopal) == initial + 1
-        assert not plan_file.exists()
-        assert archived_file.exists()
-
 
 # ============================================
 # Regression tests for rook blockers B-01/B-02/B-03
@@ -534,9 +434,8 @@ class TestB01WorktreePathConsistency:
 class TestB02AbsolutePathResolution:
     """B-02 regression: verify-switch must handle absolute paths in WorktreeContext.
 
-    After the verify-switch refactor, _run_switch_runtime_phase1 was replaced by
-    _switch_ontology / _switch_standard. These use _resolve_wt_path to determine
-    the actual worktree path for removal. The guard test now validates
+    After the verify-switch refactor, _switch_standard uses _resolve_wt_path to
+    determine the actual worktree path for removal. The guard test now validates
     _resolve_wt_path directly.
     """
 
@@ -891,24 +790,6 @@ PLAN_STANDARD = """\
   - cleanup_policy: archive
 """
 
-PLAN_ONTOLOGY = """\
-- **Status**: verifying
-- **Type**: refactor
-- **Target Project**: wopal-space-ontology
-- **Project Type**: ontology-worktree
-- **Project Path**: .wopal
-- **Issue**: #10
-- **Worktree**:
-  - enabled: true
-  - branch: issue-10-slug
-  - path: .worktrees/ontology-issue-10-slug
-  - repo_root: /home/.wopal/ontologies/wopal-space-ontology
-  - base_branch: space/main
-  - merge_target: space/main
-  - verify_mode: switch-runtime
-  - cleanup_policy: archive
-"""
-
 PLAN_NO_WORKTREE = """\
 - **Status**: verifying
 - **Type**: feature
@@ -1066,13 +947,6 @@ class TestCheckBranchMerged:
         ("log grep hit", {
             "grep_log": "abc123 Merge feature/test-1-slug\n",
         }),
-        # Ontology-worktree: integration branch is the current space branch
-        ("ontology local branch merged", {
-            "current_branch": "space/wopal-workspace\n",
-            "feature_branch": "issue-10-slug",
-            "integration": "space/wopal-workspace",
-            "local_merged": "  space/wopal-workspace\n* issue-10-slug\n",
-        }),
     ]
 
     UNMERGED_ROWS = [
@@ -1095,16 +969,9 @@ class TestCheckBranchMerged:
         ("merge-tree differs", {
             "merge_tree": "tree-merged\n",
         }),
-        ("ontology all criteria miss", {
-            "current_branch": "space/wopal-workspace\n",
-            "feature_branch": "issue-10-slug",
-            "integration": "space/wopal-workspace",
-        }),
     ]
 
     def _plan_for(self, overrides):
-        if overrides.get("feature_branch") == "issue-10-slug":
-            return PLAN_ONTOLOGY
         return PLAN_STANDARD
 
     @pytest.mark.parametrize("name,overrides", MERGED_ROWS)

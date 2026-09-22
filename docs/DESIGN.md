@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-16
+> **Updated**: 2026-09-21
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -30,7 +30,7 @@ ontology 拥有的目标态能力组：
 
 | 能力域 | 拥有的目标能力 | 明确边界 |
 |---|---|---|
-| Agent 体系 | 4 维核心角色（Wopal/Fae/Rook + Evolver）跨类型常驻；类型差异由 skills / rules 能力装配承载，不靠新增代理切分 | 不持有 Agent runtime 实现；不硬编码微型工种 |
+| Agent 体系 | 4 维核心角色（Wopal/Fae/Rook + Maka）跨类型常驻；类型差异由 skills / rules 能力装配承载，不靠新增代理切分 | 不持有 Agent runtime 实现；不硬编码微型工种 |
 | 技能生态 | 空间根 / 工作流 / 专用技能池，通过空间装配清单（BOM）按需物化与 JIT 动态注入 | 不判断技能产品价值，不负责 skill 内容设计 |
 | 命令体系 | 覆盖空间维护、自进化、项目管理、开发支持、上下文管理，可覆盖内置命令 | 不实现命令执行引擎 |
 | 规则体系 | 项目级 + 空间级 + 领域专属规则，wopal-plugin 条件匹配注入 | 不修改 ellamaka 核心行为 |
@@ -48,7 +48,8 @@ ontology 拥有的目标态能力组：
 | 灵魂与操作分离 | Agent 灵魂文件只定义角色边界与决策原则（"我是谁"），操作知识由技能承载（"我怎么做"）。 |
 | 提示词目标化（Outcome-Oriented）优于过程干涉（Hand-Holding） | 面向 2026 前沿模型原生推理与测试时计算（TTC），提示词只给目标与验证门禁，不承载操作说教，不干涉过程。 |
 | 中央能力池集中维护 + 空间装配 worktree（BOM 装配模型） | 本体资产在单一 `main` 分支集中维护，通过 `assembly/archetypes/*.yaml` 声明装配单，空间端以装配 worktree（sparse-checkout）按需物化。一处优化全域受益，进化经 `space sync` 汇入 local main。 |
-| 进化的"提议权"与"实施权"分离 | Evolver 专职元认知分析、去特异化清洗与出方案（Read & Propose Only）；落地由 Wopal 统筹、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
+| 进化的"提议权"与"实施权"分离 | Maka 专职元认知分析、去特异化清洗与出提案（Propose Only，`edit` 仅放开提案目录）；落地由 Wopal 统筹、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
+| 本体进化与代码开发分流 | 本体能力进化的执行流程由 `ontology-evolution` 技能拥有，代码项目开发流程由 `dev-flow` 拥有。两条流程的对象不同，状态词汇互不重合。本体能力是全空间类型的常驻关注点，代码开发工作流属于 coding 类型，分流后每个空间只装配其实际需要的流程。 |
 | 插件适配原则 | wopal-plugin 是运行时插件，集中提供规则注入、任务委派、记忆系统和上下文管理，插件能实现尽量不改造 engine。 |
 | 运行时装配经会话级权限落地 | 能力装配以会话级权限为注入通道，会话创建时授予、生命周期内稳定。装配参数只接受能力名称，权限规则由插件构造，Agent 不接触权限细节。 |
 | Plugin instance 隔离 | Ellamaka 通过 `PluginInput.wopalSpaceRoot` 传递可选空间根。wopal-plugin 为每次 `server(input)` 调用构造独立 RuntimeContext、effective env、logger 与 memory client。 |
@@ -235,6 +236,8 @@ Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal
 ## Plan Workflow Contract
 
 开发流程由 dev-flow 拥有：planning → reviewing → approved → executing → verifying → done。approve 保存语义版本绑定的用户授权并停留 approved；显式 begin 在实际环境准备后进入 executing。计划批准、图构建和排期均不创建 worktree。通用 Provider 提供规范化 Plan 描述、审批与幂等 prepare/begin，时间与服务归 Wopal CLI。
+
+本体能力进化流程由 `ontology-evolution` 拥有：draft → accepted → implementing → validating → archived。提案默认不带 Issue 载体，用户明确要求时才引入评审。进化流程的推进状态记在提案的 `Stage` 字段，代码开发的 Plan 记在 `Status` 字段，两套字段名与词表都不重叠，使同一空间内的两类工作在流程上不会被混淆。进化提案文档位于本体仓库 `docs/evolutions/`，与它所改变的能力资产同行一条分发链路；实施、隔离与交付纪律见 `./DESIGN-evolution.md`。
 
 Plan 支持 outcome-driven 与 detailed 格式。前者固定目标、范围、依赖、公开契约和可验证完成条件，内部文件与实施步骤由 Agent 根据最新代码确定；所有校验/审查/完成入口遵循相同 profile 语义。上游成果变化时细化实现，目标/权限/依赖契约变化时重新评审。
 

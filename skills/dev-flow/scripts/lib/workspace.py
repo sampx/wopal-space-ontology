@@ -4,7 +4,6 @@
 # Provides:
 #   - find_workspace_root: Locate workspace root using .wopal/.git worktree signature
 #   - detect_space_repo: Parse owner/repo from workspace root's git remote URL
-#   - get_ontology_main_repo: Resolve ontology main repository from .wopal/.git file
 
 import re
 from pathlib import Path
@@ -89,39 +88,3 @@ def detect_space_repo(workspace_root: Path) -> str:
                        "Expected HTTPS (https://github.com/owner/repo) "
                        "or SSH (git@github.com:owner/repo) format.")
 
-
-def get_ontology_main_repo(workspace_root: Path) -> Path | None:
-    """Resolve ontology main repository path from .wopal/.git file.
-
-    The .wopal/.git file is a worktree pointer with format:
-        gitdir: /path/to/main/repo/.git/worktrees/-wopal
-
-    This is the single implementation replacing the duplicated logic in
-    domain/plan/project.py and commands/verify_switch.py.
-
-    Args:
-        workspace_root: Workspace root path
-
-    Returns:
-        Path to ontology main repository, or None if not resolvable
-    """
-    dot_git_path = workspace_root / ".wopal" / ".git"
-
-    if not dot_git_path.exists() or not dot_git_path.is_file():
-        return None
-
-    try:
-        content = dot_git_path.read_text().strip()
-        # Format: "gitdir: /path/to/.git/worktrees/-wopal"
-        if content.startswith("gitdir: "):
-            gitdir_path = content[len("gitdir: "):].strip()
-            # Extract main repo: remove /.git/worktrees/<name> suffix
-            # gitdir: /Users/sam/.wopal/ontologies/wopal-space-ontology/.git/worktrees/-wopal
-            # main repo: /Users/sam/.wopal/ontologies/wopal-space-ontology
-            if "/.git/worktrees/" in gitdir_path:
-                main_repo = gitdir_path.split("/.git/worktrees/")[0]
-                return Path(main_repo)
-    except Exception:
-        return None
-
-    return None

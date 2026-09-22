@@ -33,7 +33,6 @@ def _make_approve_mocks(status="planning"):
         "check_doc_plan": None,
         "get_plan_issue": 42,
         "get_plan_project": "space-ontology",
-        "get_plan_field": "ontology-worktree",
         "resolve_project_path": Path("/ws/.wopal"),
         "detect_space_repo": "wopal-space-ontology",
         "is_repo_dirty": False,
@@ -43,7 +42,6 @@ def _make_approve_mocks(status="planning"):
         "sync_status_label": None,
         "sync_plan_to_issue_body": None,
         "ensure_issue_labels": None,
-        "get_ontology_main_repo": Path("/ws/.wopal"),
         "get_current_branch": "space/wopal-workspace",
         "get_branch_head": "abc123def",
         "set_plan_field": True,
@@ -155,11 +153,9 @@ class TestApproveRecordsBaseCommit(unittest.TestCase):
         self.assertEqual(result, 0)
 
     def test_base_commit_uses_integration_branch_head(self):
-        """Base Commit 应取集成分支 HEAD(standard: main;ontology: 当前空间分支)。"""
+        """Base Commit 应取集成分支 HEAD(standard: main)。"""
         from commands.approve import cmd_approve
         mocks = _make_approve_mocks(status="reviewing")
-        # 切到 standard 项目场景,验证用 main 分支
-        mocks["get_plan_field"] = MagicMock(return_value="standard")
         with patch.multiple("commands.approve", **mocks):
             args = Namespace(target="42", confirm=True, no_worktree=True)
             result = cmd_approve(args)
@@ -195,14 +191,6 @@ class TestApproveBranchDerivation(unittest.TestCase):
         self.assertEqual(
             _derive_branch("wopal-space-ontology", "42-feature-dev-flow-decouple-naming"),
             "wopal-space-ontology-42-feature-dev-flow-decouple-naming",
-        )
-
-    def test_branch_derives_for_ontology_worktree(self):
-        """Branch = <project>-<plan-name> for ontology-worktree projects."""
-        from commands.approve import _derive_branch
-        self.assertEqual(
-            _derive_branch("wopal-space-ontology", "42-refactor-dev-flow-unify-naming"),
-            "wopal-space-ontology-42-refactor-dev-flow-unify-naming",
         )
 
 
@@ -250,7 +238,6 @@ class TestApproveExistingWorktree(unittest.TestCase):
         """--existing-worktree 应绑定已有 worktree 分支，并将 Base Commit 记录为该分支 HEAD。"""
         from commands.approve import cmd_approve
         mocks = _make_approve_mocks(status="reviewing")
-        mocks["get_plan_field"] = MagicMock(return_value="standard")
         mocks["get_branch_head"] = MagicMock(return_value="wt_head_sha_999")
         mocks["get_current_branch"] = MagicMock(return_value="feature/existing-branch")
         mocks["get_common_git_dir"] = MagicMock(return_value="/ws/.git")

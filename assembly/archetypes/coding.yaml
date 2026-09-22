@@ -11,7 +11,7 @@ agents:
   - wopal
   - fae
   - rook
-  - evolver
+  - maka
 
 # 声明该空间所需技能
 skills:

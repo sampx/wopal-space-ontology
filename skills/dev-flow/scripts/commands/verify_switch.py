@@ -1,7 +1,6 @@
 """verify_switch command — unified verification switch for dev-flow.
 
 Switches workspace to feature branch for verification:
-  - ontology-worktree: git checkout .wopal/ to feature branch
   - standard: git checkout project repo to feature branch + remove worktree
 """
 
@@ -9,11 +8,11 @@ import re
 import subprocess
 from pathlib import Path
 
-from lib.git import commit_paths, get_current_branch, get_dirty_lines, get_relative_path
-from lib.workspace import find_workspace_root, get_ontology_main_repo
+from lib.git import commit_paths, get_dirty_lines, get_relative_path
+from lib.workspace import find_workspace_root
 from lib.worktree import parse_worktree_context
-from lib.logging import log_info, log_success, log_error, log_warn, log_step
-from plan import find_plan, get_plan_field, get_plan_project_path, resolve_project_path
+from lib.logging import log_success, log_error, log_warn, log_step
+from plan import find_plan, get_plan_field, resolve_project_path
 
 
 
@@ -160,80 +159,6 @@ def _update_plan_after_switch(plan_path: str, repo_root: str) -> None:
     )
 
 
-def _switch_ontology(
-    workspace_root: Path,
-    wt_ctx,
-    issue: str,
-    plan_path: str,
-) -> bool:
-    """Switch .wopal/ to feature branch for ontology-worktree.
-
-    Steps:
-    1. Check dirty on .wopal/ — warn, don't block
-    2. Remove worktree from main repo
-    3. git fetch in .wopal/
-    4. git checkout <feature_branch> in .wopal/
-    5. Update Plan metadata
-    6. Print verification guidance
-
-    Args:
-        issue: Issue number or plan name (for guidance output)
-        plan_path: Path to Plan file (for metadata update)
-    Returns:
-        True if switch succeeded
-    """
-    wopal_dir = workspace_root / ".wopal"
-    branch = wt_ctx.branch
-    # Merge target is the current space layer branch (space/<name>), detected
-    # at runtime before checkout — .wopal/ worktree currently sits on it.
-    merge_target = get_current_branch(str(wopal_dir))
-    wt_path = str(_resolve_wt_path(wt_ctx.path, workspace_root))
-
-    # Merge happens in the .wopal/ worktree, NEVER in the ontology main repo.
-    # The main repo hosts base capabilities (agents/skills/commands/rules/
-    # plugins) that other spaces' agents depend on via symlinks; it must stay
-    # on main. The worktree shares the same branch refs, so merging here
-    # updates space/<name> and restores the runtime path for archive cleanup.
-    repo_root = str(wopal_dir)
-
-    # 1. Check dirty on .wopal/
-    dirty_files = _check_dirty(str(wopal_dir))
-    if dirty_files:
-        log_warn(
-            f"Canonical path has uncommitted changes "
-            f"({len(dirty_files)} files)"
-        )
-
-    # 2. Remove worktree from main repo
-    main_repo = get_ontology_main_repo(workspace_root)
-    if main_repo:
-        if not _remove_worktree(str(main_repo), wt_path):
-            log_error("Failed to remove worktree for ontology-worktree switch")
-            return False
-
-    # 3. Fetch
-    if not _git_fetch(str(wopal_dir)):
-        return False
-
-    # 4. Checkout
-    if not _git_checkout(branch, str(wopal_dir)):
-        return False
-
-    # 5. Update Plan metadata
-    _update_plan_after_switch(plan_path, str(wopal_dir))
-
-    # 6. Print verification guidance
-    log_success(f"Switched .wopal/ to '{branch}'")
-    print()
-    log_step("Verification steps:")
-    print(f"  1. Restart ellamaka to verify ontology changes")
-    print(f"  2. Verify the feature branch: '{branch}'")
-    print(f"  3. After verification, merge manually:")
-    print(f"     cd {repo_root} && git checkout {merge_target} && git pull && git merge {branch}")
-    print(f"  4. Run: flow.sh verify {issue} --confirm")
-    return True
-
-
 def _switch_standard(
     workspace_root: Path,
     wt_ctx,
@@ -335,16 +260,12 @@ def run_verify_switch(issue: str) -> bool:
         return False
 
     branch = wt_ctx.branch
-    project_type = wt_ctx.project_type
 
     if not branch:
         log_error("Worktree metadata has empty branch")
         return False
 
-    if project_type == "ontology-worktree":
-        return _switch_ontology(workspace_root, wt_ctx, issue, str(plan_path))
-    else:
-        return _switch_standard(workspace_root, wt_ctx, issue, str(plan_path))
+    return _switch_standard(workspace_root, wt_ctx, issue, str(plan_path))
 
 
 if __name__ == "__main__":

@@ -565,7 +565,7 @@ class TestDeriveProjectPath(unittest.TestCase):
         )
 
     def test_declared_overrides_project(self):
-        """ontology-worktree declares '.wopal', must not be overridden."""
+        """A declared Project Path must not be overridden by the derived one."""
         self.assertEqual(_derive_project_path("wopal-cli", ".wopal"), ".wopal")
 
     def test_empty_when_nothing_known(self):

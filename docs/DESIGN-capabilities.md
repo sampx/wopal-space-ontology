@@ -1,7 +1,7 @@
 # DESIGN — Capability System
 
 > **Status**: Active
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-21
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -19,7 +19,7 @@
 | **Wopal**（主控 / 统筹脑） | 意图解析、人机对齐、宏观规划、跨空间记忆承载、任务派发 | 全量感知与派发权 (`wopal_*`, `task`, `memory_manage`)，`question: allow` | 双模确认原则（自由对话须确认，工作流按 Plan 执行）；结论先行 |
 | **Fae**（执行手 / 全栈工兵） | 一切实施类工作：编码、重构、构建、测试、写作、编辑、数据处理 | `edit: allow`, `bash: allow`, `task: deny`（防套娃） | 必须产出客观证据；能通过真实验证的成果是唯一指标 |
 | **Rook**（审查眼 / 正交哨兵） | 一切产出质量的独立审计：方案、实施成果、文稿与数据 | 严格只读沙箱 (`read: allow`, `edit: deny`, `bash: allow` 仅限只读命令) | 严格遵守“无证据即无效”（Evidence-or-Downgrade），只认 `file:line` 事实 |
-| **Evolver**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`, `edit: deny` 对中央库只读提案) | **只出方案、不动刀**；执行严格的三级防污染分流检疫 |
+| **Maka**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`；`edit` 仅放开 `docs/evolutions/`) | **只出提案、不动刀**；执行严格的三级防污染分流检疫 |
 
 ### Role Boundaries Defined by Responsibility
 
@@ -30,7 +30,7 @@
 - **规划与统筹**归 Wopal，规划流程由 `dev-flow` 承载；
 - **全栈实施**归 Fae，编码、重构、构建、测试在单一上下文内原子共变；
 - **独立审查**归 Rook，代码缺陷与安全风险的正交审计统一归口；
-- **经验进化**归 Evolver，会话摩擦的蒸馏与检疫统一归口。
+- **经验进化**归 Maka，会话摩擦的蒸馏与检疫统一归口。
 
 ### Dynamic Assembly
 
@@ -81,10 +81,12 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 | 层次 | 职责 | 规模 | 代表 |
 |------|------|------|------|
 | 空间根技能 | 流程导航、场景路由、委派基础原则 | 1 | `space-master` |
-| 工作流技能 | 开发状态机、Plan 规范、委派 API、WSF 产品流水线 | ~66 | `dev-flow`、`agents-collab`、WSF 技能族 |
+| 工作流技能 | 开发状态机、Plan 规范、委派 API、WSF 产品流水线 | ~66 | `dev-flow`、`ontology-evolution`、`agents-collab`、WSF 技能族 |
 | 专用技能 | 独立领域能力 | ~13 | `fc-local`、`youtube-master`、`ellamaka-config`、`automating-mail`、`mac-reminder`、`git-worktrees`、`skill-creator` 等 |
 
 每个技能遵循三级加载：元数据（name + description）→ 主体（SKILL.md body）→ 资源（scripts / references / assets）。
+
+两个工作流技能按对象分工：`dev-flow` 面向 `projects/` 下的代码仓库，`ontology-evolution` 面向空间自身的本体能力资产。四个核心角色在所有空间类型常驻，本体能力进化因此对每个空间可用，不依赖空间是否装配代码开发工作流。两条流程的状态词汇互不重合，实施与交付纪律见 `./DESIGN-evolution.md`。
 
 `space-master` 是 ontology 的根技能，但其当前实现仍偏粗糙；后续应单独重构为概念模型入口、流程选择器、核心技能路由器、ontology/worktree 协作指南与多 Space 运维入口。
 

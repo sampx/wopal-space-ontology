@@ -215,17 +215,16 @@ refactor(scope): extract regex to constant
 
 `Project Path`、`Project Type`、`Target Project` 从空间 `STRUCTURE.md` 查询：
 
-1. 根据 Plan 涉及的代码路径判断属于哪个域（ontology / projects / contents / ...）
+1. 根据 Plan 涉及的代码路径判断属于哪个域（projects / contents / ...）
 2. 在 `STRUCTURE.md` frontmatter 或表格中匹配对应的 path/type/repo
 3. 填写映射：
 
 | STRUCTURE.md type | Project Type | Project Path 示例 |
 |---|---|---|
-| `ontology-worktree` | ontology-worktree | `.wopal/` |
 | `projects` | projects | `projects/<name>/` |
 | `contents` | contents | `contents/<name>/` |
 
-常见错误：把子目录（如 `.wopal/plugins/wopal-plugin/`）当项目根——应取 worktree 根 `.wopal/`；把 ontology worktree 归为普通项目——它是独立 repo 的 worktree。
+常见错误：把子目录（如 `projects/<name>/packages/app/`）当项目根——应取仓库根目录。
 
 ## Plan 与阶段、Gap 的关系
 

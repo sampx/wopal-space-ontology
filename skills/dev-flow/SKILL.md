@@ -285,7 +285,7 @@ Flow: user validates at worktree path → merge → verify --confirm → archive
 
 ##### Scenario 2: verify-switch to validation branch
 
-Condition: project has path dependencies (layout requirements, runtime load paths, config locations) and must be validated at the canonical path (repo root). Applies to standard and ontology-worktree projects.
+Condition: project has path dependencies (layout requirements, runtime load paths, config locations) and must be validated at the canonical path (repo root).
 Flow: agent runs `flow.sh verify-switch <issue>` (removes worktree + checks out feature) → user validates at canonical path → merge → verify --confirm → archive.
 
 ##### Scenario 3: merge first, validate after
@@ -309,7 +309,6 @@ Flow: user validates at the kept worktree path → `flow.sh verify <plan> --conf
 
 - Branch creation: `approve --confirm` (script); deletion: `archive` (script)
 - **The agent's only branch operation is merge, and only after explicit user authorization**: `git checkout <integration> && git merge <feature>`
-- **ontology-worktree merges happen inside the `.wopal` worktree — never switch branches in the main repo**: the main repo `~/.wopal/ontologies/<name>` carries base capabilities other spaces depend on (symlink sources for agents/skills/commands/rules/plugins) and must stay on `main`. `.wopal` shares branch refs with the main repo, so `git checkout space/<name> && git merge <feature>` inside `.wopal` updates the integration branch and restores the runtime path to `space/<name>`, letting `archive` delete the feature branch normally. verify-switch merge instructions already follow this.
 - **Merge strategy**: prefer **squash merge** (`git merge --squash <feature>`) — compresses all feature commits into one, keeping fix-during-validation noise out of main history. Requires one manual `git commit` after. verify's tree-equality check supports squash natively. Use `--no-ff` only when the user explicitly wants commit history kept
 - Agent never runs `git branch -d/-D`, never `git branch <name>`, never creates or deletes branches
 - Worktree lifecycle is script-owned: `approve` creates, `verify-switch` or `archive` deletes

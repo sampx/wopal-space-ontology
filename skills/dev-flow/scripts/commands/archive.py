@@ -576,77 +576,8 @@ def cmd_archive(args: argparse.Namespace) -> int:
     worktree_handled = False
     keep_worktree = getattr(args, "keep_worktree", False)
 
-    # Read Project Type from Plan metadata
-    project_type_str = get_plan_field(plan_path, "Project Type")
-    is_ontology_worktree = project_type_str == "ontology-worktree"
-
     if keep_worktree:
         log_info("Evolution mode (--keep-worktree): skipping worktree and branch cleanup")
-    elif is_ontology_worktree:
-        log_step("Ontology worktree project detected")
-
-        project_path = resolve_project_path(plan_path, project, workspace_root)
-
-        if project_path:
-            wt = _detect_worktree(plan_path, project or "ontology", workspace_root)
-
-            if wt:
-                branch = wt['branch']
-                wt_path = wt['path']
-
-                # Resolve wt_path (may be absolute or workspace-relative)
-                wt_path_resolved = Path(wt_path)
-                if not wt_path_resolved.is_absolute():
-                    wt_path_resolved = workspace_root / wt_path_resolved
-
-                if not wt_path_resolved.exists():
-                    # Worktree directory was cleaned up earlier (typically
-                    # by verify-switch). The feature branch may still be
-                    # present. Skip merge — by this point the branch has
-                    # either been merged into the integration branch
-                    # (verify --confirm ensures this) or is intentionally
-                    # orphaned.
-                    log_info(f"Worktree path no longer exists: {wt_path_resolved}")
-                    log_info("Skipping merge; cleaning up feature branch only")
-                else:
-                    # Worktree directory present → check dirty and merge status
-                    if has_uncommitted_changes(str(wt_path_resolved)):
-                        if not args.force:
-                            log_warn(f"Worktree has uncommitted changes: {wt_path_resolved}")
-                            log_warn("Archive will proceed but uncommitted worktree changes may be lost when worktree is cleaned up")
-
-                    # Check if feature branch has been merged
-                    merge_status = check_branch_merged(workspace_root, plan_path)
-                    if merge_status != 0:
-                        log_error("Feature branch not yet merged. Please merge first.")
-                        return 1
-
-                    log_info("Feature branch already merged, skipping merge")
-
-                # Always cleanup — clean_worktree is safe when the
-                # worktree directory is gone; it still deletes the
-                # feature branch. Cleanup failure aborts archive so
-                # residual directories are not silently left behind.
-                if not _cleanup_worktree(
-                    str(project_path),
-                    branch,
-                    str(wt_path_resolved),
-                    workspace_root,
-                ):
-                    log_error(
-                        "Worktree cleanup failed — residual directories may remain "
-                        "under .worktrees/. Fix the cause and re-run archive."
-                    )
-                    return 1
-                worktree_handled = True
-            else:
-                # No worktree — check dirty on project
-                if has_uncommitted_changes(str(project_path)):
-                    if not args.force:
-                        log_warn(f"Project {project} has uncommitted changes — these changes will NOT be committed by archive")
-                    # Continue — dirty working tree no longer blocks archive
-
-            log_warn(f"请手动 push .wopal/ 变更: cd {project_path} && git push")
     elif project:
         project_path = resolve_project_path(plan_path, project, workspace_root)
 

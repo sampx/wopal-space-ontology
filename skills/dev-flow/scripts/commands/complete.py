@@ -245,34 +245,6 @@ def _print_standard_verification_guidance(wt_ctx, issue, workspace_root, plan_pa
     print("     Run verify-switch to checkout feature branch at canonical path, then verify.")
 
 
-def _print_ontology_verification_guidance(wt_ctx, issue, workspace_root) -> None:
-    """Print verification options for ontology-worktree projects.
-
-    Only branch-switch is available; ellamaka loads runtime from .wopal/.
-    """
-    from lib.worktree import WorktreeContext
-
-    assert isinstance(wt_ctx, WorktreeContext)
-
-    wopal_path = str(workspace_root / ".wopal")
-
-    # Check .wopal/ dirty status
-    dirty_lines = _get_git_porcelain(wopal_path)
-
-    print("")
-    log_step("Ontology path check")
-    if dirty_lines:
-        log_warn(f".wopal/ has {len(dirty_lines)} uncommitted files")
-    else:
-        log_info(f".wopal/ is clean")
-
-    print("")
-    print("### Verification Option")
-    print("")
-    print(f"  flow.sh verify-switch {issue}")
-    print("  After verify-switch, restart ellamaka to verify ontology changes.")
-
-
 # ============================================
 # complete command
 # ============================================
@@ -464,10 +436,7 @@ def cmd_complete(args: argparse.Namespace) -> int:
         # Verification guidance — print canonical path status and options
         try:
             wt_ctx = parse_worktree_context(plan_path)
-            project_type = get_plan_field(plan_path, "Project Type") or "standard"
-            if wt_ctx and project_type == "ontology-worktree":
-                _print_ontology_verification_guidance(wt_ctx, next_ref, workspace_root)
-            elif wt_ctx:
+            if wt_ctx:
                 _print_standard_verification_guidance(wt_ctx, next_ref, workspace_root, plan_path)
         except Exception as e:
             log_warn(f"Failed to generate verification guidance: {e}")

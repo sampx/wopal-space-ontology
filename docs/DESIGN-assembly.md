@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-21
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -57,7 +57,7 @@ agents:
   - wopal
   - fae
   - rook
-  - evolver
+  - maka
 
 # 该空间所需技能
 skills:

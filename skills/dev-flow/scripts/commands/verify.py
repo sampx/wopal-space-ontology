@@ -24,7 +24,7 @@ import subprocess
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn
-from lib.workspace import find_workspace_root, get_ontology_main_repo
+from lib.workspace import find_workspace_root
 from workflow import update_plan_status
 from workflow import guard_status, resolve_space_repo
 from plan import find_plan, find_plan_by_issue
@@ -34,7 +34,7 @@ from plan import (
     get_plan_project_path,
     get_plan_worktree,
 )
-from lib.git import check_branch_merged, commit_paths, get_current_branch, get_branch_head
+from lib.git import check_branch_merged, commit_paths, get_branch_head
 from lib.worktree import resolve_active_plan, ResolveActivePlanError
 from plan import set_plan_field
 from validation import (
@@ -212,16 +212,9 @@ def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bo
             branch = wt_meta.get("branch")
             final_commit = get_branch_head(str(wt_p), branch)
         else:
-            project_type_str = get_plan_field(plan_path, "Project Type")
-            if project_type_str == "ontology-worktree":
-                from lib.workspace import get_ontology_main_repo
-                main_repo = get_ontology_main_repo(workspace_root)
-                if main_repo:
-                    final_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
-            else:
-                project_path = get_plan_project_path(plan_path)
-                if project_path:
-                    final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
+            project_path = get_plan_project_path(plan_path)
+            if project_path:
+                final_commit = get_branch_head(str(Path(workspace_root) / project_path), "main")
     except (subprocess.CalledProcessError, OSError):
         final_commit = ""
 
@@ -414,32 +407,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_warn("Failed to commit Plan status=done in Plan's repo")
     else:
         log_success("Plan status=done committed to Plan's repo")
-
-    # 11.5. Ontology-worktree: detect stale worktree and branch (double-gate with archive)
-    project_type_str = get_plan_field(plan_path, "Project Type")
-    if project_type_str == "ontology-worktree" and not keep_worktree:
-        wt = get_plan_worktree(plan_path)
-        if wt:
-            branch = wt['branch']
-            wt_path = wt['path']
-            wt_path_resolved = Path(wt_path)
-            if not wt_path_resolved.is_absolute():
-                wt_path_resolved = workspace_root / wt_path_resolved
-
-            if wt_path_resolved.exists():
-                log_warn(f"Worktree 目录残留: {wt_path_resolved}")
-                log_warn(f"  请手动清理: trash {wt_path_resolved}")
-
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo:
-                branch_result = subprocess.run(
-                    ['git', 'branch', '--list', branch],
-                    capture_output=True, text=True,
-                    cwd=str(main_repo),
-                )
-                if branch_result.stdout.strip():
-                    log_warn(f"分支残留: {branch}")
-                    log_warn(f"  请手动删除: cd {main_repo} && git branch -d {branch}")
 
     # 12. Sync Issue if exists
     if effective_issue and repo:

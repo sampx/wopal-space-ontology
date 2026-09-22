@@ -31,10 +31,6 @@ from labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
 )
-from plan import (
-    resolve_project_info,
-    ProjectType,
-)
 from lib.logging import log_info, log_warn, log_success, log_error
 from lib.workspace import find_workspace_root, detect_space_repo
 from lib.github import list_issues, STATUS_LABEL_MAP
@@ -154,18 +150,8 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         # Generate empty five-section skeleton
         body = build_structured_issue_body()
     
-    # Inject project type metadata for ontology-worktree projects
-    workspace_root = find_workspace_root()
-    project_type, project_path = resolve_project_info(project, workspace_root)
-    if project_type == ProjectType.ONTOLOGY_WORKTREE and project_path:
-        injection = (
-            f"- **Project Type**: {project_type.value}\n"
-            f"- **Project Path**: {project_path}\n"
-            "\n"
-        )
-        body = injection + body
-    
     # Get repo and ensure labels
+    workspace_root = find_workspace_root()
     repo = detect_space_repo(workspace_root)
     ensure_flow_labels_exist(repo)
     ensure_label_exists(type_label, repo)

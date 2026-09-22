@@ -17,7 +17,6 @@ from lib.git import get_current_branch, get_remote_url
 
 class ProjectType(Enum):
     STANDARD = "standard"
-    ONTOLOGY_WORKTREE = "ontology-worktree"
 
 
 @dataclass

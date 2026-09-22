@@ -29,11 +29,11 @@ import subprocess
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
-from lib.workspace import find_workspace_root, detect_space_repo, get_ontology_main_repo
+from lib.workspace import find_workspace_root, detect_space_repo
 from workflow import update_plan_status, parse_plan_status, STATUS_PLANNING, STATUS_REVIEWING
 from plan import find_plan
-from plan import get_plan_project, get_plan_issue, get_plan_status, get_plan_field
-from plan import resolve_project_path, ProjectType
+from plan import get_plan_project, get_plan_issue, get_plan_status
+from plan import resolve_project_path
 from validation import check_doc_plan, ValidationError
 from issue import (
     sync_status_label,
@@ -233,12 +233,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
             return 1
 
         # Resolve project repo root and verify that wt_p is a valid worktree of this project
-        project_type_str = get_plan_field(plan_path, "Project Type")
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            main_repo = get_ontology_main_repo(workspace_root)
-            repo_root = main_repo
-        else:
-            repo_root = Path(project_path) if project_path else None
+        repo_root = Path(project_path) if project_path else None
 
         if not repo_root or not repo_root.exists():
             log_error(f"Cannot resolve project repository root for: {project}")
@@ -292,32 +287,23 @@ def cmd_approve(args: argparse.Namespace) -> int:
             log_error("Cannot create worktree: no Target Project in plan")
             return 1
 
-        # Read Project Type from Plan metadata
-        project_type_str = get_plan_field(plan_path, "Project Type")
-
         # Generate branch name from full Plan name: <project>-<plan-name>
         branch = _derive_branch(project, plan_name)
 
         # Determine planned worktree path (without creating it yet)
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            worktrees_dir = workspace_root / ".worktrees"
-            worktree_name = branch
-            worktree_path = worktrees_dir / worktree_name
-        else:
-            # Standard: worktree dir = branch (branch already has project prefix)
-            worktree_base = workspace_root / ".worktrees"
-            branch_slug = branch.replace("/", "-")
-            worktree_path = worktree_base / branch_slug
-        
-        # Block on unmerged files for standard projects
-        if project_type_str != ProjectType.ONTOLOGY_WORKTREE.value:
-            if project_path and _has_unmerged_files(str(project_path)):
-                log_error(f"目标项目 {project} 有未解决的合并冲突（UU 状态），请先解决后再执行 approve")
-                return 1
-            
-            # Warn about dirty workspace but proceed
-            if dirty_workspace:
-                log_warn(f"目标项目 {project} 有未提交的变更，建议先提交后再执行 approve")
+        # Worktree dir = branch (branch already has project prefix)
+        worktree_base = workspace_root / ".worktrees"
+        branch_slug = branch.replace("/", "-")
+        worktree_path = worktree_base / branch_slug
+
+        # Block on unmerged files
+        if project_path and _has_unmerged_files(str(project_path)):
+            log_error(f"目标项目 {project} 有未解决的合并冲突（UU 状态），请先解决后再执行 approve")
+            return 1
+
+        # Warn about dirty workspace but proceed
+        if dirty_workspace:
+            log_warn(f"目标项目 {project} 有未提交的变更，建议先提交后再执行 approve")
 
         # Write minimal Worktree metadata (branch + path) to Plan
         wt_rel = str(worktree_path)
@@ -381,79 +367,23 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # ============================================
     
     if use_worktree and branch and worktree_path:
-        project_type_str = get_plan_field(plan_path, "Project Type")
-
-        if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-            # Resolve ontology main repo path
-            main_repo = get_ontology_main_repo(workspace_root)
-            if main_repo is None:
-                log_error("无法解析 ontology 主仓库路径")
-                log_error("请检查 .wopal/.git 文件是否存在且格式正确（worktree 指针）")
-                return 1
-            
-            log_step("Creating ontology worktree from committed baseline...")
-            log_info(f"Main repo: {main_repo}")
-            log_info(f"Branch: {branch}")
-            
-            # Determine base branch from .wopal/ worktree's current branch
-            ontology_worktree = workspace_root / ".wopal"
-            base_branch = get_current_branch(ontology_worktree)
-            if not base_branch:
-                log_error("无法解析 ontology worktree 当前分支")
-                return 1
-
-            # Create feature branch from base branch in the main repo
-            branch_result = subprocess.run(
-                ["git", "branch", branch, base_branch],
-                cwd=str(main_repo),
-                capture_output=True,
-                text=True,
-            )
-            if branch_result.returncode != 0:
-                log_error(f"创建 feature 分支失败: {branch}")
-                print(branch_result.stderr)
-                return 1
-            log_info(f"Created branch: {branch} (from {base_branch})")
-            
-            # Create worktree from the new branch
-            wt_result = subprocess.run(
-                ["git", "worktree", "add", str(worktree_path), branch],
-                cwd=str(main_repo),
-                capture_output=True,
-                text=True,
-            )
-            if wt_result.returncode != 0:
-                log_error("Ontology worktree 创建失败")
-                print(wt_result.stderr)
-                # Cleanup: delete the branch we just created
-                subprocess.run(
-                    ["git", "branch", "-d", branch],
-                    cwd=str(main_repo),
-                    capture_output=True,
-                )
-                return 1
-            
-            log_success(f"Ontology worktree created: {worktree_path}")
+        # Create worktree from committed baseline
+        if not project_path:
+            log_error(f"无法解析项目路径: {project}")
+            return 1
+        
+        log_step("Creating worktree from committed baseline...")
+        actual_wt_path = _create_worktree(project_path, branch, workspace_root)
+        if actual_wt_path is not None:
             worktree_created = True
-
+            worktree_path = actual_wt_path
+            log_success(f"Worktree created: {worktree_path}")
         else:
-            # Standard project: create worktree from committed baseline
-            if not project_path:
-                log_error(f"无法解析项目路径: {project}")
-                return 1
-            
-            log_step("Creating worktree from committed baseline...")
-            actual_wt_path = _create_worktree(project_path, branch, workspace_root)
-            if actual_wt_path is not None:
-                worktree_created = True
-                worktree_path = actual_wt_path
-                log_success(f"Worktree created: {worktree_path}")
-            else:
-                log_error("Worktree creation failed - aborting approve")
-                print("")
-                print("Plan 状态保持 planning，未进入 executing")
-                print("请检查 worktree 创建失败原因后重试")
-                return 1
+            log_error("Worktree creation failed - aborting approve")
+            print("")
+            print("Plan 状态保持 planning，未进入 executing")
+            print("请检查 worktree 创建失败原因后重试")
+            return 1
     
     # ============================================
     # Record Base Commit (implementation baseline)
@@ -464,14 +394,8 @@ def cmd_approve(args: argparse.Namespace) -> int:
     try:
         if existing_worktree and worktree_path and branch:
             base_commit = get_branch_head(str(worktree_path), branch)
-        else:
-            project_type_str = get_plan_field(plan_path, "Project Type")
-            if project_type_str == ProjectType.ONTOLOGY_WORKTREE.value:
-                main_repo = get_ontology_main_repo(workspace_root)
-                if main_repo:
-                    base_commit = get_branch_head(str(main_repo), get_current_branch(workspace_root / ".wopal"))
-            elif project_path:
-                base_commit = get_branch_head(str(project_path), "main")
+        elif project_path:
+            base_commit = get_branch_head(str(project_path), "main")
     except (subprocess.CalledProcessError, FileNotFoundError):
         base_commit = ""
 

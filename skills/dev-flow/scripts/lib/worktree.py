@@ -30,14 +30,14 @@ class WorktreeContext:
     Minimal fields written by write_worktree_context:
         branch: Worktree branch name
         path: Worktree directory path (relative to workspace root)
-        project_type: "standard" or "ontology-worktree" (from Plan metadata)
+        project_type: "standard" (from Plan metadata)
 
     Other info read from Plan Metadata:
         Project Path: repo root path (used instead of repo_root)
     """
     branch: str
     path: Path
-    project_type: str = "standard"  # "standard" | "ontology-worktree"
+    project_type: str = "standard"
 
 
 def _worktree_field_name(field: str) -> str:

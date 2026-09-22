@@ -187,4 +187,5 @@ Respond in the user's language with:
 ## Related
 
 - Space access rules (memory/REGULATIONS write authorization) live in `REGULATIONS.md` templates.
-- Project type ownership (`standard` vs `ontology-worktree`) is defined in the space `STRUCTURE.md`.
+- Space component types (e.g. `ontology-worktree` describing `.wopal`) are defined in the space `STRUCTURE.md`.
+- Ontology capability evolution work is owned by the `ontology-evolution` skill; `dev-flow` covers code projects only.

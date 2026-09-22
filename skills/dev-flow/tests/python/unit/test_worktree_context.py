@@ -34,16 +34,6 @@ PLAN_TEMPLATE = """\
 - **Issue**: #42
 """
 
-PLAN_TEMPLATE_ONTOLOGY = """\
-## Metadata
-
-- **Status**: planning
-- **Type**: feature
-- **Target Project**: wopal-space-ontology
-- **Project Type**: ontology-worktree
-- **Issue**: #10
-"""
-
 
 def _write_plan(tmp_path, content: str, name: str = "42-feature-dev-flow-test.md") -> Path:
     """Write a Plan file with given content and return its path."""
@@ -106,18 +96,6 @@ class TestParseStructuredWorktree:
     def test_nonexistent_file_returns_none(self, tmp_path):
         ctx = parse_worktree_context(str(tmp_path / "nonexistent.md"))
         assert ctx is None
-
-    def test_reads_project_type_from_plan_metadata(self, tmp_path):
-        content = PLAN_TEMPLATE_ONTOLOGY + """\
-- **Worktree**:
-  - branch: feature/ont-42-slug
-  - path: .worktrees/ontology-issue-42-slug
-"""
-        plan = _write_plan(tmp_path, content)
-        ctx = parse_worktree_context(str(plan))
-
-        assert ctx is not None
-        assert ctx.branch == "feature/ont-42-slug"
 
 
 
@@ -203,7 +181,7 @@ class TestParseWorktreeScopesToMetadata:
     def test_design_placeholder_not_parsed_as_metadata(self, tmp_path):
         """Plan with Worktree placeholder in design section returns None."""
         content = (
-            PLAN_TEMPLATE_ONTOLOGY
+            PLAN_TEMPLATE
             + "\n## Scope Assessment\n\n"
             + "- D-01: Worktree 元数据以显式字段存储：\n\n"
             + "- **Worktree**:\n"

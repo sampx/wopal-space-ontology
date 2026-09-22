@@ -460,7 +460,7 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
     """Check that the feature branch has been merged to the integration branch.
 
     Reads Plan Worktree metadata to get the feature branch name,
-    determines the integration branch based on project type, and runs
+    determines the integration branch, and runs
     git branch --merged to verify.
 
     Args:
@@ -485,14 +485,8 @@ def check_branch_merged(workspace_root: Path, plan_path: str) -> int:
     else:
         repo_root = str(workspace_root)
 
-    # Determine integration branch based on project type
-    project_type = get_plan_field(plan_path, "Project Type")
-    if project_type == "ontology-worktree":
-        # .wopal/ worktree sits on the current space layer branch (space/<name>),
-        # detected at runtime — there is no fixed integration branch name.
-        integration_branch = get_current_branch(repo_root)
-    else:
-        integration_branch = "main"
+    # Determine integration branch
+    integration_branch = "main"
 
     # Prefer Verification Commit SHA — works even if branch ref is deleted
     verification_commit = get_plan_field(plan_path, "Verification Commit")

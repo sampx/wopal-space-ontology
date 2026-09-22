@@ -209,8 +209,8 @@ def create_plan_from_template(
         plan_type: Plan type (feature, fix, etc.)
         project: Target project name
         workspace_root: Workspace root path
-        project_path: Optional project path (for ontology-worktree type)
-        project_type: Optional project type (e.g., "ontology-worktree")
+        project_path: Optional project path override
+        project_type: Optional project type label
         product: Optional product name
         phase: Optional phase name
         
@@ -683,7 +683,7 @@ def _cmd_plan_status(input_ref: str) -> int:
         worktree_path = str(workspace_root / wt_meta['path'])
     else:
         # Fallback: worktree dir = branch = <project>-<plan-name>
-        # (same naming as approve.py; no ontology- prefix, no repeated project prefix)
+        # (same naming as approve.py; no repeated project prefix)
         branch = f"{project}-{plan_name}"
         worktree_path = str(workspace_root / ".worktrees" / branch)
 

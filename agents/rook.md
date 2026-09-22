@@ -15,6 +15,7 @@ permission:
     "*": deny
     df-plan-review: allow
     df-implement-review: allow
+    ontology-evolution: allow
   doom_loop: deny
   read:
     "*": allow

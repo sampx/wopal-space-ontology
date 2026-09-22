@@ -13,6 +13,7 @@ permission:
   context_manage: deny
   skill:
     "*": deny
+    ontology-evolution: allow
     skill-creator: allow
   doom_loop: deny
   external_directory:

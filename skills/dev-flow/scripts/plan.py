@@ -5,8 +5,7 @@
 #   Metadata: get_plan_field, get_plan_project, get_plan_project_path,
 #             get_plan_type, get_plan_issue, get_plan_status,
 #             set_plan_field, get_plan_worktree, set_plan_worktree
-#   Project:  resolve_project_info, resolve_project_repo,
-#             resolve_project_path, ProjectType
+#   Project:  resolve_project_repo, resolve_project_path, ProjectType
 #   Naming:   validate_plan_name, make_plan_name
 #   Body:     build_issue_body_from_plan, build_plan_link_for_issue
 #   Find:     find_plan, find_plan_by_name, find_plan_by_issue
@@ -20,7 +19,7 @@ import subprocess
 from enum import Enum
 from pathlib import Path
 
-from lib.workspace import find_workspace_root, get_ontology_main_repo
+from lib.workspace import find_workspace_root
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.git import get_current_branch
 from lib.project import resolve_plan_location, build_plan_blob_url
@@ -138,7 +137,6 @@ def set_plan_worktree(plan_path: str, branch: str, path: str) -> bool:
 class ProjectType(Enum):
     """Project type enumeration."""
     STANDARD = "standard"
-    ONTOLOGY_WORKTREE = "ontology-worktree"
 
 
 def _parse_github_repo_url(url: str) -> str | None:
@@ -147,33 +145,6 @@ def _parse_github_repo_url(url: str) -> str | None:
     if match:
         return match.group(1)
     return None
-
-
-def _get_wopal_repo_name(workspace_root: Path) -> str | None:
-    """Get the GitHub repo short name from .wopal's origin remote."""
-    dot_git = workspace_root / ".wopal" / ".git"
-    if not dot_git.exists() or not dot_git.is_file():
-        return None
-
-    try:
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            cwd=workspace_root / ".wopal",
-            capture_output=True, text=True, check=True,
-        )
-        repo = _parse_github_repo_url(result.stdout.strip())
-        if repo:
-            return repo.split("/")[-1]
-    except subprocess.CalledProcessError:
-        pass
-
-    return None
-def resolve_project_info(project_name: str, workspace_root: Path) -> tuple[ProjectType, str | None]:
-    """Resolve project type and workspace-relative path."""
-    repo_name = _get_wopal_repo_name(workspace_root)
-    if repo_name and repo_name == project_name:
-        return ProjectType.ONTOLOGY_WORKTREE, ".wopal"
-    return ProjectType.STANDARD, None
 
 
 def _get_default_branch(project_path: Path) -> str:

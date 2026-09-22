@@ -216,17 +216,16 @@ If a mechanism the validation depends on is not yet documented in the project's 
 
 `Project Path`, `Project Type`, `Target Project` are looked up from the space's `STRUCTURE.md`:
 
-1. Determine the domain from the code paths involved (ontology / projects / contents / ...)
+1. Determine the domain from the code paths involved (projects / contents / ...)
 2. Match path/type/repo in `STRUCTURE.md` frontmatter or tables
 3. Fill in the mapping:
 
 | STRUCTURE.md type | Project Type | Project Path example |
 |---|---|---|
-| `ontology-worktree` | ontology-worktree | `.wopal/` |
 | `projects` | projects | `projects/<name>/` |
 | `contents` | contents | `contents/<name>/` |
 
-Common mistakes: treating a subdirectory (e.g. `.wopal/plugins/wopal-plugin/`) as the project root — use the worktree root `.wopal/`; classifying an ontology worktree as a normal project — it is a worktree of an independent repo.
+Common mistakes: treating a subdirectory (e.g. `projects/<name>/packages/app/`) as the project root — use the repo root.
 
 ## Plans, phases, and Gaps
 
