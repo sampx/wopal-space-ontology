@@ -216,8 +216,8 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：稀疏 worktree 机制正确性闭环（毒杀不可达 / 事务化 accept / 零残留失败路径）。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`scripts/evo.py`、`scripts/lib/worktree.py`、`tests/python/unit/test_sparse_safety.py`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 2: 事务化归档：命名不变量 + 清理 + 集成守卫（P0）
 
@@ -232,7 +232,7 @@ evo.sh archive <name> [--keep-worktree]
 
 **Pre-read**: dev-flow `archive.py`（`_cleanup_worktree`、`check_branch_merged`）、evo `cmd_archive`、`_pending_content`
 
-**Design**: `cmd_archive` 两段式——preflight（集成守卫 / 清理目标存在性 / 模式 / 命名冲突）全过后进入变更序列（move → remove → prune → branch -d），失败停止上报；命名走纯函数；`_mirror_into_worktree` 处理旧名 → 新名。
+**Design**: `cmd_archive` 两段式——preflight（集成守卫 / 清理目标存在性 / 模式 / 命名冲突）全过后进入变更序列（move → remove → prune → branch -D）；`-D` 仅在 `_pending_content` 已证实内容集成后使用，失败停止上报；命名走纯函数；`_mirror_into_worktree` 处理旧名 → 新名。
 
 **TDD**: true
 
@@ -245,8 +245,8 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：事务化归档闭环。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`scripts/evo.py`、`tests/python/unit/test_sparse_safety.py`、`tests/python/unit/test_cli_behavior.py`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 3: 自验证提案契约：模板外部化 + 结构契约 + 语料自审（P1）
 
@@ -272,8 +272,8 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：自验证提案契约闭环。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`scripts/evo.py`、`templates/proposal.md`、`tests/python/unit/test_sparse_safety.py`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 4: 集中守卫表 + 拒绝信息标准化（P1）
 
@@ -299,12 +299,15 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：集中守卫表。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`scripts/evo.py`、`tests/python/unit/test_sparse_safety.py`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 5: 文档降维：矛盾消除 + 流程修正 + Boundary（P1）
 
 **Verification Intent**: AC#9
+
+**Behavior**:
+- SKILL.md / commands.md / DESIGN-evolution.md 的流程、状态语义与实际脚本一致；SKILL.md 仅承载脚本无法强制的边界与用户决策点。
 
 **Pre-read**: `SKILL.md`、`references/commands.md`、`.wopal/docs/DESIGN-evolution.md`
 
@@ -321,8 +324,8 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：三源文档降维对齐。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`SKILL.md`、`references/commands.md`、`AGENTS.md`、`docs/DESIGN-evolution.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 6: P2 收口：slug 截断 + status 增强 + hygiene
 
@@ -347,8 +350,8 @@ evo.sh archive <name> [--keep-worktree]
 
 **Done**:
 任务产出：命名边界 + status 信息量 + hygiene 收口。
-实际触碰文件：<实施后回填>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`scripts/evo.py`、`scripts/lib/worktree.py`、`assembly/archetypes/coding.yaml`、`tests/python/unit/test_sparse_safety.py`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 
