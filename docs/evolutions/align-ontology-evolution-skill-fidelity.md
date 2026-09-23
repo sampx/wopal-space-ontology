@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-22
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-align-ontology-evolution-skill-fidelity
 - **Branch**: ontology-align-ontology-evolution-skill-fidelity
