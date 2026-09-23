@@ -56,5 +56,6 @@ commands:
 
 # 声明该空间加载的插件
 plugins:
+  - tui-ellamaka
   - wopal-plugin
   - dsh-adapter
