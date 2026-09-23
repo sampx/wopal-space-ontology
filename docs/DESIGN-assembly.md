@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-21
+> **Updated**: 2026-09-23
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -175,7 +175,18 @@ CLI 读取骨架后按以下规则消费：
 
 物化使用 Git `sparse-checkout`（non-cone 模式，支持文件级路径），机制约束如下：
 
-- **基础定义始终物化**：装配单（`assembly/archetypes/<type>.yaml`）、骨架（`assembly/schemas/<schema>.yaml`）、模板（`assembly/templates/`）与仓库根 `.gitignore` 无条件包含在稀疏范围内。
+- **基础定义层始终物化**：基础定义层是所有空间类型一致、缺失即破坏装配/运行/演化闭环的固定内容，无条件包含在稀疏范围内。成员判据与完整清单：
+
+  | 成员 | 归类 |
+  |------|------|
+  | `assembly/archetypes/<type>.yaml` | 装配定义 |
+  | `assembly/schemas/<schema>.yaml` | 装配定义 |
+  | `assembly/templates/` | 装配定义 |
+  | `.gitignore` | 装配安全 |
+  | `AGENTS.md`、`AGENTS.zh-CN.md` | 工作契约 |
+  | `config/`、`docs/` | 运行与设计契约 |
+
+  排除边界：仓库管理面（`.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json`）、扩展类目（`scripts/` 等）、能力资产、`localState` 各归其位。`.env.example` 属仓库管理面（模板），空间侧实例由 `space init` 从本体源模板幂等种子为 `.wopal/.env`（已存在则跳过；`.gitignore` 持续覆盖，不入版本控制）。
 - **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
 - **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
 - **有效范围三要素**：稀疏范围 = 当前装配单基线 ∪ `localState.added` − `localState.shadowed`（见 Two-Layer Assembly Records）。基线取**当前**装配单（使其他空间经 `capability add` 的变更在各自下次同步时生效），本地增量取空间快照的 `localState`。范围重算只在 `space sync` 下行时执行，结果仅取决于这三项，不随提交历史变化。
@@ -259,7 +270,7 @@ CLI 读取骨架后按以下规则消费：
 
 ### Protected Paths
 
-装配运行所需的结构定义不可缺失：装配单（`assembly/archetypes/`）、骨架（`assembly/schemas/`）、模板（`assembly/templates/`）、仓库根 `.gitignore` 与空间根 `AGENTS.md`。这些路径的内容可自由修改并随同步上行，但**删除与重命名**会使空间无法物化。
+装配运行所需的结构定义不可缺失：装配单（`assembly/archetypes/`）、骨架（`assembly/schemas/`）、模板（`assembly/templates/`）、仓库根 `.gitignore`、空间根 `AGENTS.md` 与 `AGENTS.zh-CN.md`。这些路径的内容可自由修改并随同步上行，但**删除与重命名**会使空间无法物化。`.env.example` 不属于保护集合：它不入装配范围，空间侧的环境契约由 `space init` 种子的 `.env` 实例承载（用户资产，`.gitignore` 覆盖）。
 
 保护机制在写入侧实现，判据是"路径是否落在保护集合内"：
 
@@ -304,10 +315,11 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 
 | 资产 | 归属 | 理由 |
 |------|------|------|
-| `assembly/` | 装配定义 | 装配单、骨架与模板本身是物化源头，不参与物化 |
+| `assembly/` | 装配定义 | 装配单、骨架与模板本身是物化源头，作为基础定义层随装配物化；不作为能力资产被装配单声明 |
 | `prompts/` | wopal-plugin | 插件运行时的提示词资产，随插件分发；插件目录与用户级同名文件可覆盖，源码内保留默认值 |
 | 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
 | `config/settings.jsonc` | 空间配置 | 空间共享运行配置，随 main 分发；不承载插件引用 |
+| `.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json` | 仓库管理面 | 本体源仓库工具链消费；`.env.example` 的空间侧实例由 `space init` 种子为 `.env`，不随装配物化 |
 
 ## Permission Ownership and User Override
 

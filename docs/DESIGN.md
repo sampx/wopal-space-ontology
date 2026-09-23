@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-21
+> **Updated**: 2026-09-23
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -71,7 +71,7 @@ ontology 由装配定义与六类能力资产构成。模块细节分见各子�
 | 辅助脚本 | ontology 维护与开发辅助 | `scripts/` | `./DESIGN-capabilities.md` |
 | 进化闭环 | 能力演化、同步与海关检疫 | 跨模块 | `./DESIGN-evolution.md` |
 
-装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义不物化进空间，空间只承载物化结果。
+装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义本身不作为能力资产被装配单声明；其内容作为基础定义层随装配无条件物化进空间（成员清单与物化机制见 `./DESIGN-assembly.md` 的 Sparse Materialization Mechanics）。
 
 ---
 
