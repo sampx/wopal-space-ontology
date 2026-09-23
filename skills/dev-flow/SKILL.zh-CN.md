@@ -1,11 +1,13 @@
 ---
 name: dev-flow
 description: >
-  Issue/Plan 驱动的开发流程。所有任务必须有 GitHub Issue 或 Plan 承载。
+  Issue/Plan 驱动的开发流程。带设计面的任务必须有 GitHub Issue 或 Plan 承载。
   触发：#14 这类 Issue 引用、创建 Issue、创建 Plan、实施 Plan、执行
   Plan、检查 Plan、验证 Plan、Plan 生命周期推进
   (approve/complete/verify/archive)、从 PRD 拆分 Issue。不适用：规格驱动
-  流程、纯研究/讨论/解释、不需要 Issue 或 Plan 的小改动。
+  流程、纯研究/讨论/解释、一般 bug 修复——修复既有行为直接在主干分支完成，
+  不建 Issue 或 Plan；只有特别复杂的 bug 或用户明确要求 Issue/Plan 载体
+  才进入生命周期。
   本体能力资产（`.wopal/` 下的 skills、rules、agents、commands、
   plugins、assembly）归 `ontology-evolution`，不走本流程。
 ---
@@ -20,6 +22,19 @@ description: >
 - **命令格式**: `bash scripts/flow.sh <command> [args]`
 
 本文档中所有 `flow.sh xxx` 引用（如 `flow.sh plan new`、`flow.sh complete`、`flow.sh verify-switch`）均按此方式执行。禁止 `source`、禁止绝对路径直接调用、禁止在非技能目录下执行。
+
+## 何时适用本生命周期
+
+生命周期服务于**带设计面的工作**——新功能、增强、重构、契约变更：这些工作的结果需要在写代码之前钉死并评审。
+
+**Bug 修复是在修复已经商定的行为，不进生命周期。** 一般 bug 修复（包括在做别的事时顺带发现的修复）**直接在主干分支**实施并验证：不建 Issue、不建 Plan、不开 worktree。把一个修复塞进 `plan new → submit → approve → …` 等于给一个根本没有设计面的改动安排一轮设计评审；提交信息才是它的记录。
+
+只有以下情况修复才进入生命周期：
+
+- bug **特别复杂**——跨模块、单轮调查收不住，或者它动摇了"正确行为应该是什么"本身（修复已经变成设计工作），或
+- **用户明确要求** Issue 或 Plan 载体。
+
+拿不准时的判据：这次改动是**恢复**已经商定的意图（直接修），还是**新增**意图（走生命周期）？
 
 ## Plan 写给谁看
 
@@ -119,7 +134,7 @@ dev-flow 管理两类产物，它们在 git 中独立演化：
 
 ## 核心原则
 
-1. **Plan 先行**：先进入 Plan 生命周期，再开始实施。Plan 必须通过 `flow.sh plan new ...` 创建或定位，禁止手写创建。
+1. **Plan 先行——针对带设计面的工作**：实现新功能、增强、重构、契约变更前，先进入 Plan 生命周期。Plan 必须通过 `flow.sh plan new ...` 创建或定位，禁止手写创建。Bug 修复是固定例外：它恢复的是已经商定的行为，直接在主干分支修复（见「何时适用本生命周期」）。
 2. **人类授权门**：`approve --confirm` 和 `verify --confirm` 都需要用户明确授权，禁止未经授权执行。
 3. **脚本不操作项目代码**：`flow.sh` 命令不提交实施代码，但管理自身创建的基础设施（worktree、feature 分支）。`complete` 遇脏树报错退出。
 4. **Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。委派实施时给 fae 的 Plan 路径必须是空间仓库的绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
@@ -404,7 +419,8 @@ flow.sh archive <issue>
 
 ## 不要这样做
 
-- **跳过 dev-flow 直接手动操作** — Issue/Plan 驱动的任务必须走 `flow.sh` 命令链
+- **把一般 bug 修复塞进 Plan 生命周期** — 修复恢复的是已经商定的行为，直接在主干分支实施并验证；只有特别复杂的 bug 或用户明确要求，才值得 Issue/Plan 载体。给每个修复都套 `plan new → submit → approve`，正是这条规则要堵住的失败模式
+- **跳过 dev-flow 直接手动操作（针对带设计面的工作）** — Issue/Plan 驱动的任务必须走 `flow.sh` 命令链
 - **直接调 `gh issue create` 绕过 flow.sh** — Issue 创建必须走 `flow.sh issue create`，脚本通过 `detect_space_repo` 自动定位空间仓库，无需也不允许手动指定 `--repo`。直接调 `gh` 会导致 Issue 创建到错误仓库 = 严重失职
 - **手动 `gh issue list` 查询未完成 Issue** — 查询未完成 Issue 必须走 `flow.sh issue list`，脚本自动定位空间仓库并显示 repo URL，避免 Agent 因不知道仓库归属而查错仓库
 - **手动 `gh issue view` 查看单个 Issue** — 已知编号时必须走 `flow.sh issue view <编号>`，自动定位空间仓库；直接调 `gh` 查错仓库风险同上

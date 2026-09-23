@@ -1,15 +1,17 @@
 ---
 name: dev-flow
 description: >
-  Issue/Plan-driven development workflow. Tasks must be backed by a GitHub
-  Issue or Plan. Trigger: issue references like #14, creating issues,
-  creating plans, implementing plans, executing plans, checking plans,
+  Issue/Plan-driven development workflow. Design-bearing tasks must be
+  backed by a GitHub Issue or Plan. Trigger: issue references like #14,
+  creating issues, creating plans, implementing plans, executing plans, checking plans,
   verifying plans, Plan lifecycle transitions
   (approve/complete/verify/archive), decomposing PRDs into Issues. Skip:
-  spec-driven workflows, research/discussion/explanation only, small
-  ad-hoc changes that don't need an Issue or Plan. Ontology capability
-  assets (skills, rules, agents, commands, plugins, assembly under
-  `.wopal/`) belong to `ontology-evolution`, never here.
+  spec-driven workflows, research/discussion/explanation only, and
+  ordinary bug fixes — fix existing behavior directly on the trunk branch
+  without an Issue or Plan. Only an exceptionally complex bug, or an
+  explicit user request for an Issue/Plan, enters the lifecycle.
+  Ontology capability assets (skills, rules, agents, commands, plugins,
+  assembly under `.wopal/`) belong to `ontology-evolution`, never here.
 ---
 
 # dev-flow — Issue / Plan Driven Development Workflow
@@ -22,6 +24,19 @@ All `flow.sh` commands must run from the skill root directory:
 - **Command format**: `bash scripts/flow.sh <command> [args]`
 
 Every `flow.sh xxx` reference in this document (e.g. `flow.sh plan new`, `flow.sh complete`, `flow.sh verify-switch`) runs this way. No `source`, no absolute-path invocation, never run from outside the skill directory.
+
+## When the lifecycle applies
+
+The lifecycle exists for **design-bearing work** — features, enhancements, refactors, contract changes: work whose outcome must be pinned down and reviewed before code exists.
+
+**Bug fixes repair behavior that was already agreed; they stay out of the lifecycle.** An ordinary bug fix — including a fix discovered while doing something else — is implemented and verified **directly on the trunk branch**, with no Issue, no Plan, and no worktree. Routing a fix through `plan new → submit → approve → …` spends a design review on a change that has no design surface; the commit message is the record.
+
+A fix enters the lifecycle only when:
+
+- the bug is **exceptionally complex** — it spans modules, needs investigation beyond a single pass, or turns out to question what the right behavior should be (the fix has become design work), or
+- the **user explicitly asks** for an Issue or Plan carrier.
+
+The test when unsure: does this change **restore** intent that was already agreed (fix it directly), or **add** new intent (lifecycle)?
 
 ## Who a Plan is written for
 
@@ -121,7 +136,7 @@ The full git commit sequence of a Plan (feature branch view):
 
 ## Core principles
 
-1. **Plan first**: enter the Plan lifecycle before implementation. Plans must be created or located via `flow.sh plan new ...` — never hand-written.
+1. **Plan first — for design-bearing work**: enter the Plan lifecycle before implementing features, enhancements, refactors, or contract changes. Plans must be created or located via `flow.sh plan new ...` — never hand-written. Bug fixes are the standing exception: they restore already-agreed behavior and are fixed directly on the trunk branch (see "When the lifecycle applies").
 2. **Human authorization gates**: both `approve --confirm` and `verify --confirm` require explicit user authorization.
 3. **Scripts never touch project code**: `flow.sh` commands do not commit implementation code, but manage their own infrastructure (worktrees, feature branches). `complete` aborts on a dirty tree.
 4. **Plan path**: Plan files live in the space repo at `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. The Plan path given to fae must be the space-repo absolute path; fae edits that file to tick Done checkboxes and never touches Plan Status metadata.
@@ -409,7 +424,8 @@ Precondition: Plan status = `done`. The script archives the Plan, cleans the wor
 
 ## Never do this
 
-- **Bypass dev-flow with manual operations** — Issue/Plan-driven tasks must use the `flow.sh` chain
+- **Route an ordinary bug fix through the Plan lifecycle** — fixes restore already-agreed behavior; implement and verify them directly on the trunk branch. Only an exceptionally complex bug or an explicit user request justifies an Issue/Plan carrier. Wrapping every fix in `plan new → submit → approve` is the failure mode this rule exists to stop
+- **Bypass dev-flow with manual operations for design-bearing work** — Issue/Plan-driven tasks must use the `flow.sh` chain
 - **Calling `gh issue create` directly** — must go through `flow.sh issue create`; the script locates the space repo via `detect_space_repo`, no `--repo` needed or allowed. Direct `gh` puts Issues in the wrong repo = serious dereliction
 - **Manual `gh issue list`** — must use `flow.sh issue list`; same wrong-repo risk
 - **Manual `gh issue view`** — must use `flow.sh issue view <number>`; same wrong-repo risk
