@@ -6,7 +6,8 @@
 #   evo.sh status <name|path>            print stage, file path, and next command
 #   evo.sh accept <name> [--no-worktree] accept for implementation (derive a worktree)
 #   evo.sh advance <name> --to <state>   advance the state machine (illegal -> exit 1)
-#   evo.sh commit <name> -m <message>    sparse-safe commit of the working changes
+#   evo.sh commit <name> -m <message>    sparse-safe commit (--paths/--all in quick mode)
+#   evo.sh fix -m <message> [...]        immediate defect repair (no proposal)
 #   evo.sh integrate <name>              squash the isolated work into the space branch
 #   evo.sh check <name>                  report proposal and sparse-state problems
 #   evo.sh archive <name>                move an archived proposal to archived/
@@ -42,7 +43,9 @@ commands:
   status <name|path>               show stage, file path, and suggested next command
   accept <name> [--no-worktree]    accept for implementation; derive an isolated worktree
   advance <name> --to <state>      advance the state machine
-  commit <name> -m <message>       sparse-safe commit of the working changes
+  commit <name> -m <message>       sparse-safe commit (--paths <p>... or --all in quick mode)
+  fix -m <message> (--paths <p>... | --all)
+                                   immediate defect repair: commit on the space branch
   integrate <name>                 squash the isolated work into the space branch
   check <name>                     report proposal and sparse-state problems
   archive <name>                   move an archived proposal to docs/evolutions/archived/
@@ -327,7 +330,16 @@ def _resolve_work_dir(path: Path, mode: str) -> tuple[Path | None, str | None]:
         return None, "no worktree recorded; re-run `evo.sh accept <name>`"
     work_dir = _recorded(space, recorded)
     if not worktree.worktree_exists(work_dir):
-        return None, f"recorded worktree {recorded} is missing; re-run `evo.sh accept`"
+        if proposal.get_stage(path) in ("accepted", "implementing"):
+            return None, (
+                f"recorded worktree {recorded} is missing; "
+                "re-run `evo.sh accept` to re-attach it"
+            )
+        return None, (
+            f"recorded worktree {recorded} is missing; its content is already "
+            "integrated — finish the lifecycle (advance to archived, then "
+            "`evo.sh archive`) or restore the worktree"
+        )
 
     expected = proposal.get_field(path, "Branch") or ""
     actual = worktree.current_branch(work_dir)
@@ -924,11 +936,11 @@ def cmd_commit(args: argparse.Namespace) -> int:
             f"{path.name} has no recorded Mode; run `evo.sh accept <name>` first"
         )
 
-    if mode == "quick" and not args.paths:
+    if mode == "quick" and not args.paths and not args.all_paths:
         return _fail(
             "quick mode commits into the live space worktree, so it stages only "
-            "the paths you name: pass `--paths <path>...` (the proposal file is "
-            "always included)"
+            "the paths you name: pass `--paths <path>...` or `--all` "
+            "(the proposal file is always included)"
         )
 
     work_dir, error = _resolve_work_dir(path, mode)
@@ -940,7 +952,13 @@ def cmd_commit(args: argparse.Namespace) -> int:
         return _fail("refusing to commit: " + "; ".join(problems))
 
     if mode == "quick":
-        targets = _quick_targets(path, work_dir, args.paths)
+        if args.all_paths:
+            # Multi-file fixes should not need one --paths entry per file.
+            # Still by name and still transient-free: `_staging_candidates`
+            # is the same collector isolated mode uses.
+            targets = _staging_candidates(work_dir)
+        else:
+            targets = _quick_targets(path, work_dir, args.paths)
         try:
             inside = path.resolve().relative_to(work_dir.resolve())
         except ValueError:
@@ -1008,6 +1026,108 @@ def _quick_targets(path: Path, work_dir: Path, requested: list[str]) -> list[str
             continue
         targets.append(candidate)
     return targets
+
+
+def cmd_fix(args: argparse.Namespace) -> int:
+    """Commit a defect fix directly on the space branch — no proposal.
+
+    A defect is existing, already-agreed behavior that is wrong; restoring
+    intent needs no design review, no isolated worktree, and no validation
+    gate. The commit is the record. Everything safety-relevant still holds:
+    the sparse preflight runs first, the range widens before staging, and
+    staging is by name.
+    """
+    if not args.message:
+        return _fail(
+            "a commit message is required: evo.sh fix -m <message> "
+            "(--paths <path>... | --all)"
+        )
+    if not args.paths and not args.all_paths:
+        return _fail(
+            "name the paths to commit (`--paths <path>...`) or stage every "
+            "change (`--all`)"
+        )
+
+    space = _space_root(_root())
+    wopal = worktree.space_worktree_path(space)
+    if not wopal.is_dir():
+        return _fail(
+            "no space assembly worktree found; `fix` commits on the space branch"
+        )
+    current = worktree.current_branch(wopal)
+    if not current.startswith("space/"):
+        return _fail(
+            f"the space worktree is on {current!r}, not a 'space/*' branch; "
+            "refusing to commit a fix there"
+        )
+
+    problems = sparse.preflight(wopal)
+    if problems:
+        return _fail("refusing to commit: " + "; ".join(problems))
+
+    if args.all_paths:
+        targets = _staging_candidates(wopal)
+    else:
+        targets, invalid = _fix_targets(wopal, args.paths)
+        if invalid:
+            return _fail(
+                "these paths are neither on disk nor tracked, so there is "
+                "nothing to commit for them: " + ", ".join(invalid)
+            )
+    if not targets:
+        print("nothing to commit")
+        return 0
+
+    try:
+        added = sparse.widen(wopal, targets)
+    except sparse.SparseError as exc:
+        return _fail(str(exc))
+
+    if added:
+        problems = sparse.preflight(wopal)
+        if problems:
+            return _fail("refusing to commit: " + "; ".join(problems))
+
+    staged = _git(wopal, "add", "--", *sorted(set(targets)))
+    if staged.returncode != 0:
+        return _fail(f"failed to stage changes: {staged.stderr.strip()}")
+
+    committed = _git(wopal, "commit", "-m", args.message)
+    if committed.returncode != 0:
+        if "nothing to commit" in (committed.stdout + committed.stderr):
+            print("nothing to commit")
+            return 0
+        return _fail(f"commit failed: {committed.stderr.strip()}")
+
+    head = _git(wopal, "rev-parse", "HEAD").stdout.strip()
+    print(f"commit  : {head[:12]} ({len(set(targets))} path(s))")
+    for item in sorted(set(targets)):
+        print(f"          {item}")
+    if added:
+        print(f"widened : {', '.join(added)}")
+    print("record  : none (the commit is the record)")
+    return 0
+
+
+def _fix_targets(work_dir: Path, requested: list[str]) -> tuple[list[str], list[str]]:
+    """Validate explicit fix paths: each must be on disk or tracked.
+
+    A deleted tracked path is valid (a rename records its deletion); an
+    unknown path is refused loudly rather than silently dropped.
+    """
+    targets: list[str] = []
+    invalid: list[str] = []
+    for raw in requested:
+        candidate = raw.strip()
+        if not candidate or sparse.is_transient(candidate):
+            continue
+        on_disk = (work_dir / candidate).exists()
+        tracked = bool(_git(work_dir, "ls-files", "--", candidate).stdout.strip())
+        if on_disk or tracked:
+            targets.append(candidate)
+        else:
+            invalid.append(candidate)
+    return targets, invalid
 
 
 def cmd_integrate(args: argparse.Namespace) -> int:
@@ -1174,12 +1294,42 @@ def cmd_check(args: argparse.Namespace) -> int:
             )
 
     if mode in ("isolated", "quick"):
-        work_dir, error = _resolve_work_dir(path, mode)
-        if error or work_dir is None:
-            problems.append(f"sparse: {error or 'cannot resolve the working directory'}")
+        recorded = proposal.get_field(path, "Worktree") or ""
+        recorded_dir = (
+            _recorded(space, recorded)
+            if recorded and recorded != "(none)"
+            else None
+        )
+        # The archived terminal state is the one place a missing worktree is
+        # expected: `archive` removes the isolation artifacts by design. A
+        # surviving branch there means the cleanup did not finish — a notice,
+        # not a failure (the content is integrated; 2026-09-23 fix).
+        archived_clean = (
+            stage == "archived"
+            and mode == "isolated"
+            and (recorded_dir is None or not worktree.worktree_exists(recorded_dir))
+        )
+        if archived_clean:
+            branch = proposal.get_field(path, "Branch") or ""
+            if (
+                branch
+                and branch != "(none)"
+                and worktree.reference_exists(wopal, f"refs/heads/{branch}")
+            ):
+                notices.append(
+                    f"branch {branch!r} still exists although the proposal is "
+                    "archived; isolation cleanup did not finish — remove it "
+                    "once you have confirmed its content is integrated"
+                )
         else:
-            problems.extend(f"sparse: {item}" for item in sparse.preflight(work_dir))
-            if mode == "isolated":
+            work_dir, error = _resolve_work_dir(path, mode)
+            if error or work_dir is None:
+                problems.append(
+                    f"sparse: {error or 'cannot resolve the working directory'}"
+                )
+            else:
+                problems.extend(f"sparse: {item}" for item in sparse.preflight(work_dir))
+            if work_dir is not None and not error and mode == "isolated":
                 problems.extend(
                     f"isolation: {item}"
                     for item in worktree.assert_isolated(space, work_dir)
@@ -1417,9 +1567,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--paths",
         nargs="*",
         default=[],
-        help="explicit paths to stage (required in quick mode)",
+        help="explicit paths to stage (quick mode)",
+    )
+    p_commit.add_argument(
+        "--all",
+        dest="all_paths",
+        action="store_true",
+        help="stage every changed path (quick mode multi-file fixes)",
     )
     p_commit.set_defaults(func=cmd_commit)
+
+    p_fix = sub.add_parser(
+        "fix", help="immediate defect repair: commit on the space branch (no proposal)"
+    )
+    p_fix.add_argument("-m", "--message", default="", help="commit message")
+    p_fix.add_argument(
+        "--paths",
+        nargs="*",
+        default=[],
+        help="explicit paths to commit",
+    )
+    p_fix.add_argument(
+        "--all",
+        dest="all_paths",
+        action="store_true",
+        help="stage every changed path",
+    )
+    p_fix.set_defaults(func=cmd_fix)
 
     p_integrate = sub.add_parser("integrate", help="squash isolated work into the space branch")
     p_integrate.add_argument("name", nargs="?", default="")

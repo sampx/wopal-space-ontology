@@ -160,6 +160,7 @@ Run from the skill root: `bash scripts/evo.sh <command> [args]`.
 | `evo.sh accept <name> [--no-worktree]` | Gates the proposal (placeholders + structure), then derives or re-attaches the isolated worktree transactionally |
 | `evo.sh advance <name> --to <state>` | Advances the state machine; refuses illegal transitions |
 | `evo.sh commit <name> -m <msg>` | Sparse-safe commit at `implementing`; widens the range first, stages by name |
+| `evo.sh fix -m <msg> (--paths <p>... \| --all)` | Immediate defect repair: commits on the space branch, no proposal |
 | `evo.sh integrate <name>` | Squashes the isolated work into the space branch; refuses invisible content (corpus assertion) |
 | `evo.sh check <name>` | Reports proposal, sparse-state, structure, and corpus problems |
 | `evo.sh archive <name> [--keep-worktree]` | Moves an `archived` proposal to `docs/evolutions/archived/YYYYMMDD-<name>.md`, cleans up isolation artifacts |
@@ -190,6 +191,18 @@ Seven hard constraints:
 ### Quick mode
 
 Typo fixes, bug fixes in existing assets, and small changes the user explicitly scopes may be committed in small steps directly on the `.wopal` space branch — the space branch is itself the isolation boundary against `local main`. When the judgment is unclear, use isolated mode. Widening scope is a user decision, not an agent's convenience.
+
+### Defect repair is immediate
+
+A **defect** is existing, already-agreed behavior that is wrong. Repairing it restores the intent that was already approved — it adds no design surface, so it does not go through the proposal lifecycle. Routing a defect through `new → accept → … → archive` costs a full design review for a change nobody needs to review; the record that matters is the commit.
+
+The fast path is `evo.sh fix -m "<message>" (--paths <p>... | --all)`:
+
+- It commits **directly on the space branch** — the branch is the isolation boundary against `local main`, exactly as in quick mode.
+- It still refuses on an incoherent sparse state, widens the range before staging, and stages by name. The fix path is a shortcut past the *process*, never past the *safety*.
+- It leaves no proposal artifact and moves no stage. The commit is the record.
+
+The distinction matters: a defect **fixes** agreed behavior; anything that **changes** behavior — a new capability, a contract change, a workflow step that should behave differently — is an evolution and follows the proposal lifecycle. When you cannot tell which you have, ask. Choosing the fast path for a change that deserved review is worse than a slow path for a fix.
 
 ## Landing an evolution
 

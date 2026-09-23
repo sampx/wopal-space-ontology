@@ -441,6 +441,31 @@ class TestCommitSafety(SparseSpaceFixture):
         committed = _git(self.wopal, "show", "--name-only", "--format=", "HEAD").stdout
         self.assertIn("agents/maka.md", committed)
 
+    def test_quick_commit_all_stages_every_changed_path(self):
+        # A multi-file fix should not need one --paths entry per file: --all
+        # stages every changed path (transient build output still dropped).
+        _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        (self.wopal / "agents" / "maka.md").write_text("maka edited\n")
+        (self.wopal / "skills" / "alpha" / "SKILL.md").write_text("alpha edited\n")
+
+        result = _run_evo(
+            self.wopal, "commit", "probe-evolution", "-m", "fix", "--all"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        committed = _git(self.wopal, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertIn("agents/maka.md", committed)
+        self.assertIn("skills/alpha/SKILL.md", committed)
+
+    def test_quick_commit_requires_paths_or_all(self):
+        _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        (self.wopal / "agents" / "maka.md").write_text("maka edited\n")
+
+        refused = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "fix")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("--all", refused.stderr)
+
     def test_quick_mode_commit_includes_the_proposal_record(self):
         _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
         # An implementation that changes the proposal itself must be able to
@@ -1413,6 +1438,136 @@ class TestCheck(SparseSpaceFixture):
         _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit alpha")
         result = _run_evo(self.wopal, "check", "probe-evolution")
         self.assertIn("not integrated", result.stdout + result.stderr)
+
+    def test_check_passes_for_a_cleanly_archived_proposal(self):
+        # The terminal state: `archive` moved the file and cleaned up the
+        # isolation artifacts. A missing worktree there is the expected end
+        # state, not a problem (2026-09-23 fix).
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "validating")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "archived")
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((target / ".git").exists(), "fixture: cleanup did not run")
+
+        result = _run_evo(self.wopal, "check", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("missing", result.stderr)
+        self.assertNotIn("re-run", result.stderr)
+
+    def test_check_notes_an_incomplete_archive_cleanup(self):
+        # Worktree gone but branch still present: cleanup did not finish.
+        # The content is already integrated, so this is a notice, not a
+        # failure — and the advice must not point at `accept` (impossible
+        # for an archived proposal).
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "validating")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "archived")
+        result = _run_evo(self.wopal, "archive", "probe-evolution", "--keep-worktree")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        _git(self.wopal, "worktree", "remove", "--force", str(target))
+        _git(self.wopal, "worktree", "prune")
+
+        result = _run_evo(self.wopal, "check", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("branch", result.stdout)
+
+    def test_check_still_fails_a_missing_worktree_before_archive(self):
+        # The archived terminal state is the only place a missing worktree
+        # is expected; mid-flight it stays a hard problem.
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        shutil.rmtree(target)
+        _git(self.wopal, "worktree", "prune")
+
+        result = _run_evo(self.wopal, "check", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing", result.stderr)
+
+
+class TestFix(SparseSpaceFixture):
+    """The immediate defect-repair path: a commit, and nothing else."""
+
+    def test_fix_commits_named_paths_without_a_proposal(self):
+        (self.wopal / "agents" / "maka.md").write_text("repaired\n")
+
+        result = _run_evo(
+            self.wopal, "fix", "-m", "fix: repair maka", "--paths", "agents/maka.md"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        committed = _git(self.wopal, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertIn("agents/maka.md", committed)
+        self.assertNotIn("docs/evolutions", committed)
+        # No proposal artifact appears, and none is touched.
+        proposals = [
+            item.name
+            for item in (self.wopal / "docs" / "evolutions").glob("*.md")
+        ]
+        self.assertEqual(proposals, ["probe-evolution.md"])
+        self.assertEqual(self.stage_of(self.proposal), "draft")
+
+    def test_fix_all_stages_changed_paths_and_drops_transient(self):
+        (self.wopal / "agents" / "maka.md").write_text("a\n")
+        (self.wopal / "skills" / "alpha" / "SKILL.md").write_text("b\n")
+        cache = self.wopal / "skills" / "ontology-evolution" / "scripts" / "__pycache__"
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / "x.pyc").write_bytes(b"\x00")
+
+        result = _run_evo(self.wopal, "fix", "-m", "fix: two files", "--all")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        committed = _git(self.wopal, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertIn("agents/maka.md", committed)
+        self.assertIn("skills/alpha/SKILL.md", committed)
+        self.assertNotIn("__pycache__", committed)
+
+    def test_fix_refuses_without_message_or_paths(self):
+        missing_paths = _run_evo(self.wopal, "fix", "-m", "fix: x")
+        self.assertNotEqual(missing_paths.returncode, 0)
+        self.assertIn("--all", missing_paths.stderr)
+
+        missing_message = _run_evo(self.wopal, "fix", "--paths", "agents/maka.md")
+        self.assertNotEqual(missing_message.returncode, 0)
+        self.assertIn("message", missing_message.stderr)
+
+    def test_fix_refuses_an_unknown_path(self):
+        result = _run_evo(
+            self.wopal, "fix", "-m", "fix: x", "--paths", "no/such/file.md"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no/such/file.md", result.stderr)
+
+    def test_fix_widens_the_range_for_a_new_capability_file(self):
+        new_dir = self.wopal / "skills" / "newcap"
+        new_dir.mkdir(parents=True)
+        (new_dir / "SKILL.md").write_text("new\n")
+
+        result = _run_evo(
+            self.wopal,
+            "fix", "-m", "fix: new cap",
+            "--paths", "skills/newcap/SKILL.md",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("/skills/newcap/", self.patterns_of())
+        # The decisive property: the file survives a range recompute.
+        _git(self.wopal, "sparse-checkout", "reapply")
+        self.assertTrue((new_dir / "SKILL.md").exists())
+
+    def test_fix_refuses_on_an_incoherent_sparse_state(self):
+        _git(self.wopal, "sparse-checkout", "disable")
+        (self.wopal / "agents" / "maka.md").write_text("repaired\n")
+
+        result = _run_evo(
+            self.wopal, "fix", "-m", "fix: x", "--paths", "agents/maka.md"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sparse", result.stderr.lower())
 
 
 if __name__ == "__main__":  # pragma: no cover

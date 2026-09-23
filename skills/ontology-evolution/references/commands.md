@@ -144,9 +144,10 @@ stages named paths only — never `-A`.
 touched, minus transient build output) and prints the `integrate` command.
 
 **Quick mode** commits into the live space worktree and therefore requires
-`--paths <path>...`: an explicit list is the only thing standing between a
-stray file and the space branch. The proposal file is added to that list
-automatically.
+`--paths <path>...` or `--all`: an explicit list (or the changed-path
+collector behind `--all`) is the only thing standing between a stray file
+and the space branch. The proposal file is added to that list automatically.
+`--all` stages every changed path, transient build output still dropped.
 
 ### Why widening is not `--sparse`
 
@@ -190,6 +191,26 @@ Why not `git push .` or `git update-ref`: pushing to a branch checked out in
 `.wopal` is refused by git, and moving the ref directly leaves `.wopal` in the
 same inconsistent `D`/`M` state as the 2026-09-20 incident.
 
+## `evo.sh fix -m <message> (--paths <path>... | --all)`
+
+Immediate defect repair. A defect is existing, already-agreed behavior that
+is wrong; restoring it needs no proposal, no worktree, and no stage — the
+commit is the record.
+
+- Commits **directly on the space branch** (which must be checked out and is
+  itself the isolation boundary against `local main`).
+- The same safety contract as `commit` applies: refuse on an incoherent
+  sparse state, widen the range before staging, stage by name, drop
+  transient build output. The fast path skips process, never safety.
+- `--paths` entries must be on disk or tracked (a deleted tracked path is
+  valid; an unknown path is refused loudly). `--all` stages every changed
+  path.
+- No proposal artifact is created or modified; no stage moves.
+
+Use it when behavior that was already agreed is broken. Anything that
+changes agreed behavior — a new capability, a contract change — is an
+evolution and follows the proposal lifecycle instead.
+
 ## `evo.sh check <name>`
 
 Reports problems with the proposal and the sparse state as a classified list,
@@ -202,7 +223,12 @@ exiting non-zero when anything is wrong.
 | `structure:` | The proposal format contract — required sections and the Task six elements; **notes** in `draft`, problems from `accepted` onward. Also: the space worktree sits on a `space/*` branch |
 | `sparse:` | The `commit` preflight, run in whichever directory the mode commits into |
 | `isolation:` | The derived worktree still sees every pattern the space has, and its bits are coherent |
-| `note:` | Non-fatal observations: content not integrated yet, a branch with nothing committed, placeholders expected in a draft, and **corpus lint** — archived files that lack the `YYYYMMDD-` prefix |
+| `note:` | Non-fatal observations: content not integrated yet, a branch with nothing committed, placeholders expected in a draft, an archived proposal whose isolation branch outlived its cleanup, and **corpus lint** — archived files that lack the `YYYYMMDD-` prefix |
+
+An archived proposal whose worktree was removed (the normal end state of
+`archive`) is **not** a problem: the terminal state expects the cleanup to
+have happened. A branch that survives there is reported as a note — the
+content is integrated, only the artifact removal is incomplete.
 
 The integration notice compares **content**, not commit counts: the space
 branch legitimately carries the accept and stage records the derived worktree

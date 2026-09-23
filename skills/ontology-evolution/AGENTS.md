@@ -62,6 +62,15 @@ state name is a contract change: it must be updated here, in
 declare its precondition stage and its resulting stage, and must refuse —
 non-zero exit, file untouched — when the precondition does not hold.
 
+### Defect Repairs Are Immediate
+
+A defect — existing, already-agreed behavior that is wrong — is repaired
+directly with `evo.sh fix`, committed on the space branch. It does not go
+through the proposal lifecycle: the review a proposal exists to provide is
+already settled for behavior that was agreed. The safety contract (sparse
+preflight, widen-then-stage, named staging) still applies. Anything that
+changes agreed behavior is an evolution and uses the proposal lifecycle.
+
 ### No Automatic Delivery
 
 `space sync` and `ontology contribute` are the user's terminal decision
