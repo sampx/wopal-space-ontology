@@ -23,12 +23,18 @@
 #     Squashing after every commit does not: squash creates new commit ids, so
 #     the next squash loses the merge base and fails with add/add conflicts.
 
+import hashlib
 import re
 import subprocess
 from pathlib import Path
 
 WORKTREE_DIR = ".worktrees"
 BRANCH_PREFIX = "ontology-"
+
+# Git branch names have no hard length limit, but commit-msg hooks and
+# readability do; past this many characters a slug truncates with a 4-hex
+# digest suffix (deterministic: the same name always truncates the same way).
+SLUG_LIMIT = 55
 
 
 class WorktreeError(Exception):
@@ -47,16 +53,26 @@ def _run(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(list(args), cwd=str(cwd), capture_output=True, text=True)
 
 
+def _zlines(result: subprocess.CompletedProcess) -> list[str]:
+    return [token for token in result.stdout.split("\0") if token]
+
+
 def slugify(name: str) -> str:
     """Turn a proposal name into a git-safe slug.
 
     Slashes are the reason this exists: git cannot create a branch that has
     both `ontology-a/b` and `ontology-a` as prefixes, so a proposal named
     after a path would produce a worktree that can never be integrated.
+
+    Slugs longer than SLUG_LIMIT truncate to it with a 4-hex digest of the
+    full name appended, keeping distinct long names distinct.
     """
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", name.strip())
-    slug = re.sub(r"-{2,}", "-", slug).strip("-._")
-    return slug.lower()
+    slug = re.sub(r"-{2,}", "-", slug).strip("-._").lower()
+    if len(slug) <= SLUG_LIMIT:
+        return slug
+    digest = hashlib.sha1(name.encode()).hexdigest()[:4]
+    return f"{slug[:SLUG_LIMIT]}-{digest}"
 
 
 def space_worktree_path(space_root: Path) -> Path:
@@ -173,12 +189,24 @@ def assert_isolated(space_root: Path, worktree: Path) -> list[str]:
     return problems
 
 
-def integrate(space_root: Path, feature_branch: str, message: str) -> str | None:
+def integrate(
+    space_root: Path,
+    feature_branch: str,
+    message: str,
+    worktree_path: Path | None = None,
+) -> str | None:
     """Squash the feature branch into the space branch inside `.wopal`.
 
     The space worktree already has the space branch checked out, so the merge
     happens there and the host repository is untouched. This is the only
     integration path that leaves `.wopal` coherent.
+
+    `worktree_path` is the isolated worktree the proposal recorded. When it
+    is known it must exist and sit on `feature_branch`: the worktree's range
+    is the widening source, so a missing or foreign worktree is refused —
+    merging without it silently commits brand-new capabilities as off-disk
+    skip-worktree entries (measured 2026-09-23: status clean, runtime
+    invisible, every existing guard blind to it).
 
     Returns the resulting commit id, or None when the space branch was
     already up to date (nothing to integrate).
@@ -192,6 +220,28 @@ def integrate(space_root: Path, feature_branch: str, message: str) -> str | None
             f"space worktree is on '{current}', expected a 'space/*' branch; "
             "integration must not run from another branch"
         )
+
+    if worktree_path is not None:
+        if not worktree_exists(worktree_path):
+            raise WorktreeError(
+                f"the recorded worktree {worktree_path} is missing; re-run "
+                "`evo.sh accept <name>` to re-attach a worktree to the "
+                f"recorded branch (its commits are NOT lost — do not delete "
+                f"{feature_branch!r})"
+            )
+        landed = current_branch(worktree_path)
+        if landed != feature_branch:
+            raise WorktreeError(
+                f"the recorded worktree {worktree_path} is on {landed!r}, "
+                f"not {feature_branch!r}; bring it back on the recorded "
+                "branch before integrating (its commits are NOT lost)"
+            )
+        isolation = assert_isolated(space_root, worktree_path)
+        if isolation:
+            raise WorktreeError(
+                "refusing to integrate: the isolated worktree failed the "
+                "isolation checks: " + "; ".join(isolation)
+            )
 
     problems = sparse.preflight(wopal)
     if problems:
@@ -231,16 +281,41 @@ def integrate(space_root: Path, feature_branch: str, message: str) -> str | None
             f"squash merge of '{feature_branch}' failed: {staged.stderr.strip()}"
         )
 
+    # `merge --squash` stages its result but does not commit it. An empty
+    # index means the space branch already has every change.
+    staged_paths = _zlines(_git(wopal, "diff", "--cached", "--name-only", "-z"))
+    if not staged_paths:
+        return None
+
+    # The poison-killer (2026-09-23): every path this integration is about
+    # to commit must be visible to the runtime after the range is final. A
+    # staged path outside the (already widened) range would be committed as
+    # an off-disk skip-worktree entry — status clean, listed in the tree,
+    # never materialized, never loaded. That is the silent capability-pool
+    # poisoning the 2026-09-20 incident was made of, and no later guard can
+    # see it. Widening sources can miss (a worktree range that never
+    # declared a raw `git add --sparse` path); this assertion cannot.
+    final_patterns = sparse.read_patterns(wopal)
+    invisible = [
+        path
+        for path in staged_paths
+        if not sparse.path_in_range(path, final_patterns)
+    ]
+    if invisible:
+        _reset(wopal)
+        raise WorktreeError(
+            f"refusing to integrate: {len(invisible)} staged path(s) would "
+            "be committed invisible to the runtime (outside the sparse "
+            "range, so never materialized): "
+            + ", ".join(invisible[:10])
+            + "; widen the isolated worktree's range over them and commit "
+            "again (evo.sh commit)"
+        )
+
     # The range must be final before this runs: `reapply` materializes
     # whatever the range covers, so a widened-then-reapplied range is what
     # puts the new capability on disk.
     _git(wopal, "sparse-checkout", "reapply")
-
-    # `merge --squash` stages its result but does not commit it. An empty
-    # index means the space branch already has every change.
-    staged_status = _git(wopal, "diff", "--cached", "--name-only")
-    if not staged_status.stdout.strip():
-        return None
 
     committed = _run(wopal, "git", "commit", "-m", message)
     if committed.returncode != 0:

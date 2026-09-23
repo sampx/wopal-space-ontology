@@ -17,7 +17,8 @@ description: Ontology capability evolution — semantic lane (Maka) plus mechani
 | Directory | Responsibility |
 |---|---|
 | `scripts/evo.sh` | CLI entry point; resolves its own directory and execs the Python program |
-| `scripts/evo.py` | argparse dispatch for every command; owns the proposal template and the staging logic |
+| `scripts/evo.py` | argparse dispatch for every command; owns the staging logic and the guard table |
+| `templates/proposal.md` | The proposal skeleton with authoring comments; the single source of the proposal format |
 | `scripts/lib/repo.py` | Locates the ontology repository root (env override, git toplevel, `docs/evolutions` marker) |
 | `scripts/lib/proposal.py` | State machine (`STATES`, `next_states`, `validate_transition`) and metadata field read/write |
 | `scripts/lib/sparse.py` | Sparse-checkout reads (`is_enabled`, `read_patterns`, bit inspection) and the `preflight` / `widen` pair |
@@ -110,6 +111,11 @@ must keep them true, and each has a test in
 7. **Integration widens the space range to match the feature branch before
    merging.** Otherwise a brand-new capability directory lands as an off-disk
    skip-worktree entry: committed, listed, and invisible to the runtime.
+8. **The integrate corpus assertion is the last line of defense.** After the
+   squash stages and before it commits, every staged path must fall inside
+   the final range; a path that does not is rolled back and refused. The
+   widening source can miss (a raw `git add --sparse` path the worktree range
+   never declared); the assertion cannot.
 
 ## 5. Testing
 

@@ -17,6 +17,7 @@
 
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -52,7 +53,11 @@ def _fill_placeholders(path: Path) -> None:
     changes, and the drift would look like a `check` bug.
     """
     import importlib.util
+    import sys as _sys
 
+    scripts = str(SKILL_ROOT / "scripts")
+    if scripts not in _sys.path:
+        _sys.path.insert(0, scripts)
     spec = importlib.util.spec_from_file_location(
         "evo_under_test", SKILL_ROOT / "scripts" / "evo.py"
     )
@@ -127,6 +132,9 @@ class SparseSpaceFixture(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         path = self.wopal / "docs" / "evolutions" / f"{name}.md"
         self.assertTrue(path.is_file(), "proposal was not written into .wopal")
+        # A real proposal is filled in before it is accepted; the fixture
+        # does the same so the accept-time contract gate sees a real shape.
+        _fill_placeholders(path)
         # The proposal rides on the space branch, as it does in a live space.
         _git(self.wopal, "add", "--", "docs/evolutions")
         _git(self.wopal, "commit", "-qm", f"docs(evolutions): draft {name}")
@@ -188,6 +196,7 @@ class TestAccept(SparseSpaceFixture):
 
     def test_derived_worktree_inherits_patterns_and_keeps_host_on_main(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         target = self.derived()
 
         self.assertEqual(self.patterns_of(target), self.patterns_of())
@@ -201,6 +210,7 @@ class TestAccept(SparseSpaceFixture):
 
     def test_derived_worktree_keeps_out_of_range_files_off_disk(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         target = self.derived()
         # `skills/beta` is tracked but outside the range: no on-disk copy.
         self.assertFalse((target / "skills" / "beta").exists())
@@ -213,6 +223,7 @@ class TestAccept(SparseSpaceFixture):
         # mid-flight state. "The worktree sees less" is the failure: it means
         # part of the space it was derived from is no longer visible.
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         target = self.derived()
 
         _git(target, "sparse-checkout", "add", "/skills/newcap/")
@@ -237,10 +248,13 @@ class TestAccept(SparseSpaceFixture):
         self.assertFalse((self.derived() / ".git").exists(), "worktree was created")
 
     def test_accept_rejects_wrong_stage(self):
-        _run_evo(self.wopal, "accept", "probe-evolution")
-        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        # 'validating' and beyond are past the isolation boundary: an accept
+        # there could re-derive work that is already integrated.
+        for state in ("accepted", "implementing", "validating"):
+            _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
         result = _run_evo(self.wopal, "accept", "probe-evolution")
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("validating", result.stderr)
 
 
 class TestPreflight(SparseSpaceFixture):
@@ -248,6 +262,7 @@ class TestPreflight(SparseSpaceFixture):
 
     def _accept_isolated(self) -> Path:
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         return self.derived()
 
     def _sparse(self):
@@ -338,6 +353,7 @@ class TestPreflight(SparseSpaceFixture):
 class TestCommitSafety(SparseSpaceFixture):
     def _accept_isolated(self) -> Path:
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         return self.derived()
 
     def test_commit_requires_accept_first(self):
@@ -410,6 +426,7 @@ class TestCommitSafety(SparseSpaceFixture):
 
     def test_quick_mode_requires_explicit_paths(self):
         _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         (self.wopal / "agents" / "maka.md").write_text("maka edited\n")
 
         refused = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit")
@@ -441,6 +458,7 @@ class TestCommitSafety(SparseSpaceFixture):
 class TestIntegrate(SparseSpaceFixture):
     def test_integrate_refuses_in_quick_mode(self):
         _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         result = _run_evo(self.wopal, "integrate", "probe-evolution")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("quick", result.stderr)
@@ -448,6 +466,7 @@ class TestIntegrate(SparseSpaceFixture):
     def test_integrate_squashes_work_into_space_branch(self):
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
 
         (target / "skills" / "alpha" / "SKILL.md").write_text("alpha EDITED\n")
         new_dir = target / "skills" / "newskill"
@@ -500,6 +519,7 @@ class TestIntegrate(SparseSpaceFixture):
         # invisible to the runtime.
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
 
         new_dir = target / "skills" / "newskill"
         new_dir.mkdir(parents=True)
@@ -531,6 +551,7 @@ class TestIntegrate(SparseSpaceFixture):
         # left dirty blocks the next `integrate`.
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
 
         for state in ("implementing", "validating", "archived"):
             result = _run_evo(
@@ -566,14 +587,16 @@ class TestIntegrate(SparseSpaceFixture):
         # The move is a deletion plus an addition, and both must be recorded
         # or the space worktree is left dirty.
         self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
-        self.assertEqual(_git(target, "status", "--porcelain").stdout.strip(), "")
-        self.assertTrue(
-            (self.wopal / "docs" / "evolutions" / "archived" / "probe-evolution.md").is_file()
+        # The archived name carries the YYYYMMDD- prefix (D-03), and the
+        # default archive cleans up the isolation artifacts (D-02).
+        dated = list(
+            (self.wopal / "docs" / "evolutions" / "archived").glob(
+                "[0-9]" * 8 + "-probe-evolution.md"
+            )
         )
+        self.assertEqual(len(dated), 1, "archived copy lacks the dated name")
         self.assertFalse((self.wopal / "docs" / "evolutions" / "probe-evolution.md").exists())
-        self.assertTrue(
-            (target / "docs" / "evolutions" / "archived" / "probe-evolution.md").is_file()
-        )
+        self.assertFalse((target / ".git").exists(), "worktree not cleaned up")
 
     def test_check_notices_missing_content_not_the_record_commits(self):
         # The space branch legitimately carries stage records the derived
@@ -602,22 +625,32 @@ class TestIntegrate(SparseSpaceFixture):
         # live space.
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         for state in ("implementing", "validating", "archived"):
             _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
 
-        result = _run_evo(target, "archive", "probe-evolution")
+        result = _run_evo(target, "archive", "probe-evolution", "--keep-worktree")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-        self.assertTrue(
-            (self.wopal / "docs" / "evolutions" / "archived" / "probe-evolution.md").is_file(),
-            "canonical copy was not archived on the space branch",
+        dated = list(
+            (self.wopal / "docs" / "evolutions" / "archived").glob(
+                "[0-9]" * 8 + "-probe-evolution.md"
+            )
         )
+        self.assertEqual(len(dated), 1, "canonical copy was not archived (dated name)")
         self.assertFalse(
             (self.wopal / "docs" / "evolutions" / "probe-evolution.md").exists()
         )
         # The mirror keeps the isolated copy in the same shape, committed.
-        self.assertTrue(
-            (target / "docs" / "evolutions" / "archived" / "probe-evolution.md").is_file()
+        self.assertEqual(
+            len(
+                list(
+                    (target / "docs" / "evolutions" / "archived").glob(
+                        "[0-9]" * 8 + "-probe-evolution.md"
+                    )
+                )
+            ),
+            1,
         )
         self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
         self.assertEqual(_git(target, "status", "--porcelain").stdout.strip(), "")
@@ -647,6 +680,7 @@ class TestIntegrate(SparseSpaceFixture):
         # path either, so the drop is explicit and not left to .gitignore.
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
         cache = target / "skills" / "ontology-evolution" / "scripts" / "__pycache__"
         cache.mkdir(parents=True)
@@ -661,6 +695,7 @@ class TestIntegrate(SparseSpaceFixture):
 
     def test_integrate_is_a_noop_when_nothing_is_outstanding(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         first = _run_evo(self.wopal, "integrate", "probe-evolution")
         self.assertEqual(first.returncode, 0, first.stderr)
         second = _run_evo(self.wopal, "integrate", "probe-evolution")
@@ -668,11 +703,631 @@ class TestIntegrate(SparseSpaceFixture):
         self.assertIn("no-op", second.stdout)
 
 
+class TestWorktreeCorrectness(SparseSpaceFixture):
+    """The 2026-09-23 probe findings, pinned as behavior (proposal D-13/14/15).
+
+    Each test here was first reproduced as a silent corruption or a dead-end
+    residue in a temp-repo probe; the assertions encode the corrected
+    behavior, not the current one.
+    """
+
+    def _accepted(self) -> Path:
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        return self.derived()
+
+    def _widen_and_commit_new_capability(self, target: Path) -> None:
+        _git(target, "sparse-checkout", "add", "/skills/gamma/")
+        gamma = target / "skills" / "gamma"
+        gamma.mkdir(parents=True)
+        (gamma / "SKILL.md").write_text("gamma capability\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "add gamma")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    # ── D-13: integrate must refuse a missing or foreign worktree ────────
+
+    def test_integrate_refuses_a_missing_worktree(self):
+        # Probe B: a lost worktree directory used to make integrate widen
+        # nothing, commit the capability as an off-disk skip-worktree entry,
+        # and report success. It must refuse instead, before any mutation.
+        target = self._accepted()
+        self._widen_and_commit_new_capability(target)
+
+        shutil.rmtree(target)
+        _git(self.wopal, "worktree", "prune")
+        head_before = _git(self.wopal, "rev-parse", "HEAD").stdout.strip()
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("worktree", result.stderr.lower())
+        # Recovery guidance must not lead toward destroying the branch.
+        self.assertNotIn("remove the stale branch", result.stderr)
+        # Refusal precedes mutation: nothing moved, nothing committed.
+        self.assertEqual(
+            _git(self.wopal, "rev-parse", "HEAD").stdout.strip(), head_before
+        )
+        self.assertFalse((self.wopal / "skills" / "gamma").exists())
+
+    def test_integrate_refuses_a_worktree_on_a_foreign_branch(self):
+        # Probe D: the recorded worktree sitting on some other branch used to
+        # pass integrate with only a dirtiness check. The recorded branch and
+        # the worktree's checked-out branch must agree.
+        target = self._accepted()
+        (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        result = _git(target, "checkout", "-qb", "stray-branch")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        head_before = _git(self.wopal, "rev-parse", "HEAD").stdout.strip()
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("branch", result.stderr.lower())
+        self.assertEqual(
+            _git(self.wopal, "rev-parse", "HEAD").stdout.strip(), head_before
+        )
+
+    def test_integrate_reruns_the_isolation_assertion(self):
+        # Defense in depth: an accept-time assertion is not enough; the range
+        # can be narrowed or disabled afterwards, and integrate is the last
+        # gate before the pool is written.
+        target = self._accepted()
+        (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        _git(target, "sparse-checkout", "disable")
+        head_before = _git(self.wopal, "rev-parse", "HEAD").stdout.strip()
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sparse", result.stderr.lower())
+        self.assertEqual(
+            _git(self.wopal, "rev-parse", "HEAD").stdout.strip(), head_before
+        )
+
+    # ── D-14: the poison-killer — no committed-but-invisible path ────────
+
+    def test_integrate_refuses_when_a_merged_path_stays_out_of_range(self):
+        # The invariant: every path the squash stages must end up visible to
+        # the runtime. A path staged but left out of the (widened) range is
+        # the silent-poison shape from the 2026-09-20 incident: committed,
+        # listed, and never materialized. The assertion runs after staging
+        # and before commit, so refusal leaves the space worktree clean.
+        #
+        # Setup: the implementer bypassed `evo.sh commit` and staged a new
+        # capability with `git add --sparse`, so the feature branch carries
+        # it while the worktree range (the widening source) does not declare
+        # it. Widening proposes nothing; the corpus assertion must catch it.
+        target = self._accepted()
+        gamma = target / "skills" / "gamma"
+        gamma.mkdir(parents=True)
+        (gamma / "SKILL.md").write_text("gamma capability\n")
+        _git(target, "add", "--sparse", "--", "skills/gamma/SKILL.md")
+        self.assertEqual(_git(target, "commit", "-qm", "raw git commit").returncode, 0)
+        self.assertNotIn("/skills/gamma/", self.patterns_of(target))
+
+        head_before = _git(self.wopal, "rev-parse", "HEAD").stdout.strip()
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("skills/gamma/SKILL.md", result.stderr)
+        # Refusal restored the space worktree: no staged poison, no residue.
+        self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
+        self.assertEqual(
+            _git(self.wopal, "rev-parse", "HEAD").stdout.strip(), head_before
+        )
+        self.assertFalse((self.wopal / "skills" / "gamma").exists())
+
+    def test_integrate_happy_path_materializes_new_capability(self):
+        # The belt-and-braces companion: with a healthy worktree the same
+        # flow must keep working end to end.
+        target = self._accepted()
+        self._widen_and_commit_new_capability(target)
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(
+            (self.wopal / "skills" / "gamma" / "SKILL.md").is_file(),
+            "gamma not materialized in the space worktree",
+        )
+        self.assertEqual(self.flags_of(self.wopal, "skills/gamma/SKILL.md"), "0")
+
+    # ── D-15: accept is transactional; failure cleans up its own residue ─
+
+    def test_accept_refuses_a_corrupted_source_before_deriving(self):
+        # Probe G: a disabled-sparse .wopal used to derive a full-checkout
+        # worktree first and only fail at the isolation assertion, leaving a
+        # branch, a worktree directory, and committed metadata behind. The
+        # source health check must refuse before anything is created.
+        _git(self.wopal, "sparse-checkout", "disable")
+
+        result = _run_evo(self.wopal, "accept", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sparse", result.stderr.lower())
+        # Zero residue: no worktree, no branch, no metadata commit.
+        self.assertFalse((self.derived() / ".git").exists())
+        self.assertFalse(
+            _git(self.wopal, "branch", "--list", "ontology-probe-evolution").stdout.strip()
+        )
+        self.assertEqual(self.stage_of(self.proposal), "draft")
+        self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
+
+    def test_accept_failure_after_derive_cleans_up_its_own_residue(self):
+        # Half-derive shape: the branch exists (its worktree was lost) and
+        # the derive path is occupied, so re-attaching fails. The refusal
+        # must leave the branch untouched — its commits are possibly
+        # unmerged work — and never write the accept metadata.
+        target = self.derived()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "blocker.txt").write_text("blocked\n")
+        _git(self.wopal, "branch", "ontology-probe-evolution")
+
+        result = _run_evo(self.wopal, "accept", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        # The metadata was never written: stage and tree are untouched.
+        self.assertEqual(self.stage_of(self.proposal), "draft")
+        self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
+        # The branch and its potential commits survive the refusal.
+        self.assertTrue(
+            _git(self.wopal, "branch", "--list", "ontology-probe-evolution").stdout.strip()
+        )
+
+    # ── E4-E8: failed integrate restores cleanly; untracked survives ─────
+
+    def test_failed_integrate_restores_the_space_worktree(self):
+        # Probe E: a conflicted squash is refused and the reset must leave
+        # no unmerged entries and a clean status, with untracked files the
+        # user left in .wopal surviving the refusal.
+        target = self._accepted()
+        prop_wt = target / "docs" / "evolutions" / "probe-evolution.md"
+        prop_wt.write_text(prop_wt.read_text() + "\nworktree-side edit\n")
+        _git(target, "add", "--", "docs/evolutions/probe-evolution.md")
+        _git(target, "commit", "-qm", "wt edit")
+        prop_sp = self.wopal / "docs" / "evolutions" / "probe-evolution.md"
+        prop_sp.write_text(prop_sp.read_text() + "\nspace-side edit\n")
+        _git(self.wopal, "add", "--", "docs/evolutions/probe-evolution.md")
+        _git(self.wopal, "commit", "-qm", "space edit")
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
+        self.assertEqual(_git(self.wopal, "ls-files", "--unmerged").stdout.strip(), "")
+
+    def test_integrate_refuses_but_untracked_files_survive(self):
+        # Probe E7/E8: an in-range untracked file blocks integrate at the
+        # dirty check, and the refusal must not delete it.
+        target = self._accepted()
+        (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        scratch = self.wopal / "agents" / "scratch.md"
+        scratch.write_text("in-range untracked\n")
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(scratch.exists(), "untracked scratch was deleted by a refusal")
+
+    # ── R1-R3: recovery guidance must not push toward branch deletion ────
+
+    def test_reaccept_with_missing_worktree_recovers_instead_of_destroying(self):
+        # Probe R: a re-run of accept with the branch present and the
+        # worktree gone used to fail with "remove the stale branch" — advice
+        # that destroys possibly-unmerged work. The recovery must re-attach a
+        # worktree to the existing branch instead.
+        target = self._accepted()
+        (target / "skills" / "alpha" / "SKILL.md").write_text("stranded work\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "stranded")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        shutil.rmtree(target)
+        _git(self.wopal, "worktree", "prune")
+
+        result = _run_evo(self.wopal, "accept", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # The stranded work survived: the re-attached worktree carries it.
+        self.assertTrue((self.derived() / ".git").exists())
+        self.assertEqual(
+            (self.derived() / "skills" / "alpha" / "SKILL.md").read_text(),
+            "stranded work\n",
+        )
+
+
+class TestTransactionalArchive(SparseSpaceFixture):
+    """Archive hygiene (proposal D-02/D-03): dated name, cleanup, guards."""
+
+    def _archiveable(self, keep_worktree: bool = False):
+        """Drive a proposal through to the archived stage with real work."""
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        (target / "skills" / "alpha" / "SKILL.md").write_text("archived work\n")
+        result = _run_evo(self.wopal, "commit", "probe-evolution", "-m", "work")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for state in ("implementing", "validating", "archived"):
+            result = _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        return target
+
+    def test_archive_names_the_file_with_a_date_prefix(self):
+        target = self._archiveable()
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        dated = list(
+            (self.wopal / "docs" / "evolutions" / "archived").glob(
+                "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-probe-evolution.md"
+            )
+        )
+        self.assertEqual(len(dated), 1, "archived file lacks the YYYYMMDD- prefix")
+        self.assertFalse(
+            (self.wopal / "docs" / "evolutions" / "probe-evolution.md").exists()
+        )
+
+    def test_archive_resolves_a_bare_name_to_the_dated_file(self):
+        self._archiveable()
+        _run_evo(self.wopal, "archive", "probe-evolution")
+
+        result = _run_evo(self.wopal, "status", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("archived", result.stdout)
+
+    def test_archive_refuses_a_duplicate_dated_name(self):
+        # A file archived earlier the same day already occupies the dated
+        # name; a second archive of the same stem must refuse to overwrite.
+        self._archiveable()
+        _run_evo(self.wopal, "archive", "probe-evolution", "--keep-worktree")
+
+        # Restore an active copy of the same proposal (stage already
+        # 'archived'), then archive again: the dated target exists.
+        archived = next(
+            (self.wopal / "docs" / "evolutions" / "archived").glob(
+                "*-probe-evolution.md"
+            )
+        )
+        restored = self.wopal / "docs" / "evolutions" / "probe-evolution.md"
+        restored.write_text(archived.read_text())
+        _git(self.wopal, "add", "--", str(restored.relative_to(self.wopal)))
+        _git(self.wopal, "commit", "-qm", "restore for re-archive")
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("already exists", result.stderr)
+
+    def test_archive_cleans_up_the_isolated_worktree_and_branch(self):
+        target = self._archiveable()
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        self.assertFalse((target / ".git").exists(), "worktree not removed")
+        self.assertFalse(
+            _git(self.wopal, "branch", "--list", "ontology-probe-evolution").stdout.strip(),
+            "feature branch not removed",
+        )
+        self.assertEqual(_git(self.wopal, "status", "--porcelain").stdout.strip(), "")
+
+    def test_archive_keep_worktree_preserves_the_isolation_artifacts(self):
+        target = self._archiveable()
+
+        result = _run_evo(
+            self.wopal, "archive", "probe-evolution", "--keep-worktree"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((target / ".git").exists())
+        self.assertTrue(
+            _git(self.wopal, "branch", "--list", "ontology-probe-evolution").stdout.strip()
+        )
+
+    def test_archive_refuses_unintegrated_content(self):
+        # The guard that makes cleanup safe: a branch that still carries
+        # unintegrated content must never be deleted, and the archive move
+        # must not happen either (refusal precedes mutation).
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        (target / "skills" / "alpha" / "SKILL.md").write_text("stranded\n")
+        _run_evo(self.wopal, "commit", "probe-evolution", "-m", "stranded")
+        for state in ("implementing", "validating", "archived"):
+            _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("integrated", result.stderr.lower())
+        # Refusal precedes mutation: nothing moved, nothing deleted.
+        self.assertTrue((target / ".git").exists())
+        self.assertTrue(
+            _git(self.wopal, "branch", "--list", "ontology-probe-evolution").stdout.strip()
+        )
+        self.assertTrue(
+            (self.wopal / "docs" / "evolutions" / "probe-evolution.md").exists()
+        )
+        self.assertFalse(
+            list(
+                (self.wopal / "docs" / "evolutions" / "archived").glob(
+                    "*probe-evolution*"
+                )
+            )
+        )
+
+    def test_archive_skips_cleanup_in_quick_mode(self):
+        _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        for state in ("implementing", "validating", "archived"):
+            _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(
+            (self.wopal / "docs" / "evolutions" / "archived").glob(
+                "[0-9]" * 8 + "-probe-evolution.md"
+            )
+        )
+
+    def test_archive_moves_the_mirror_to_the_dated_name(self):
+        target = self._archiveable()
+
+        result = _run_evo(
+            self.wopal, "archive", "probe-evolution", "--keep-worktree"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        dated = list(
+            (target / "docs" / "evolutions" / "archived").glob(
+                "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-probe-evolution.md"
+            )
+        )
+        self.assertEqual(len(dated), 1, "mirror not moved to the dated name")
+        self.assertFalse(
+            (target / "docs" / "evolutions" / "probe-evolution.md").exists(),
+            "stale active copy left in the worktree",
+        )
+        self.assertEqual(_git(target, "status", "--porcelain").stdout.strip(), "")
+
+    def test_archive_refuses_a_corrupted_space_worktree(self):
+        self._archiveable()
+        _git(self.wopal, "sparse-checkout", "disable")
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sparse", result.stderr.lower())
+        self.assertTrue(
+            (self.wopal / "docs" / "evolutions" / "probe-evolution.md").exists(),
+            "the move happened despite the refusal",
+        )
+
+
+class TestProposalContract(SparseSpaceFixture):
+    """The self-validating proposal contract (D-05/D-06/D-07): the external
+    template, the accept-time structure gate, and the corpus lint."""
+
+    def test_new_uses_the_external_template_file(self):
+        template = SKILL_ROOT / "templates" / "proposal.md"
+        self.assertTrue(template.is_file(), "templates/proposal.md missing")
+
+        result = _run_evo(self.wopal, "new", "template-probe")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        produced = self.wopal / "docs" / "evolutions" / "template-probe.md"
+        text = produced.read_text()
+        # The in-use format sections, not the old six thin ones.
+        for section in (
+            "## Technical Context",
+            "### Key Decisions",
+            "## In Scope",
+            "## Out of Scope",
+            "## Affected Files",
+            "## Acceptance Criteria",
+            "### Agent Verification",
+            "### User Validation",
+            "## Implementation",
+            "## Delegation Strategy",
+        ):
+            self.assertIn(section, text, f"template lacks {section}")
+
+    def test_new_template_matches_the_live_proposal_shape(self):
+        result = _run_evo(self.wopal, "new", "shape-probe")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        produced = self.wopal / "docs" / "evolutions" / "shape-probe.md"
+        text = produced.read_text()
+        # The metadata block carries every field the state machine reads.
+        for field in (
+            "**Stage**",
+            "**Mode**",
+            "**Worktree**",
+            "**Branch**",
+            "**Base Commit**",
+            "**Final Commit**",
+        ):
+            self.assertIn(field, text)
+
+    def test_accept_refuses_a_proposal_missing_task_structure(self):
+        # A proposal whose Implementation section has no Task structure
+        # cannot be accept-gated into implementation: fill everything else,
+        # leave the tasks shapeless, and accept must refuse.
+        result = _run_evo(self.wopal, "new", "shapeless")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.wopal / "docs" / "evolutions" / "shapeless.md"
+        _fill_placeholders(path)
+        text = path.read_text()
+        # Strip the Implementation body to a shapeless blob.
+        text = text.split("## Implementation")[0] + (
+            "## Implementation\n\nJust do it.\n\n## Delegation Strategy\n\nN/A\n"
+        )
+        path.write_text(text)
+        _git(self.wopal, "add", "--", "docs/evolutions")
+        _git(self.wopal, "commit", "-qm", "shapeless proposal")
+
+        result = _run_evo(self.wopal, "accept", "shapeless")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Task", result.stderr)
+
+    def test_accept_refuses_a_proposal_missing_ac_sections(self):
+        result = _run_evo(self.wopal, "new", "no-ac")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.wopal / "docs" / "evolutions" / "no-ac.md"
+        _fill_placeholders(path)
+        text = path.read_text()
+        head, _, tail = text.partition("## Acceptance Criteria")
+        tail = tail.partition("## Implementation")[2]
+        path.write_text(head + "## Implementation" + tail)
+        _git(self.wopal, "add", "--", "docs/evolutions")
+        _git(self.wopal, "commit", "-qm", "ac-less proposal")
+
+        result = _run_evo(self.wopal, "accept", "no-ac")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Acceptance Criteria", result.stderr)
+
+    def test_accept_passes_a_well_formed_proposal(self):
+        # The fixture's own proposal is filled and Task-shaped; accept
+        # must pass it (and this stays green as the contract evolves).
+        result = _run_evo(self.wopal, "accept", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_check_lints_an_undated_file_in_archived(self):
+        result = _run_evo(self.wopal, "new", "corpus-lint")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.wopal / "docs" / "evolutions" / "corpus-lint.md"
+        _fill_placeholders(path)
+        archived_dir = self.wopal / "docs" / "evolutions" / "archived"
+        archived_dir.mkdir(parents=True, exist_ok=True)
+        (archived_dir / "corpus-lint.md").write_text(path.read_text())
+        _git(self.wopal, "add", "--", "docs/evolutions")
+        _git(self.wopal, "commit", "-qm", "undated archived file")
+
+        result = _run_evo(self.wopal, "check", "corpus-lint")
+        # A lint note, not a hard failure: the file is still addressable.
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("corpus-lint.md", result.stdout)
+        self.assertIn("YYYYMMDD-", result.stdout)
+
+    def test_check_requires_all_six_elements_for_each_task(self):
+        # A global element count is not a contract: Task 1 can be complete
+        # while Task 2 silently lacks Done. Every Task block must carry all
+        # six required elements independently.
+        result = _run_evo(self.wopal, "new", "per-task-contract")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.wopal / "docs" / "evolutions" / "per-task-contract.md"
+        _fill_placeholders(path)
+        result = _run_evo(self.wopal, "accept", "per-task-contract")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        incomplete_task = """
+### Task 2: missing done
+
+**Verification Intent**: AC#1
+
+**Behavior**:
+- second behavior
+
+**Pre-read**: N/A
+
+**Design**: second design
+
+**TDD**: true
+
+**Changes**:
+1. RED: second test
+
+**Verify**: `true`
+
+"""
+        path.write_text(
+            path.read_text().replace(
+                "\n---\n\n## Delegation Strategy",
+                f"\n{incomplete_task}---\n\n## Delegation Strategy",
+            )
+        )
+        _git(self.wopal, "commit", "-qam", "drop task two done")
+
+        result = _run_evo(self.wopal, "check", "per-task-contract")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Task 2", result.stderr)
+        self.assertIn("Done", result.stderr)
+
+
+class TestStageGuards(SparseSpaceFixture):
+    """D-08: stage guards fail before mode, sparse, or git operations."""
+
+    def _quick_at(self, stage: str) -> None:
+        result = _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        chain = {
+            "accepted": (),
+            "implementing": ("implementing",),
+            "validating": ("implementing", "validating"),
+            "archived": ("implementing", "validating", "archived"),
+        }
+        for target in chain[stage]:
+            result = _run_evo(self.wopal, "advance", "probe-evolution", "--to", target)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_commit_and_integrate_refuse_before_implementing(self):
+        self._quick_at("accepted")
+        (self.wopal / "agents" / "maka.md").write_text("edited\n")
+
+        for argv in (
+            ("commit", "probe-evolution", "-m", "edit", "--paths", "agents/maka.md"),
+            ("integrate", "probe-evolution"),
+        ):
+            with self.subTest(command=argv[0]):
+                result = _run_evo(self.wopal, *argv)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("requires 'implementing'", result.stderr)
+                self.assertIn(
+                    "evo.sh advance probe-evolution --to implementing",
+                    result.stderr,
+                )
+
+    def test_terminal_stage_refuses_without_a_guard_crash(self):
+        self._quick_at("archived")
+        (self.wopal / "agents" / "maka.md").write_text("edited\n")
+
+        for argv in (
+            ("commit", "probe-evolution", "-m", "edit", "--paths", "agents/maka.md"),
+            ("integrate", "probe-evolution"),
+        ):
+            with self.subTest(command=argv[0]):
+                result = _run_evo(self.wopal, *argv)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("requires 'implementing'", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+
+class TestP2Hardening(SparseSpaceFixture):
+    """D-10/P2: naming bounds, status informativeness, assembly hygiene."""
+
+    def test_slug_truncates_beyond_55_characters(self):
+        # Long branch names collide with hook limits and hurt readability;
+        # past 55 characters the slug truncates with a 4-hex suffix.
+        long_name = "a" * 70
+        slug = None
+        import sys as _sys
+        _sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+        from lib import worktree as _wt
+
+        slug = _wt.slugify(long_name)
+        self.assertLessEqual(len(slug), 55 + 1 + 4)
+        self.assertTrue(slug.endswith(tuple("0123456789abcdef")))
+
+    def test_status_reports_isolation_metadata(self):
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        result = _run_evo(self.wopal, "status", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for expected in ("Mode", "Worktree", "Branch", "Base Commit"):
+            self.assertIn(expected, result.stdout)
+
+
 class TestCheck(SparseSpaceFixture):
     def test_check_reports_ok_for_a_draft_with_placeholders(self):
         # A fresh draft is supposed to be full of placeholders; failing it
         # would punish the workflow for working as designed.
-        result = _run_evo(self.wopal, "check", "probe-evolution")
+        result = _run_evo(self.wopal, "new", "raw-draft")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = _run_evo(self.wopal, "check", "raw-draft")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("note", result.stdout)
         self.assertIn("placeholder", result.stdout)
@@ -688,8 +1343,9 @@ class TestCheck(SparseSpaceFixture):
         # inside a fenced block or an inline span. That is documentation, not
         # an unreplaced template placeholder — failing it would reject every
         # proposal that documents its own commands.
-        _run_evo(self.wopal, "accept", "probe-evolution")
         _fill_placeholders(self.proposal)
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         self.proposal.write_text(
             self.proposal.read_text()
             + "\n## Commands\n\n```\nevo.sh advance <name> --to <state>\n```\n"
@@ -702,8 +1358,9 @@ class TestCheck(SparseSpaceFixture):
         self.assertNotIn("placeholder", result.stderr)
 
     def test_check_still_flags_a_real_placeholder_in_prose(self):
-        _run_evo(self.wopal, "accept", "probe-evolution")
         _fill_placeholders(self.proposal)
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         self.proposal.write_text(
             self.proposal.read_text() + "\nA real <unfilled> placeholder.\n"
         )
@@ -715,6 +1372,7 @@ class TestCheck(SparseSpaceFixture):
 
     def test_check_reports_ok_for_an_accepted_isolated_proposal(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         _fill_placeholders(self.proposal)
         _git(self.wopal, "commit", "-qam", "fill in proposal")
 
@@ -730,12 +1388,18 @@ class TestCheck(SparseSpaceFixture):
 
     def test_check_detects_unreplaced_placeholder_after_accept(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        self.proposal.write_text(
+            self.proposal.read_text() + "\nA late <unfilled> placeholder.\n"
+        )
+        _git(self.wopal, "commit", "-qam", "late placeholder")
         result = _run_evo(self.wopal, "check", "probe-evolution")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("placeholder", result.stderr)
 
     def test_check_detects_disabled_sparse_checkout(self):
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         _git(self.derived(), "sparse-checkout", "disable")
         result = _run_evo(self.wopal, "check", "probe-evolution")
         self.assertNotEqual(result.returncode, 0)
@@ -744,6 +1408,7 @@ class TestCheck(SparseSpaceFixture):
     def test_check_notes_unintegrated_commits(self):
         target = self.derived()
         _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
         (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
         _run_evo(self.wopal, "commit", "probe-evolution", "-m", "edit alpha")
         result = _run_evo(self.wopal, "check", "probe-evolution")

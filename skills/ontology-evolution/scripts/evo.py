@@ -50,45 +50,12 @@ commands:
 state machine: draft -> accepted -> implementing -> validating -> archived
 """
 
-PROPOSAL_TEMPLATE = """# {name}
-
-## Metadata
-
-- **Type**: {type}
-- **Project Path**: .wopal
-- **Created**: {created}
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: (accept 时记录)
-- **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
-
-## Goal
-
-<这项本体能力进化要达到什么目标。>
-
-## Scope Assessment
-
-- **Complexity**: <Low | Medium | High>
-- **Confidence**: <Low | Medium | High>
-
-## Design
-
-<设计契约：不可改动的部分与必须成立的行为。>
-
-## Changes
-
-<改动清单>
-
-## Verification
-
-<如何在运行时确认改动生效；加载链路变更以重启 ellamaka 后的结果为准。>
-
-## Delivery
-
-`space sync` 与 `ontology contribute` 由用户拍板，技能不自动上行。
-"""
+# The proposal skeleton lives in `templates/proposal.md` — an external file
+# with per-section authoring comments, mirroring dev-flow's template layout.
+# Loading it here (instead of embedding a string) is what keeps the scaffold
+# and the authoring guidance one artifact: edit the file, and every new
+# proposal inherits the change.
+TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "proposal.md"
 
 # Placeholders the author must replace before a proposal counts as
 # implemented. Derived from the template so the two can never drift apart.
@@ -109,17 +76,116 @@ def _prose(text: str) -> str:
     return _INLINE_CODE_RE.sub("", _FENCED_CODE_RE.sub("", text))
 
 
+def _template_text() -> str:
+    if not TEMPLATE_PATH.is_file():
+        raise repo.RepoRootError(
+            f"proposal template not found at {TEMPLATE_PATH}; the skill is "
+            "incomplete without it"
+        )
+    return TEMPLATE_PATH.read_text()
+
+
 def _placeholders() -> list[str]:
     seen: list[str] = []
-    for token in PLACEHOLDER_RE.findall(PROPOSAL_TEMPLATE):
+    for token in PLACEHOLDER_RE.findall(_template_text()):
         if token not in seen:
             seen.append(token)
     return seen
 
 
+# The sections a filled proposal must carry (structure contract, D-06/D-07).
+# `## Implementation` requires at least one `### Task N:` with the six
+# elements; `## Acceptance Criteria` requires both AV and UV subsections.
+_REQUIRED_SECTIONS = (
+    "## Goal",
+    "## Technical Context",
+    "## In Scope",
+    "## Out of Scope",
+    "## Affected Files",
+    "## Acceptance Criteria",
+    "### Agent Verification",
+    "### User Validation",
+    "## Implementation",
+    "## Delegation Strategy",
+)
+_TASK_ELEMENTS = (
+    "Verification Intent",
+    "Behavior",
+    "TDD",
+    "Changes",
+    "Verify",
+    "Done",
+)
+_TASK_HEADER_RE = re.compile(r"^### Task (?P<number>\d+):.*$", re.MULTILINE)
+
+
+def _structure_problems(text: str) -> list[str]:
+    """The missing pieces of the proposal structure contract.
+
+    Prose-only scan (code fences stripped) so a proposal that documents its
+    own CLI contract cannot false-positive.
+    """
+    problems: list[str] = []
+    prose = _prose(text)
+    for section in _REQUIRED_SECTIONS:
+        if section not in prose:
+            problems.append(f"structure: missing section {section!r}")
+    tasks = list(_TASK_HEADER_RE.finditer(prose))
+    if not tasks:
+        problems.append("structure: no `### Task N:` entries under Implementation")
+    else:
+        for index, task in enumerate(tasks):
+            end = tasks[index + 1].start() if index + 1 < len(tasks) else len(prose)
+            block = prose[task.start() : end]
+            missing = [
+                element
+                for element in _TASK_ELEMENTS
+                if not re.search(
+                    rf"^\*\*{re.escape(element)}\*\*:",
+                    block,
+                    re.MULTILINE,
+                )
+            ]
+            if missing:
+                problems.append(
+                    f"structure: Task {task.group('number')} lacks "
+                    + " / ".join(missing)
+                )
+    return problems
+
+
 def _fail(message: str) -> int:
     print(f"ERROR: {message}", file=sys.stderr)
     return 1
+
+
+# The command/stage guard table (D-08): one source of truth for every
+# mutating command's stage precondition. Scattered checks drift; this table
+# is covered by the stage-guard tests.
+_GUARDS: dict[str, str] = {
+    "commit": "implementing",
+    "integrate": "implementing",
+    "archive": "archived",
+}
+
+
+def _guard_stage(command: str, path: Path) -> int | None:
+    """Refuse a mutating command outside its single permitted stage."""
+    required = _GUARDS.get(command)
+    if required is None:
+        return None
+    stage = proposal.get_stage(path)
+    if stage == required:
+        return None
+    successors = proposal.next_states(stage or "")
+    if successors:
+        hint = f" Run `evo.sh advance {path.stem} --to {successors[0]}` first."
+    else:
+        hint = " No legal next state is available; create a new proposal for further work."
+    return _fail(
+        f"{path.name} is at stage {stage or 'unknown'!r}; `{command}` "
+        f"requires {required!r}.{hint}"
+    )
 
 
 def _slugify(title: str) -> str:
@@ -203,6 +269,9 @@ def _resolve_proposal(ref: str) -> Path | None:
     The worktree holds a checked-out copy too, but it is a snapshot: the
     stage moves on the space branch, and reading the snapshot would report a
     stage the proposal no longer has.
+
+    Archived files carry a `YYYYMMDD-` prefix, so a bare name resolves
+    against the dated form: `status <name>` keeps working after archive.
     """
     candidate = Path(ref)
     if candidate.suffix == ".md" and candidate.is_file():
@@ -215,10 +284,16 @@ def _resolve_proposal(ref: str) -> Path | None:
         repo.evolutions_root(_root()),
         repo.archived_root(_root()),
     ]
+    dated = re.compile(r"^\d{8}-")
     for base in bases:
         for path in (base / f"{ref}.md", base / f"{ref}"):
             if path.is_file():
                 return path.resolve()
+    for base in bases:
+        if base.is_dir() and base.parent.name == "evolutions" and base.name == "archived":
+            for path in sorted(base.glob(f"*{ref}.md")):
+                if dated.match(path.name):
+                    return path.resolve()
     return None
 
 
@@ -291,7 +366,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         return _fail(f"{path} already exists; pick another title or edit it directly")
 
     path.write_text(
-        PROPOSAL_TEMPLATE.format(
+        _template_text().format(
             name=name, type=args.type, created=date.today().isoformat()
         )
     )
@@ -317,6 +392,10 @@ def cmd_status(args: argparse.Namespace) -> int:
     mode = proposal.get_field(path, "Mode") or ""
     if mode in ("isolated", "quick"):
         print(f"Mode     : {mode}")
+        for field in ("Worktree", "Branch", "Base Commit", "Final Commit"):
+            value = proposal.get_field(path, field) or ""
+            if value and not value.startswith("("):
+                print(f"{field:<9}: {value}")
 
     successors = proposal.next_states(stage)
     if successors:
@@ -365,17 +444,38 @@ def cmd_accept(args: argparse.Namespace) -> int:
     stage = proposal.get_stage(path)
     if stage is None:
         return _fail(f"{path} has no `- **Stage**:` field")
-    if stage not in ("draft", "accepted"):
+    if stage not in ("draft", "accepted", "implementing"):
         return _fail(
-            f"{path.name} is at stage {stage!r}; accept expects 'draft' or 'accepted'"
+            f"{path.name} is at stage {stage!r}; accept expects 'draft', "
+            "'accepted', or 'implementing' (the last one covers re-attaching "
+            "a worktree lost mid-implementation)"
+        )
+
+    # The accept gate: a proposal is read and judged here. Unreplaced
+    # placeholders and a missing structure contract mean it was never
+    # actually written, so acceptance refuses (mirrors dev-flow's submit).
+    text = path.read_text()
+    blocking = list(PLACEHOLDER_RE.findall(_prose(text)))
+    if blocking:
+        return _fail(
+            f"{path.name} still has {len(blocking)} unreplaced "
+            f"placeholder(s) ({blocking[0]}...); fill the proposal in "
+            "before accepting"
+        )
+    structural = _structure_problems(text)
+    if structural:
+        return _fail(
+            f"{path.name} does not meet the proposal structure contract: "
+            + "; ".join(structural)
         )
 
     space = _space_root(_root())
     slug = path.stem
     wopal = worktree.space_worktree_path(space)
 
+    recorded_base = ""
     if args.no_worktree:
-        mode, wt_path, branch, base_commit = "quick", "", "", ""
+        mode, wt_path, branch = "quick", None, ""
     else:
         if not wopal.is_dir():
             return _fail(
@@ -390,29 +490,99 @@ def cmd_accept(args: argparse.Namespace) -> int:
                 "branch; isolate from the branch that carries this space"
             )
 
-        base_commit = _git(wopal, "rev-parse", base_branch).stdout.strip()
+        # The source must be healthy before anything is derived from it.
+        # A disabled or corrupted space range otherwise spawns a full-checkout
+        # worktree that only fails at the isolation assertion — by which time
+        # the residue has to be cleaned up from exists (measured 2026-09-23).
+        problems = sparse.preflight(wopal)
+        if problems:
+            return _fail(
+                "refusing to accept: the space worktree is not coherent: "
+                + "; ".join(problems)
+            )
+
         isolated = worktree.slugify(slug)
-        target = worktree.derive_path(space, isolated)
+        wt_path = worktree.derive_path(space, isolated)
         branch = worktree.branch_name(isolated)
-        mode, wt_path = "isolated", target
+        mode = "isolated"
 
-    # `Base Commit` is the commit the isolated work starts from, so it must be
-    # read before the metadata commit below moves the space branch forward.
-    # Recording the post-metadata head would point a reviewer at a commit
-    # that contains none of the work.
+        # Transactional derive (2026-09-23): the proposal metadata is written
+        # and committed only after the worktree exists and passes the
+        # isolation checks. A failure before that point cleans up the
+        # artifacts it created, so a refused accept leaves the repository
+        # exactly as it was.
+        branch_preexists = worktree.reference_exists(wopal, f"refs/heads/{branch}")
+        created = "none"
+        if worktree.worktree_exists(wt_path):
+            landed = worktree.current_branch(wt_path)
+            if landed != branch:
+                return _fail(
+                    f"{wt_path} exists but is on {landed!r}, not {branch!r}; "
+                    "resolve the stale worktree before accepting"
+                )
+            error = _fast_forward(wt_path, base_branch, wopal)
+            if error:
+                return _fail(error)
+        elif branch_preexists:
+            # The branch outlived its worktree (directory lost, cleanup never
+            # ran). The commits on it are work: re-attach a worktree to the
+            # branch instead of advising its deletion.
+            result = _git(wopal, "worktree", "add", str(wt_path), branch)
+            if result.returncode != 0:
+                return _fail(
+                    f"failed to re-attach a worktree to {branch!r} at "
+                    f"{wt_path}: {result.stderr.strip()}"
+                )
+            created = "reattach"
+            _adopt_space_patterns(wt_path, wopal)
+            _widen_worktree_over_branch(wt_path, wopal, base_branch, branch)
+            error = _fast_forward(wt_path, base_branch, wopal)
+            if error:
+                _cleanup_failed_derive(wopal, wt_path, branch, remove_branch=False)
+                return _fail(error)
+        else:
+            base_commit = _git(wopal, "rev-parse", base_branch).stdout.strip()
+            try:
+                worktree.derive(space, isolated, base_commit)
+            except worktree.WorktreeError as exc:
+                _cleanup_failed_derive(wopal, wt_path, branch, remove_branch=True)
+                return _fail(str(exc))
+            created = "derive"
 
-    # Metadata is recorded, then the worktree is derived, so the derived copy
-    # starts from a tree that already carries it. Writing it afterwards would
-    # leave both copies dirty and make the squash merge conflict on the
-    # proposal file itself.
+        problems = worktree.assert_isolated(space, wt_path)
+        if problems:
+            if created != "none":
+                _cleanup_failed_derive(
+                    wopal, wt_path, branch, remove_branch=(created == "derive")
+                )
+            return _fail(
+                "derived worktree failed the isolation checks: " + "; ".join(problems)
+            )
+
+        # `Base Commit` is the worktree's actual fork point: the start commit
+        # of a fresh derive, or the merge base for an adopted or re-attached
+        # worktree. One source of truth for the record and the derivation.
+        if created == "derive":
+            recorded_base = base_commit
+        else:
+            recorded_base = _git(
+                wopal, "merge-base", base_branch, branch
+            ).stdout.strip()
+
+    # Everything above is side-effect free with respect to the proposal; the
+    # metadata is recorded only now that the worktree is verified.
+    original = path.read_text()
     proposal.set_field(path, "Mode", mode)
-    proposal.set_field(path, "Worktree", _portable(space, wt_path) if wt_path else "(none)")
+    proposal.set_field(
+        path, "Worktree", _portable(space, wt_path) if wt_path else "(none)"
+    )
     proposal.set_field(path, "Branch", branch or "(none)")
-    proposal.set_field(path, "Base Commit", base_commit or "(none)")
+    proposal.set_field(path, "Base Commit", recorded_base or "(none)")
     if stage == "draft":
         proposal.set_stage(path, "accepted")
 
     if not _commit_proposal(path, f"docs(evolutions): accept {slug}"):
+        path.write_text(original)
         return _fail(
             f"could not record accept metadata in {path}; the proposal has "
             "uncommitted changes that do not belong to this command — commit "
@@ -420,33 +590,10 @@ def cmd_accept(args: argparse.Namespace) -> int:
         )
 
     if mode == "isolated":
-        # The metadata commit advanced the space branch, so the derived
-        # worktree is created from that new head and the proposal file it
-        # inherits already carries the metadata.
-        base_commit = _git(wopal, "rev-parse", base_branch).stdout.strip()
-        landed = (
-            worktree.current_branch(wt_path) if worktree.worktree_exists(wt_path) else ""
-        )
-        if landed and landed != branch:
-            # Adopting an existing worktree is only safe when it is the one
-            # this proposal derived.
-            return _fail(
-                f"{wt_path} exists but is on {landed!r}, not {branch!r}; "
-                "resolve the stale worktree before accepting"
-            )
-        if not worktree.worktree_exists(wt_path):
-            try:
-                worktree.derive(space, worktree.slugify(slug), base_commit)
-            except worktree.WorktreeError as exc:
-                return _fail(str(exc))
-        else:
-            _fast_forward(wt_path, base_commit)
-
-        problems = worktree.assert_isolated(space, wt_path)
-        if problems:
-            return _fail(
-                "derived worktree failed the isolation checks: " + "; ".join(problems)
-            )
+        # The worktree predates the metadata commit, so its checked-out copy
+        # of the proposal is stale. Mirror the record in and commit it on the
+        # feature branch, or the next `integrate` refuses a dirty worktree.
+        _mirror_into_worktree(space, path.name, path)
 
     print(f"{path}")
     print(f"Mode    : {mode}")
@@ -457,18 +604,82 @@ def cmd_accept(args: argparse.Namespace) -> int:
     return 0
 
 
-def _fast_forward(worktree_path: Path, base_branch: str) -> None:
-    """Bring a derived worktree onto the space branch head when it trails.
+def _fast_forward(worktree_path: Path, base_branch: str, wopal: Path) -> str | None:
+    """Bring an adopted worktree onto the space branch head when it trails.
 
-    A re-run of `accept` (or a space branch that moved since the worktree was
-    derived) would otherwise leave the worktree on a stale base and its next
-    squash would try to re-apply commits the space branch already has.
+    A worktree that carries its own commits is left alone: adoption keeps
+    the work, and the squash at integration time reconciles the rest. A
+    strictly-behind worktree is fast-forwarded, and its range is widened
+    back over any pattern the space adopted in the meantime — the merge
+    brings commits, not the worktree-local pattern list, and the isolation
+    assertion would (correctly) refuse a worktree that no longer sees the
+    whole space it was derived from.
+
+    Returns an error message, or None on success.
     """
     ahead = _git(
         worktree_path, "rev-list", "--count", f"HEAD..{base_branch}"
     ).stdout.strip()
-    if ahead and ahead != "0":
-        _git(worktree_path, "merge", "--ff-only", base_branch)
+    if not ahead or ahead == "0":
+        return None
+    behind = _git(
+        worktree_path, "rev-list", "--count", f"{base_branch}..HEAD"
+    ).stdout.strip()
+    if behind and behind != "0":
+        return None
+    result = _git(worktree_path, "merge", "--ff-only", base_branch)
+    if result.returncode != 0:
+        return (
+            f"failed to fast-forward {worktree_path} onto {base_branch}: "
+            f"{result.stderr.strip()}"
+        )
+    _adopt_space_patterns(worktree_path, wopal)
+    return None
+
+
+def _adopt_space_patterns(worktree_path: Path, wopal: Path) -> None:
+    """Widen a worktree over every pattern the space range carries."""
+    space_patterns = sparse.read_patterns(wopal)
+    if not space_patterns:
+        return
+    own = sparse.read_patterns(worktree_path)
+    missing = [item for item in space_patterns if item not in own]
+    if missing:
+        _git(worktree_path, "sparse-checkout", "add", *missing)
+
+
+def _widen_worktree_over_branch(
+    worktree_path: Path, wopal: Path, base_branch: str, branch: str
+) -> None:
+    """Give a re-attached worktree back the visibility its range died with.
+
+    The lost worktree's pattern list lived in its git dir and is gone with
+    the directory; the branch it checked out still carries what that range
+    had to cover. Widening over the branch's own changed paths reconstructs
+    exactly that, so the implementer sees the work again and the integrate
+    corpus assertion does not fire on it later.
+    """
+    result = _git(wopal, "diff", "--name-only", "-z", f"{base_branch}...{branch}")
+    paths = [item for item in result.stdout.split("\0") if item]
+    if paths:
+        sparse.widen(worktree_path, paths)
+
+
+def _cleanup_failed_derive(
+    wopal: Path, target: Path, branch: str, *, remove_branch: bool
+) -> None:
+    """Best-effort removal of the artifacts a failed accept just created.
+
+    Only ever called for artifacts this run created: a branch that was
+    verified absent a moment ago, or a worktree re-attached to a branch
+    that predates this run (the branch is never touched in that case — its
+    commits are possibly-unmerged work).
+    """
+    if worktree.worktree_exists(target):
+        _git(wopal, "worktree", "remove", "--force", str(target))
+    _git(wopal, "worktree", "prune")
+    if remove_branch:
+        _git(wopal, "branch", "-D", branch)
 
 
 def _commit_proposal(path: Path, message: str) -> bool:
@@ -526,10 +737,20 @@ def _sync_record(path: Path, message: str) -> bool:
             return True
         return _commit_paths(work_dir, [relative], message)
 
-    candidates = [
-        repo.evolutions_root(wopal) / path.name,
-        repo.archived_root(wopal) / path.name,
-    ]
+    candidates = [repo.evolutions_root(wopal) / path.name, path]
+    if path.parent.name == "archived":
+        candidates.insert(1, path.parent / path.name)
+        # A dated archive (`YYYYMMDD-<name>.md`) removed the undated active
+        # copy; the record commit must stage that deletion too, or the space
+        # worktree is left dirty with a phantom `D` entry.
+        dated = re.compile(r"^\d{8}-(?P<stem>.+\.md)$")
+        match = dated.match(path.name)
+        if match:
+            # The stem group already carries the `.md` suffix; appending
+            # another produced `x.md.md` and silently missed the deletion.
+            candidates.append(repo.evolutions_root(wopal) / match.group("stem"))
+    else:
+        candidates.append(repo.archived_root(wopal) / path.name)
     canonical = next((item for item in candidates if item.is_file()), candidates[0])
 
     # Adopt the caller's content into the canonical location.
@@ -559,6 +780,11 @@ def _mirror_into_worktree(space: Path, name: str, canonical: Path) -> None:
 
     The copy is committed too: an uncommitted mirror is indistinguishable
     from unfinished work, and `integrate` refuses a dirty worktree.
+
+    `name` is the file's CURRENT name, which for an archived proposal is the
+    dated form (`YYYYMMDD-<name>.md`). The worktree's stale active copy
+    (undated) is removed alongside, so a dated archive leaves no double
+    copy behind.
     """
     recorded = proposal.get_field(canonical, "Worktree") or ""
     if not recorded or recorded == "(none)":
@@ -571,16 +797,59 @@ def _mirror_into_worktree(space: Path, name: str, canonical: Path) -> None:
     archived_copy = work_dir / "docs" / "evolutions" / "archived" / name
 
     if canonical.parent.name == "archived":
-        # The canonical copy moved into archived/; mirror the move.
-        if copy.is_file():
+        # The canonical copy moved into archived/ (possibly with a date
+        # prefix). Mirror the move and remove the stale active copy — the
+        # undated original this proposal used before archiving.
+        stale_names = {name}
+        dated = re.compile(r"^\d{8}-(?P<stem>.+\.md)$")
+        match = dated.match(name)
+        if match:
+            stale_names.add(match.group("stem"))
+        moved = False
+        if not archived_copy.is_file() or archived_copy.read_text() != canonical.read_text():
             archived_copy.parent.mkdir(parents=True, exist_ok=True)
             archived_copy.write_text(canonical.read_text())
-            copy.unlink()
-            _commit_paths(
-                work_dir,
-                ["docs/evolutions/archived", f"docs/evolutions/{name}"],
-                f"docs(evolutions): archive {Path(name).stem}",
+            moved = True
+        for stale in stale_names:
+            active = work_dir / "docs" / "evolutions" / stale
+            if active.is_file():
+                active.unlink()
+                moved = True
+        if moved:
+            # Stage exactly what changed under the proposal's docs tree.
+            # porcelain -z entries are `XY <path>` (two status letters, one
+            # space); untracked directories collapse to `dir/`, so unroll
+            # them with ls-files instead of trusting the collapsed entry.
+            targets = _zlines(
+                _git(work_dir, "status", "--porcelain", "-z", "--", "docs/evolutions")
             )
+            paths: set[str] = set()
+            for entry in targets:
+                path = entry[3:] if len(entry) > 3 else ""
+                if not path:
+                    continue
+                if path.endswith("/"):
+                    unrolled = _zlines(
+                        _git(
+                            work_dir,
+                            "ls-files",
+                            "--others",
+                            "--exclude-standard",
+                            "-z",
+                            "--",
+                            path,
+                        )
+                    )
+                    paths.update(unrolled or [path])
+                else:
+                    paths.add(path)
+            ordered = sorted(paths)
+            if ordered:
+                _commit_paths(
+                    work_dir,
+                    ordered,
+                    f"docs(evolutions): archive {Path(name).stem}",
+                )
         return
 
     if not copy.is_file() or copy.resolve() == canonical.resolve():
@@ -644,6 +913,10 @@ def cmd_commit(args: argparse.Namespace) -> int:
     path = _resolve_proposal(args.name)
     if path is None:
         return _fail(f"no proposal named {args.name!r} under docs/evolutions/")
+
+    refused = _guard_stage("commit", path)
+    if refused is not None:
+        return refused
 
     mode = proposal.get_field(path, "Mode") or ""
     if mode not in ("isolated", "quick"):
@@ -745,6 +1018,10 @@ def cmd_integrate(args: argparse.Namespace) -> int:
     if path is None:
         return _fail(f"no proposal named {args.name!r} under docs/evolutions/")
 
+    refused = _guard_stage("integrate", path)
+    if refused is not None:
+        return refused
+
     mode = proposal.get_field(path, "Mode") or ""
     if mode != "isolated":
         return _fail(
@@ -761,6 +1038,11 @@ def cmd_integrate(args: argparse.Namespace) -> int:
     work_dir = (
         _recorded(space, recorded) if recorded and recorded != "(none)" else None
     )
+    if work_dir is None:
+        return _fail(
+            f"{path.name} has no recorded Worktree; re-run `evo.sh accept` "
+            "before integrating"
+        )
 
     if work_dir is not None and worktree.worktree_exists(work_dir):
         dirty = _git(work_dir, "status", "--porcelain").stdout.strip()
@@ -771,7 +1053,7 @@ def cmd_integrate(args: argparse.Namespace) -> int:
 
     message = args.message or f"evolve({path.stem}): squash validated work"
     try:
-        squashed = worktree.integrate(space, branch, message)
+        squashed = worktree.integrate(space, branch, message, work_dir)
     except worktree.WorktreeError as exc:
         return _fail(str(exc))
 
@@ -839,21 +1121,46 @@ def cmd_check(args: argparse.Namespace) -> int:
     draft = stage == "draft"
     mode = proposal.get_field(path, "Mode") or ""
 
+    text = path.read_text()
     if draft:
-        remaining = PLACEHOLDER_RE.findall(_prose(path.read_text()))
+        remaining = PLACEHOLDER_RE.findall(_prose(text))
         if remaining:
             notices.append(
                 f"stage is 'draft': {len(remaining)} placeholder(s) are "
                 "expected until the proposal is accepted"
             )
+        # The structure contract is advisory in draft: warn, do not fail —
+        # a scaffold is allowed to be mid-authoring.
+        for item in _structure_problems(text):
+            notices.append(item)
     else:
         if mode not in ("isolated", "quick"):
             problems.append(
                 f"metadata: Mode is {mode or 'unset'!r}; "
                 "expected 'isolated' or 'quick'"
             )
-        for placeholder in PLACEHOLDER_RE.findall(_prose(path.read_text())):
+        for placeholder in PLACEHOLDER_RE.findall(_prose(text)):
             problems.append(f"content: unreplaced placeholder {placeholder}")
+        # From accepted onward the contract is hard: an ill-structured
+        # proposal has been gated into implementation.
+        problems.extend(_structure_problems(text))
+
+    # Corpus lint (D-04): the archive corpus is dated; bare names are
+    # outliers worth surfacing wherever check runs. Notes, not failures —
+    # history is not rewritten by a lint.
+    archived_root = repo.archived_root(
+        worktree.space_worktree_path(_space_root(_root()))
+    )
+    if archived_root.is_dir():
+        undated = [
+            item.name
+            for item in sorted(archived_root.iterdir())
+            if item.suffix == ".md" and not re.match(r"^\d{8}-", item.name)
+        ]
+        for name in undated[:10]:
+            notices.append(
+                f"corpus: archived file {name!r} lacks the YYYYMMDD- prefix"
+            )
 
     space = _space_root(_root())
     wopal = worktree.space_worktree_path(space)
@@ -910,6 +1217,17 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _archive_name(name: str) -> str:
+    """The dated name every archived proposal carries (a pure function).
+
+    The corpus convention is `YYYYMMDD-<name>.md` — sortable, self-describing,
+    and what 74 of 75 historical files already look like. Keeping it a pure
+    function (date + name in, filename out) makes it testable and gives
+    `_resolve_proposal` a deterministic thing to invert.
+    """
+    return f"{date.today().strftime('%Y%m%d')}-{name}"
+
+
 def cmd_archive(args: argparse.Namespace) -> int:
     if not args.name:
         return _fail("a proposal name is required: evo.sh archive <name>")
@@ -921,11 +1239,9 @@ def cmd_archive(args: argparse.Namespace) -> int:
     stage = proposal.get_stage(path)
     if stage is None:
         return _fail(f"{path} has no `- **Stage**:` field")
-    if stage != "archived":
-        return _fail(
-            f"{path.name} is at stage {stage!r}; "
-            "advance it to 'archived' before archiving"
-        )
+    refused = _guard_stage("archive", path)
+    if refused is not None:
+        return refused
     if path.parent.name == "archived":
         return _fail(f"{path.name} is already archived")
 
@@ -933,17 +1249,121 @@ def cmd_archive(args: argparse.Namespace) -> int:
     # there; `_sync_record` then mirrors it into the derived worktree. Moving
     # the copy the command happened to resolve would leave the archived file
     # inside the isolated worktree and absent from the live space.
-    target_dir = repo.archived_root(_space_worktree(_root()))
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / path.name
-    if target.exists():
-        return _fail(f"{target} already exists")
+    space = _space_root(_root())
+    wopal = _space_worktree(_root())
 
-    if target.resolve() != path.resolve():
-        shutil.move(str(path), str(target))
-    _sync_record(target, f"docs(evolutions): archive {target.stem}")
+    # ── preflight: every check runs before the first mutation ────────────
+    # A corrupted space range must not be the stage a cleanup runs on, and
+    # an uncommitted anything blocks the record commit the move depends on.
+    if wopal.is_dir() and wopal == worktree.space_worktree_path(space):
+        problems = sparse.preflight(wopal)
+        if problems:
+            return _fail(
+                "refusing to archive: the space worktree is not coherent: "
+                + "; ".join(problems)
+            )
+        dirty = _git(wopal, "status", "--porcelain").stdout.strip()
+        if dirty:
+            return _fail(
+                "refusing to archive: the space worktree has uncommitted "
+                f"changes: {dirty[:200]}"
+            )
+
+    mode = proposal.get_field(path, "Mode") or ""
+    branch = proposal.get_field(path, "Branch") or ""
+    recorded = proposal.get_field(path, "Worktree") or ""
+    work_dir = _recorded(space, recorded) if recorded and recorded != "(none)" else None
+
+    # Cleanup preflight: the isolation artifacts are only removed when the
+    # feature content is fully integrated — deleting a branch that still
+    # carries work destroys it (probe R). The guard mirrors dev-flow's
+    # check_branch_merged: refuse before touching anything.
+    will_clean = (
+        mode == "isolated"
+        and not args.keep_worktree
+        and work_dir is not None
+        and (work_dir.exists() or not _branch_is_gone(wopal, branch))
+    )
+    if will_clean and branch and branch != "(none)":
+        pending = _pending_content(wopal, branch)
+        if pending:
+            sample = ", ".join(pending[:5])
+            return _fail(
+                f"refusing to archive: {len(pending)} path(s) on {branch!r} are "
+                f"not integrated into the space branch ({sample}); run "
+                "`evo.sh integrate <name>` first"
+            )
+
+    target_dir = repo.archived_root(wopal)
+    target_name = _archive_name(path.name)
+    target = target_dir / target_name
+    if target.exists():
+        return _fail(
+            f"{target} already exists; refusing to overwrite"
+        )
+
+    # ── mutations: preflight passed, run in order, stop on first failure ─
+    if target_dir != path.parent:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        if target.resolve() != path.resolve():
+            shutil.move(str(path), str(target))
+    if not _sync_record(target, f"docs(evolutions): archive {target.stem}"):
+        return _fail(
+            "archive move could not be recorded on the space branch; the "
+            "repository is unchanged — resolve the reported commit failure "
+            "and re-run `evo.sh archive`"
+        )
+
+    # Cleanup last: it is the only step that can be safely skipped or
+    # retried, and it must never run before the move is recorded.
+    if will_clean:
+        _cleanup_isolation(space, work_dir, wopal, branch, keep=False)
+
     print(target.resolve())
+    if will_clean:
+        print("cleaned : worktree and branch removed (--keep-worktree to keep)")
+    elif mode == "isolated" and args.keep_worktree:
+        print("kept    : worktree and branch preserved (--keep-worktree)")
     return 0
+
+
+def _branch_is_gone(wopal: Path, branch: str) -> bool:
+    return not worktree.reference_exists(wopal, f"refs/heads/{branch}")
+
+
+def _cleanup_isolation(
+    space: Path, work_dir: Path | None, wopal: Path, branch: str, *, keep: bool
+) -> None:
+    """Remove the isolation artifacts the metadata declares (post-integrate).
+
+    Targets are taken from the proposal's metadata only — never discovered by
+    name similarity. Cleanup failure is loud: partial removal leaves the
+    repository usable but the residue visible, so it prints to stderr rather
+    than failing the (already archived) command.
+    """
+    if work_dir is not None and worktree.worktree_exists(work_dir):
+        result = _git(wopal, "worktree", "remove", "--force", str(work_dir))
+        if result.returncode != 0:
+            print(
+                f"WARNING: failed to remove worktree {work_dir}: "
+                f"{result.stderr.strip()}",
+                file=sys.stderr,
+            )
+            return
+    _git(wopal, "worktree", "prune")
+    if branch and branch != "(none)" and not _branch_is_gone(wopal, branch):
+        # `-D`, not `-d`: the integrated squash is not an ancestor of the
+        # feature branch (squash rewrites history by design), so `-d` refuses
+        # every legitimate cleanup. Safety comes from the caller's
+        # `_pending_content` guard — content proven integrated — never from
+        # the ancestry check.
+        result = _git(wopal, "branch", "-D", branch)
+        if result.returncode != 0:
+            print(
+                f"WARNING: branch {branch!r} was not fully integrated or "
+                f"could not be deleted: {result.stderr.strip()}",
+                file=sys.stderr,
+            )
 
 
 def _space_worktree(root: Path) -> Path:
@@ -1012,6 +1432,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_archive = sub.add_parser("archive", help="move an archived proposal")
     p_archive.add_argument("name", nargs="?", default="")
+    p_archive.add_argument(
+        "--keep-worktree",
+        dest="keep_worktree",
+        action="store_true",
+        help="keep the isolated worktree and branch instead of cleaning up",
+    )
     p_archive.set_defaults(func=cmd_archive)
 
     return parser

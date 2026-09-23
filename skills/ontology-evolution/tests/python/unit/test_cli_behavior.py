@@ -197,8 +197,13 @@ class TestArchive(EvoTestCase):
         self._advance_to_archived()
         result = _run(self.root, "archive", "add-probe-capability")
         self.assertEqual(result.returncode, 0, result.stderr)
-        archived = self.root / "docs" / "evolutions" / "archived" / "add-probe-capability.md"
-        self.assertTrue(archived.is_file())
+        # The archived name carries the YYYYMMDD- prefix (D-03).
+        dated = list(
+            (self.root / "docs" / "evolutions" / "archived").glob(
+                "[0-9]" * 8 + "-add-probe-capability.md"
+            )
+        )
+        self.assertEqual(len(dated), 1)
         self.assertFalse(self.proposal().exists())
 
     def test_archive_refuses_proposal_not_yet_archived(self):

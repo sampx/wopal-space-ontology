@@ -10,39 +10,47 @@ bash scripts/evo.sh <command> [args]
 `WOPAL_EVOLUTION_REPO_ROOT` overrides root discovery; it exists for tests and
 for driving the script against a non-default repository.
 
-Two rules every command obeys:
+Three rules every command obeys:
 
 - **Refuse before writing.** Safety checks run before the first mutation, so a
   rejected command leaves the repository exactly as it found it.
 - **Never stage wholesale.** On a checkout whose sparse range has drifted,
   `git add -A` records every out-of-range path as a deletion. Staging is always
   by name, and the range is widened before anything is staged.
+- **Guards come from one table.** The stage precondition of every mutating
+  command derives from a single guard table; a refusal names the current
+  stage, the requirement, and the copyable next command.
 
 ## `evo.sh new "<title>"`
 
-Creates `docs/evolutions/<name>.md` at `Stage: draft` and prints the path.
+Creates `docs/evolutions/<name>.md` at `Stage: draft` from
+`templates/proposal.md` — the external skeleton with per-section authoring
+comments — and prints the path.
 
 - `<name>` is derived from the title: lowercased, non-alphanumerics collapsed
   to hyphens, a leading `type(scope):` prefix dropped.
 - Refuses if the target file already exists; refuses an empty title.
 - Options: `--type <type>` (default `enhance`) sets the `Type` metadata field.
 
-```bash
-bash scripts/evo.sh new "Add keywords to memory rule"
-# -> docs/evolutions/add-keywords-to-memory-rule.md
-```
+The template is the single source of the proposal shape; the placeholder scan
+in `check` derives from the same file, so the two cannot drift apart.
 
 ## `evo.sh status <name|path>`
 
-Prints the current stage, the resolved file path, the recorded mode, and the
-next command. Accepts a bare proposal name (`add-keywords-to-memory-rule`) or
-an explicit path (`docs/evolutions/add-keywords-to-memory-rule.md`).
+Prints the current stage, the resolved file path, the recorded mode, the
+isolation metadata (Worktree / Branch / Base Commit / Final Commit once
+recorded), and the next command. Accepts a bare proposal name
+(`add-keywords-to-memory-rule`), an explicit path, or the bare name of an
+archived proposal (resolved against the dated `YYYYMMDD-` form).
 
 ```text
 Proposal : /space/.wopal/docs/evolutions/add-keywords-to-memory-rule.md
-Stage    : draft
+Stage    : implementing
 Mode     : isolated
-Next     : evo.sh advance add-keywords-to-memory-rule --to accepted
+Worktree : .worktrees/ontology-add-keywords-to-memory-rule
+Branch   : ontology-add-keywords-to-memory-rule
+Base Com : 1a47d0f
+Next     : evo.sh advance add-keywords-to-memory-rule --to validating
 ```
 
 At the terminal stage it prints `none (terminal)` and the `archive` command.
@@ -65,60 +73,56 @@ Moves the proposal to `<state>` after validating the transition.
 - A proposal with no `- **Stage**:` field cannot be advanced; recreate it with
   `evo.sh new`.
 
-```text
-ERROR: illegal transition draft -> archived; legal next state: accepted
-state machine: draft -> accepted -> implementing -> validating -> archived
-```
-
 ## `evo.sh accept <name> [--no-worktree]`
 
 Accepts the proposal for implementation and records the mode. Requires the
-proposal to be at `draft` or `accepted`.
+proposal at `draft`, `accepted`, or `implementing` (the last one exists so a
+worktree lost mid-implementation can be re-attached).
 
-**Isolated mode (default)** derives `<space>/.worktrees/ontology-<slug>` on
-branch `ontology-<slug>` from the space branch, then asserts that the derived
-worktree can still see every pattern the space worktree has — a superset is
-expected, since the worktree widens its own range as it adds capabilities —
-and that its range and index agree. The host repository is not touched.
+**The gate first.** `accept` is where the proposal is read and judged: it
+refuses unreplaced placeholders and a missing structure contract (required
+sections + the Task six elements) — a proposal that was never actually
+written cannot be accepted into implementation.
 
-**Quick mode** (`--no-worktree`) records `Mode: quick` and creates nothing. Use
-it for typo fixes, bug fixes in existing assets, and small changes the user
-explicitly scoped — the space branch is itself the isolation boundary against
-`local main`.
+**Isolated mode (default)** is transactional — every check runs before the
+first write, in this order:
 
-In both modes the metadata (`Mode`, `Worktree`, `Branch`, `Base Commit`, plus
-`Stage: accepted`) is written and committed to the space branch **before** the
-worktree is derived, so the derived copy starts from a tree that already
-carries it. Committing it afterwards would leave both copies dirty and make the
-squash merge conflict on the proposal file itself.
+1. The space worktree's sparse state is coherent (a corrupted source spawns
+   corrupted children; refuse before deriving anything).
+2. The isolated worktree is derived from the space branch — or, when the
+   branch exists but its worktree directory was lost, **re-attached** to the
+   surviving branch (its commits are work, not garbage; recovery never
+   suggests deleting it).
+3. The isolation assertion: the worktree still sees every pattern the space
+   has (a superset is fine), and its bits and range agree.
+4. Only then is the metadata (`Mode`, `Worktree`, `Branch`, `Base Commit`,
+   `Stage: accepted`) written and committed.
 
-`Base Commit` is read before that metadata commit, so it names the commit the
-work contains and not an annotation about it. `Worktree` is stored relative to
-the space root (`.worktrees/ontology-<slug>`), so the record survives the space
-being moved.
+A failure before step 4 removes only the artifacts that run created; a failure
+at step 4 restores the proposal file byte-for-byte. `Base Commit` is the
+worktree's actual fork point — the derive start commit, or the merge base for
+an adopted or re-attached worktree.
 
-Re-running `accept` on an already-accepted proposal is a no-op: an existing
-worktree is adopted when it carries the expected branch and fast-forwarded onto
-the space branch head, so a space branch that moved in the meantime does not
-leave the worktree on a stale base.
+**Quick mode** (`--no-worktree`) records `Mode: quick` and creates nothing.
+Use it for typo fixes, bug fixes in existing assets, and small changes the
+user explicitly scoped — the space branch is itself the isolation boundary
+against `local main`.
 
-```text
-/space/.wopal/docs/evolutions/add-keywords-to-memory-rule.md
-Mode    : isolated
-Worktree: .worktrees/ontology-add-keywords-to-memory-rule
-Branch  : ontology-add-keywords-to-memory-rule
-Stage   : accepted
-```
+Re-running `accept` is safe: an existing worktree is adopted when it carries
+the expected branch and fast-forwarded onto the space branch head (a worktree
+with its own commits is left alone — the squash at integrate reconciles), and
+its range is widened back over any pattern the space adopted in the meantime.
 
 ## `evo.sh commit <name> -m <message>`
 
-The only command that writes to the working tree, and the one that keeps a
-corrupted sparse checkout from destroying the capability pool.
+Commits working changes at stage `implementing`, and is the command that
+keeps a corrupted sparse checkout from destroying the capability pool.
 
 Checks, in order, before anything is staged:
 
 | Check | Refusal reason |
 |-------|----------------|
+| Stage is `implementing` | The guard table: committing belongs to implementation only. |
 | `core.sparseCheckout` is enabled | A checkout with the range switched off cannot tell an intentional off-disk entry from a deleted one. `disable` writes `false` rather than unsetting the key, so the value is checked, not just its presence. |
 | The pattern list is non-empty | An empty range cannot be verified. |
 | Nothing is mid-merge | An unresolved merge state cannot be committed coherently. |
@@ -133,31 +137,16 @@ Measured, on a temp repository reproducing the layout:
 | on | clear | no | ` D` | stages nothing (git refuses) |
 | off | clear | no | ` D` | **stages the deletion** |
 
-The guard refuses the second row as a warning and the third as the state it
-becomes. The tool cannot see a bare `git add -A` typed by hand; it can only
-refuse to run one itself, which it does.
-
 Then it widens the range to cover every changed path **before** staging, and
 stages named paths only — never `-A`.
 
-**Isolated mode** commits in the derived worktree and prints the `integrate`
-command that follows.
+**Isolated mode** commits in the derived worktree (everything the evolution
+touched, minus transient build output) and prints the `integrate` command.
 
 **Quick mode** commits into the live space worktree and therefore requires
 `--paths <path>...`: an explicit list is the only thing standing between a
 stray file and the space branch. The proposal file is added to that list
 automatically.
-
-```bash
-bash scripts/evo.sh commit add-keywords -m "add keyword list to memory rule"
-# commit  : 4f2a91c (2 path(s))
-#           skills/memory/SKILL.md
-#           docs/evolutions/add-keywords.md
-# widened : /skills/memory/
-# next    : evo.sh integrate add-keywords
-```
-
-An empty change set prints `nothing to commit` and exits 0.
 
 ### Why widening is not `--sparse`
 
@@ -169,22 +158,33 @@ the assembly range, where it survives recomputation.
 
 ## `evo.sh integrate <name>`
 
-Squashes the isolated work into the space branch inside `.wopal`, and is the
-only integration path that leaves the space worktree coherent.
+Squashes the isolated work into the space branch inside `.wopal` at stage
+`implementing`, and is the only integration path that leaves the space
+worktree coherent.
 
-- Refuses unless `Mode: isolated`.
-- Refuses when the space worktree is dirty or its sparse state is incoherent.
-- Refuses when the derived worktree still has uncommitted changes.
-- **Widens the space worktree's range to match the feature branch before
-  merging.** Without this the squash records a brand-new capability directory
-  as an off-disk skip-worktree entry: committed, listed, and invisible to the
-  runtime — an evolution that silently does not load.
-- After the squash it recomputes the range (`sparse-checkout reapply`) so the
-  newly covered paths are materialized on disk.
-- Records `Final Commit` in the space-branch copy of the proposal as a
-  follow-up commit. That annotation cannot exist before the squash does.
-- Running it again with nothing outstanding prints
-  `the space branch already contains every change (no-op)` and exits 0.
+Refusals, all before any mutation:
+
+- Stage is not `implementing`, or `Mode` is not `isolated`.
+- The recorded worktree is missing (recovery: re-run `evo.sh accept <name>`;
+  it re-attaches the branch — its commits are not lost, do not delete it).
+- The recorded worktree sits on a foreign branch.
+- The isolation assertion fails on the worktree (re-run as defense in depth —
+  accept checked once, drift happens).
+- The worktree is dirty, or the space worktree is dirty / incoherent.
+
+Then, in order: the space range is widened to match the feature branch **and
+the content it carries**, the squash is staged, and — before anything is
+committed — the **corpus assertion** runs: every staged path must fall inside
+the final range. A path that would land outside it is the silent-poison shape
+(committed, listed, invisible to the runtime, and no later guard can see it);
+the integration is rolled back and refused with the offending paths named.
+Widening sources can miss (a raw `git add --sparse` path the worktree's range
+never declared); the assertion cannot.
+
+After the squash commits, the range is recomputed so newly covered paths are
+materialized on disk, and `Final Commit` is recorded in the space-branch copy
+of the proposal. Running integrate again with nothing outstanding prints
+`no-op` and exits 0.
 
 Why not `git push .` or `git update-ref`: pushing to a branch checked out in
 `.wopal` is refused by git, and moving the ref directly leaves `.wopal` in the
@@ -198,31 +198,35 @@ exiting non-zero when anything is wrong.
 | Group | Checks |
 |-------|--------|
 | `metadata:` | `Stage` present and known; `Type`, `Project Path`, `Created` present; `Created` is an ISO date; `Mode` valid once the proposal leaves `draft` |
-| `content:` | No unreplaced `<...>` placeholders once the proposal leaves `draft` |
-| `structure:` | The space worktree sits on a `space/*` branch |
+| `content:` | No unreplaced `<...>` placeholders once the proposal leaves `draft` (code spans excluded) |
+| `structure:` | The proposal format contract — required sections and the Task six elements; **notes** in `draft`, problems from `accepted` onward. Also: the space worktree sits on a `space/*` branch |
 | `sparse:` | The `commit` preflight, run in whichever directory the mode commits into |
 | `isolation:` | The derived worktree still sees every pattern the space has, and its bits are coherent |
-| `note:` | Non-fatal observations: content that is not integrated yet, a branch with nothing committed, or placeholders that are expected because the proposal is still a draft |
+| `note:` | Non-fatal observations: content not integrated yet, a branch with nothing committed, placeholders expected in a draft, and **corpus lint** — archived files that lack the `YYYYMMDD-` prefix |
 
-A fresh draft is *supposed* to be full of placeholders, so `check` reports them
-as a note rather than a failure; from `accepted` onward they are problems.
-
-The integration notice compares **content**, not commit counts. The space
+The integration notice compares **content**, not commit counts: the space
 branch legitimately carries the accept and stage records the derived worktree
-does not, so a commit-count comparison would fire forever; what matters is
-whether any file content is missing from the space branch.
+does not.
 
-```text
-/space/.wopal/docs/evolutions/add-keywords.md: 1 problem(s)
-  - sparse: 3 index entr(ies) outside the sparse range carry no skip-worktree bit (skills/ontology-evolution/SKILL.md); the range and the bits disagree, and if the range is switched off these become recorded deletions — commit refused (run `git sparse-checkout reapply` to restore the bits)
-  note: 2 path(s) on ontology-add-keywords are not integrated into the space branch yet (skills/memory/SKILL.md)
-```
+## `evo.sh archive <name> [--keep-worktree]`
 
-## `evo.sh archive <name>`
+Moves a proposal at stage `archived` into `docs/evolutions/archived/` under
+its **dated name** — `YYYYMMDD-<name>.md` (a pure function of date + name;
+refuses to overwrite an existing target). Bare names still resolve against
+the dated form.
 
-Moves a proposal whose stage is `archived` into `docs/evolutions/archived/`
-and prints the new path. Refuses a proposal that is not yet `archived`, or one
-already inside `archived/`.
+Transactional preflight, all before the first mutation: the space worktree is
+coherent and clean, and — when isolation cleanup would run — the feature
+branch carries no unintegrated content (deleting a branch that still holds
+work destroys it).
+
+The mutation sequence: move → record the move on the space branch (the
+undated deletion is staged alongside the dated addition) → mirror into the
+worktree. Cleanup runs **last**, only in isolated mode and only without
+`--keep-worktree`: the recorded worktree is removed and the feature branch
+deleted (`-D`, safe because the content guard proved it integrated). Quick
+mode touches no isolation artifacts. Cleanup failure is loud but does not
+undo the archive: the residue is reported for manual removal.
 
 ## State writes are script-only
 

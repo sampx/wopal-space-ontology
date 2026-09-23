@@ -16,7 +16,7 @@ agents:
 # 声明该空间所需技能
 skills:
   - space-master
-  - ontology-evolution 
+  - ontology-evolution
   - agents-collab
   - dev-flow
   - df-plan-review

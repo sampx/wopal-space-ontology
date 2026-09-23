@@ -91,8 +91,8 @@ draft → accepted → implementing → validating → archived
 |------|------|
 | `draft` | 提案落盘于本体仓库 `docs/evolutions/`，等待用户审阅 |
 | `accepted` | 用户接受提案，进入实施 |
-| `implementing` | 改动在空间装配 worktree 内提交 |
-| `validating` | 改动已提交，等待用户在运行时确认 |
+| `implementing` | 实施进行中：隔离 worktree 内的实施提交（或 quick 模式直提空间分支） |
+| `validating` | 改动已集成到空间分支，等待用户重启运行时观察确认 |
 | `archived` | 用户确认通过，提案归档 |
 
 提案默认不创建 Issue 载体；用户明确要求时才引入评审与 Issue。

@@ -17,7 +17,6 @@ description: |
 
   The semantic lane is Maka-exclusive. This skill defines how the evolution heart does its work; the maka agent file defines who Maka is.
 ---
-
 # ontology-evolution
 
 The workflow that turns runtime facts into living capability — and the machinery that lands that capability in the ontology without corrupting the pool.
@@ -121,7 +120,7 @@ Keep candidates few and well-argued. Three strong proposals beat ten weak ones.
 
 # Mechanism Lane
 
-The mechanism lane lands an approved plan. It is deliberately thin: one script plus a markdown status field — no issue layer, no worktree-manager layer. Isolation is done with git primitives under discipline; the script only moves state.
+The mechanism lane lands an approved plan. Its discipline lives in `scripts/` — enforced by the script, not by prose: refusing before the first write, staging by name, the guard table, the isolation assertion, and the integrate corpus assertion. This document records what the script cannot enforce: roles, user decision points, and the validation philosophy.
 
 ## Roles
 
@@ -141,10 +140,10 @@ draft → accepted → implementing → validating → archived
 | Stage | Meaning |
 |-------|---------|
 | `draft` | Proposal is on disk under `docs/evolutions/`, waiting for the user to read it |
-| `accepted` | User accepted; implementation may begin |
-| `implementing` | Change is being landed on the space assembly worktree |
-| `validating` | Change is committed; waiting for the user to confirm in the running system |
-| `archived` | User confirmed; proposal is filed away |
+| `accepted` | User accepted; the isolated worktree exists and the mode is recorded |
+| `implementing` | Work is being landed: implementation commits in the isolated worktree (or quick-mode commits on the space branch) |
+| `validating` | The change is integrated onto the space branch; the user restarts and observes |
+| `archived` | User confirmed; the proposal is filed away |
 
 `accepted → implementing` and `validating → archived` are the only forward edges. Review does not occupy a stage: it happens when the user asks for it, and it does not invent a state. There is no backward edge — if a landed change must be reworked, the fix is a new commit, not a stage rewind.
 
@@ -156,26 +155,23 @@ Run from the skill root: `bash scripts/evo.sh <command> [args]`.
 
 | Command | Does |
 |---------|------|
-| `evo.sh new "<title>"` | Creates `docs/evolutions/<name>.md` with `Stage: draft` |
-| `evo.sh status <name\|path>` | Prints current stage, file path, mode, and the next command |
-| `evo.sh accept <name> [--no-worktree]` | Records the mode and derives the isolated worktree |
+| `evo.sh new "<title>"` | Creates `docs/evolutions/<name>.md` from `templates/proposal.md` at `Stage: draft` |
+| `evo.sh status <name\|path>` | Prints stage, path, mode, isolation metadata, and the next command |
+| `evo.sh accept <name> [--no-worktree]` | Gates the proposal (placeholders + structure), then derives or re-attaches the isolated worktree transactionally |
 | `evo.sh advance <name> --to <state>` | Advances the state machine; refuses illegal transitions |
-| `evo.sh commit <name> -m <msg>` | Sparse-safe commit; the only command that writes the working tree |
-| `evo.sh integrate <name>` | Squashes the isolated work into the space branch inside `.wopal` |
-| `evo.sh check <name>` | Reports proposal and sparse-state problems |
-| `evo.sh archive <name>` | Moves an `archived` proposal to `docs/evolutions/archived/` |
+| `evo.sh commit <name> -m <msg>` | Sparse-safe commit at `implementing`; widens the range first, stages by name |
+| `evo.sh integrate <name>` | Squashes the isolated work into the space branch; refuses invisible content (corpus assertion) |
+| `evo.sh check <name>` | Reports proposal, sparse-state, structure, and corpus problems |
+| `evo.sh archive <name> [--keep-worktree]` | Moves an `archived` proposal to `docs/evolutions/archived/YYYYMMDD-<name>.md`, cleans up isolation artifacts |
 
-Rules that make this safe to rely on:
+Properties the commands guarantee — each has a named test, so this is a claim about the suite, not a hope:
 
-- **Stage is written only by the script.** Never hand-edit `- **Stage**:` in a proposal. A hand-edited stage defeats the point of a script-owned state machine, and the script will refuse to advance a proposal whose field it cannot find.
-- **Illegal transitions exit non-zero and change nothing.** A skip (`draft → archived`) or a rewind (`validating → implementing`) prints the legal successor to stderr and leaves the file byte-for-byte untouched — so a mistaken command has no recovery cost.
-- **Refusal happens before the first write.** Every safety check runs before any mutation, so a rejected `commit` or `integrate` leaves the repository exactly as it found it.
-- **Nothing is ever staged wholesale.** Staging is by name, and the sparse range is widened first. `git add -A` over a drifted range is the one instruction that records a whole capability pool as deleted; no command in this skill issues it.
-- **Re-running is safe.** Re-advancing to the current stage is a no-op; re-running `accept` adopts the existing worktree and fast-forwards it rather than fighting it.
-- **`commit` and `integrate` share one preflight.** Both refuse on a disabled range, an empty pattern list, an unresolved merge, an out-of-range entry missing its skip-worktree bit, or an in-range path carrying a stray one.
-- **The repository root is discovered from the script's own location**, so the same script works from `.wopal` and from an isolated worktree, with no hard-coded path.
+- **Stage is written only by the script.** Never hand-edit `- **Stage**:`; the script refuses a proposal whose field it cannot find.
+- **Refusal precedes mutation.** Every safety check runs before any write; a rejected command leaves the repository exactly as it found it.
+- **Nothing is ever staged wholesale.** Staging is by name and the range widens first; no command in this skill issues `git add -A`.
+- **Re-running is safe.** Re-advancing is a no-op; re-accept adopts or re-attaches instead of fighting existing state.
 
-Command-level detail lives in `references/commands.md`.
+Command-level detail — including the shared `commit`/`integrate` preflight — lives in `references/commands.md`.
 
 ## Sparse isolation discipline
 
@@ -183,13 +179,13 @@ Default implementation mode: **derive a worktree from `.wopal`**. The derived wo
 
 Seven hard constraints:
 
-1. **Isolate by default.** Derive the worktree from `.wopal` (the sparse source). After deriving, assert that it can still see every pattern `.wopal` has (a superset is fine — the worktree widens its own range as it adds capabilities) and that its bits and range agree. Deriving from the full host repository does *not* inherit the patterns.
-2. **The host repository never switches branches.** It carries the base capabilities other spaces depend on and stays on `main` — `~/.wopal/ontologies/<source>/` must be found on `main` before and after any work.
-3. **Merge on the space branch.** The merge happens inside the worktree or `.wopal`, on the space branch. Afterwards the space branch holds the complete tree.
-4. **New capability directories must be assembled first.** To write a brand-new capability directory, widen the implementation-side assembly range before writing content; after merging, widen `.wopal`'s assembly and re-materialize, or the validator cannot see the new capability.
-5. **Never clear the `S` bits in bulk.** skip-worktree is derived state of the assembly range: a path inside the range is materialized, so the bit is always wrong there, and a path outside it must have one. Adjust visible scope only by widening assembly. Two states matter, and they are not equally bad. An out-of-range entry with a *cleared* bit makes `git status` report a deletion, but `git add -A` still stages nothing while the range is on — git refuses. Switch the range *off* in that same state (which `git sparse-checkout disable` does, clearing the config and the bits together) and the same `git add -A` stages the deletion for real. That is the 2026-09-20 shape, and it is why `commit` / `integrate` verify the range instead of trusting discipline.
+1. **Isolate by default.** Derive the worktree from `.wopal` (the sparse source); `accept` asserts the derivation is a faithful sparse copy of the space.
+2. **The host repository never switches branches.** It carries the base capabilities other spaces depend on and stays on `main`.
+3. **Merge on the space branch.** The merge happens inside `.wopal`, on the space branch, as a single squash after validation.
+4. **New capability directories are assembled first.** Widening happens before staging, and the space range adopts the feature's range at integrate — verified by the corpus assertion, which refuses any path that would land invisible.
+5. **Never clear the `S` bits in bulk.** skip-worktree is derived state of the assembly range; adjust visible scope only by widening assembly. The commit/integrate preflight verifies the range instead of trusting discipline.
 6. **Validation means restarting and observing.** For anything touching the load path, the verdict is what the user sees after restarting ellamaka. A green test is not a substitute for observing the loaded behavior.
-7. **Delivery is the user's terminal decision.** `space sync` (into `local main`) and `ontology contribute` (upstream) are called one at a time, at the user's word. The skill contains no automatic upstream path — by design, not by omission.
+7. **Delivery is the user's terminal decision.** `space sync` and `ontology contribute` are called one at a time, at the user's word. The skill contains no automatic upstream path — by design, not by omission.
 
 ### Quick mode
 
@@ -199,36 +195,38 @@ Typo fixes, bug fixes in existing assets, and small changes the user explicitly 
 
 ```
 Evolution Plan (approved)
-  → evo.sh new "<title>"                    # draft
+  → evo.sh new "<title>"                    # draft from the external template
   → user reads the proposal
-  → evo.sh accept <name>                    # accepted + isolated worktree
-  → implement in the worktree
-  → evo.sh commit <name> -m "<message>"     # sparse-safe, widens the range first
+  → evo.sh accept <name>                    # gate + isolated worktree
   → evo.sh advance <name> --to implementing
-  → user restarts ellamaka and observes     # validating
-  → evo.sh advance <name> --to validating
+  → implement, then evo.sh commit <name> -m "..."   # sparse-safe, per task
   → evo.sh integrate <name>                 # squash onto the space branch
-  → user confirms
+  → evo.sh advance <name> --to validating
+  → user restarts ellamaka and confirms
   → evo.sh advance <name> --to archived
-  → evo.sh archive <name>
+  → evo.sh archive <name>                   # dated name + isolation cleanup
   → delivery decision (space sync / ontology contribute) — user only
 ```
 
 In quick mode, skip `integrate`: `commit --paths <path>...` lands directly on
 the space branch, which is itself the isolation boundary.
 
-`integrate` runs once, after validation. Squashing after every commit does not
-work: squash creates new commit ids, so the next squash loses its merge base
-and fails with add/add conflicts.
+`integrate` runs once, after implementation. Squashing after every commit does
+not work: squash creates new commit ids, so the next squash loses its merge
+base and fails with add/add conflicts. Rework after integrate is a new commit
+on the space branch, not a second squash.
 
 ## Boundary
 
-The boundary is per lane, and the two are not the same.
+The lane boundary, and the boundary against neighboring entry points:
 
-- **Semantic lane — Propose Only.** In this lane you write and refine proposals under `docs/evolutions/`; you never touch a capability asset, never commit, and never implement changes. Every proposal waits for explicit user approval. When evidence is thin, say so: a speculative proposal presented as fact is worse than no proposal. Violating this = **CRITICAL FAILURE**.
-- **Mechanism lane — propose, land, gate.** Wopal decides and orchestrates; Fae implements and commits on the space branch; Rook audits. The lane touches files *only* through those roles, and *never* ships upstream on its own.
+- **Semantic lane — propose only.** Proposals under `docs/evolutions/`; never touch a capability asset, never commit, never implement. Every proposal waits for explicit user approval. A speculative proposal presented as fact is worse than no proposal. Violating this = **CRITICAL FAILURE**.
+- **Mechanism lane — propose, land, gate.** Wopal decides and orchestrates; Fae implements; Rook audits. The lane never ships upstream on its own.
+- **`/wopal:evolve` and `/wopal:distill`** are user-facing entry commands that arrive at this skill's mechanism lane; they do not bypass the state machine or the user decision points.
+- **`wopal/ontology-maintain`** covers maintenance operations on the ontology (sync, hygiene) outside an evolution's lifecycle; it is not a proposal path.
+- **Assembly overlay**: assets here are assembled per space via the overlay mechanism (`docs/DESIGN-distribution.md`); the skill operates on the assembled worktree (`.wopal`), never on the central pool directly.
 
-The separation exists because a proposal that its own author can silently implement is no longer a proposal. It constrains the semantic lane; it is not a description of the mechanism lane.
+The separation exists because a proposal that its own author can silently implement is no longer a proposal.
 
 ---
 
