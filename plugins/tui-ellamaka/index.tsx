@@ -21,6 +21,12 @@ import type {
   TuiSlotPlugin,
 } from "@opencode-ai/plugin/tui";
 import { join } from "node:path";
+import { resolveTuiConfig } from "./config";
+
+// WOPAL_HOME default per the engine's Global.Path contract (~/.wopal); the
+// plugin has no env-independent way to read the engine's resolved value, and
+// every deployment so far uses the default.
+const WOPAL_HOME = join(process.env.HOME ?? "", ".wopal");
 
 // ─── Sound ───────────────────────────────────────────────────────────
 
@@ -1133,7 +1139,14 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
 });
 
 const tui: TuiPlugin = async (api, options) => {
-  if (options?.enabled === false) return;
+  // ONT-G4 unified channel: behavior config lives in
+  // `wopal.pluginConfig["tui-ellamaka"]` (three-layer settings resolved from
+  // the process cwd's space root); the inline mount entry (`rawOptions`)
+  // stays as a fallback. The engine only passes TUI options inline, so the
+  // plugin resolves its own config until the TuiPluginApi grows a config
+  // surface.
+  const config = resolveTuiConfig(WOPAL_HOME, options);
+  if (config.enabled === false) return;
   api.attention.soundboard.registerPack({
     id: "wopal-space",
     name: "WopalSpace",
@@ -1146,7 +1159,7 @@ const tui: TuiPlugin = async (api, options) => {
   await api.theme.install("./ellamaka-theme.json");
   api.theme.set("ellamaka-theme");
   const theme = extractTheme(api.theme.current);
-  api.slots.register(branding(theme, options?.label));
+  api.slots.register(branding(theme, config.label));
 };
 
 const plugin: TuiPluginModule & { id: string } = {
