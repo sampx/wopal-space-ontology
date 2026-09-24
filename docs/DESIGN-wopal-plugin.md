@@ -263,7 +263,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 ```
 
 - Schema：`z.record(z.string(), z.record(z.string(), z.unknown())).optional()` — 外层 key 为插件名，内层为该插件的自由配置对象，由各插件自行定义与校验
-- 定位：**没有自有顶层配置节的生态插件**（如 dsh-adapter）的行为配置统一注入通道，替代插件挂载条目的内联 options。拥有自有 `wopal` 子节的第一方插件（wopal-plugin 自身的 `memory`/`llm`/`rules` 等）不使用此通道。判定规则：插件条目（settings `plugin` 数组）保持零内联 options；凡仍依赖内联 options 传配置的插件，一律迁入 `wopal.pluginConfig.<插件名>`，插件只读不写（ONT-G4）
+- 定位：**所有 ellamaka 插件统一的插件行为配置格式**。wopal-plugin 自身同样消费 `wopal.pluginConfig["wopal-plugin"]`（优先级高于顶层遗留字段，顶层 `wopal.memory`/`llm` 等保留为未迁移部署的回退），dsh-adapter 等生态插件从 `wopal.pluginConfig.<插件名>` 读取。判定规则：插件条目（settings `plugin` 数组）保持零内联 options；插件只读不写（ONT-G4）
 - 继承：随三层 settings 走 deep merge（代码默认 < 全局 < 空间公共 < 空间私有），生态插件配置天然获得继承与覆盖能力
 - 写入端：由 wopal-cli `config` 命令族（见 `projects/wopal-cli/docs/DESIGN-config-cli.md`）承载；在此之前该节点的值由用户手工维护
 

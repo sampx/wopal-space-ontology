@@ -204,5 +204,6 @@ Feature switches and connection settings live in the `wopal` node of the three-l
 | `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR` referencing process.env / `.env` files; never store plaintext keys |
 | `embedding` | `baseUrl`, `model`, `apiKey` | Same `$VAR` semantics as `llm` |
 | `logLevel` / `logFile` / `logModules` | — | Config is the default source; `WOPAL_PLUGIN_LOG_*` env vars override |
+| `pluginConfig` | `record<string, record<string, unknown>>` | Unified ONT-G4 channel for every plugin's behavior config. wopal-plugin reads its own config from `pluginConfig["wopal-plugin"]` (wins over the legacy top-level fields above, which remain as fallback). `$VAR` references resolve inside pluginConfig values too |
 
 `.env` files hold only secrets referenced via `$VAR` (e.g. `WOPAL_LLM_API_KEY`) plus the log diagnostic overrides; feature switches never go in `.env`.

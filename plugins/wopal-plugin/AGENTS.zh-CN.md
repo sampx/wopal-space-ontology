@@ -204,5 +204,6 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 | `llm` | `baseUrl`, `model`, `apiKey` | apiKey 支持 `$VAR` 引用 process.env / `.env` 文件；禁止存放明文密钥 |
 | `embedding` | `baseUrl`, `model`, `apiKey` | `$VAR` 语义与 `llm` 相同 |
 | `logLevel` / `logFile` / `logModules` | — | 配置为默认来源；`WOPAL_PLUGIN_LOG_*` env 覆盖 |
+| `pluginConfig` | `record<string, record<string, unknown>>` | 所有插件统一的 ONT-G4 行为配置通道。wopal-plugin 自身从 `pluginConfig["wopal-plugin"]` 读取（优先于上方遗留顶层字段，顶层字段保留为回退）；pluginConfig 值内同样支持 `$VAR` 引用 |
 
 `.env` 文件仅承载经 `$VAR` 引用的密钥（如 `WOPAL_LLM_API_KEY`）与日志诊断覆盖项；功能开关一律不进 `.env`。
