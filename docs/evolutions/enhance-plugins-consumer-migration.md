@@ -5,11 +5,11 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-19
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: 8790d95
+- **Stage**: accepted
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-enhance-plugins-consumer-migration
+- **Branch**: ontology-enhance-plugins-consumer-migration
+- **Base Commit**: 481dd5f3331477ebc3c12a7c7dc6091bea24e303
 - **Final Commit**: (integrate 时记录：合入空间分支后的提交)
 
 ## Scope Assessment
