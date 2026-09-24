@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-23
+> **Updated**: 2026-09-24
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -190,8 +190,9 @@ CLI 读取骨架后按以下规则消费：
 - **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
 - **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
 - **有效范围三要素**：稀疏范围 = 当前装配单基线 ∪ `localState.added` − `localState.shadowed`（见 Two-Layer Assembly Records）。基线取**当前**装配单（使其他空间经 `capability add` 的变更在各自下次同步时生效），本地增量取空间快照的 `localState`。范围重算只在 `space sync` 下行时执行，结果仅取决于这三项，不随提交历史变化。
-- **范围外新增须记入本地状态**：用户在装配区新增路径后，须记入 `localState.added` 并纳入稀疏范围，否则后续范围重算会将其从磁盘移除。
-- **移除装配项用范围遮蔽，不提交删除**：用户移除装配单声明的能力路径时，记入 `localState.shadowed` 并从稀疏范围排除；内容保留在对象库与空间分支树中，不作为删除提交上行。
+- **范围外新增须登记本地状态**：用户在装配区新增路径后，须记入 `localState.added` 并纳入稀疏范围，否则后续范围重算会将其从磁盘移除。登记入口是 `space capability add --local`（能力池内资产）或直接放入后由用户显式登记；未登记的未跟踪文件由 `space sync` 的范围重算保护不清扫，但不出现在任何清单中。
+- **移除装配项用范围遮蔽，不提交删除**：用户移除装配单声明的能力路径时，记入 `localState.shadowed` 并从稀疏范围排除；内容保留在对象库与空间分支树中，不作为删除提交上行。显式入口是 `space capability remove --local`。
+- **本地通道不进入空间分支树**：`localState` 两条目承载的能力调整（本地引入、本地移除）不产生提交。内容要么以未跟踪状态躺在磁盘（added），要么留在分支树但移出可见范围（shadowed）。空间分支树与 local main 的差异只包含共享通道（装配单声明变更、内容提交）的产物——「进 space 分支」是共享动作本身，本地通道的全部意义就是内容不进分支树。
 
 ## Two-Layer Assembly Records
 
@@ -204,7 +205,7 @@ CLI 读取骨架后按以下规则消费：
 
 **本地状态是空间私有事实**：`space-meta.json` 位于空间仓库内，不属于本体仓库，因此不会随 `space sync` 上行。它记录"本空间实际持有与不持有哪些路径"，是范围重算的唯一输入之一，跨同步持久稳定。
 
-**能力来源与收敛路径**：装配单声明的能力来自能力池。空间新增的自有路径在同步时上行进入 local main，自此成为池中资产，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。空间遮蔽是对装配单基线的本地收窄，只作用于本空间，不影响能力池与同类型其他空间。
+**能力来源与收敛路径**：装配单声明的能力来自能力池。经装配单通道引入池中不存在的自有能力时（`space capability add`，无 `--local` 旗标），内容随装配单提交在同步时上行进入 local main，自此成为池中资产，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。本地通道（`--local` 旗标）不产生提交、不上行，内容停留在本空间（见 Two-Layer Assembly Records 的差异收敛表）。空间遮蔽是对装配单基线的本地收窄，只作用于本空间，不影响能力池与同类型其他空间。
 
 ### Space Assembly Snapshot Structure
 
@@ -258,13 +259,16 @@ CLI 读取骨架后按以下规则消费：
 有效装配 = capabilities（装配单基线） ∪ localState.added − localState.shadowed
 ```
 
-由此产生三类差异，各有不同的收敛路径：
+由此产生四类差异，各有不同的收敛路径。装配单通道产生提交并随同步上行；本地通道不产生提交、不进入空间分支树，**构造上不可上行**：
 
 | 变更 | 记录位置 | 是否上行 local main | 收敛方式 |
 |------|----------|---------------------|----------|
 | **装配单新增能力**（`space capability add`） | `capabilities` 与装配单同步更新 | 是 | 同类型其他空间在各自下次 `space sync` 时跟进 |
-| **空间新增自有路径**（用户直接放入装配区） | 仅记入 `localState.added` | 是（内容上行，装配单不变） | 上行后成为池中资产，可经装配单被其他空间引用 |
-| **空间遮蔽基线能力**（用户移除装配单声明的路径） | 仅记入 `localState.shadowed` | 否 | 只收窄本空间范围；能力池与同类型空间不受影响 |
+| **本地引入能力**（`space capability add --local`） | 仅记入 `localState.added` | **否** | 只扩本空间范围与磁盘物化；能力池不受影响；`capability add`（无旗标）转正为共享引入 |
+| **本地移除能力**（`space capability remove --local`） | 仅记入 `localState.shadowed` | **否** | 只收窄本空间范围；能力池与同类型空间不受影响；`capability add --local` 或 `capability add`（无旗标）恢复 |
+| **空间遮蔽基线能力**（用户直接删除装配单声明的路径，自动探测兜底） | 仅记入 `localState.shadowed` | 否 | 同本地移除；同步输出列出遮蔽项 |
+
+**本地状态的两个条目都是私有事实，不进入空间分支树**：`localState.added` 的路径以未跟踪状态存在于磁盘——它不在任何提交里，`git diff main...space` 看不到它，上行在构造上不可能发生；`localState.shadowed` 只收窄稀疏范围，内容留在对象库与空间分支树中，不产生删除提交。`localState` 本身存放于空间根目录 `.wopal-space/space-meta.json`（管理面），不属于本体仓库，永不随 `space sync` 上行。
 
 `source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
 

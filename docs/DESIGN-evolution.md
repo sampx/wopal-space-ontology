@@ -1,7 +1,7 @@
 # DESIGN — Evolution Loop
 
 > **Status**: Active
-> **Updated**: 2026-09-21
+> **Updated**: 2026-09-24
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -29,8 +29,8 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
 6. **默认执行，不设审批门控**：`space sync` 由 agent 按用户意图调用。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
-7. **空间自有能力在 sync 前自动纳管**：装配区内的未跟踪文件由 `space sync` 纳入版本控制并扩展稀疏范围，防止下行范围重算将其移除；`.gitignore` 过滤敏感文件。
-8. **范围重算保留空间自有部分**：下行按装配单重算稀疏范围时，范围 = 装配单声明 ∪ 空间自有文件；装配定义类基础文件始终包含。
+7. **登记是唯一范围入口**：装配区内新路径的持久持有靠显式登记（`space capability add --local` 记入 `localState.added` 并扩稀疏范围）；未登记的未跟踪文件由范围重算保护不清扫，但不出现在任何清单中。登记不产生提交——`localState` 是空间私有事实，不进入空间分支树。`.gitignore` 过滤敏感文件。
+8. **范围重算保留本地状态**：下行按装配单重算稀疏范围时，范围 = 装配单声明 ∪ `localState.added` − `localState.shadowed`；装配定义类基础文件始终包含。本地条目（added/shadowed）不随提交历史变化，也不上行。
 
 ## Self-Evolution Loop
 
@@ -133,16 +133,20 @@ draft → accepted → implementing → validating → archived
 
 | 命令 | 方向 | 职责 |
 |------|------|------|
-| `space status` | — | 只读：落后 / 待贡献 / 装配状态 / 待纳管的游离文件 |
-| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；默认执行，`--dry-run` 仅预览 |
-| `space capability add/remove` | — | 增删装配单中的能力，立即重新物化；改动随 sync 上行，同类型空间在各自下次 sync 跟进 |
+| `space status` | — | 只读：落后 / 待贡献 / 装配状态 / 本地状态清单（added / shadowed / 未登记未跟踪文件） |
+| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；上行前校验本地状态不泄漏（见下）；默认执行，`--dry-run` 仅预览 |
+| `space capability add/remove` | — | 无旗标：增删装配单中的能力并提交，随 sync 上行，同类型空间跟进；`--local`：写入 `localState`（added / shadowed）并调整稀疏范围，零提交、永不上行 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
+**本地通道与共享通道的分界**：`space capability` 的 `--local` 旗标决定变更归宿。无旗标走装配单通道——修改装配单、产生提交、随 sync 上行，是共享动作；`--local` 走本地通道——只写 `localState` 并调整稀疏范围，不进入空间分支树，构造上不可上行。`add --local` 对已遮蔽能力兼任恢复出口（清 shadow 条目并物化最新版）；`remove --local` 对本地引入（added，未提交）的能力撤回磁盘文件并清除登记。
+
+**上行不泄漏本地状态（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）与 `localState`（added ∪ shadowed）无交集；命中即拒绝上行并给出处置指引（撤出提交或解除登记）。该闸兜底用户手动 `git add/commit` 将本地状态内容提交进空间分支的场景——本地隔离不依赖用户记得，由机制强制。
+
 `space sync` 默认执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳管的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
 
-`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么。装配单中不存在的能力不走本命令：用户直接放入装配区，由 `space sync` 纳管上行进入能力池，此后可被任意空间装配。
+`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么、以哪条通道装（共享进装配单或 `--local` 私有持有）。装配单中不存在的能力不走本命令：用户以共享意图引入时用 `space capability add`，以私有意图引入时用 `space capability add --local`。
 
 空间内日常能力进化通过 Maka 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 
