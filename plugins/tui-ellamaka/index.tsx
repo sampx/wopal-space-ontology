@@ -19,7 +19,7 @@ import type {
   TuiPlugin,
   TuiPluginModule,
   TuiSlotPlugin,
-} from "@opencode-ai/plugin/tui";
+} from "@wopal/ellamaka-plugin/tui";
 import { join } from "node:path";
 import { resolveTuiConfig } from "./config";
 
