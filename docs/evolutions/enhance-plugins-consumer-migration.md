@@ -10,7 +10,7 @@
 - **Worktree**: .worktrees/ontology-enhance-plugins-consumer-migration
 - **Branch**: ontology-enhance-plugins-consumer-migration
 - **Base Commit**: 481dd5f3331477ebc3c12a7c7dc6091bea24e303
-- **Final Commit**: (integrate 时记录：合入空间分支后的提交)
+- **Final Commit**: f7866f5ad97ea61416b1df569f8e5d670c3a5a37
 
 ## Scope Assessment
 
