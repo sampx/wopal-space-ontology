@@ -1,4 +1,4 @@
-import type { SystemPromptMetadata, SystemPromptSection, SystemPromptSectionKind } from "../types.js";
+import type { SystemPromptMetadata, SystemPromptSection, SystemPromptSectionKind } from "@wopal/ellamaka-plugin";
 
 /**
  * Parse raw system blocks into structured metadata (for native OpenCode)

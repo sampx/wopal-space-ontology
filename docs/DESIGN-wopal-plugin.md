@@ -51,14 +51,15 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 插件在两个运行时表面依赖 fork 扩展，这些字段由 fork 引擎注入、插件被动接收：
 
-- `PluginInput.wopalSpaceRoot`：插件入口断言 `PluginInput & { wopalSpaceRoot?: string }` 读取空间根。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
-- `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` 结构由插件在本地 `types.ts` 定义（与 fork 契约层同构），运行时值来自引擎注入。
+- `PluginInput.wopalSpaceRoot`：`PluginInput` 契约本身已声明 `wopalSpaceRoot?` 字段（`@wopal/ellamaka-plugin` 导出），插件入口直接读取，无需本地交叉类型断言。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
+- `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 类型从 `@wopal/ellamaka-plugin` 导入，运行时值来自引擎注入。
 
 ### 依赖声明
 
-插件声明 `@wopal/ellamaka-plugin` 为直接依赖，版本跟随产品主版本。声明后：
+插件声明 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk` 为直接依赖，版本跟随产品主版本（纯 `x.y.z`，如 `2.0.5`）。声明后：
 
-- 不再复制 `SystemPromptMetadata` 等类型，从 `@wopal/ellamaka-plugin` 导入
+- 契约层类型（`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 等）与 `tool` 等辅助 API 全部从 `@wopal/ellamaka-plugin` 导入，仓库内零手抄 fork 类型
+- SDK 消费点（`createOpencodeClient` 的 `/v2` client、`Model` 类型等）从 `@wopal/ellamaka-sdk` 导入，与上游 `@opencode-ai/sdk` 彻底脱钩
 - 运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致
 
 依赖随插件 package.json 分发。空间级依赖安装在 `.wopal/` 的运行时 node_modules，由引擎的插件依赖收集机制统一安装。
@@ -248,6 +249,23 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在启动时报错，不静默降级。未配置的字段使用默认值。
 
 `apiKey` 支持 `$VAR` 环境变量引用：以 `$` 开头从 `process.env` 解析，未设置时启动报错；不以 `$` 开头按字面值处理。配置文件即使进 git 也不承载明文密钥。
+
+### Plugin Config Node (`wopal.pluginConfig`)
+
+`wopal` 节点支持可选的 `pluginConfig` 子节点，作为本体生态插件行为配置的统一载体：
+
+```jsonc
+"wopal": {
+  "pluginConfig": {
+    "dsh-adapter": { "sandbox": { "enabled": true, "mode": "workspace-write" } }
+  }
+}
+```
+
+- Schema：`z.record(z.string(), z.record(z.string(), z.unknown())).optional()` — 外层 key 为插件名，内层为该插件的自由配置对象，由各插件自行定义与校验
+- 定位：本体生态插件行为配置的唯一注入通道。插件条目（settings `plugin` 数组）保持零内联 options；插件行为配置一律经 `wopal.pluginConfig.<插件名>` 读取，插件只读不写（ONT-G4）
+- 继承：随三层 settings 走 deep merge（代码默认 < 全局 < 空间公共 < 空间私有），生态插件配置天然获得继承与覆盖能力
+- 写入端：由 wopal-cli `config` 命令族（见 `projects/wopal-cli/docs/DESIGN-config-cli.md`）承载；在此之前该节点的值由用户手工维护
 
 ### Prompt Template Resolution
 

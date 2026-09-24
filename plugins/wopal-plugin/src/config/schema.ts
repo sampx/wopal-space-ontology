@@ -1,6 +1,6 @@
-import { tool } from "@opencode-ai/plugin";
+import { tool } from "@wopal/ellamaka-plugin";
 
-// Build the schema on the zod engine re-exported by @opencode-ai/plugin
+// Build the schema on the zod engine re-exported by @wopal/ellamaka-plugin
 // (`tool.schema`) instead of a standalone `zod` dependency. This guarantees the
 // plugin and the host share one zod instance: a separate bare `zod` resolves to
 // a second copy, and the host detects Zod types by their v4 `_zod` marker.
@@ -41,6 +41,13 @@ export const wopalPluginConfigSchema = z.object({
   logLevel: z.string().optional(),
   logFile: z.string().optional(),
   logModules: z.array(z.string()).optional(),
+  // ONT-G4: the single injection channel for ecosystem plugin behavior config.
+  // Outer key = plugin name; inner = free-form object each plugin validates
+  // itself. Plugin mount entries (settings `plugin`) stay option-free; plugin
+  // behavior is read from `wopal.pluginConfig.<pluginName>` (plugins read-only).
+  pluginConfig: z
+    .record(z.string(), z.record(z.string(), z.unknown()))
+    .optional(),
 });
 
 export type WopalPluginConfig = (typeof wopalPluginConfigSchema)["_zod"]["output"];

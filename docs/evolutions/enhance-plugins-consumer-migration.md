@@ -185,7 +185,7 @@ export interface DshAdapterConfig {
 `cd .wopal/plugins/wopal-plugin && bun run typecheck && bun run test:run` 全绿；`grep -rn "@opencode-ai" src/` 退出码 1（无匹配）
 
 **Done**:
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
 
@@ -210,7 +210,7 @@ export interface DshAdapterConfig {
 `cd .wopal/plugins/dsh-adapter && bun test` 全绿；`grep -rn "@opencode-ai/plugin" index.ts` 退出码 1
 
 **Done**:
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤.
 
 ---
 

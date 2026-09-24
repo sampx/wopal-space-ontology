@@ -7,7 +7,7 @@
 
 import type { OpenCodeClient } from "../types.js"
 import type { SessionState, SessionStore } from "../session-store.js"
-import type { SystemPromptMetadata } from "../types.js"
+import type { SystemPromptMetadata } from "@wopal/ellamaka-plugin"
 import type { MessageWithInfo } from "../hooks/message-context.js"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { TaskSessionInspector } from "../session-runtime-info.js"

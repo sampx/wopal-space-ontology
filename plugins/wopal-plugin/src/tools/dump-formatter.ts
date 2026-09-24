@@ -5,7 +5,7 @@
  * and system-prompt-formatter into the main writeContextDump entry point.
  */
 
-import type { SystemPromptMetadata } from "../types.js";
+import type { SystemPromptMetadata } from "@wopal/ellamaka-plugin";
 import type { MessageWithInfo } from "../hooks/message-context.js";
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";

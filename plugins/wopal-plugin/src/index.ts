@@ -6,9 +6,13 @@
  * Task is a perpetual dialog channel - no terminal states, only running/waiting/error.
  */
 
-import type { PluginInput, Hooks } from "@opencode-ai/plugin";
-import type { SystemPromptMetadata, OpenCodeClient } from "./types.js";
-import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk/v2";
+import type {
+  PluginInput,
+  Hooks,
+  SystemPromptMetadata,
+} from "@wopal/ellamaka-plugin";
+import type { OpenCodeClient } from "./types.js";
+import { createOpencodeClient as createV2OpencodeClient } from "@wopal/ellamaka-sdk/v2";
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
@@ -107,7 +111,9 @@ async function createPluginResources(
 const openCodeRulesPlugin = async (
   pluginInput: PluginInput,
 ): Promise<Hooks> => {
-  const input = pluginInput as PluginInput & { wopalSpaceRoot?: string };
+  // `PluginInput` from `@wopal/ellamaka-plugin` already declares the fork's
+  // `wopalSpaceRoot` extension, so no local cast is needed to read it.
+  const input = pluginInput;
   const runtime = createPluginRuntime({
     directory: input.directory,
     ...(input.wopalSpaceRoot !== undefined

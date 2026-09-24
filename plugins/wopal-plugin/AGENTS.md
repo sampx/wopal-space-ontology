@@ -178,7 +178,8 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 ## 6. Do Not
 
 - Use `console.log` (use module-level loggers)
-- Use npm / pnpm (Bun only)
+- Use npm / pnpm (Bun only) — the Bun toolchain is the single toolchain. No `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or `package-lock.json` may ever exist in this plugin; the only lockfile is `bun.lock`. Native postinstall builds are declared via `trustedDependencies` in `package.json`, never via pnpm "onlyBuiltDependencies" or npm scripts
+- Import contract or SDK types from `@opencode-ai/*` — fork contract types (`SystemPromptMetadata` etc.) come from `@wopal/ellamaka-plugin`, SDK consumers (`createOpencodeClient`, `Model`) come from `@wopal/ellamaka-sdk`; hand-copying fork types in `types.ts` is forbidden (a residual local definition duplicates the contract and drifts silently)
 - Use `^` prefix for LanceDB — `@lancedb/lancedb` and `@lancedb/lancedb-darwin-x64` must have matching exact versions (currently `0.22.3`); ABI incompatibility crashes the memory system
 - Directly concatenate injection content in `system-transform.ts`
 - Cross-use loggers across modules

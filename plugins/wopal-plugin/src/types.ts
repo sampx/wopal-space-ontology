@@ -138,28 +138,10 @@ export type CancelResult = InterruptResult
 
 // SNAPSHOT-TEST [2026-04-14 17:20:08]
 
-// System prompt metadata types (pending @opencode-ai/plugin release)
-// These will be provided by ellamaka's hook input at runtime
-export type SystemPromptSectionKind =
-  | "agent-prompt"
-  | "provider-prompt"
-  | "environment"
-  | "instruction"
-  | "skill"
-  | "structured-output"
-  | "user-system"
-  | "custom"
-
-export interface SystemPromptSection {
-  kind: SystemPromptSectionKind
-  content: string
-  source?: string | undefined
-}
-
-export interface SystemPromptMetadata {
-  version: 1
-  sections: SystemPromptSection[]
-}
+// System prompt metadata contract types (`SystemPromptSectionKind` /
+// `SystemPromptSection` / `SystemPromptMetadata`) are part of the fork plugin
+// contract and are imported from `@wopal/ellamaka-plugin`; a local copy would
+// duplicate the contract and drift silently.
 
 // EllaMaka SDK client types (minimal interface for plugin usage)
 // Return types use `unknown` because the SDK returns discriminated unions

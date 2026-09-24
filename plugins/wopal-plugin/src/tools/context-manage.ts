@@ -6,8 +6,12 @@
  * Target resolver extracted to context-target.ts.
  */
 
-import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
-import type { SystemPromptMetadata } from "../types.js";
+import {
+  tool,
+  type SystemPromptMetadata,
+  type ToolDefinition,
+  type ToolContext,
+} from "@wopal/ellamaka-plugin";
 import type { MessageWithInfo } from "../hooks/message-context.js";
 import type { SessionStore } from "../session-store.js";
 import { SessionStore as SessionStoreClass } from "../session-store.js";

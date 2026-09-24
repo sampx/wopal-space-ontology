@@ -178,7 +178,8 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 ## 6. 禁止
 
 - `console.log`（用模块级 logger）
-- npm / pnpm（只允许 Bun）
+- npm / pnpm（只允许 Bun）— Bun 是唯一工具链。插件目录内禁止出现 `pnpm-lock.yaml`、`pnpm-workspace.yaml`、`package-lock.json`，锁文件仅认 `bun.lock`；native postinstall 构建由 `package.json` 的 `trustedDependencies` 声明，禁止用 pnpm `onlyBuiltDependencies` 或 npm scripts 承载
+- 从 `@opencode-ai/*` 导入契约或 SDK 类型 — fork 契约类型（`SystemPromptMetadata` 等）从 `@wopal/ellamaka-plugin` 导入，SDK 消费点（`createOpencodeClient`、`Model`）从 `@wopal/ellamaka-sdk` 导入；禁止在 `types.ts` 手抄 fork 类型（残留的本地定义与契约层同构却会静默漂移）
 - `^` 前缀引用 LanceDB — `@lancedb/lancedb` 和 `@lancedb/lancedb-darwin-x64` 必须精确版本一致（当前 `0.22.3`），ABI 不兼容会导致记忆系统崩溃
 - 在 `system-transform.ts` 直接拼接注入内容
 - 跨模块混用 logger
