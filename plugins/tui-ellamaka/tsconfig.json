@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "bun"
+    ],
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "paths": {
+      "@opentui/core": [
+        "../../../projects/ellamaka/node_modules/.bun/node_modules/@opentui/core/index.d.ts"
+      ],
+      "@opentui/solid": [
+        "../../../projects/ellamaka/node_modules/.bun/node_modules/@opentui/solid/index.d.ts"
+      ],
+      "solid-js": [
+        "../../../projects/ellamaka/node_modules/.bun/node_modules/solid-js/types/index.d.ts"
+      ],
+      "solid-js/*": [
+        "../../../projects/ellamaka/node_modules/.bun/node_modules/solid-js/*"
+      ],
+      "@opentui/solid/jsx-runtime": [
+        "../../../projects/ellamaka/node_modules/.bun/node_modules/@opentui/solid/jsx-runtime.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "*.ts",
+    "*.tsx"
+  ]
+}
