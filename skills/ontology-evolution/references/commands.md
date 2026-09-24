@@ -183,9 +183,13 @@ Widening sources can miss (a raw `git add --sparse` path the worktree's range
 never declared); the assertion cannot.
 
 After the squash commits, the range is recomputed so newly covered paths are
-materialized on disk, and `Final Commit` is recorded in the space-branch copy
-of the proposal. Running integrate again with nothing outstanding prints
-`no-op` and exits 0.
+materialized on disk, and the feature branch is **realigned to the squash** —
+its post-condition is that the branch carries no commit the space branch
+lacks, so later stage records and any post-integrate rework no longer make
+the branch read as unintegrated work. `Final Commit` is recorded in the
+space-branch copy of the proposal, and later proposal records mirror into
+the worktree on top of the realigned branch. Running integrate again with
+nothing outstanding prints `no-op` and exits 0.
 
 Why not `git push .` or `git update-ref`: pushing to a branch checked out in
 `.wopal` is refused by git, and moving the ref directly leaves `.wopal` in the
@@ -230,9 +234,13 @@ An archived proposal whose worktree was removed (the normal end state of
 have happened. A branch that survives there is reported as a note — the
 content is integrated, only the artifact removal is incomplete.
 
-The integration notice compares **content**, not commit counts: the space
-branch legitimately carries the accept and stage records the derived worktree
-does not.
+The integration notice compares **content in one direction**: what the branch
+holds that the space branch's history does not. Commits the branch has that
+the space branch does not are not themselves a problem — a squash-integrated
+branch legitimately stays non-ancestor — and paths where only the space
+branch advanced (stage records, rework, another proposal's integration)
+carry nothing to lose. For every differing path the branch's blob is checked
+against the objects reachable from `HEAD`; a blob found there is integrated.
 
 ## `evo.sh archive <name> [--keep-worktree]`
 
@@ -243,8 +251,11 @@ the dated form.
 
 Transactional preflight, all before the first mutation: the space worktree is
 coherent and clean, and — when isolation cleanup would run — the feature
-branch carries no unintegrated content (deleting a branch that still holds
-work destroys it).
+branch holds no content that the space branch's history lacks (deleting a
+branch that still carries unintegrated work destroys it). Integration leaves
+the branch realigned to its squash, so the normal end state passes this
+guard by construction; a branch integrated before that post-condition
+existed is still measured by content, not by commit ancestry.
 
 The mutation sequence: move → record the move on the space branch (the
 undated deletion is staged alongside the dated addition) → mirror into the

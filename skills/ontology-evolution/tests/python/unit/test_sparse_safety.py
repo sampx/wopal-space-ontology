@@ -727,6 +727,43 @@ class TestIntegrate(SparseSpaceFixture):
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertIn("no-op", second.stdout)
 
+    def test_integrate_realigns_the_feature_branch_to_the_squash(self):
+        # Post-condition of integration: the feature branch carries no commit
+        # the space branch lacks. A squash rewrites history by design, so a
+        # branch left at its original tip looked perpetually unintegrated to
+        # every later commit/content comparison and blocked `archive`'s
+        # cleanup guard (2026-09-24 friction).
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+
+        (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
+        committed = _run_evo(
+            self.wopal, "commit", "probe-evolution", "-m", "feature work"
+        )
+        self.assertEqual(committed.returncode, 0, committed.stderr)
+
+        result = _run_evo(self.wopal, "integrate", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        ahead = _git(
+            self.wopal, "rev-list", "--count", "HEAD..ontology-probe-evolution"
+        ).stdout.strip()
+        self.assertEqual(ahead, "0", "feature branch still carries unique commits")
+
+        # The realignment is a reset, not a detach or a foreign checkout: the
+        # worktree stays clean, on its branch, sparse-coherent, and the
+        # feature content stays on disk.
+        self.assertEqual(_git(target, "status", "--porcelain").stdout.strip(), "")
+        self.assertEqual(
+            _git(target, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip(),
+            "ontology-probe-evolution",
+        )
+        self.assertEqual(worktree_problems(self.space, target), [])
+        self.assertEqual(
+            (target / "skills" / "alpha" / "SKILL.md").read_text(), "edited\n"
+        )
+
 
 class TestWorktreeCorrectness(SparseSpaceFixture):
     """The 2026-09-23 probe findings, pinned as behavior (proposal D-13/14/15).
@@ -1079,6 +1116,38 @@ class TestTransactionalArchive(SparseSpaceFixture):
                 )
             )
         )
+
+    def test_archive_tolerates_an_integrated_branch_without_squash_ancestry(self):
+        # The 2026-09-24 friction: a branch whose content was integrated by a
+        # squash (so its commits are NOT ancestors of the space branch) while
+        # the space branch keeps moving (rework after integrate). Nothing on
+        # the branch is missing from the space branch's history, so the
+        # cleanup guard must not report it as unintegrated.
+        target = self.derived()
+        _run_evo(self.wopal, "accept", "probe-evolution")
+        _run_evo(self.wopal, "advance", "probe-evolution", "--to", "implementing")
+        (target / "skills" / "alpha" / "SKILL.md").write_text("edited\n")
+        _run_evo(self.wopal, "commit", "probe-evolution", "-m", "feature work")
+        # A branch integrated before the realignment post-condition existed
+        # sits at its pre-squash tip; simulate that shape.
+        tip = _git(target, "rev-parse", "HEAD").stdout.strip()
+        _run_evo(self.wopal, "integrate", "probe-evolution")
+        _git(target, "reset", "--hard", tip)
+
+        # The space branch moves on after integration (post-integrate rework
+        # is a new commit on the space branch), which used to make the
+        # symmetric tree diff read the branch as unintegrated.
+        (self.wopal / "skills" / "alpha" / "SKILL.md").write_text("reworked\n")
+        _git(self.wopal, "add", "--", "skills/alpha/SKILL.md")
+        _git(self.wopal, "commit", "-qm", "rework after integrate")
+
+        for state in ("validating", "archived"):
+            result = _run_evo(self.wopal, "advance", "probe-evolution", "--to", state)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        result = _run_evo(self.wopal, "archive", "probe-evolution")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((target / ".git").exists(), "worktree not cleaned up")
 
     def test_archive_skips_cleanup_in_quick_mode(self):
         _run_evo(self.wopal, "accept", "probe-evolution", "--no-worktree")

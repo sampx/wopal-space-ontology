@@ -26,6 +26,7 @@
 import hashlib
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 WORKTREE_DIR = ".worktrees"
@@ -325,8 +326,24 @@ def integrate(
             f"{committed.stderr.strip()}"
         )
 
-    head = _git(wopal, "rev-parse", "HEAD")
-    return head.stdout.strip()
+    head = _git(wopal, "rev-parse", "HEAD").stdout.strip()
+
+    # Post-condition of integration: the feature branch carries no commit
+    # the space branch lacks. A squash rewrites history by design, so a
+    # branch left at its original tip stays non-ancestor forever and reads
+    # as unintegrated work to every later commit/content comparison — which
+    # blocked `archive`'s cleanup guard once the space branch moved on
+    # (2026-09-24 friction). Move the branch onto the commit that now holds
+    # its content. Later proposal-record mirrors stack on top of it.
+    if worktree_path is not None:
+        realigned = _run(worktree_path, "git", "reset", "--hard", head)
+        if realigned.returncode != 0:
+            print(
+                "WARNING: the squash landed, but the feature branch could not "
+                f"be realigned to {head[:12]}: {realigned.stderr.strip()}",
+                file=sys.stderr,
+            )
+    return head
 
 
 def _reset(repo: Path) -> None:

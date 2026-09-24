@@ -877,15 +877,55 @@ def _mirror_into_worktree(space: Path, name: str, canonical: Path) -> None:
 
 
 def _pending_content(wopal: Path, branch: str) -> list[str]:
-    """Paths whose content differs between the space branch and `branch`.
+    """Paths whose content lives on `branch` but not in the space branch.
 
-    Excludes the proposal file itself: the space branch advances it with the
+    Compares content in one direction only. The symmetric tree diff this
+    replaces reported every difference as missing work — including paths
+    where only the space branch had advanced (stage records, post-integrate
+    rework, another proposal's integration), which blocked `archive`'s
+    cleanup guard with content that was already integrated (2026-09-24
+    friction).
+
+    For each differing path the branch's blob is looked up among the
+    objects reachable from HEAD: a blob found there is integrated (it was
+    merged and may since have been superseded — nothing is lost by deleting
+    the branch); a blob absent is unintegrated work. A path that exists
+    only on the space branch carries nothing to lose and is skipped. The
+    proposal file itself is excluded: the space branch advances it with the
     accept and stage records, so it always differs and reporting it would
     make the notice permanent noise rather than a real signal.
     """
     result = _git(wopal, "diff", "--name-only", "-z", f"HEAD..{branch}")
-    paths = [item for item in result.stdout.split("\0") if item]
-    return [item for item in paths if not item.startswith("docs/evolutions/")]
+    differing = [
+        item
+        for item in result.stdout.split("\0")
+        if item and not item.startswith("docs/evolutions/")
+    ]
+    if not differing:
+        return []
+    reachable = _reachable_objects(wopal)
+    pending = []
+    for item in differing:
+        blob = _git(wopal, "rev-parse", "--verify", "--quiet", f"{branch}:{item}")
+        if blob.returncode != 0 or not blob.stdout.strip():
+            continue
+        if blob.stdout.strip() not in reachable:
+            pending.append(item)
+    return pending
+
+
+def _reachable_objects(wopal: Path) -> set[str]:
+    """Every object id reachable from the space branch tip.
+
+    Built once per `_pending_content` call: on the live ontology repository
+    this is a single `rev-list` walk over ~14k objects, cheaper than a
+    per-path history search that must walk all history to answer "not
+    found".
+    """
+    result = _git(wopal, "rev-list", "--objects", "HEAD")
+    return {
+        line.split(" ", 1)[0] for line in result.stdout.splitlines() if line.strip()
+    }
 
 
 def _enclosing_repo(path: Path) -> Path | None:
@@ -1339,8 +1379,9 @@ def cmd_check(args: argparse.Namespace) -> int:
                     # Commits ahead of the space branch are not by themselves
                     # a problem: the space branch legitimately carries the
                     # accept and stage records the worktree does not. What
-                    # matters is whether any *content* is missing, so compare
-                    # the trees instead of counting commits.
+                    # matters is whether any *content* is missing, so report
+                    # only paths whose branch-side blob is unreachable from
+                    # the space branch's history.
                     pending_content = _pending_content(wopal, branch)
                     if pending_content:
                         sample = ", ".join(pending_content[:5])
