@@ -6,10 +6,11 @@
 - **Project Path**: .wopal
 - **Created**: 2026-09-19
 - **Stage**: draft
-- **Worktree**: (implementing 时记录)
-- **Branch**: (implementing 时记录)
+- **Mode**: (accept 时记录：isolated | quick)
+- **Worktree**: (accept 时记录)
+- **Branch**: (accept 时记录)
 - **Base Commit**: 8790d95
-- **Final Commit**: (archived 时记录)
+- **Final Commit**: (integrate 时记录：合入空间分支后的提交)
 
 ## Scope Assessment
 
@@ -49,7 +50,7 @@
 - D-04: `dsh-adapter` 补齐 `package.json`（声明 `@wopal/ellamaka-plugin` 依赖与插件元数据），不再依赖同目录其他插件的依赖安装结果。
 - D-05: 两个插件声明的 `@wopal/ellamaka-plugin` 版本必须严格一致（D-06 同步约束）——引擎的 `collectPluginDeps` 用 Map 聚合所有插件依赖，同名依赖后者覆盖前者；版本不一致会导致安装结果不确定。
 - D-06: 插件依赖仍由引擎的插件依赖收集机制安装到 `.wopal/` 运行时 node_modules，不改变安装路径。
-- D-07: `@wopal/ellamaka-*` 包尚未发布到 npm（发布账号待解锁）期间，本地验证采用 symlink 接线到 ellamaka worktree 的包目录（`.wopal/node_modules/@wopal/ellamaka-plugin` → `<ellamaka-worktree>/packages/plugin`，`.wopal/node_modules/@wopal/ellamaka-sdk` → `<ellamaka-worktree>/packages/sdk/js`），模拟 npm 安装结果；发布后删除 symlink，由引擎依赖安装机制接管。
+- D-07: `@wopal/ellamaka-*` 包已发布至 npm（2.0.5、2.0.6，latest 为 dist-tag）；本地验证直接声明依赖，走引擎依赖收集安装机制（重启触发）或插件本地 `bun install`，不做 symlink 接线。`.wopal/node_modules/@wopal/` 下的旧 symlink 接线已悬空（目标 worktree 已删除），实施前需清理。
 - D-08: 确立纯 Bun 开发工具链铁律：清理所有 pnpm/npm 遗留锁文件与配置，锁文件仅认 `bun.lock`；native build 由 `trustedDependencies` 管理。
 - D-09: 修正 `DESIGN-wopal-plugin.md` 内部目标态自相矛盾（消除"本地 types.ts 定义"历史遗留句，与依赖声明章节保持一致）。
 - D-10 (ONT-G4): 收敛插件配置消费面。`wopalPluginConfigSchema` 扩展支持可选的 `pluginConfig` 节点；`dsh-adapter` 优先从 `wopal.pluginConfig.dsh-adapter` 读取行为配置（回退支持 rawOptions 兼容），彻底支持插件条目零内联 options。
@@ -91,6 +92,8 @@ export interface DshAdapterConfig {
 - 引擎侧 `config.ts` 的 pin 逻辑调整（归 ellamaka 侧）
 - CLI 侧 `wopal config` 命令族与 operation 实现（归 CLI 侧 P-J 槽位）
 - 运行时能力装配（ONT-G1 ~ ONT-G3，依赖 ellamaka P-C 完成后再行动）
+- 配置写入端与 settings 迁移：`wopal.pluginConfig` 的值本次由用户手工调整（不做迁移步骤）；待 wopal-cli `config` 命令族落地（CLI P-J）后经 CLI 配置与管理
+- `tui-ellamaka` TUI 插件迁移：其仍消费 `@opencode-ai/plugin/tui`（无 package.json），本次不覆盖。风险备忘：引擎依赖重装剪除未声明包后 TUI 插件可能加载失败——后续提案处理（切换 `@wopal/ellamaka-plugin/tui` 或补自有 package.json）
 
 ## Affected Files
 
@@ -110,7 +113,7 @@ export interface DshAdapterConfig {
 
 ### Agent Verification
 
-1. [ ] `wopal-plugin` 的 `package.json` 依赖声明已迁移：包含 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk`（纯 `x.y.z` 稳定版本），且不再包含 `@opencode-ai/*` 依赖；`src/types.ts` 不再定义手抄的 `SystemPromptMetadata` 等类型，全仓无 `@opencode-ai/*` 导入残留。
+1. [ ] `wopal-plugin` 的 `package.json` 依赖声明已迁移：包含 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk`（纯 `x.y.z` 稳定版本），且不再包含 `@opencode-ai/*` 依赖；`src/types.ts` 不再定义手抄的 `SystemPromptMetadata` 等类型，两个插件目录内（源码、测试与 package 清单）无 `@opencode-ai/*` 导入残留（`bun.lock` 随 `bun install` 再生成）。
 2. [ ] `dsh-adapter` 目录包含合法的 `package.json`，声明 `@wopal/ellamaka-plugin` 依赖且版本与 `wopal-plugin` 保持一致，`index.ts` 无 `@opencode-ai/*` 导入残留。
 3. [ ] ONT-G4 闭合验证：`dsh-adapter` 在插件条目零 options 时，能正确从 `wopal.pluginConfig.dsh-adapter` 读取沙箱配置（`sandbox.enabled`、`sandbox.mode`、`escalation`）且行为等价；`wopal-plugin` 配置 schema 支持 `pluginConfig` 节点校验。
 4. [ ] 工具链纯净性验证：插件目录下无任何 `pnpm-lock.yaml` / `pnpm-workspace.yaml` / `package-lock.json`，`bun run typecheck` 退出码为 0，`bun run test:run` 全绿，`dsh-adapter` 测试全绿。
@@ -146,12 +149,14 @@ export interface DshAdapterConfig {
 - 补充 `wopal.pluginConfig` 配置节架构说明，指出生态插件零内联 options 规范
 - `wopal-plugin/AGENTS.md` 与 `AGENTS.zh-CN.md` 明确禁止任何非 Bun 锁文件与配置，规范 `trustedDependencies` 机制与包导入规则
 
+**TDD**: false
+
 **Changes**:
 1. 修改 `.wopal/docs/DESIGN-wopal-plugin.md`
 2. 修改 `.wopal/plugins/wopal-plugin/AGENTS.md` 与 `AGENTS.zh-CN.md`
 
 **Verify**:
-`python3 .wopal/skills/dev-doc-master/scripts/verify-docset.py .wopal/docs --main DESIGN.md` 退出码 0；`grep` 断言文档中不再出现手抄描述
+`python3 skills/dev-doc-master/scripts/verify-docset.py docs --main DESIGN.md` 退出码 0（在隔离 worktree 根目录运行）；`grep` 断言文档中不再出现手抄描述
 
 **Done**:
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
@@ -168,6 +173,8 @@ export interface DshAdapterConfig {
 - `src/index.ts`、`src/hooks/system-transform.ts` 及所有工具代码中的 `@opencode-ai/*` import 全部替换为 `@wopal/ellamaka-*`
 - `src/config/schema.ts` 扩展 `pluginConfig` 节点支持
 - 在纯 Bun 环境下 `bun run typecheck` 与 `bun run test:run` 全绿
+
+**TDD**: true
 
 **Changes**:
 1. RED: 添加断言全仓无 `@opencode-ai/*` 残留、types.ts 无手抄类型及 schema 支持 pluginConfig 的测试，确认失败
@@ -192,6 +199,8 @@ export interface DshAdapterConfig {
 - `index.ts` 实现配置读取逻辑：优先从三层 settings（通过 input.wopalSpaceRoot 或配置解析）读取 `wopal.pluginConfig.dsh-adapter`，回退兼容 rawOptions；实现零内联 options
 - 测试覆盖新配置路径与工具代理逻辑，测试全绿
 
+**TDD**: true
+
 **Changes**:
 1. RED: 为 dsh-adapter 添加无 `@opencode-ai/plugin` 残留及支持 `wopal.pluginConfig.dsh-adapter` 配置读取的失败测试
 2. GREEN: 创建 `package.json`，切换 import，增加配置解析与回退逻辑
@@ -214,3 +223,7 @@ export interface DshAdapterConfig {
 | 2 | Task 3 | fae | Task 1 | dsh-adapter 依赖补齐与配置读取，可与 Task 2 并行或串行 |
 
 Wave 2 完成后由 Rook 执行质量守门审查，随后由 Wopal 推进 Stage 至 validating。
+
+## Delivery
+
+`space sync` 与 `ontology contribute` 由用户拍板，技能不自动上行。
