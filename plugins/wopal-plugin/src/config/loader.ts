@@ -163,7 +163,23 @@ export function loadWopalConfig(
     layers.push({ layer: definition.layer, fragment });
   }
 
-  const merged = mergeConfigs(layers);
+  // ONT-G4 unified channel: this plugin's own behavior config lives under
+  // `wopal.pluginConfig["wopal-plugin"]` inside the merged `wopal` node. It
+  // wins over the legacy top-level fields (kept as a fallback for un-migrated
+  // deployments). The entry is applied as a final fragment layered on top,
+  // so deep-merge semantics, source attribution, `$VAR` resolution, and the
+  // strict zod validation all behave exactly like any other layer.
+  const winningLayer = layers.at(-1)?.layer ?? "global";
+  const rawLayers: { layer: ConfigLayer; fragment: ConfigFragment }[] = [
+    ...layers,
+  ];
+  const merged0 = mergeConfigs(rawLayers);
+  const selfEntry = merged0.config.pluginConfig?.["wopal-plugin"];
+  if (isPlainObject(selfEntry)) {
+    rawLayers.push({ layer: winningLayer, fragment: selfEntry });
+  }
+
+  const merged = mergeConfigs(rawLayers);
 
   const validated = validate(
     resolveVarReferences(

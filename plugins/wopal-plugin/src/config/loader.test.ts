@@ -255,4 +255,119 @@ describe("loadWopalConfig", () => {
       "rules.enabled": "default",
     });
   });
+
+  // ONT-G4 unified channel: the plugin's own behavior config lives under
+  // `wopal.pluginConfig["wopal-plugin"]` and takes precedence over the
+  // legacy top-level `wopal` fields (which remain as a fallback for
+  // un-migrated deployments).
+  describe("pluginConfig[wopal-plugin] precedence", () => {
+    it("overrides the legacy top-level fields when present", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spaceLocal: `{
+          "wopal": {
+            "memory": { "injection": false },
+            "pluginConfig": {
+              "wopal-plugin": { "memory": { "injection": true } }
+            }
+          }
+        }`,
+      });
+
+      const loaded = loadWopalConfig({ wopalHome, wopalSpaceRoot: spaceRoot });
+
+      expect(loaded.config.memory.injection).toBe(true);
+    });
+
+    it("deep-merges over the legacy fields instead of replacing whole nodes", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spaceLocal: `{
+          "wopal": {
+            "llm": { "baseUrl": "legacy", "model": "legacy-model", "apiKey": "$WOPAL_TEST_KEY" },
+            "pluginConfig": {
+              "wopal-plugin": { "llm": { "model": "pc-model" } }
+            }
+          }
+        }`,
+      });
+      const previous = process.env.WOPAL_TEST_KEY;
+      process.env.WOPAL_TEST_KEY = "k";
+      try {
+        const loaded = loadWopalConfig({ wopalHome, wopalSpaceRoot: spaceRoot });
+        expect(loaded.config.llm).toEqual({
+          baseUrl: "legacy",
+          model: "pc-model",
+          apiKey: "k",
+        });
+      } finally {
+        if (previous === undefined) delete process.env.WOPAL_TEST_KEY;
+        else process.env.WOPAL_TEST_KEY = previous;
+      }
+    });
+
+    it("resolves $VAR references inside pluginConfig values", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spaceLocal: `{
+          "wopal": {
+            "pluginConfig": {
+              "wopal-plugin": { "llm": { "baseUrl": "u", "model": "m", "apiKey": "$WOPAL_TEST_PC_KEY" } }
+            }
+          }
+        }`,
+      });
+      const previous = process.env.WOPAL_TEST_PC_KEY;
+      delete process.env.WOPAL_TEST_PC_KEY;
+      try {
+        const loaded = loadWopalConfig(
+          { wopalHome, wopalSpaceRoot: spaceRoot },
+          { WOPAL_TEST_PC_KEY: "from-env-file" },
+        );
+        expect(loaded.config.llm?.apiKey).toBe("from-env-file");
+      } finally {
+        if (previous === undefined) delete process.env.WOPAL_TEST_PC_KEY;
+        else process.env.WOPAL_TEST_PC_KEY = previous;
+      }
+    });
+
+    it("attributes overridden fields to the winning layer in sources", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spacePublic: `{ "wopal": { "memory": { "injection": true } } }`,
+        spaceLocal: `{
+          "wopal": {
+            "pluginConfig": { "wopal-plugin": { "memory": { "injection": false } } }
+          }
+        }`,
+      });
+
+      const loaded = loadWopalConfig({ wopalHome, wopalSpaceRoot: spaceRoot });
+
+      expect(loaded.config.memory.injection).toBe(false);
+      expect(loaded.sources["memory.injection"]).toBe("space-local");
+    });
+
+    it("still honors legacy top-level fields when pluginConfig is absent", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spaceLocal: `{ "wopal": { "memory": { "injection": false } } }`,
+      });
+
+      const loaded = loadWopalConfig({ wopalHome, wopalSpaceRoot: spaceRoot });
+
+      expect(loaded.config.memory.injection).toBe(false);
+    });
+
+    it("fails loud when the pluginConfig entry is not an object", () => {
+      const { wopalHome, spaceRoot } = fixture();
+      writeSettings(wopalHome, spaceRoot, {
+        spaceLocal: `{
+          "wopal": { "pluginConfig": { "wopal-plugin": "on" } }
+        }`,
+      });
+
+      expect(() => loadWopalConfig({ wopalHome, wopalSpaceRoot: spaceRoot })).toThrow();
+    });
+  });
 });
