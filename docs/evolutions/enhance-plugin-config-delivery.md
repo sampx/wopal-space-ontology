@@ -71,11 +71,11 @@ plugins:
 
 ## In Scope
 
+- `assembly/archetypes/coding.yaml` 切换分段格式（与 CLI 结构切换同窗口落地）
+- wopal-plugin 导出 id 修正 `wopal-plugin`
 - dsh-adapter：删三层自读链，改取 `input.pluginConfig["dsh-adapter"]` + zod 校验 + 内联 fallback；`wopalSpaceRoot` 消费点如仅用于文件定位则同步清理（保留引擎仍注入的契约字段）
 - wopal-plugin：loader 改取 `input.pluginConfig["wopal-plugin"]` 切片 + `$VAR` 解析 + zod 校验；旧顶层字段 fallback 语义维持与内联一致的兼容层级
 - tui-ellamaka：删 `config.ts` 文件读取链，改取 `api.pluginConfig["tui-ellamaka"]` + 校验 + 内联 fallback
-- `assembly/archetypes/coding.yaml` 切换分段格式
-- wopal-plugin 导出 id 修正 `wopal-plugin`
 - 三插件测试更新；wopal-plugin lint / typecheck 纳入验证
 
 ## Out of Scope
@@ -99,11 +99,11 @@ plugins:
 
 ### Agent Verification
 
-1. [ ] dsh-adapter 消费：注入 `pluginConfig["dsh-adapter"]` 片段 → 生效配置正确（含无 entry 走内联、非法 entry fail loud 报错信息含插件名与字段路径）；源码不再有任何 settings 文件读取调用。
-2. [ ] wopal-plugin 消费：注入切片 → 生效配置正确（deep merge、`$VAR` 解析、zod 校验、缺失走默认）；源码不再读 settings 文件；旧顶层字段兼容语义与设计一致。
-3. [ ] tui-ellamaka 消费：`api.pluginConfig["tui-ellamaka"]` 的 `enabled`/`label` 生效；非法形状报错；`config.ts` 及其文件读取链删除；内联 fallback 仍生效。
-4. [ ] 装配单切换：`coding.yaml` 为新分段格式；在空间上经 CLI 物化后 `settings.local.jsonc` 的 `ellamaka.plugin` 与 `tui.plugin` 分段正确（与 CLI 侧联合验证，物化命令可重跑幂等）。
-5. [ ] wopal-plugin id：导出 id 为 `wopal-plugin`；TUI 插件启用状态键与去重身份随之对齐（无 `wopal-wopal-plugin` 残留）。
+1. [ ] 装配单切换：`coding.yaml` 为新分段格式；在空间上经 CLI 物化后 `settings.local.jsonc` 的 `ellamaka.plugin` 与 `tui.plugin` 分段正确（与 CLI 侧联合验证，物化命令可重跑幂等）。
+2. [ ] wopal-plugin id：导出 id 为 `wopal-plugin`；TUI 插件启用状态键与去重身份随之对齐（无 `wopal-wopal-plugin` 残留）。
+3. [ ] dsh-adapter 消费：注入 `pluginConfig["dsh-adapter"]` 片段 → 生效配置正确（含无 entry 走内联、非法 entry fail loud 报错信息含插件名与字段路径）；源码不再有任何 settings 文件读取调用。
+4. [ ] wopal-plugin 消费：注入切片 → 生效配置正确（deep merge、`$VAR` 解析、zod 校验、缺失走默认）；源码不再读 settings 文件；旧顶层字段兼容语义与设计一致。
+5. [ ] tui-ellamaka 消费：`api.pluginConfig["tui-ellamaka"]` 的 `enabled`/`label` 生效；非法形状报错；`config.ts` 及其文件读取链删除；内联 fallback 仍生效。
 6. [ ] 回归与质量（cross-Task）：三插件既有测试适配后全绿（dsh-adapter `bun test`、wopal-plugin `bun run test:run`、tui-ellamaka 等效测试入口）；wopal-plugin `bun run lint` / `typecheck` 通过；改动文件格式检查通过。
 
 ### User Validation
@@ -124,9 +124,39 @@ plugins:
 
 ## Implementation
 
-### Task 1: dsh-adapter 消费引擎交付表
+### Task 1: 装配单切换与 id 修正
 
-**Verification Intent**: AC#1
+**Verification Intent**: AC#1, AC#2
+
+**Behavior**:
+- `coding.yaml` 为新分段格式，其余四类能力声明不变
+- 经 CLI 物化后 `settings.local.jsonc` 双段正确、可幂等重跑
+- wopal-plugin 导出 id = `wopal-plugin`；无 `wopal-wopal-plugin` 源码残留
+
+**Pre-read**: `assembly/archetypes/coding.yaml`、`plugins/wopal-plugin/src/index.ts:350-361`、`.wopal/docs/DESIGN-assembly.md`（装配单格式）
+
+**Design**:
+`coding.yaml` 的 `plugins` 改为分段映射（`ellamaka` / `tui` 段键）；wopal-plugin 导出 id 字符串修正。物化验证依赖 CLI Plan 已交付的解析与物化实现。本 Task 与 `wopal-cli/enhance-assembly-sectioned-plugins` **同窗口落地**——解析器切换后旧格式即 invalid，两侧必须同批；落地时三插件仍自读文件（功能等价），消费改造在 Task 2-4 跟进。
+
+**TDD**: false（装配单为声明式数据、id 为字面量修正；验证以物化幂等命令与源码扫描为主）
+
+**Changes**:
+1. 装配单 `plugins` 切换为分段映射
+2. wopal-plugin 导出 id 修正
+3. 验证物化命令幂等（依赖 CLI 侧实现）
+
+**Verify**: `git -C .wopal diff --stat` 显示仅预期文件；`grep -rn "wopal-wopal-plugin" .wopal/plugins/` 无命中；物化命令 `wopal space capability add plugin wopal-plugin --section ellamaka`（或等效）重跑输出 up to date
+
+**Done**:
+任务产出：装配单分段格式 + id 修正
+实际触碰文件：
+- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+
+---
+
+### Task 2: dsh-adapter 消费引擎交付表
+
+**Verification Intent**: AC#3
 
 **Behavior**:
 - 注入 `{ "dsh-adapter": { sandbox: { enabled: true, mode: "read-only" } } }` → 生效配置同上
@@ -156,9 +186,9 @@ plugins:
 
 ---
 
-### Task 2: wopal-plugin 消费引擎交付表
+### Task 3: wopal-plugin 消费引擎交付表
 
-**Verification Intent**: AC#2
+**Verification Intent**: AC#4
 
 **Behavior**:
 - 注入 `{ "wopal-plugin": { memory: {...}, rules: {...} } }` → 生效配置正确、zod 校验、`$VAR` 解析正常
@@ -188,9 +218,9 @@ plugins:
 
 ---
 
-### Task 3: tui-ellamaka 消费 TuiPluginApi 交付表
+### Task 4: tui-ellamaka 消费 TuiPluginApi 交付表
 
-**Verification Intent**: AC#3
+**Verification Intent**: AC#5
 
 **Behavior**:
 - `api.pluginConfig["tui-ellamaka"]` = `{ enabled: true, label: "X" }` → 品牌 label 为 X、插件启用
@@ -220,43 +250,17 @@ plugins:
 
 ---
 
-### Task 4: 装配单切换与 id 修正
-
-**Verification Intent**: AC#4, AC#5
-
-**Behavior**:
-- `coding.yaml` 为新分段格式，其余四类能力声明不变
-- 经 CLI 物化后 `settings.local.jsonc` 双段正确、可幂等重跑
-- wopal-plugin 导出 id = `wopal-plugin`；无 `wopal-wopal-plugin` 源码残留
-
-**Pre-read**: `assembly/archetypes/coding.yaml`、`plugins/wopal-plugin/src/index.ts:350-361`、`.wopal/docs/DESIGN-assembly.md`（装配单格式）
-
-**Design**:
-`coding.yaml` 的 `plugins` 改为分段映射（`ellamaka` / `tui` 段键）；wopal-plugin 导出 id 字符串修正。物化验证依赖 CLI Plan 已交付的解析与物化实现（联合验收在 Delivery Notes 说明）。本 Task 属本体侧切换动作，落地即改变装配行为——与 Task 1-3 同批集成，确保中间态不破坏启动。
-
-**TDD**: false（装配单为声明式数据、id 为字面量修正；验证以物化幂等命令与源码扫描为主）
-
-**Changes**:
-1. 装配单 `plugins` 切换为分段映射
-2. wopal-plugin 导出 id 修正
-3. 验证物化命令幂等（依赖 CLI 侧实现）
-
-**Verify**: `git -C .wopal diff --stat` 显示仅预期文件；`grep -rn "wopal-wopal-plugin" .wopal/plugins/` 无命中；物化命令 `wopal space capability add plugin wopal-plugin --section ellamaka`（或等效）重跑输出 up to date
-
-**Done**:
-任务产出：装配单分段格式 + id 修正
-实际触碰文件：
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
-
 ---
 
 ## Delegation Strategy
 
 | Wave | Task | 执行者 | 依赖 | 委派理由 |
 |------|------|--------|------|---------|
-| 1 | Task 1, Task 2, Task 3 | fae | 引擎交付 Plan 已交付 | 三插件消费改造相互独立，可分派并行（同 worktree 串行） |
-| 2 | Task 4 | fae | Task 1-3 + CLI Plan 已交付 | 装配单切换需消费改造就位，避免中间态 |
+| 1 | Task 1 | fae | `wopal-cli/enhance-assembly-sectioned-plugins` 同窗口 | 结构切换：CLI 解析器与装配单必须同批 |
+| 2 | Task 2, Task 3, Task 4 | fae | `ellamaka/enhance-config-delivery` 交付字段 | 三插件消费改造相互独立，可分派并行（同 worktree 串行） |
 
 ## Delivery
+
+- 批次内顺序：Task 1 与 `wopal-cli/enhance-assembly-sectioned-plugins` 同窗口（结构切换）→ Task 2-4 待 `ellamaka/enhance-config-delivery` 交付字段后实施 → 实机回归（User Validation）。
 
 `space sync` 与 `ontology contribute` 由用户拍板，技能不自动上行。
