@@ -81,7 +81,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 | Plugin logger | `.wopal/plugins/wopal-plugin/src/logger.ts` | 修改 | 增加兜底层与归一化 |
 | Plugin runtime env | `.wopal/plugins/wopal-plugin/src/runtime-environment.ts` | 修改 | allowlist 增加变量 |
 | Plugin tests | `.wopal/plugins/wopal-plugin/src/logger.test.ts`, `src/runtime-environment.test.ts` | 修改 | 契约锁定 |
-| Plugin design | `.wopal/docs/DESIGN-wopal-plugin.md` | 修改 | Logging System / Precedence 节同步 |
+| Plugin design | `.wopal/docs/DESIGN-wopal-plugin.md` | 修改 | Logging System / Precedence 节 + Environment Variable Roles 表同步 |
 | Plugin AGENTS | `.wopal/plugins/wopal-plugin/AGENTS.md` | 修改 | Debug Switches 表新增 `ELLAMAKA_LOG_LEVEL` 行（debug-switch 契约） |
 
 ## Acceptance Criteria
@@ -92,7 +92,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 2. [ ] 归一化与回退：`ELLAMAKA_LOG_LEVEL=DEBUG` → 生效 `debug`；非法宿主值（如 `TRACE` 或空串）不破坏解析，回落至下一层或 `info`。
 3. [ ] allowlist：`ELLAMAKA_LOG_LEVEL` 从真实进程环境被读取；`.env` 文件中的同名键不生效（既有边界保持）。
 4. [ ] 回归与门禁：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过 `bun run lint` 与 `bun run typecheck`。
-5. [ ] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
+5. [ ] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链，且 Environment Variable Roles 表（`DESIGN-wopal-plugin.md:299-308` 附近）纳入 `ELLAMAKA_LOG_LEVEL` 行（角色：宿主统一级别兜底；来源：仅真实进程环境，不从 `.env` 读取）；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
 
 ### User Validation
 
@@ -136,7 +136,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 1. RED：四层优先级、归一化、非法值、allowlist 行为落成失败测试
 2. GREEN：实现兜底层与 allowlist 变更，至测试全绿
 3. REFACTOR：合并级别词表归一化辅助函数
-4. DOCS：`DESIGN-wopal-plugin.md` 四层链同步 + `AGENTS.md` Debug Switches 表新行
+4. DOCS：`DESIGN-wopal-plugin.md` 四层链 + Environment Variable Roles 表同步 + `AGENTS.md` Debug Switches 表新行
 
 **Verify**: `cd .wopal/plugins/wopal-plugin && bun run test:run -- src/logger.test.ts src/runtime-environment.test.ts` 全绿；`bun run lint` 与 `bun run typecheck` 通过（AC#4 质量门禁）；`grep -n "ELLAMAKA_LOG_LEVEL" AGENTS.md` 命中 Debug Switches 表新行
 
@@ -160,3 +160,4 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 ## Review Disposition
 
 2026-09-25 rook 首审 REVISE → 修订：W-01 → `plugins/wopal-plugin/AGENTS.md` Debug Switches 表纳入 Affected Files 与 Task 1（AC#5）；W-02 → Task Verify 补 `bun run lint` / `bun run typecheck`（AC#4）。
+2026-09-25 rook 终局复审 REVISE（预算用尽，wopal 按报告处置）：终局 W-01 指出 `DESIGN-wopal-plugin.md` 的 Environment Variable Roles 表（:299-308）仍只列 `WOPAL_PLUGIN_LOG_*`。处置：Task 1 DOCS 步骤、Affected Files Role 列、AC#5 均已补入该表同步，并明示 `ELLAMAKA_LOG_LEVEL` 仅来自真实进程环境、不从 `.env` 读取。
