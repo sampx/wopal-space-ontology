@@ -19,7 +19,7 @@
 
 ## Goal
 
-本体资产的全部维护面单点收编到 `ontology-evolution` 技能；`space-master` 收窄为路由指引；`wopal/ontology-maintain` 命令薄化为技能触发器；机制脚本在 CLI `space evo` 命令族完整交付后退役（CLI 交付由配套 dev-flow Plan `feat-cli-space-evo-migration` 承载）。
+本体资产的全部维护面单点收编到 `ontology-evolution` 技能；`space-master` 收窄为路由指引；`wopal/ontology-maintain` 命令薄化为技能触发器；机制脚本在 CLI `space evo` 命令族完整交付后退役（CLI 交付由配套 dev-flow Plan `feature-cli-space-evo-state-machine-migration` 承载）。
 
 ## Technical Context
 
@@ -77,7 +77,7 @@ description: maintain ontology instance and collaboration
 
 ## Out of Scope
 
-- CLI `space evo` 状态机命令交付——配套 dev-flow Plan `feat-cli-space-evo-migration` 承载，本提案不碰 wopal-cli 仓库
+- CLI `space evo` 状态机命令交付——配套 dev-flow Plan `feature-cli-space-evo-state-machine-migration` 承载，本提案不碰 wopal-cli 仓库
 - scripts/（evo.py / lib/）删除——CLI 命令族合入 main 后按 D-04 步骤二执行（quick 模式即可，无设计面）
 - space-master 的 AGENTS.md / README / Skills 维护章节——非本体维护面
 - `dev-flow` / `agents-collab` 等其他技能
