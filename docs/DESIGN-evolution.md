@@ -1,7 +1,7 @@
 # DESIGN — Evolution Loop
 
 > **Status**: Active
-> **Updated**: 2026-09-24
+> **Updated**: 2026-09-25
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -28,7 +28,7 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 3. **正常推进一律 fast-forward**：空间分支必须可对齐时才能推进；有待贡献提交时先贡献，有未提交修改时先处理工作区。
 4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
-6. **默认执行，不设审批门控**：`space sync` 由 agent 按用户意图调用。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
+6. **机制安全，不设审批门控**：CLI 默认 dry-run 预览，`--confirm` 才落盘；agent 按用户意图直接执行 `--confirm`，不引入额外审批门控。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
 7. **登记是唯一范围入口**：装配区内新路径的持久持有靠显式登记（`space capability add --local` 记入 `localState.added` 并扩稀疏范围）；未登记的未跟踪文件由范围重算保护不清扫，但不出现在任何清单中。登记不产生提交——`localState` 是空间私有事实，不进入空间分支树。`.gitignore` 过滤敏感文件。
 8. **范围重算保留本地状态**：下行按装配单重算稀疏范围时，范围 = 装配单声明 ∪ `localState.added` − `localState.shadowed`；装配定义类基础文件始终包含。本地条目（added/shadowed）不随提交历史变化，也不上行。
 
@@ -68,7 +68,7 @@ Maka 专职海关与提议-实施权责分立，空间运行中产生的能力�
 
 ## Capability Evolution Workflow
 
-本体能力进化的执行机制由 `ontology-evolution` 技能承载。该技能是四个核心角色在所有空间类型下的常驻能力：任意空间都能维护与补充自己的本体能力，无需装配代码开发工作流。代码项目开发流程由 `dev-flow` 拥有（见 `./DESIGN-capabilities.md`）；本体能力进化流程由 `ontology-evolution` 拥有。两条流程的对象不同——前者面向 `projects/` 下的代码仓库，后者面向空间自身的本体能力资产。
+本体能力进化的执行机制由 `ontology-evolution` 技能承载。该技能是四个核心角色在所有空间类型下的常驻能力：任意空间都能维护与补充自己的本体能力，无需装配代码开发工作流。代码项目开发流程由 `dev-flow` 拥有（见 `./DESIGN-capabilities.md`）；本体能力进化流程由 `ontology-evolution` 拥有。两条流程的对象不同——前者面向 `projects/` 下的代码仓库，后者面向空间自身的本体能力资产。技能同时承载本体维护操作的执行协议（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）——进化的机制操作与日常维护共用同一套命令面与安全纪律，规范单点维护在技能内。
 
 技能分两条车道，职责不重叠：
 
@@ -97,7 +97,7 @@ draft → accepted → implementing → validating → archived
 
 提案默认不创建 Issue 载体；用户明确要求时才引入评审与 Issue。
 
-推进状态记在提案的 `Stage` 字段。与代码开发流程相比，字段名与词表都不重叠；与设计文档的 `Status` 字段（Draft / Proposed / Active）相比，词表出现一个同形词 `draft`，靠字段名区分。三者同处 `docs/` 之下，字段名是主要的区分依据。状态推进由技能脚本承担，Agent 不手改 `Stage` 字段。
+推进状态记在提案的 `Stage` 字段。与代码开发流程相比，字段名与词表都不重叠；与设计文档的 `Status` 字段（Draft / Proposed / Active）相比，词表出现一个同形词 `draft`，靠字段名区分。三者同处 `docs/` 之下，字段名是主要的区分依据。状态推进由机制命令承担，Agent 不手改 `Stage` 字段；机制命令的唯一操作面是 CLI `space evo` 命令族（目标态，契约见 `../../projects/wopal-cli/docs/DESIGN-evolution.md`），迁移期技能内脚本为过渡实现，双实现不得长期并行。
 
 ### Evolution Documents
 
@@ -134,8 +134,9 @@ draft → accepted → implementing → validating → archived
 | 命令 | 方向 | 职责 |
 |------|------|------|
 | `space status` | — | 只读：落后 / 待贡献 / 装配状态 / 本地状态清单（added / shadowed / 未登记未跟踪文件） |
-| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；上行前校验本地状态不泄漏（见下）；默认执行，`--dry-run` 仅预览 |
+| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；上行前校验本地状态不泄漏（见下）；CLI 默认 dry-run 预览，`--confirm` 落盘 |
 | `space capability add/remove` | — | 无旗标：增删装配单中的能力并提交，随 sync 上行，同类型空间跟进；`--local`：写入 `localState`（added / shadowed）并调整稀疏范围，零提交、永不上行 |
+| `space evo <family>` | — | 机制车道：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
@@ -144,7 +145,7 @@ draft → accepted → implementing → validating → archived
 
 **上行不泄漏本地状态（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）与 `localState`（added ∪ shadowed）无交集；命中即拒绝上行并给出处置指引（撤出提交或解除登记）。该闸兜底用户手动 `git add/commit` 将本地状态内容提交进空间分支的场景——本地隔离不依赖用户记得，由机制强制。
 
-`space sync` 默认执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳管的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
+`space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
 
 `ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么、以哪条通道装（共享进装配单或 `--local` 私有持有）。装配单中不存在的能力不走本命令：用户以共享意图引入时用 `space capability add`，以私有意图引入时用 `space capability add --local`。
 

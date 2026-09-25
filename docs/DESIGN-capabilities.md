@@ -80,22 +80,24 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 
 | 层次 | 职责 | 规模 | 代表 |
 |------|------|------|------|
-| 空间根技能 | 流程导航、场景路由、委派基础原则 | 1 | `space-master` |
-| 工作流技能 | 开发状态机、Plan 规范、委派 API、WSF 产品流水线 | ~66 | `dev-flow`、`ontology-evolution`、`agents-collab`、WSF 技能族 |
+| 空间根技能 | 流程路由与概念模型入口：场景分流、核心技能导航、协作边界 | 1 | `space-master` |
+| 工作流技能 | 开发状态机、本体进化与维护执行协议、委派 API、WSF 产品流水线 | ~66 | `dev-flow`、`ontology-evolution`、`agents-collab`、WSF 技能族 |
 | 专用技能 | 独立领域能力 | ~13 | `fc-local`、`youtube-master`、`ellamaka-config`、`automating-mail`、`mac-reminder`、`git-worktrees`、`skill-creator` 等 |
 
 每个技能遵循三级加载：元数据（name + description）→ 主体（SKILL.md body）→ 资源（scripts / references / assets）。
 
 两个工作流技能按对象分工：`dev-flow` 面向 `projects/` 下的代码仓库，`ontology-evolution` 面向空间自身的本体能力资产。四个核心角色在所有空间类型常驻，本体能力进化因此对每个空间可用，不依赖空间是否装配代码开发工作流。两条流程的状态词汇互不重合，实施与交付纪律见 `./DESIGN-evolution.md`。
 
-`space-master` 是 ontology 的根技能，但其当前实现仍偏粗糙；后续应单独重构为概念模型入口、流程选择器、核心技能路由器、ontology/worktree 协作指南与多 Space 运维入口。
+本体资产的全部维护面由 `ontology-evolution` 技能单点拥有：能力进化的语义与机制两条车道（提案、状态机、隔离实施、交付终端），以及本体维护操作（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）的执行协议。`space-master` 只保留路由职责——把本体相关请求导向 `ontology-evolution`，不重复维护规范；`wopal/ontology-maintain` 命令是薄触发入口，加载该技能后按其协议执行，自身不承载规范。
+
+`space-master` 是 ontology 的根技能，定位为概念模型入口、流程选择器与核心技能路由器。本体维护规范收编至 `ontology-evolution` 后，其职责边界收窄为「选哪个技能」，不再持有任何执行协议的完整副本。
 
 ## Command System
 
 | 类别 | 命令 | 载体 |
 |------|------|------|
 | 空间维护 | `/init`、`wopal space status`、`wopal space sync`、`wopal space capability add/remove` | `commands/init.md`、CLI 命令 |
-| 记忆与进化 | `/wopal:memo`、`/wopal:evolve`、`/wopal:distill`、`/wopal:memory` | `commands/wopal/` |
+| 记忆与进化 | `/wopal:memo`、`/wopal:evolve`、`/wopal:distill`、`/wopal:memory`、`wopal/ontology-maintain` | `commands/wopal/` |
 | 唤醒与感知 | `/wopal:summon` | `commands/wopal/summon.md` |
 | 文档管理 | `/cupdate-prd`、`/cupdate-design`、`/cupdate-roadmap`、`/cupdate-readme`、`/cupdate-br`、`/cupdate-agent-rules` | `commands/cupdate-*.md` |
 | 开发支持 | `/commit`、`/review` | `commands/commit.md`、`commands/review.md` |

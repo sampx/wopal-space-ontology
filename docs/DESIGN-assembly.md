@@ -425,7 +425,7 @@ CLI 首次初始化必须创建：
 1. 提醒 Agent 在上下文压缩或信息缺失时可重新读取 `.wopal-space/STRUCTURE.md`、`.wopal-space/REGULATIONS.md`、`.wopal-space/memory/USER.md` 与 `.wopal-space/memory/MEMORY.md`。
 2. 提供用户空间个性化规则的写入位置。
 
-空间事实由 `STRUCTURE.md` 承载，工作规则由 `REGULATIONS.md` 承载，详细技能路由由 `space-master` 承载。
+空间事实由 `STRUCTURE.md` 承载，工作规则由 `REGULATIONS.md` 承载，详细技能路由由 `space-master` 承载；本体维护与进化流程的执行协议在 `ontology-evolution` 技能（由 `wopal/ontology-maintain` 命令触发）。
 
 ### `REGULATIONS.md` Template
 
@@ -437,12 +437,12 @@ CLI 首次初始化必须创建：
 - Git 基本法：实施前检查、提交前检查、提交格式、历史不可变原则。
 - 子代理委托：任何委派前加载 `agents-collab`，并遵守路径与目标项目上下文检查。
 - 记忆与进化：长期记忆写入需去重、展示、等待用户确认。
-- 核心技能入口：介绍 `space-master`、`agents-collab`、`dev-flow` 三个空间核心技能。
+- 核心技能入口：介绍 `space-master`、`agents-collab`、`dev-flow` 三个空间核心技能；本体维护与进化的执行协议见 `ontology-evolution`。
 
 核心技能概要：
 
 | 技能 | 空间职责 | 触发场景 |
 |---|---|---|
-| `space-master` | 空间技能根与流程路由总入口 | 任务意图不清、空间运维、ontology 协作、技能体系、流程选择、多 Space 管理 |
+| `space-master` | 空间技能根与流程路由总入口 | 任务意图不清、空间运维、技能体系、流程选择、多 Space 管理；本体维护与进化路由至 `ontology-evolution` |
 | `agents-collab` | 子代理协作协议 | 任何 fae、rook 或 general 子代理委派前 |
 | `dev-flow` | Issue/Plan 驱动开发状态机 | Issue、Plan、审批、执行、验证、归档 |
