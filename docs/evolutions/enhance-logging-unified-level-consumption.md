@@ -64,6 +64,8 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 - `resolveLevel` 增加 `ELLAMAKA_LOG_LEVEL` 兜底层与归一化
 - `ENV_ALLOWLIST` 增加 `ELLAMAKA_LOG_LEVEL`
 - 单测：四层优先级、归一化、非法值回退、allowlist 读取
+- 文档同步：`DESIGN-wopal-plugin.md` 四层链 + `plugins/wopal-plugin/AGENTS.md` Debug Switches 表新行
+- 质量门禁：lint + typecheck 纳入 Task 验证命令
 
 ## Out of Scope
 
@@ -80,6 +82,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 | Plugin runtime env | `.wopal/plugins/wopal-plugin/src/runtime-environment.ts` | 修改 | allowlist 增加变量 |
 | Plugin tests | `.wopal/plugins/wopal-plugin/src/logger.test.ts`, `src/runtime-environment.test.ts` | 修改 | 契约锁定 |
 | Plugin design | `.wopal/docs/DESIGN-wopal-plugin.md` | 修改 | Logging System / Precedence 节同步 |
+| Plugin AGENTS | `.wopal/plugins/wopal-plugin/AGENTS.md` | 修改 | Debug Switches 表新增 `ELLAMAKA_LOG_LEVEL` 行（debug-switch 契约） |
 
 ## Acceptance Criteria
 
@@ -88,7 +91,8 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 1. [ ] 四层优先级：`WOPAL_PLUGIN_LOG_LEVEL=warn` + 配置 `debug` + `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `warn`；无显式 env 时配置 `debug` 胜 `ERROR`；两者皆缺时 `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `error`；全缺 → `info`。
 2. [ ] 归一化与回退：`ELLAMAKA_LOG_LEVEL=DEBUG` → 生效 `debug`；非法宿主值（如 `TRACE` 或空串）不破坏解析，回落至下一层或 `info`。
 3. [ ] allowlist：`ELLAMAKA_LOG_LEVEL` 从真实进程环境被读取；`.env` 文件中的同名键不生效（既有边界保持）。
-4. [ ] 回归：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过插件 lint/typecheck。
+4. [ ] 回归与门禁：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过 `bun run lint` 与 `bun run typecheck`。
+5. [ ] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
 
 ### User Validation
 
@@ -110,7 +114,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 
 ### Task 1: 插件级别兜底层
 
-**Verification Intent**: AC#1, AC#2, AC#3, AC#4
+**Verification Intent**: AC#1, AC#2, AC#3, AC#4, AC#5
 
 **Behavior**:
 - `resolveLevel({ WOPAL_PLUGIN_LOG_LEVEL: "warn" }, { level: "debug" })` → `warn`（显式 env 最高）
@@ -121,10 +125,10 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 - `resolveLevel({})` → `info`
 - `loadRuntimeEnvironment` 从真实 process env 读取 `ELLAMAKA_LOG_LEVEL`；`.env` 文件同名键被忽略
 
-**Pre-read**: `.wopal/plugins/wopal-plugin/src/logger.ts`（resolveLevel 与 getMinLevel）、`src/runtime-environment.ts`（ENV_ALLOWLIST 与 loadRuntimeEnvironment）、`src/logger.test.ts`
+**Pre-read**: `.wopal/plugins/wopal-plugin/src/logger.ts`（resolveLevel 与 getMinLevel）、`src/runtime-environment.ts`（ENV_ALLOWLIST 与 loadRuntimeEnvironment）、`src/logger.test.ts`、`.wopal/plugins/wopal-plugin/AGENTS.md:140`（debug-switch 契约）与 `:185-193`（Debug Switches 表现状）
 
 **Design**:
-在 `resolveLevel` 的配置层之后、`info` 默认之前插入兜底层：读取 `environment.ELLAMAKA_LOG_LEVEL`，小写归一后匹配既有 `LEVELS` 词表；`TRACE` 不映射（宿主 TRACE 必须带类别才生效，插件侧静默回落默认，避免把未点名的高容量诊断打开）。`ENV_ALLOWLIST` 增加该键并补注释；`.env` 读取路径不改（allowlist 仅作用于 process env 的 pick 与 .env 的过滤，需确认 `.env` 分支是否应排除该键——实现时保证 `.env` 不提供该键，测试锁定）。
+在 `resolveLevel` 的配置层之后、`info` 默认之前插入兜底层：读取 `environment.ELLAMAKA_LOG_LEVEL`，小写归一后匹配既有 `LEVELS` 词表；`TRACE` 不映射（宿主 TRACE 必须带类别才生效，插件侧静默回落默认，避免把未点名的高容量诊断打开）。`ENV_ALLOWLIST` 增加该键并补注释；`.env` 读取路径不改（allowlist 仅作用于 process env 的 pick 与 .env 的过滤，需确认 `.env` 分支是否应排除该键——实现时保证 `.env` 不提供该键，测试锁定）。文档同步两处：`.wopal/docs/DESIGN-wopal-plugin.md` 的 Logging System / Precedence 节补四层链；`.wopal/plugins/wopal-plugin/AGENTS.md` 第 7 节 Debug Switches 表新增 `ELLAMAKA_LOG_LEVEL` 行（新 env 必须进该表，插件 AGENTS.md:140 契约）。
 
 **TDD**: true
 
@@ -132,11 +136,12 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 1. RED：四层优先级、归一化、非法值、allowlist 行为落成失败测试
 2. GREEN：实现兜底层与 allowlist 变更，至测试全绿
 3. REFACTOR：合并级别词表归一化辅助函数
+4. DOCS：`DESIGN-wopal-plugin.md` 四层链同步 + `AGENTS.md` Debug Switches 表新行
 
-**Verify**: `cd .wopal/plugins/wopal-plugin && bun test src/logger.test.ts src/runtime-environment.test.ts` 全绿
+**Verify**: `cd .wopal/plugins/wopal-plugin && bun run test:run -- src/logger.test.ts src/runtime-environment.test.ts` 全绿；`bun run lint` 与 `bun run typecheck` 通过（AC#4 质量门禁）；`grep -n "ELLAMAKA_LOG_LEVEL" AGENTS.md` 命中 Debug Switches 表新行
 
 **Done**:
-任务产出：插件级别兜底层 + allowlist + 测试
+任务产出：插件级别兜底层 + allowlist + 测试 + 双文档同步
 实际触碰文件：<实施后回填>
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
@@ -151,3 +156,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 ## Delivery
 
 `space sync` 与 `ontology contribute` 由用户拍板，技能不自动上行。
+
+## Review Disposition
+
+2026-09-25 rook 首审 REVISE → 修订：W-01 → `plugins/wopal-plugin/AGENTS.md` Debug Switches 表纳入 Affected Files 与 Task 1（AC#5）；W-02 → Task Verify 补 `bun run lint` / `bun run typecheck`（AC#4）。
