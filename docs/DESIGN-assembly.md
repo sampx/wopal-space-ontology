@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-24
+> **Updated**: 2026-09-25
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -78,17 +78,22 @@ commands:
   - review
   - wopal/memo
 
-# 该空间加载的插件
+# 该空间加载的插件：键 = settings 顶层段名，值 = 装配进该段的插件名。
+# 段名是开放的装配类目：今天 ellamaka / tui 两段，将来新的消费运行时
+# 加一个键即可（如 dsh），物化规则不变。
 plugins:
-  - wopal-plugin
-  - dsh-adapter
+  ellamaka:
+    - wopal-plugin
+    - dsh-adapter
+  tui:
+    - tui-ellamaka
 
 # 该空间加载的脚本
 scripts:
   - emt
 ```
 
-装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`。全部字段按名称声明，物化时在能力资产目录下解析为对应资产。
+装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`。前四类按名称声明；`plugins` 按「settings 段名 → 插件名列表」的映射声明，键是装配目标段名（`ellamaka` 段对应引擎的 server 插件装配，`tui` 段对应 TUI 插件装配），值是物化时在能力资产目录下解析为对应资产、并写入该段 `plugin` 数组的插件名。物化规则对每个段键一致：`settings[<段>].plugin += ../plugins/<插件名>`。
 
 脚本等扩展类目的装配语义在后续演进中定义。
 
@@ -307,7 +312,7 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 |------|---------|---------|
 | 空间插件 | 空间级 `.wopal/config/settings.local.jsonc` | CLI 按装配单生成，git 忽略，可再生 |
 
-共享 `settings.jsonc` 不硬编码插件引用。装配单的 `plugins` 字段是插件声明的唯一真相源：CLI 在 `space init` 与 `space capability add/remove` 时读取装配单，把插件引用生成到空间级 `settings.local.jsonc`。该文件可由 CLI 再生——换机器后重新按装配单装配即恢复，因此不进入版本控制。
+共享 `settings.jsonc` 不硬编码插件引用。装配单的 `plugins` 字段是插件声明的唯一真相源：CLI 在 `space init` 与 `space capability add/remove` 时读取装配单，按声明的段把插件引用生成到空间级 `settings.local.jsonc` 的对应段——`ellamaka` 段写 `ellamaka.plugin`（引擎的 server 插件装配），`tui` 段写 `tui.plugin`（TUI 插件装配）。两类装配项由消费方各自装载：引擎按 `ellamaka.plugin` 装 server 插件，TUI 运行时按 `tui.plugin` 装 TUI 插件。该文件可由 CLI 再生——换机器后重新按装配单装配即恢复，因此不进入版本控制。
 
 **插件条目只含路径引用，零内联配置。** 插件引用生成时只写路径（如 `["../plugins/dsh-adapter"]`），不携带 options——条目是纯装配事实，保证可再生。插件的行为配置统一放 settings 的 `wopal.pluginConfig.<插件名>` 节，走配置继承链（用户全局默认 → 空间覆写）。装配单可以为插件声明默认配置（`configDefaults`），CLI 装配时把默认值补丁写进 `wopal.pluginConfig` 节而不是内联进条目——默认值与用户调整都落在继承链上，设置面板与 `wopal config schema` 因此天然覆盖插件配置。
 

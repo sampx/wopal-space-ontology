@@ -1,7 +1,7 @@
 # DESIGN — Capability System
 
 > **Status**: Active
-> **Updated**: 2026-09-21
+> **Updated**: 2026-09-25
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -141,6 +141,8 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 `tui-ellamaka` 插件为 WopalSpace 模式注入 TUI 品牌元素：首页 logo 块字符画与阴影、提示行紧凑 logo、会话提示行 logo 与会话 ID，以及 Nord 系 `ellamaka-theme.json` 主题。该插件随 `.wopal/` ontology 分发，不属于 ellamaka 引擎仓库。
 
 插件静态资源（主题文件、音频）随插件目录放置，由插件按相对路径解析。
+
+插件的装配与配置消费与其他插件同一条契约：装配单的 `tui` 键物化为 settings 的 `tui.plugin` 条目（只含路径引用，见 `./DESIGN-assembly.md`）；行为配置放 `wopal.pluginConfig["tui-ellamaka"]`（`enabled` / `label` 等），由 TUI 配置链在三层 settings 中合并后经 `TuiPluginApi.pluginConfig` 整表交付，插件按自身配置键自取条目并 zod 校验，不读配置文件。装配条目的内联 options 保持为兼容 fallback，`pluginConfig` 的同名配置优先。
 
 ## Template System
 
