@@ -231,18 +231,22 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 合并规则：deep merge，后者覆盖前者的叶子值。文件缺失则跳过该层。优先级：代码默认 < 全局 < 空间公共 < 空间私有。
 
-插件启动时读取三层配置，输出 effective config 日志，标明每项配置的来源层级。
+引擎在配置加载期完成三层合并并记录来源层级；插件经 `PluginInput.pluginConfig` 取得生效表，按自身配置键自取条目。
 
 ### Configuration Schema
 
 ```jsonc
 "wopal": {
-  "llm":       { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_LLM_API_KEY" },
-  "embedding": { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_EMBEDDING_API_KEY" },
-  "rules":     { "enabled": false },
-  "memory":    { "enabled": true, "injection": true },
-  "context":   { "enabled": true },
-  "logLevel":  "info"
+  "pluginConfig": {
+    "wopal-plugin": {
+      "llm":       { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_LLM_API_KEY" },
+      "embedding": { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_EMBEDDING_API_KEY" },
+      "rules":     { "enabled": false },
+      "memory":    { "enabled": true, "injection": true },
+      "context":   { "enabled": true },
+      "logLevel":  "info"
+    }
+  }
 }
 ```
 
@@ -263,7 +267,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 ```
 
 - Schema：`z.record(z.string(), z.record(z.string(), z.unknown())).optional()` — 外层 key 为插件名，内层为该插件的自由配置对象，由各插件自行定义与校验
-- 定位：**所有 ellamaka 插件统一的插件行为配置格式**。wopal-plugin 自身同样消费 `wopal.pluginConfig["wopal-plugin"]`（优先级高于顶层遗留字段，顶层 `wopal.memory`/`llm` 等保留为未迁移部署的回退），dsh-adapter 等生态插件从 `wopal.pluginConfig.<插件名>` 读取。判定规则：插件条目（settings `plugin` 数组）保持零内联 options；插件只读不写（ONT-G4）
+- 定位：**所有 ellamaka 插件统一的插件行为配置格式**。wopal-plugin 消费 `wopal.pluginConfig["wopal-plugin"]`，dsh-adapter 等生态插件消费 `wopal.pluginConfig.<插件名>`。判定规则：插件条目（settings `plugin` 数组）保持零内联 options；插件只读不写（ONT-G4）
 - 继承：随三层 settings 走 deep merge（代码默认 < 全局 < 空间公共 < 空间私有），生态插件配置天然获得继承与覆盖能力
 - 写入端：由 wopal-cli `config` 命令族（见 `projects/wopal-cli/docs/DESIGN-config-cli.md`）承载；在此之前该节点的值由用户手工维护
 
