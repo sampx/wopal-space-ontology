@@ -42,7 +42,7 @@ def get_plan_field(plan_path: str, field_name: str) -> str:
     
     content = path.read_text()
     
-    pattern = rf'^\- \*\*{re.escape(field_name)}\*\*:\s*(.+)$'
+    pattern = rf'^\- \*\*{re.escape(field_name)}\*\*:[ \t]*(.+)$'
     match = re.search(pattern, content, re.MULTILINE)
     
     if match:
@@ -91,14 +91,14 @@ def set_plan_field(plan_path: str, field_name: str, field_value: str) -> bool:
     
     content = path.read_text()
     
-    pattern = rf'^\- \*\*{re.escape(field_name)}\*\*:\s*.*$'
+    pattern = rf'^\- \*\*{re.escape(field_name)}\*\*:[ \t]*.*$'
     match = re.search(pattern, content, re.MULTILINE)
     
     if match:
         new_line = f'- **{field_name}**: {field_value}'
         new_content = re.sub(pattern, new_line, content, count=1, flags=re.MULTILINE)
     else:
-        status_pattern = r'^\- \*\*Status\*\*:\s*.*$'
+        status_pattern = r'^\- \*\*Status\*\*:[ \t]*.*$'
         status_match = re.search(status_pattern, content, re.MULTILINE)
         
         if status_match:

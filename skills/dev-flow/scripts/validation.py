@@ -3,6 +3,7 @@
 #
 # Provides:
 #   check_doc_plan          - Plan completeness gate (submit/approve)
+#   check_product_phase     - Product/Phase metadata contract (presence + pair)
 #   check_user_validation   - UV checkbox gate (verify)
 #   check_acceptance_criteria - AC completion gate (complete)
 #   check_step_completion   - Task Done completion gate (complete)
@@ -87,6 +88,7 @@ def check_doc_plan(plan_file: str) -> None:
     issues.extend(check_agent_verification(content))
     issues.extend(check_user_validation_new(content))
     issues.extend(check_plan_status(content))
+    issues.extend(check_product_phase(content))
 
     p = _check_project_path(content)
     if p:
@@ -204,6 +206,41 @@ def check_plan_status(content: str) -> list[str]:
     if match and match.group(1) not in PLAN_STATES:
         return [f"Status: unsupported state '{match.group(1)}'"]
     return []
+
+
+def check_product_phase(content: str) -> list[str]:
+    """Product/Phase metadata contract.
+
+    Both items are always present. The pair is atomic: a phase-linked plan
+    declares both values, an unlinked plan leaves both empty. A missing item
+    breaks the archive-time phase-doc sync; a half-declared pair cannot be
+    rendered or synced at all.
+    """
+    issues: list[str] = []
+    product_m = re.search(r'^- \*\*Product\*\*:[ \t]*(.*)$', content, re.MULTILINE)
+    phase_m = re.search(r'^- \*\*Phase\*\*:[ \t]*(.*)$', content, re.MULTILINE)
+
+    if not product_m:
+        issues.append(
+            "Metadata: 'Product' item missing — keep the line, leave the "
+            "value empty when the plan is not phase-linked"
+        )
+    if not phase_m:
+        issues.append(
+            "Metadata: 'Phase' item missing — keep the line, leave the "
+            "value empty when the plan is not phase-linked"
+        )
+
+    if product_m and phase_m:
+        product_value = _strip_md(product_m.group(1)).strip()
+        phase_value = _strip_md(phase_m.group(1)).strip()
+        if bool(product_value) != bool(phase_value):
+            issues.append(
+                "Metadata: Product and Phase must be declared together "
+                "(one is set, the other is empty)"
+            )
+
+    return issues
 
 
 def _check_project_path(content: str) -> str | None:

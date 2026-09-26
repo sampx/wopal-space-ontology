@@ -132,6 +132,33 @@ def _extract_product_phase_from_body(issue_info: dict) -> tuple[str | None, str 
     )
 
 
+def _resolve_product_phase(
+    cli_product: str | None,
+    cli_phase: str | None,
+    body_product: str | None,
+    body_phase: str | None,
+) -> tuple[str | None, str | None]:
+    """Merge Product/Phase from CLI flags and the Issue body.
+
+    CLI flags, when given, override body values. The pair is atomic: a
+    phase-linked plan declares both; an unlinked plan declares neither.
+    A half-declared pair is an error — it cannot be rendered or synced.
+
+    Raises:
+        ValueError: when exactly one of the resolved pair is non-empty.
+    """
+    product = (cli_product or "").strip() or (body_product or "").strip() or None
+    phase = (cli_phase or "").strip() or (body_phase or "").strip() or None
+
+    if bool(product) != bool(phase):
+        missing = "Phase" if product else "Product"
+        raise ValueError(
+            f"Product and Phase must be declared together: missing {missing}. "
+            "Pass both --product/--phase, or fix the Issue body."
+        )
+    return product, phase
+
+
 def _title_to_slug(title: str) -> str:
     """Convert Issue title to slug (lowercase, hyphen-separated)."""
     # Extract description part: type(scope): description
@@ -236,7 +263,7 @@ def create_plan_from_template(
     template_content = template_path.read_text()
     
     # Build metadata values (just the value part, not the full line)
-    issue_value = str(issue_number) if issue_number else ""
+    issue_value = f"#{issue_number}" if issue_number else "N/A"
     type_value = plan_type
     project_value = project
     project_path_value = _derive_project_path(project, project_path)
@@ -257,11 +284,20 @@ def create_plan_from_template(
     content = content.replace("{phase}", phase_value)
     content = content.replace("{date}", created_date)
     
-    # Remove metadata lines with empty values (optional fields)
-    # Pattern: "- **Field**: " with nothing after the colon+space
+    # Remove metadata lines with empty values (optional fields), except
+    # Product/Phase which are always kept — an empty value means "not
+    # phase-linked". Presence and pair atomicity are gated at submit/approve.
     content = re.sub(
-        r'^\s*-\s+\*\*[^*]+\*\*:\s*$',
+        r'^\s*-\s+\*\*(?!Product\*\*|Phase\*\*)[^*]+\*\*:[ \t]*(?:\n|$)',
         '',
+        content,
+        flags=re.MULTILINE,
+    )
+
+    # Normalize empty Product/Phase values (drop the trailing space)
+    content = re.sub(
+        r'^(- \*\*(?:Product|Phase)\*\*:)[ \t]+$',
+        r'\1',
         content,
         flags=re.MULTILINE,
     )
@@ -317,7 +353,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     log_error("Missing plan subcommand.")
     print("Usage:")
     print("  flow.sh plan new <issue>")
-    print("  flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>]")
+    print("  flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>] [--product <name> --phase <id>]")
     print("  flow.sh plan status <plan-id>")
     print("  flow.sh plan list [--issue]")
     print("  flow.sh plan check <plan-name-or-path>")
@@ -344,7 +380,7 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
     if not issue_number and not title:
         log_error("Either Issue number or --title required")
         print("Usage: flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>")
-        print("   or: flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>]")
+        print("   or: flow.sh plan new --title \"<title>\" --project <name> --type <type> [--scope <scope>] [--product <name> --phase <id>]")
         return 1
 
     # Issue mode: type/scope/slug are explicitly specified by Wopal.
@@ -472,6 +508,19 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             log_error(str(e))
             return 1
 
+    # Product/Phase: CLI flags override Issue body values. The pair is
+    # atomic — a phase-linked plan declares both, an unlinked plan neither.
+    try:
+        product_value, phase_value = _resolve_product_phase(
+            getattr(args, "product", None),
+            getattr(args, "phase", None),
+            issue_product,
+            issue_phase,
+        )
+    except ValueError as e:
+        log_error(str(e))
+        return 1
+
     log_info(f"Plan name: {plan_name}")
 
     # Resolve plan directory
@@ -488,8 +537,8 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             workspace_root,
             project_path=issue_project_path,
             project_type=issue_project_type,
-            product=issue_product,
-            phase=issue_phase,
+            product=product_value,
+            phase=phase_value,
         )
         log_success(f"Plan created: {plan_file}")
     except (FileExistsError, FileNotFoundError) as e:
@@ -1002,6 +1051,14 @@ def register_plan_parser(subparsers: argparse._SubParsersAction) -> None:
     new_parser.add_argument(
         "--slug",
         help="Slug identifier (required in Issue mode; no-issue mode derived from title)",
+    )
+    new_parser.add_argument(
+        "--product",
+        help="Product name for phase linkage (optional; must pair with --phase)",
+    )
+    new_parser.add_argument(
+        "--phase",
+        help="Phase id for phase linkage, e.g. P3 (optional; must pair with --product)",
     )
 
     # ---- plan status ----

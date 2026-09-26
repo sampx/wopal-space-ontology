@@ -4,6 +4,8 @@
 
 - **Type**: test
 - **Target Project**: test-project
+- **Product**:
+- **Phase**:
 - **Created**: 2026-05-16
 - **Status**: planning
 

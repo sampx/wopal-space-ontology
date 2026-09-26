@@ -141,6 +141,7 @@ Agent 定位 Issue 的顺序：已知编号 → `issue view`；需要浏览/筛�
 # 创建
 flow.sh plan new <issue>                # 从 Issue 创建
 flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue 创建
+# 阶段关联：默认继承 Issue body 的 Product/Phase；--product <name> --phase <id> 可覆盖（须成对，缺一报错；无关联时两项均留空）
 
 # 查询
 flow.sh plan status <plan-id>           # 查看 Plan 完整状态

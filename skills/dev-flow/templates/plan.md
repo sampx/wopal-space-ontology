@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Issue**: #{issue}
+- **Issue**: {issue}
 - **Type**: {type}
 - **Target Project**: {project}
 - **Product**: {product}
