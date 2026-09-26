@@ -368,6 +368,9 @@ type JsonSchemaNode = {
   required?: string[]
   items?: JsonSchemaNode
   enum?: unknown[]
+  const?: unknown
+  oneOf?: JsonSchemaNode[]
+  anyOf?: JsonSchemaNode[]
 }
 
 /**
@@ -419,8 +422,18 @@ function toSnakeCase(name: string): string {
  * document (`{ type: "object", properties: {...}, required: [...] }`). The
  * plugin SDK contract is a ZodRawShape — a map of property name to Zod type —
  * so the document is unwrapped into its property definitions, each converted
- * to the matching Zod type. Unsupported nodes degrade to `z.unknown()` so a
- * future dsh schema extension can never break the projection.
+ * to the matching Zod type.
+ *
+ * The conversion must stay faithful to what the container declares, because
+ * dsh re-validates every call against its own schema: dsh compiles nullable
+ * parameters to `oneOf: [{ type: X }, { type: "null" }]` and enumerations to
+ * `enum`, and rejects args that miss those constraints (the
+ * str_replace_editor `insert_line` regression: a degraded `z.unknown()` let
+ * the model send shapes dsh then refused with `oneOf branch (matched 0)`).
+ * The per-property `description` carries the model-facing usage guidance and
+ * must survive as `.describe()` so the model sees parameter semantics.
+ * Only genuinely unsupported nodes degrade to `z.unknown()` so a future dsh
+ * schema extension can never break the projection.
  */
 function jsonSchemaToZodShape(schema: unknown): Record<string, ZodType> {
   const node = schema as JsonSchemaNode
@@ -430,13 +443,55 @@ function jsonSchemaToZodShape(schema: unknown): Record<string, ZodType> {
   for (const [name, property] of Object.entries(properties)) {
     let type = jsonSchemaNodeToZod(property)
     if (!required.has(name)) type = type.optional()
+    const description = typeof property?.description === "string" ? property.description : undefined
+    if (description && description.trim()) type = type.describe(description)
     shape[toCamelCase(name)] = type
   }
   return shape
 }
 
+/** Convert a single JSON Schema node, preserving oneOf/anyOf unions and enums. */
 function jsonSchemaNodeToZod(node: JsonSchemaNode | undefined): ZodType {
   if (!node || typeof node !== "object") return z.unknown()
+
+  // Nullable parameters arrive as `oneOf: [{ type: X }, { type: "null" }]`;
+  // anyOf is accepted as the same union shape. The null branch maps to
+  // `.nullable()` so null placeholders and omission satisfy validation
+  // exactly like the container's own validator.
+  const branches = Array.isArray(node.oneOf) ? node.oneOf : Array.isArray(node.anyOf) ? node.anyOf : undefined
+  if (branches && branches.length > 0) {
+    const nullable = branches.some((branch) => branch?.type === "null")
+    const converted = branches.filter((branch) => branch?.type !== "null").map((branch) => jsonSchemaNodeToZod(branch))
+    if (converted.length === 0) return z.null()
+    const union = converted.length === 1 ? converted[0] : z.union(converted as [ZodType, ZodType, ...ZodType[]])
+    return nullable ? union.nullable() : union
+  }
+
+  if (Array.isArray(node.enum) && node.enum.length > 0) {
+    const values = node.enum
+    if (values.every((value) => typeof value === "string")) {
+      return z.enum(values as [string, ...string[]])
+    }
+    const literals = values
+      .filter((value): value is string | number | boolean => {
+        const kind = typeof value
+        return kind === "string" || kind === "number" || kind === "boolean"
+      })
+      .map((value) => z.literal(value))
+    if (literals.length === values.length && literals.length > 0) {
+      return literals.length === 1 ? literals[0] : z.union(literals as [ZodType, ZodType, ...ZodType[]])
+    }
+    return z.unknown()
+  }
+
+  if (node.const !== undefined) {
+    const kind = typeof node.const
+    if (kind === "string" || kind === "number" || kind === "boolean") {
+      return z.literal(node.const as string | number | boolean)
+    }
+    return z.unknown()
+  }
+
   switch (node.type) {
     case "string":
       return z.string()

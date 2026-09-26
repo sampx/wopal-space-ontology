@@ -1403,6 +1403,115 @@ describe("dsh-adapter projection", () => {
   })
 })
 
+/**
+ * Schema fidelity: the projected args must carry the container's real type
+ * constraints (oneOf unions, enums) and per-property descriptions. The
+ * str_replace_editor `insert` failure is the canonical regression: the
+ * `insert_line` constraint was projected away, the model sent strings, and
+ * dsh's validator rejected every call with `oneOf branch (matched 0)`.
+ */
+describe("projected schema fidelity", () => {
+  const editorTools = () => ({
+    schemas: () => [
+      {
+        name: "str_replace_editor",
+        description: "dsh editor",
+        parameters: {
+          type: "object",
+          required: ["command", "path"],
+          properties: {
+            command: {
+              type: "string",
+              enum: ["view", "create", "str_replace", "insert"],
+              description: "The commands to run.",
+            },
+            path: { type: "string", description: "Absolute path to file or directory." },
+            insert_line: {
+              oneOf: [{ type: "integer" }, { type: "null" }],
+              description: "Required integer parameter of `insert` command.",
+            },
+            view_range: {
+              oneOf: [{ type: "array", items: { type: "integer" } }, { type: "null" }],
+              description: "Optional parameter of `view` command.",
+            },
+          },
+        },
+      },
+    ],
+  })
+
+  type ArgLike = {
+    safeParse(input: unknown): { success: boolean }
+    description?: string
+  }
+
+  async function editorArgs(): Promise<Record<string, ArgLike>> {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer(editorTools())
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    return (tools.str_replace_editor as { args: Record<string, ArgLike> }).args
+  }
+
+  test("oneOf [integer, null] projects to a nullable integer, not any", async () => {
+    const args = await editorArgs()
+    expect(args.insert_line.safeParse(1).success).toBe(true)
+    expect(args.insert_line.safeParse(null).success).toBe(true)
+    expect(args.insert_line.safeParse("1").success).toBe(false)
+    expect(args.insert_line.safeParse(1.5).success).toBe(false)
+  })
+
+  test("enum constraints survive the projection", async () => {
+    const args = await editorArgs()
+    expect(args.command.safeParse("view").success).toBe(true)
+    expect(args.command.safeParse("insert").success).toBe(true)
+    expect(args.command.safeParse("undo_edit").success).toBe(false)
+  })
+
+  test("oneOf [array<integer>, null] projects to a nullable integer array", async () => {
+    const args = await editorArgs()
+    expect(args.view_range.safeParse([1, 2]).success).toBe(true)
+    expect(args.view_range.safeParse(null).success).toBe(true)
+    expect(args.view_range.safeParse("1").success).toBe(false)
+    expect(args.view_range.safeParse([1.5]).success).toBe(false)
+  })
+
+  test("constraints and descriptions reach the model-facing JSON Schema", async () => {
+    const args = await editorArgs()
+    expect(args.command.description).toContain("commands")
+    expect(args.insert_line.description).toContain("insert")
+    const { tool } = await import("@wopal/ellamaka-plugin")
+    const json = tool.schema.toJSONSchema(tool.schema.object(args as Record<string, never>), { io: "input" }) as {
+      properties: Record<string, { description?: string; enum?: unknown[]; anyOf?: { type?: string }[] }>
+    }
+    expect(json.properties.command.enum).toEqual(["view", "create", "str_replace", "insert"])
+    expect(json.properties.command.description).toContain("commands")
+    expect(json.properties.insert_line.description).toContain("insert")
+    expect((json.properties.insert_line.anyOf ?? []).map((branch) => branch.type)).toEqual(["integer", "null"])
+  })
+
+  test("scalar property descriptions are preserved on plain nodes", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "read",
+          description: "dsh read",
+          parameters: {
+            type: "object",
+            required: ["file_path"],
+            properties: {
+              file_path: { type: "string", description: "Path to read, resolved by the filesystem backend." },
+            },
+          },
+        },
+      ],
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const args = (tools.read as { args: Record<string, ArgLike> }).args
+    expect(args.filePath.description).toContain("Path to read")
+  })
+})
+
 describe("dsh-adapter escalation answerer bridge", () => {
   /** The dsh escalation reason shape: `escalate sandbox to ${mode}: ${justification}`. */
   const escalationRequest = (overrides?: Partial<Record<string, unknown>>) => ({
