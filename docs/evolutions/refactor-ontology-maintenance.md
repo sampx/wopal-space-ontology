@@ -270,8 +270,8 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：技能开发规则与用户文档一致，机制面描述全部指向 CLI。
-实际触碰文件：（实施完成后由实施 Agent 回填）
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`skills/ontology-evolution/AGENTS.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 
