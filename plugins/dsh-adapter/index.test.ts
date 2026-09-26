@@ -414,7 +414,8 @@ describe("dsh-adapter projection", () => {
     const second = tool.execute({}, ctx)
     release()
     await Promise.all([first, second])
-    const events = (captured[0]?.session as { snapshotEvents(): { type: string }[] }).snapshotEvents()
+    const session = captured[0]?.session as { snapshotEvents(): { type: string }[] } | undefined
+    const events = session?.snapshotEvents() ?? []
     const types = events.map((event) => event.type)
     expect(types.filter((type) => type === "turn/start")).toHaveLength(1)
     expect(types.filter((type) => type === "turn/end")).toHaveLength(1)
@@ -849,6 +850,9 @@ describe("dsh-adapter projection", () => {
     // Only the changed line counts; the shared context line is not a change.
     expect(filediff.additions).toBe(1)
     expect(filediff.deletions).toBe(1)
+    // Without a validated full-file value the adapter emits no unified patch —
+    // meta.diffs carry no absolute line positions, so one would be fabricated.
+    expect(res.metadata.diff).toBeUndefined()
   })
 
   test("execute maps dsh snake_case args to ellamaka camelCase before dispatch", async () => {
@@ -990,6 +994,26 @@ describe("dsh-adapter projection", () => {
     expect(filediff.deletions).toBe(0)
   })
 
+  test("write retains its existing metadata projection when a full result value is present", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [{ name: "write", description: "dsh write", parameters: { properties: { file_path: { type: "string" } } } }],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "ok" }],
+        value: { path: "/w/f.ts", operation: "update", before: "old\n", after: "new\n" },
+        meta: { diffs: [{ path: "/w/f.ts", oldText: "old\n", newText: "new\n" }] },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const res = await (tools.write as Projected).execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-write-value", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    expect(res.metadata.diff).toBeUndefined()
+    expect(res.metadata.filediff).toEqual({ file: "/w/f.ts", before: "old\n", after: "new\n", additions: 1, deletions: 1 })
+  })
+
   test("filediffFromMeta merges multiple hunks into one filediff", async () => {
     ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
       schemas: () => [
@@ -1084,6 +1108,282 @@ describe("dsh-adapter projection", () => {
     // 2000*2000 = 4M cells > 1M threshold; the filediff is omitted rather than
     // showing a misleading badge.
     expect(res.metadata.filediff).toBeUndefined()
+  })
+
+  // ----- full-file value diff (result.value) -----
+  //
+  // When the tool result exposes its schema-validated `value` ({path, before,
+  // after}), the adapter derives a real unified patch from the full before/after
+  // texts — the same shape the builtin edit tool emits via
+  // createTwoFilesPatch/trimDiff. meta.diffs remain only the fallback: those
+  // hunks carry no absolute line positions, so a patch built from them would
+  // fabricate line numbers.
+
+  /** The 67-char separator jsdiff@8.0.2 emits after the Index header. */
+  const PATCH_SEPARATOR = "=".repeat(67)
+
+  /** Build the exact jsdiff@8.0.2-format patch the adapter must emit (builtin parity). */
+  function expectedPatch(path: string, hunkLines: string[]): string {
+    return [`Index: ${path}`, PATCH_SEPARATOR, `--- ${path}`, `+++ ${path}`, ...hunkLines, ""].join("\n")
+  }
+
+  test("execute emits a unified metadata.diff from the full-file value (single hunk)", async () => {
+    const before = "const a = 1\nconst b = 2\nconst c = 3\n"
+    const after = "const a = 1\nconst b = 42\nconst c = 3\n"
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/workspace/app/src/file.ts", before, after },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/workspace/app/src/file.ts" },
+      { sessionID: "ses-value-single", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    expect(res.metadata.diff).toBe(
+      expectedPatch("/workspace/app/src/file.ts", [
+        "@@ -1,3 +1,3 @@",
+        " const a = 1",
+        "-const b = 2",
+        "+const b = 42",
+        " const c = 3",
+      ]),
+    )
+    // Workbench filediff keeps its {file, before, after, additions, deletions}
+    // shape, now sourced from the full-file texts with exact line-change counts.
+    expect(res.metadata.filediff).toEqual({
+      file: "/workspace/app/src/file.ts",
+      before,
+      after,
+      additions: 1,
+      deletions: 1,
+    })
+  })
+
+  test("execute emits faithful multi-hunk metadata.diff (distant hunks stay separate)", async () => {
+    const lines = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`)
+    const before = lines.join("\n") + "\n"
+    const after =
+      lines.map((line) => (line === "line 3" ? "line THREE" : line === "line 25" ? "line TWENTY-FIVE" : line)).join("\n") + "\n"
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/workspace/app/src/file.ts", before, after },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/workspace/app/src/file.ts" },
+      { sessionID: "ses-value-multi", directory: "/workspace/app", worktree: "/workspace", ask: async () => {} },
+    )
+    // Two distant changes each keep their own hunk with real file line numbers;
+    // the 8 unchanged gap lines (line 8..line 20) are NOT concatenated into a
+    // fake contiguous change.
+    expect(res.metadata.diff).toBe(
+      expectedPatch("/workspace/app/src/file.ts", [
+        "@@ -1,7 +1,7 @@",
+        " line 1",
+        " line 2",
+        "-line 3",
+        "+line THREE",
+        " line 4",
+        " line 5",
+        " line 6",
+        " line 7",
+        "@@ -21,9 +21,9 @@",
+        " line 21",
+        " line 22",
+        " line 23",
+        " line 24",
+        "-line 25",
+        "+line TWENTY-FIVE",
+        " line 26",
+        " line 27",
+        " line 28",
+        " line 29",
+      ]),
+    )
+    expect(res.metadata.filediff).toEqual({
+      file: "/workspace/app/src/file.ts",
+      before,
+      after,
+      additions: 2,
+      deletions: 2,
+    })
+  })
+
+  test("execute renders a pure insertion from the full-file value", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/w/f.ts", before: "b\nc\n", after: "a\nb\nc\n" },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-value-insert", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    expect(res.metadata.diff).toBe(
+      expectedPatch("/w/f.ts", ["@@ -1,2 +1,3 @@", "+a", " b", " c"]),
+    )
+    expect(res.metadata.filediff).toMatchObject({ additions: 1, deletions: 0 })
+  })
+
+  test("execute renders a deletion to an empty file from the full-file value", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/w/f.ts", before: "only\n", after: "" },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-value-delete", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    expect(res.metadata.diff).toBe(
+      expectedPatch("/w/f.ts", ["@@ -1,1 +0,0 @@", "-only"]),
+    )
+    expect(res.metadata.filediff).toMatchObject({ additions: 0, deletions: 1 })
+  })
+
+  test("execute strips common indentation like the builtin edit tool (trimDiff)", async () => {
+    const before = "    a\n    b\n    c\n"
+    const after = "    a\n    B\n    c\n"
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/w/f.ts", before, after },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-value-trim", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    // The TUI patch mirrors the builtin: the common 4-space indentation is
+    // stripped from the hunk content lines, while filediff keeps the full texts.
+    expect(res.metadata.diff).toBe(
+      expectedPatch("/w/f.ts", ["@@ -1,3 +1,3 @@", " a", "-b", "+B", " c"]),
+    )
+    expect(res.metadata.filediff).toEqual({ file: "/w/f.ts", before, after, additions: 1, deletions: 1 })
+  })
+
+  test("execute ignores a malformed full-file value (graceful, no fabricated diff)", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: 42, before: "a", after: "b" },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-value-malformed", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    expect(res.metadata.diff).toBeUndefined()
+    expect(res.metadata.filediff).toBeUndefined()
+    expect(res.output).toBe("Edit applied successfully.")
+  })
+
+  test("execute keeps the meta.diffs fallback when the full-file value is oversized", async () => {
+    const before = Array.from({ length: 3000 }, (_, i) => `old ${i}`).join("\n") + "\n"
+    const after = Array.from({ length: 3000 }, (_, i) => `new ${i}`).join("\n") + "\n"
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer({
+      schemas: () => [
+        {
+          name: "edit",
+          description: "dsh edit",
+          parameters: { properties: { file_path: { type: "string" } } },
+        },
+      ],
+      execute: async () => ({
+        isError: false,
+        content: [{ type: "text", text: "Edit applied successfully." }],
+        value: { path: "/w/f.ts", before, after },
+        meta: { diffs: [{ path: "/w/f.ts", oldText: "old\n", newText: "new\n" }] },
+      }),
+    })
+    const out = await mod.dshAdapter({}, sandboxOn())
+    const tools = await invokeProvider(out)
+    const tool = tools.edit as Projected
+    const res = await tool.execute(
+      { filePath: "/w/f.ts" },
+      { sessionID: "ses-value-oversize", directory: "/w", worktree: "/w", ask: async () => {} },
+    )
+    // 3000*3000 = 9M cells > 4M cap: no full-file diff is attempted (no
+    // fabricated positions), and the pre-existing meta.diffs fallback still
+    // provides the Workbench filediff.
+    expect(res.metadata.diff).toBeUndefined()
+    expect(res.metadata.filediff).toEqual({
+      file: "/w/f.ts",
+      before: "old\n",
+      after: "new\n",
+      additions: 1,
+      deletions: 1,
+    })
   })
 
   test("projected args expose camelCase filePath for read/edit/write", async () => {

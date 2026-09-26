@@ -88,6 +88,13 @@ type Container = {
       content?: { type: string; text?: string }[]
       error?: { message?: string }
       meta?: unknown
+      /**
+       * The schema-validated tool output value. For edit this is
+       * `{path, before, after}` — the full file texts the backend applied —
+       * which is the authoritative source for a real unified patch (see
+       * `filediffFromValue`).
+       */
+      value?: unknown
     }>
   } | undefined
   logger(name: string): {
@@ -454,6 +461,295 @@ function contentText(content: { type: string; text?: string }[] | undefined): st
     .join("\n")
 }
 
+/**
+ * The dsh edit tool result `value` shape the adapter consumes: the
+ * schema-validated full before/after file texts the backend applied. Unlike
+ * `meta.diffs` (per-hunk fragments with no absolute line positions), these
+ * texts support a real unified patch with accurate hunk line numbers.
+ */
+type DshFileChangeValue = {
+  path: string
+  before: string
+  after: string
+}
+
+function isDshFileChangeValue(value: unknown): value is DshFileChangeValue {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.path === "string" &&
+    candidate.path.length > 0 &&
+    typeof candidate.before === "string" &&
+    typeof candidate.after === "string"
+  )
+}
+
+/** One text line plus whether it ends with a newline (EOF marker handling). */
+type DiffLine = { text: string; hasNewline: boolean }
+
+/**
+ * Split text into lines the way a unified diff sees them: a trailing newline
+ * terminates the previous line rather than producing an extra empty one, and
+ * the last line keeps its missing-newline state for the patch's
+ * `\ No newline at end of file` markers.
+ */
+function splitDiffLines(text: string): DiffLine[] {
+  if (text === "") return []
+  const segments = text.split("\n")
+  const lines: DiffLine[] = []
+  for (let i = 0; i < segments.length; i++) {
+    const last = i === segments.length - 1
+    if (last && segments[i] === "") break
+    lines.push({ text: segments[i]!, hasNewline: !last })
+  }
+  return lines
+}
+
+function sameDiffLine(a: DiffLine, b: DiffLine): boolean {
+  return a.text === b.text && a.hasNewline === b.hasNewline
+}
+
+// Bounded comparison budget for the line alignment. Beyond it the adapter
+// omits the diff (graceful degrade) rather than risk an unbounded O(n*m) walk
+// or fabricate positions it cannot compute.
+const MAX_DIFF_CHARS = 2_000_000
+const MAX_LCS_CELLS = 4_000_000
+
+// Context lines per hunk side, matching the builtin edit tool's
+// createTwoFilesPatch default (jsdiff context: 4).
+const DIFF_CONTEXT = 4
+
+type DiffEntry = { side: "=" | "-" | "+"; line: DiffLine }
+
+/**
+ * Line alignment via an LCS direction table (rolled length rows, so memory is
+ * O(min(n,m)) plus the direction bytes). Returns undefined when the comparison
+ * would exceed MAX_LCS_CELLS.
+ */
+function alignLines(before: DiffLine[], after: DiffLine[]): DiffEntry[] | undefined {
+  const n = before.length
+  const m = after.length
+  if (n * m > MAX_LCS_CELLS) return undefined
+  const dir = new Uint8Array(n * m)
+  let prev = new Int32Array(m + 1)
+  let curr = new Int32Array(m + 1)
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      if (sameDiffLine(before[i]!, after[j]!)) {
+        curr[j] = prev[j + 1]! + 1
+        dir[i * m + j] = 0
+      } else if (prev[j]! >= curr[j + 1]!) {
+        curr[j] = prev[j]!
+        dir[i * m + j] = 1
+      } else {
+        curr[j] = curr[j + 1]!
+        dir[i * m + j] = 2
+      }
+    }
+    const swap = prev
+    prev = curr
+    curr = swap
+  }
+  const entries: DiffEntry[] = []
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    const move = dir[i * m + j]
+    if (move === 0) {
+      entries.push({ side: "=", line: before[i]! })
+      i++
+      j++
+    } else if (move === 1) {
+      entries.push({ side: "-", line: before[i]! })
+      i++
+    } else {
+      entries.push({ side: "+", line: after[j]! })
+      j++
+    }
+  }
+  while (i < n) {
+    entries.push({ side: "-", line: before[i]! })
+    i++
+  }
+  while (j < m) {
+    entries.push({ side: "+", line: after[j]! })
+    j++
+  }
+  return entries
+}
+
+/**
+ * Build a unified-diff patch between two full-file texts, mirroring the
+ * builtin edit tool's shape: jsdiff `createTwoFilesPatch` with the default
+ * 4 context lines, the `Index:`/`---`/`+++` headers, hunk line numbers counted
+ * from the real files, and per-line `\ No newline at end of file` markers.
+ * Distant changes stay separate hunks — context never bridges unrelated
+ * hunks into one fake contiguous change.
+ *
+ * Returns undefined when the texts are identical or exceed the bounded
+ * comparison budget: the caller then omits the diff rather than fabricating
+ * one.
+ */
+function unifiedPatch(
+  path: string,
+  beforeText: string,
+  afterText: string,
+): { patch: string; additions: number; deletions: number } | undefined {
+  if (beforeText.length + afterText.length > MAX_DIFF_CHARS) return undefined
+  const before = splitDiffLines(beforeText)
+  const after = splitDiffLines(afterText)
+
+  // Strip the common prefix/suffix first: typical edits reduce to a tiny
+  // middle, so the LCS walk stays cheap without any heuristic.
+  let prefix = 0
+  while (prefix < before.length && prefix < after.length && sameDiffLine(before[prefix]!, after[prefix]!)) prefix++
+  let suffix = 0
+  while (
+    suffix < before.length - prefix &&
+    suffix < after.length - prefix &&
+    sameDiffLine(before[before.length - 1 - suffix]!, after[after.length - 1 - suffix]!)
+  ) {
+    suffix++
+  }
+
+  const oldMiddle = before.slice(prefix, before.length - suffix)
+  const newMiddle = after.slice(prefix, after.length - suffix)
+  if (oldMiddle.length === 0 && newMiddle.length === 0) return undefined
+  const middle = alignLines(oldMiddle, newMiddle)
+  if (!middle) return undefined
+
+  const entries: DiffEntry[] = [
+    ...before.slice(0, prefix).map((line): DiffEntry => ({ side: "=", line })),
+    ...middle,
+    ...before.slice(before.length - suffix).map((line): DiffEntry => ({ side: "=", line })),
+  ]
+
+  // A line participates in a hunk when it changed or sits within DIFF_CONTEXT
+  // lines of a change; contiguous runs of participants become hunks (the same
+  // merge rule jsdiff applies, so hunks split exactly like the builtin's).
+  const needed = Array.from({ length: entries.length }, () => false)
+  for (let index = 0; index < entries.length; index++) {
+    if (entries[index]!.side === "=") continue
+    const from = Math.max(0, index - DIFF_CONTEXT)
+    const to = Math.min(entries.length - 1, index + DIFF_CONTEXT)
+    for (let k = from; k <= to; k++) needed[k] = true
+  }
+
+  const out: string[] = [
+    `Index: ${path}`,
+    "===================================================================",
+    `--- ${path}`,
+    `+++ ${path}`,
+  ]
+  let additions = 0
+  let deletions = 0
+  let index = 0
+  let oldConsumed = 0
+  let newConsumed = 0
+
+  while (index < entries.length) {
+    if (!needed[index]) {
+      const entry = entries[index]!
+      if (entry.side !== "+") oldConsumed++
+      if (entry.side !== "-") newConsumed++
+      index++
+      continue
+    }
+    const oldBase = oldConsumed
+    const newBase = newConsumed
+    const hunkLines: string[] = []
+    while (index < entries.length && needed[index]) {
+      const entry = entries[index]!
+      if (entry.side !== "+") oldConsumed++
+      if (entry.side !== "-") newConsumed++
+      hunkLines.push((entry.side === "=" ? " " : entry.side) + entry.line.text)
+      // A line without a trailing newline carries the standard marker so the
+      // patch stays faithful about the file's end-of-file state.
+      if (!entry.line.hasNewline) hunkLines.push("\\ No newline at end of file")
+      if (entry.side === "+") additions++
+      if (entry.side === "-") deletions++
+      index++
+    }
+    const oldCount = oldConsumed - oldBase
+    const newCount = newConsumed - newBase
+    // Unified-diff quirk: a zero-length side starts one line lower (jsdiff's
+    // formatPatch does the same).
+    const oldStart = oldCount === 0 ? oldBase : oldBase + 1
+    const newStart = newCount === 0 ? newBase : newBase + 1
+    out.push(`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`, ...hunkLines)
+  }
+
+  return { patch: out.join("\n") + "\n", additions, deletions }
+}
+
+/**
+ * Strip the common leading indentation from a patch's content lines, mirroring
+ * the builtin edit tool's `trimDiff` so dsh edits render exactly like builtin
+ * edits in the TUI. Header lines (`Index:`/`---`/`+++`/`@@`/EOF markers) are
+ * untouched.
+ */
+function trimDiff(patch: string): string {
+  const lines = patch.split("\n")
+  const contentLines = lines.filter(
+    (line) =>
+      (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) &&
+      !line.startsWith("---") &&
+      !line.startsWith("+++"),
+  )
+  if (contentLines.length === 0) return patch
+  let min = Infinity
+  for (const line of contentLines) {
+    const content = line.slice(1)
+    if (content.trim().length > 0) {
+      const match = content.match(/^(\s*)/)
+      if (match) min = Math.min(min, match[1]!.length)
+    }
+  }
+  if (min === Infinity || min === 0) return patch
+  const trimmedLines = lines.map((line) => {
+    if (
+      (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) &&
+      !line.startsWith("---") &&
+      !line.startsWith("+++")
+    ) {
+      const prefix = line[0]!
+      const content = line.slice(1)
+      return prefix + content.slice(min)
+    }
+    return line
+  })
+  return trimmedLines.join("\n")
+}
+
+/**
+ * Derive the diff metadata from one dsh file-mutation result `value`
+ * (`{path, before, after}` from edit): the unified patch for
+ * the TUI (trimDiff-applied, builtin parity) plus the full-file texts and
+ * exact `+N/-N` counts for the Workbench `filediff`. Returns undefined when
+ * the value is absent, malformed, or too large to diff — the caller then
+ * falls back to the meta.diffs path or omits diff metadata entirely.
+ */
+function filediffFromValue(value: unknown): {
+  file: string
+  before: string
+  after: string
+  patch: string
+  additions: number
+  deletions: number
+} | undefined {
+  if (!isDshFileChangeValue(value)) return undefined
+  const full = unifiedPatch(value.path, value.before, value.after)
+  if (!full) return undefined
+  return {
+    file: value.path,
+    before: value.before,
+    after: value.after,
+    patch: trimDiff(full.patch),
+    additions: full.additions,
+    deletions: full.deletions,
+  }
+}
+
 type DshDiff = { path: string; oldText: string | null; newText: string }
 
 /**
@@ -482,8 +778,8 @@ function countLineChanges(before: string, after: string): { additions: number; d
   if (n * m > MAX_LCS_CELLS) {
     return null
   }
-  let prev = new Array<number>(m + 1).fill(0)
-  let curr = new Array<number>(m + 1).fill(0)
+  let prev = Array.from<number>({ length: m + 1 }).fill(0)
+  let curr = Array.from<number>({ length: m + 1 }).fill(0)
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       curr[j] = beforeLines[i] === afterLines[j]
@@ -497,18 +793,23 @@ function countLineChanges(before: string, after: string): { additions: number; d
 }
 
 /**
- * Extract an ellamaka `filediff` from dsh result `meta.diffs`.
+ * Fallback path: extract an ellamaka `filediff` from dsh result `meta.diffs`.
  *
- * dsh's edit/write tools project `meta.diffs` (an array of `{path, oldText,
- * newText}` hunks, one per applied change) via their `presentationMeta`. The
- * Workbench render layer (`message-part.tsx`) consumes `filediff` with
- * `file`/`before`/`after` and derives the diff itself when `patch` is absent.
+ * Used only when the result exposes no validated full-file `value` (see
+ * `filediffFromValue`). dsh's edit/write tools project `meta.diffs` (an array
+ * of `{path, oldText, newText}` hunks, one per applied change) via their
+ * `presentationMeta`. The Workbench render layer (`message-part.tsx`) consumes
+ * `filediff` with `file`/`before`/`after` and derives the diff itself when
+ * `patch` is absent.
  *
  * The adapter merges every hunk into a single `filediff`: `before`/`after`
  * concatenate each hunk's old/new text, and the `+N/-N` badge sums the
  * per-hunk line changes. This mirrors dsh's own DiffBlock, which draws each
- * hunk's old side red and new side green without line numbers. Malformed or
- * absent meta yields `undefined` so the projected tool degrades to plain text.
+ * hunk's old side red and new side green without line numbers. These hunks
+ * carry no absolute line positions, so no unified patch is derived from them
+ * (the Workbench derives the display diff from the concatenated texts).
+ * Malformed or absent meta yields `undefined` so the projected tool degrades
+ * to plain text.
  */
 function filediffFromMeta(meta: unknown): { file: string; before: string; after: string; additions: number; deletions: number } | undefined {
   if (typeof meta !== "object" || meta === null || Array.isArray(meta)) return undefined
@@ -825,8 +1126,26 @@ export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions
           }
           log.info("tool call", { tool: source, sessionID: ctx.sessionID, callID: ctx.callID })
           const metadata: Record<string, unknown> = { source: "dsh-container", containerTool: source }
-          const filediff = filediffFromMeta(result.meta)
-          if (filediff) metadata.filediff = filediff
+          // Prefer the schema-validated full-file value for edit: it yields
+          // a real unified patch with accurate hunk line numbers plus an
+          // exact-content filediff for the Workbench. meta.diffs remain the
+          // fallback for results that expose no value — their hunks carry no
+          // absolute positions, so no unified patch can be truthfully derived
+          // from them.
+          const fullDiff = source === "edit" ? filediffFromValue(result.value) : undefined
+          if (fullDiff) {
+            metadata.diff = fullDiff.patch
+            metadata.filediff = {
+              file: fullDiff.file,
+              before: fullDiff.before,
+              after: fullDiff.after,
+              additions: fullDiff.additions,
+              deletions: fullDiff.deletions,
+            }
+          } else {
+            const filediff = filediffFromMeta(result.meta)
+            if (filediff) metadata.filediff = filediff
+          }
           return {
             output,
             title: source,
