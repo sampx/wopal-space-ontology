@@ -42,7 +42,7 @@
 - D-04: 校验（zod fail-loud）留在插件侧不变；交付表缺失该插件条目时按"未配置"语义走默认/内联，不视为错误。
 - D-05: `coding.yaml` 直接切换为分段映射（`version: 1` 不变，无兼容层）；切换以 `wopal-cli/enhance-assembly-sectioned-plugins` 已交付为前提。
 - D-06: wopal-plugin 导出 id 修正为 `wopal-plugin`（运行时身份与配置键、装配名对齐）。
-- D-07: 发布顺序：先引擎交付（`ellamaka/enhance-config-delivery`）与 CLI 分段物化（`wopal-cli/enhance-assembly-sectioned-plugins`）落地，再本提案一次性切换三插件消费与装配单格式（同批发布，避免中间态读不到配置）。
+- D-07: 发布顺序：先引擎交付（`ellamaka/feature-plugin-config`）与 CLI 分段物化（`wopal-cli/enhance-assembly-sectioned-plugins`）落地，再本提案一次性切换三插件消费与装配单格式（同批发布，避免中间态读不到配置）。
 
 ### Key Interfaces
 
@@ -80,7 +80,7 @@ plugins:
 
 ## Out of Scope
 
-- 引擎侧交付实现与 `/config-v2`（`ellamaka/enhance-config-delivery`）
+- 引擎侧整表交付实现（`ellamaka/feature-plugin-config`）与 `/config-v2` 端点（`ellamaka/enhance-config-delivery`）
 - CLI 装配单解析与两段物化（`wopal-cli/enhance-assembly-sectioned-plugins`）
 - 插件读取 `ELLAMAKA_LOG_LEVEL`（另一提案 `enhance-logging-unified-level-consumption`，待交付）
 - 设置面板的插件配置编辑 UI（产品侧后续）
@@ -257,10 +257,10 @@ plugins:
 | Wave | Task | 执行者 | 依赖 | 委派理由 |
 |------|------|--------|------|---------|
 | 1 | Task 1 | fae | `wopal-cli/enhance-assembly-sectioned-plugins` 同窗口 | 结构切换：CLI 解析器与装配单必须同批 |
-| 2 | Task 2, Task 3, Task 4 | fae | `ellamaka/enhance-config-delivery` 交付字段 | 三插件消费改造相互独立，可分派并行（同 worktree 串行） |
+| 2 | Task 2, Task 3, Task 4 | fae | `ellamaka/feature-plugin-config` 交付字段 | 三插件消费改造相互独立，可分派并行（同 worktree 串行） |
 
 ## Delivery
 
-- 批次内顺序：Task 1 与 `wopal-cli/enhance-assembly-sectioned-plugins` 同窗口（结构切换）→ Task 2-4 待 `ellamaka/enhance-config-delivery` 交付字段后实施 → 实机回归（User Validation）。
+- 批次内顺序：Task 1 与 `wopal-cli/enhance-assembly-sectioned-plugins` 同窗口（结构切换）→ Task 2-4 待 `ellamaka/feature-plugin-config` 交付字段后实施 → 实机回归（User Validation）。
 
 `space sync` 与 `ontology contribute` 由用户拍板，技能不自动上行。
