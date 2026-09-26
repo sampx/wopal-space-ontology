@@ -1,7 +1,7 @@
 # GAPS — ontology Design vs Implementation Divergence
 
 > **Status**: Active
-> **Updated**: 2026-09-21
+> **Updated**: 2026-09-26
 > **Design Source**: `./DESIGN.md`（差距对照的设计真相源，子设计见其 Sub-DESIGNs）
 > **Companion**: 追踪 ontology 本体资产与 wopal-plugin 实现的目标态差距，逐项解决后关闭。
 
@@ -50,6 +50,24 @@
 - [ ] 特别为该会话指定的规则确实生效
 - [ ] 上下文重建后仍按该会话被赋予的能力渲染
 - [ ] 原有的关键词匹配与去重表现不变
+
+---
+
+## Plugin Configuration Delivery
+
+### ONT-G5: 插件配置各自读取，装配单插件声明未分段（P0）
+
+**Current**: 三个本体插件（dsh-adapter、wopal-plugin、tui-ellamaka）各自读三层 settings 的 `wopal.pluginConfig.<插件名>`，自行定位空间根、合并来源与校验取值；装配单的 `plugins` 是不分段的纯名字数组，插件声明不区分目标 settings 段；`wopal-plugin` 的运行时导出 id 为 `wopal-wopal-plugin`，与装配名、配置键不一致。
+
+**Target**: 装配单按「settings 段名 → 插件名列表」分段声明插件，物化时写入对应段的 `plugin` 数组。插件不读配置文件、不写配置：引擎把三层合并后的配置整表经 `PluginInput.pluginConfig`（server 插件）与 `TuiPluginApi.pluginConfig`（TUI 插件）交付，插件按自己的名字取用条目并校验，装配条目的内联 options 仅作兜底保留，`$VAR` 解析留在插件侧。`wopal-plugin` 导出 id 修正为 `wopal-plugin`。
+
+**Design**: `./DESIGN-assembly.md`（装配单分段声明与物化）；`./DESIGN-wopal-plugin.md`（Configuration 节）
+
+**Exit**:
+- [ ] 装配单 `plugins` 按段映射声明，物化结果写入对应 settings 段的 `plugin` 数组
+- [ ] 三个插件不读配置文件、不自行定位空间根，消费引擎交付的整表条目
+- [ ] 内联 options 兜底、`$VAR` 解析与取值校验行为保持
+- [ ] `wopal-plugin` 运行时 id 与装配名、配置键一致
 
 ---
 
