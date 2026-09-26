@@ -29,8 +29,8 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
 6. **机制安全，不设审批门控**：CLI 默认 dry-run 预览，`--confirm` 才落盘；agent 按用户意图直接执行 `--confirm`，不引入额外审批门控。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
-7. **登记是唯一范围入口**：装配区内新路径的持久持有靠显式登记（`space capability add --local` 记入 `localState.added` 并扩稀疏范围）；未登记的未跟踪文件由范围重算保护不清扫，但不出现在任何清单中。登记不产生提交——`localState` 是空间私有事实，不进入空间分支树。`.gitignore` 过滤敏感文件。
-8. **范围重算保留本地状态**：下行按装配单重算稀疏范围时，范围 = 装配单声明 ∪ `localState.added` − `localState.shadowed`；装配定义类基础文件始终包含。本地条目（added/shadowed）不随提交历史变化，也不上行。
+7. **共享内容与本地选择正交**：共享资产的 Git 新增、修改、删除随提交上行；本地装配选择以完整能力身份记录，只决定空间物化范围。共享能力可只在一个空间挂载，其选择不阻止内容上行。
+8. **显式私有化**：只有显式能力操作能更改本地挂载或私有内容登记。同步范围由当前装配单、能力级挂载选择及临时游离文件保护重算；私有内容不得进入 Git 提交，能力内部文件删除不触发私有卸载。
 
 ## Self-Evolution Loop
 
@@ -133,21 +133,21 @@ draft → accepted → implementing → validating → archived
 
 | 命令 | 方向 | 职责 |
 |------|------|------|
-| `space status` | — | 只读：落后 / 待贡献 / 装配状态 / 本地状态清单（added / shadowed / 未登记未跟踪文件） |
-| `space sync` | 双向 | 与 local main 对齐：先上行（隔离整合空间独有进化）再下行（fast-forward 到最新），刷新装配版本；上行前校验本地状态不泄漏（见下）；CLI 默认 dry-run 预览，`--confirm` 落盘 |
-| `space capability add/remove` | — | 无旗标：增删装配单中的能力并提交，随 sync 上行，同类型空间跟进；`--local`：写入 `localState`（added / shadowed）并调整稀疏范围，零提交、永不上行 |
+| `space status` | — | 只读：refs 双向差异、稀疏健康、当前有效装配与本地选择（include / exclude / private / 未登记未跟踪文件） |
+| `space sync` | 双向 | 先整合空间共享内容、再 fast-forward 下行；上行前阻止已登记的私有内容泄漏，按当前装配事实重算范围；CLI 默认 dry-run 预览，`--confirm` 落盘 |
+| `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常 Git 提交上行；`--local`：只改变本空间能力级挂载选择，或显式登记未跟踪私有能力；不生成内容提交 |
 | `space evo <family>` | — | 机制车道：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
-**本地通道与共享通道的分界**：`space capability` 的 `--local` 旗标决定变更归宿。无旗标走装配单通道——修改装配单、产生提交、随 sync 上行，是共享动作；`--local` 走本地通道——只写 `localState` 并调整稀疏范围，不进入空间分支树，构造上不可上行。`add --local` 对已遮蔽能力兼任恢复出口（清 shadow 条目并物化最新版）；`remove --local` 对本地引入（added，未提交）的能力撤回磁盘文件并清除登记。
+**内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力是否在本空间挂载由装配单和本地选择决定。`space capability` 无旗标调整类型装配单，变更按正常提交上行；`--local` 调整本空间能力级 `include` / `exclude` / `private`，不生成内容提交。显式卸载完整能力与共享删除其内部文件是不同操作。新建共享能力可只由当前空间挂载；相应 `include` 登记与提交原子发生，但不被当作内容私有化。
 
-**上行不泄漏本地状态（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）与 `localState`（added ∪ shadowed）无交集；命中即拒绝上行并给出处置指引（撤出提交或解除登记）。该闸兜底用户手动 `git add/commit` 将本地状态内容提交进空间分支的场景——本地隔离不依赖用户记得，由机制强制。
+**上行不泄漏私有内容（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）是否落在已登记的 `private` 能力根下；命中即拒绝并给出可执行的解除私有登记或撤出提交路径。`include` / `exclude` 只记录挂载选择，不进入内容泄漏判定。写入命令在提交前执行相同私有检查；sync 闸为手动 Git 提交兜底。
 
 `space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
 
-`ontology capability list` 揭示本体拥有的全部能力，是 `space capability add/remove` 的挑选依据——空间先用它发现有什么可装，再决定装什么、以哪条通道装（共享进装配单或 `--local` 私有持有）。装配单中不存在的能力不走本命令：用户以共享意图引入时用 `space capability add`，以私有意图引入时用 `space capability add --local`。
+`ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对新建能力，内容先按共享提交或显式私有登记选定归属，再按能力身份确定本空间是否挂载。
 
 空间内日常能力进化通过 Maka 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 

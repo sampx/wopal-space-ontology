@@ -148,7 +148,7 @@ clone 模式为默认，`--fork` 进入 fork 模式（详见 `./DESIGN-evolution
 
 User 解析：fork 模式优先从 `origin` remote 解析 GitHub owner；clone 模式尝试 `gh api user`；fallback OS 用户名 slug 化。
 
-空间装配记录：`.wopal-space/space-meta.json` 记录类型、骨架、来源 revision、装配时间与装配快照。
+空间装配记录：空间根仓库跟踪 `.wopal-space/space-meta.json` 中稳定的类型、骨架与 ontology 来源；CLI 在忽略的 `.wopal-space/state/assembly.json` 持有本空间的装配选择。同步进度由本体 Git refs 计算，装配详情见 `./DESIGN-assembly.md`。
 
 配置写入 `$WOPAL_HOME/config/settings.jsonc` 的 `ontologies.<name>` 节点（含 `path`、`origin`、`upstream`、`fork`）和 `spaces.<name>` 节点（含 `ontology`、`branch`、`user`、`type`）。
 
@@ -161,7 +161,7 @@ CLI 负责：
 5. 按骨架创建运行态目录与空间级目录。
 6. 首次渲染骨架声明的全部文件到空间根与 `.wopal-space/`。
 7. 按装配单生成空间特有插件配置到 `settings.local.jsonc`。
-8. 写入 `.wopal-space/space-meta.json`（类型、骨架与装配快照）。
+8. 写入 `.wopal-space/space-meta.json` 的稳定空间身份，并初始化忽略的 `.wopal-space/state/assembly.json` 能力级选择。
 9. rerun 时创建缺失项并保留已有文件内容。
 10. 在完整成功后注册 space 并设置 active space。
 11. 提供 `wopal space scan` 只读扫描入口，输出 repo / module JSON 事实。
@@ -207,7 +207,8 @@ ontology 本身是无状态的声明式能力包，不持有运行时状态：
 | 记忆数据 | `$WOPAL_HOME/storage/memory` 下的 LanceDB | memory_manage | ontology 提供工具，不持有数据 |
 | 会话状态 | ellamaka session | ellamaka | ontology 不持有 |
 | 空间结构 | `.wopal-space/STRUCTURE.md` | `/init` | ontology 提供模板，不持有实例 |
-| 空间装配快照 | `.wopal-space/space-meta.json` | `wopal space` CLI | 记录空间类型、骨架、来源 revision、装配时间与装配快照 |
+| 空间身份声明 | `.wopal-space/space-meta.json` | `wopal space` CLI | 空间仓库跟踪稳定的类型、骨架与 ontology 来源 |
+| 空间装配状态 | `.wopal-space/state/assembly.json` | `wopal space` CLI | 忽略的本地状态；持有能力级挂载选择和私有能力登记 |
 | 空间守则 | `.wopal-space/REGULATIONS.md` | 用户 + `/wopal:evolve` | ontology 提供初始化模板，不持有实例 |
 
 Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal:memo`（日记暂存）、`/wopal:evolve`（经验沉淀）、`/wopal:distill`（记忆蒸馏）、`/cupdate-agent-rules`（项目规范更新）。

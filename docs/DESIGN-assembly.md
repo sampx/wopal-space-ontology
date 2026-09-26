@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-25
+> **Updated**: 2026-09-26
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -158,9 +158,9 @@ CLI 读取骨架后按以下规则消费：
 2. 按 `schema` 字段读取 `.wopal/assembly/schemas/<schema>.yaml`，得到空间骨架
 3. 按骨架创建目录、渲染模板文件到空间根与 `.wopal-space/`
 4. 按装配单通过 Git sparse-checkout 在 `<space>/.wopal/` worktree 内物化能力资产
-5. 生成 `.wopal-space/space-meta.json`，记录类型、骨架与装配快照
+5. 写入空间根仓库的稳定身份声明，并初始化 CLI 管理的本地装配状态
 
-空间内正常修改与提交，进化经 `space sync` 汇入 local main。
+空间内正常修改与提交，进化经 `space sync` 汇入 local main。已有空间重复运行 `space init` 时，以当前空间分支的装配单和本地能力级选择重装配；main 已更新而空间分支未接收时先完成显式 `space sync`。重复物化保留用户已编辑内容，只补齐缺失项和安全维护 CLI 拥有的规则，无变化时不写入状态。
 
 ### Capability Name Resolution
 
@@ -191,91 +191,37 @@ CLI 读取骨架后按以下规则消费：
   | `AGENTS.md`、`AGENTS.zh-CN.md` | 工作契约 |
   | `config/`、`docs/` | 运行与设计契约 |
 
-  排除边界：仓库管理面（`.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json`）、扩展类目（`scripts/` 等）、能力资产、`localState` 各归其位。`.env.example` 属仓库管理面（模板），空间侧实例由 `space init` 从本体源模板幂等种子为 `.wopal/.env`（已存在则跳过；`.gitignore` 持续覆盖，不入版本控制）。
+  排除边界：仓库管理面（`.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json`）、扩展类目（`scripts/` 等）、能力资产和空间私有装配状态各归其位。`.env.example` 属仓库管理面（模板），空间侧实例由 `space init` 从本体源模板幂等种子为 `.wopal/.env`（已存在则跳过；`.gitignore` 持续覆盖，不入版本控制）。
 - **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
 - **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
-- **有效范围三要素**：稀疏范围 = 当前装配单基线 ∪ `localState.added` − `localState.shadowed`（见 Two-Layer Assembly Records）。基线取**当前**装配单（使其他空间经 `capability add` 的变更在各自下次同步时生效），本地增量取空间快照的 `localState`。范围重算只在 `space sync` 下行时执行，结果仅取决于这三项，不随提交历史变化。
-- **范围外新增须登记本地状态**：用户在装配区新增路径后，须记入 `localState.added` 并纳入稀疏范围，否则后续范围重算会将其从磁盘移除。登记入口是 `space capability add --local`（能力池内资产）或直接放入后由用户显式登记；未登记的未跟踪文件由 `space sync` 的范围重算保护不清扫，但不出现在任何清单中。
-- **移除装配项用范围遮蔽，不提交删除**：用户移除装配单声明的能力路径时，记入 `localState.shadowed` 并从稀疏范围排除；内容保留在对象库与空间分支树中，不作为删除提交上行。显式入口是 `space capability remove --local`。
-- **本地通道不进入空间分支树**：`localState` 两条目承载的能力调整（本地引入、本地移除）不产生提交。内容要么以未跟踪状态躺在磁盘（added），要么留在分支树但移出可见范围（shadowed）。空间分支树与 local main 的差异只包含共享通道（装配单声明变更、内容提交）的产物——「进 space 分支」是共享动作本身，本地通道的全部意义就是内容不进分支树。
+- **有效范围**：稀疏范围由当前类型装配单、空间私有的能力级挂载选择，以及尚未跟踪的私有能力和游离文件保护路径共同确定。挂载选择只影响本空间物化；共享内容仍由 Git 提交进入能力池。下行重算范围时，能力身份按当前树解析；名称冲突或能力缺失须显式报告，不能清扫私有内容。
+- **共享新增**：新内容通过空间分支提交。若类型默认挂载，则同一变更更新装配单；若只在当前空间挂载，则登记能力级本地选择。两种情况下内容都可上行，本地选择不是上行闸的保护对象。
+- **私有能力**：未提交的私有内容须显式登记完整能力身份、保留在本空间，且不得与本体 Git 树中已有的同名能力重叠。未登记的未跟踪文件在同步期间仅受保盘保护，不被自动收养；私有能力与上游新增能力同名时同步拒绝并给出人工选择，不覆盖文件。
+- **私有卸载**：仅显式 `space capability remove <kind>:<name> --local` 记录对完整能力的本地不挂载选择；`add --local` 撤销该选择。修改、删除能力内部文件都是 Git 内容变更，不能被推断为卸载。共享删除整个能力时须同时满足装配单引用完整性，否则拒绝提交或同步。
 
-## Two-Layer Assembly Records
+## Assembly Facts and Ownership
 
-装配记录分两层，各司其职：
+装配由三类互不替代的事实组成：
 
-1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。`space capability add/remove` 修改本层。
-2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配，含装配单声明的基线、空间新增与空间遮蔽三类。由 CLI 维护，不手工编辑。
+| 事实 | 真相源 | 更新者 | 持久性与用途 |
+|------|--------|--------|-------------|
+| 共享内容与类型默认组合 | 本体 Git 分支中的资产与 `assembly/archetypes/<type>.yaml` | 本体能力编辑与 `space capability` 共享操作 | commit 携带内容差异，`space sync` 上行后在能力池复用 |
+| 空间身份 | 空间根仓库的 `.wopal-space/space-meta.json` | CLI 初始化；空间身份操作 | 跟踪稳定的类型、骨架、ontology 来源；普通 sync 不改写 |
+| 空间私有装配选择 | 忽略的 `.wopal-space/state/assembly.json` | CLI `space capability --local` 与共享内容首次挂载操作 | 持久保存完整能力身份；重启和同步后有效，不进入任一 Git 仓库 |
 
-装配物化使用 Git `sparse-checkout`：空间 worktree 只物化由装配单派生、经空间本地状态调整后的路径，共享中央仓库对象库，不复制历史。
+`space sync` 的进度与对齐情况由本体 `main` 和 `space/<name>` refs 的祖先关系计算。上次同步提交可作为本地诊断记录，但不是下行决策输入，也不作为根仓库受跟踪文件的高频字段。状态显示分别报告双向提交差异、稀疏健康、本地挂载与私有内容，不使用一个混合含义的 revision 一致性布尔值。
 
-**本地状态是空间私有事实**：`space-meta.json` 位于空间仓库内，不属于本体仓库，因此不会随 `space sync` 上行。它记录"本空间实际持有与不持有哪些路径"，是范围重算的唯一输入之一，跨同步持久稳定。
+空间身份声明的最小结构是 `version`、`type`、`schema` 和 `source.ontology`。运行态文件的最小结构是 `version`、`include`、`exclude` 和 `private` 三组**规范能力身份**（如 `skill:dev-flow`）：`include` 挂载未在类型默认组合中的共享能力，`exclude` 仅在本空间卸载类型默认能力，`private` 登记未提交的私有能力内容。三组互斥；`include` 的能力须存在于本体空间分支或 local main 的树中，`private` 的能力须不在两棵树中；解析完整能力路径时对目录型与文件型能力使用同一身份规则。状态写入采用原子替换，持久保留；空间根 `.gitignore` 模板只忽略 CLI 管理的 `.wopal-space/state/`，不得忽略用户的整个 `.wopal-space/`。CLI 提供显式导出/备份与恢复入口，备份涵盖状态与私有内容；丢失或损坏私有状态时停止重算并报告，不能悄悄以空集合覆盖用户选择。有效装配按能力身份计算：
 
-**能力来源与收敛路径**：装配单声明的能力来自能力池。经装配单通道引入池中不存在的自有能力时（`space capability add`，无 `--local` 旗标），内容随装配单提交在同步时上行进入 local main，自此成为池中资产，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。本地通道（`--local` 旗标）不产生提交、不上行，内容停留在本空间（见 Two-Layer Assembly Records 的差异收敛表）。空间遮蔽是对装配单基线的本地收窄，只作用于本空间，不影响能力池与同类型其他空间。
-
-### Space Assembly Snapshot Structure
-
-`space-meta.json` 是空间装配的机器可读事实，供 `space status`、`space sync` 与 `space capability` 消费：
-
-```jsonc
-{
-  "version": 1,
-  "type": "coding",
-  "schema": "coding-space-schema.yaml",
-  "source": {
-    "ontology": "wopal-space-ontology",
-    "revision": "60a4cf5"
-  },
-  "assembledAt": "2026-09-14T10:30:00Z",
-  "capabilities": {
-    "agents": ["wopal", "fae", "rook", "maka"],
-    "skills": ["dev-flow", "agents-collab"],
-    "rules": ["typescript", "business-rules"],
-    "commands": ["init", "commit"],
-    "plugins": ["wopal-plugin"]
-  },
-  "localState": {
-    "added": [
-      { "path": "skills/newskill", "recordedAt": "2026-09-21T13:40:00Z" }
-    ],
-    "shadowed": [
-      { "path": "skills/dev-flow", "recordedAt": "2026-09-21T13:41:00Z" }
-    ]
-  }
-}
+```text
+物化能力 =（当前类型装配单 ∪ include ∪ private）− exclude
 ```
 
-字段语义：
+稀疏范围由有效能力的路径、必要装配定义以及当前未登记未跟踪文件的临时保盘路径派生；运行态只持有身份，不存技能内部文件路径。`include` 的共享文件即使仅本空间挂载，仍能随空间分支提交进入 local main；`private` 对应内容保持未跟踪，任何写入命令拒绝将它暂存。同步上行前用 Git 的无 rename 路径差异与私有能力的根路径交叉检查，阻止手动提交泄漏；`include`、`exclude` 不参与上行闸。
 
-| 字段 | 含义 |
-|------|------|
-| `version` | 快照结构版本；`localState` 是向后兼容的字段扩充，不改版本号，读方缺失该字段时视为空 |
-| `type` | 空间类型，与装配单 `type` 一致 |
-| `schema` | 实际使用的骨架名，由装配单解析所得 |
-| `source.ontology` | 来源 ontology 名称 |
-| `source.revision` | 装配时的来源提交，供下行对齐判断 |
-| `assembledAt` | 装配时间，ISO 8601 |
-| `capabilities` | 装配单基线快照，按类目分组；物化时复制，此后不随空间本地变更 |
-| `localState.added` | 空间新增的仓库相对路径，含记录时间；范围重算时并入 |
-| `localState.shadowed` | 空间遮蔽的仓库相对路径，含记录时间；范围重算时排除 |
+共享内容提交与装配状态调整互不暗示。`space evo commit/integrate` 对普通文件新增、修改、删除保留 Git 语义；新增共享能力若不在类型装配单内，则在同一事务中登记 `include` 以保证物化，登记不得误归类为私有内容。整个能力的共享删除须同时移除仍指向它的类型装配声明，并清理本空间无效的挂载选择；同步前校验其他适用装配定义，不允许留下悬空引用。显式 `remove --local` 才能生成 `exclude`；恢复以完整能力身份匹配。空间内部文件删除既不能产生 `exclude`，也不能产生私有内容登记。
 
-`capabilities` 是**物化时的基线副本**，`localState` 是其上的**本地增量**。三者的关系是：
-
-```
-有效装配 = capabilities（装配单基线） ∪ localState.added − localState.shadowed
-```
-
-由此产生四类差异，各有不同的收敛路径。装配单通道产生提交并随同步上行；本地通道不产生提交、不进入空间分支树，**构造上不可上行**：
-
-| 变更 | 记录位置 | 是否上行 local main | 收敛方式 |
-|------|----------|---------------------|----------|
-| **装配单新增能力**（`space capability add`） | `capabilities` 与装配单同步更新 | 是 | 同类型其他空间在各自下次 `space sync` 时跟进 |
-| **本地引入能力**（`space capability add --local`） | 仅记入 `localState.added` | **否** | 只扩本空间范围与磁盘物化；能力池不受影响；`capability add`（无旗标）转正为共享引入 |
-| **本地移除能力**（`space capability remove --local`） | 仅记入 `localState.shadowed` | **否** | 只收窄本空间范围；能力池与同类型空间不受影响；`capability add --local` 或 `capability add`（无旗标）恢复 |
-| **空间遮蔽基线能力**（用户直接删除装配单声明的路径，自动探测兜底） | 仅记入 `localState.shadowed` | 否 | 同本地移除；同步输出列出遮蔽项 |
-
-**本地状态的两个条目都是私有事实，不进入空间分支树**：`localState.added` 的路径以未跟踪状态存在于磁盘——它不在任何提交里，`git diff main...space` 看不到它，上行在构造上不可能发生；`localState.shadowed` 只收窄稀疏范围，内容留在对象库与空间分支树中，不产生删除提交。`localState` 本身存放于空间根目录 `.wopal-space/space-meta.json`（管理面），不属于本体仓库，永不随 `space sync` 上行。
-
-`source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
+未登记的游离文件只在当前同步中得到保盘保护，不被自动登记或提交。私有能力卸载时先把内容安全保留在 CLI 管理的 `.wopal-space/state/held/`，再撤销登记和收窄范围；不隐式删除用户文件。私有能力与本体将引入的同名资产发生碰撞时停止并列出双方路径，用户明确选择保持私有身份或转为共享；任何重算不得默默覆盖私有内容。
 
 ### Protected Paths
 
@@ -286,7 +232,7 @@ CLI 读取骨架后按以下规则消费：
 | 操作 | 受保护路径 | 装配单声明的能力路径 | 其他路径 |
 |------|-----------|---------------------|----------|
 | 修改内容 | 允许，随同步上行 | 允许，随同步上行 | 允许，随同步上行 |
-| 删除 | 恢复 | 记入 `localState.shadowed` | 正常删除 |
+| 删除 | 恢复 | 文件级删除作为共享内容变更；完整能力的本地卸载由显式 `remove --local` 执行 | 正常删除 |
 | 重命名 | 恢复 | 按遮蔽旧路径 + 新增新路径处理 | 正常重命名 |
 
 受保护路径的删除或重命名由写入命令在提交前从索引与工作区一并恢复，不产生提交。恢复使用路径级操作（`git restore --staged --worktree <path>`），不触碰用户的其他未提交改动。

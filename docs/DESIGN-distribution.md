@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-09-14
+> **Updated**: 2026-09-26
 > **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -60,7 +60,7 @@ P1 目标语义：
 2. fork flow 是显式选择的替代模式
 3. 每个 space 拥有独立的 `space/<name>` 分支与装配 worktree
 4. `.wopal/` 是装配 worktree，不是复制目录，也不持有独立能力演化
-5. `.wopal-space/space-meta.json` 记录类型、骨架、来源 revision、装配时间、装配单基线与空间本地状态（新增与遮蔽）
+5. 空间根仓库跟踪 `.wopal-space/space-meta.json` 中的稳定身份；`.wopal-space/state/assembly.json` 由 CLI 在忽略的运行态中持有本地装配选择；本体 Git refs 提供同步进度
 
 ---
 
@@ -122,7 +122,7 @@ $WOPAL_HOME/{agents,skills,commands,rules,plugins}  # base
 -> <space>/.wopal/{agents,skills,commands,rules,plugins}  # overlay，优先级最高
 ```
 
-空间 overlay 层由装配 worktree 物化（sparse-checkout 真实文件），空间内可写可进化。空间新增的内容经 `space sync` 汇入 local main；对装配单基线的本地收窄（遮蔽）只作用于本空间，不上行。有效范围与本地状态契约见 `./DESIGN-assembly.md` 的 Two-Layer Assembly Records。
+空间 overlay 层由装配 worktree 物化（sparse-checkout 真实文件），空间内可写可进化。空间提交的共享内容经 `space sync` 汇入 local main；对类型默认能力的本地卸载只改变本空间挂载选择，不阻断共享内容上行。有效范围与本地状态契约见 `./DESIGN-assembly.md` 的 Assembly Facts and Ownership。
 
 ---
 
