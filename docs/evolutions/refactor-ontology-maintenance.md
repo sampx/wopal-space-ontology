@@ -207,8 +207,8 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：维护入口三角（技能 / 命令 / 路由）职责清晰，旧协议副本清零。
-实际触碰文件：（实施完成后由实施 Agent 回填）
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`commands/wopal/ontology-maintain.md`、`skills/space-master/SKILL.md`、`skills/space-master/SKILL.zh-CN.md`、`skills/space-master/references/ontology-maintenance.md`（删除）、`agents/wopal.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 
