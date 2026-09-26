@@ -175,8 +175,8 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：机制文档完成向 `wopal space evo` 的完全切换，脚本命令零残留；维护协议成为技能章节。
-实际触碰文件：（实施完成后由实施 Agent 回填）
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`skills/ontology-evolution/SKILL.md`、`skills/ontology-evolution/references/commands.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 
