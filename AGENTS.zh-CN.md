@@ -80,9 +80,33 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 - `trigger` 声明匹配方式（如 `model_decision`）；`keywords` 声明触发关键词。
 - 正文只写 Agent 可执行的约束，不写产品意图或实现细节。
 
+### dev-flow Worktree 生命周期
+
+dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约：
+
+- `planning` 和已批准的 `executing` 基线位于集成分支（main 或 space/<name>）
+- `approve --confirm` 先在集成分支提交 `executing` + Worktree 元数据，再创建 worktree
+- `complete` 在 feature 分支上提交 Plan-only commit（`verifying`），脏实施树报错退出
+- 用户验证在 feature 分支上进行
+- `verify-switch --merge` 在用户明确确认后将 feature 分支集成到 main
+- `verify --confirm` 在集成分支上提交 Plan-only commit（`done`）
+- `archive` 在集成分支上将已接受 Plan 移至 `done/`，清理 worktree
+
+**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent 负责。
+
+**Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
+
+权威细节见 `skills/dev-flow/SKILL.md` 的「Plan 分支归属」、「Wopal 编排规则」和「委派用 Plan 路径」章节。
+
 ### 插件
 
 - 插件内部架构、日志、类型安全、错误处理、开发与测试细则，**遵循** `.wopal/plugins/wopal-plugin/AGENTS.md`。
+
+### dsh-adapter 不变量
+
+- **事件日志折叠 LAST-wins**：每条消息的 sandbox 覆写必须无条件追加 `sandbox/mode`，包括与空间默认值相等的取值——「恢复默认」需要显式事件；跳过与默认值相同的追加会让先前的覆写继续生效。只有缺失 `extra.sandboxMode` 才表示「保持当前折叠」（见 poc DESIGN-dsh-poc §4.5）。
+- **权限 frontmatter 不带通配符**：agent 的 `permission:` 块不得声明 `"*": allow` 形式的条目（引擎默认值已提供）。求值是对深合并的多副本 frontmatter 按 LAST-wins 进行，因此通配符可能因键顺序不同而静默覆盖显式的 `ask`（见 poc DESIGN-dsh-poc §6.8）。任何权限改动后，在活实例上通过 `GET /agent` 验证合并后的规则顺序。
+- **投影给模型的工具 schema 必须忠实于容器声明**：JSON Schema→zod 转换必须保留 `oneOf`/`anyOf`（null 分支折为 nullable）、`enum`、`const` 以及每个属性的 `description`，只有真正不支持的节点才降级为 `z.unknown()`。dsh 会用自己的 schema 重新校验每次调用，模型看不见的约束正是模型会猜错、dsh 会随后拒收的约束（`insert_line` 被投影成 `any` → 模型发字符串 → `oneOf branch (matched 0)`）。保真度属于转换器，不属于逐工具补丁——provider 每次请求重读容器活 schema，一次转换器修复即覆盖所有已投影工具与未来所有参数。验证必须对照已安装 dsh 运行时的全部投影工具 schema（schema 检查 + 与 `validateJsonSchemaValue` 的接受/拒绝一致性），绝不对手写样例验证。
 
 ## 5. 测试
 
