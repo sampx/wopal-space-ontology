@@ -31,7 +31,7 @@
 2. **`ontology-evolution` 持有进化工作流但缺维护面**：SKILL.md + scripts/（evo.py 2629 行 + lib/ 946 行）+ references/commands.md；SKILL.md description 仍以 `evo.sh` 指称机制（"proposal state machine via evo.sh"）；Boundary 引用的 `wopal/ontology-maintain` 本身是旧模型。
 3. **`wopal/ontology-maintain` 命令引用已不存在的事物**：`wopal ontology apply`（CLI 无此命令）、`DESIGN.md §6.9.2`（章节号不存在）、`upstream-sync.md §4`（该参考文档已更名）、type/* 分支晋升模型（`DESIGN-evolution.md` 明文不设 type/* 层级）。
 4. **设计真相源已定稿（2026-09-25）**：`.wopal/docs/DESIGN-capabilities.md`（收编归属）、`.wopal/docs/DESIGN-evolution.md`（命令表 + `space evo` 唯一操作面）、`projects/wopal-cli/docs/DESIGN-evolution.md`（机制契约 + 迁移分批交付）。
-5. **机制操作面现状**：CLI 演进分支仅 `commit` / `integrate` 已落地（`src/commands/space.ts` evoGroupDef，help 注明状态机命令 "land in later tasks"）；技能脚本为过渡实现，两实现已漂移（fix 退役、isolated commit、realign）。
+5. **机制操作面现状（2026-09-26 更新）**：CLI `space evo` 八命令**已全部合入 main 并交付**（`wopal-cli` v0.3.24，合并提交 `9f6f424`）——`new` / `status` / `check` / `advance` / `accept` / `commit` / `integrate` / `archive`，注册于 `src/commands/space.ts` evoGroupDef。原「仅 `commit` / `integrate` 已落地、状态机命令 land in later tasks」的记载已过时。两实现的三处漂移（fix 退役、isolated commit、realign）已在迁移中收敛，**CLI 成为机制车道唯一操作面**——这使 D-04 的文档切换具备前置条件。技能脚本自此成为待退役实体。
 
 ### Research Findings
 
@@ -53,7 +53,7 @@
 - D-01: **收编归属**——本体维护操作协议（`ontology update` / `space sync` / `ontology contribute`、能力装配增删、status 解读、执行口径）作为 `ontology-evolution` 技能的新增 Maintenance 章节；技能是唯一规范单点，进化与维护共用同一命令面叙述。
 - D-02: **space-master 保留纯路由**——Skill Usage Scenarios 表与本体段改写为路由指针（本体维护/进化 → `ontology-evolution`）；删除 `references/ontology-maintenance.md`；AGENTS.md / README / Skills 生命周期章节保留不动。
 - D-03: **命令薄化**——`wopal/ontology-maintain.md` 重写为 ≤30 行薄触发器：description + 加载 `ontology-evolution` 技能 + 按 `$ARGUMENTS` 传入焦点；全部决策表与 CLI 用法删除。
-- D-04: **机制退役两步走**——步骤一（本提案）：SKILL.md / references/commands.md 标注脚本为过渡实现、以 CLI `space evo` 命令族为唯一操作面目标态；步骤二（CLI 命令族合入 main 后，quick 模式）：scripts/ 目录删除、SKILL.md 机制章节改写为 `space evo` 调用协议。双实现不得长期并行。
+- D-04: **机制文档完全切换到 CLI，脚本实体重行后删**——本提案内，`SKILL.md` / `references/commands.md` / `AGENTS.md` 三个说明文件**全部改写为 `wopal space evo` 调用协议，任何说明文件不再出现 `evo.sh` / `evo.py` / `bash scripts/...` 任何一处引用**（用户 2026-09-26 指令：文档先行，为下一步彻底删除脚本铺路）。`evo.sh fix` 在 CLI 无对应子命令（`space evo` 实测仅 new/status/check/advance/accept/commit/integrate/archive 八条），其职责统一由 **`space evo commit` instant 模式**承担（不带提案名，`-m` + `--paths`/`--all` 必填）。**脚本实体（`evo.py` 1683 行 + `lib/` 946 行）与 `tests/python/` 4 个测试文件的删除是下一步独立 quick 模式操作**（无设计面，不进提案生命周期），本提案不删——给仍在跑的代码删测试是错的。改完后存在一个**刻意容忍的短暂不一致**：脚本与测试仍可运行，但已无任何文档描述它们；下一步删除落地即消失。
 - D-05: **执行口径按定稿**——CLI 默认 dry-run 预览，agent 按用户意图直接执行 `--confirm`，不设审批门控；`ontology contribute` 是唯一需用户逐次拍板的动作；scope determination / 主题化 PR 规则保留（内容按新 CLI 参数面改写）。
 - D-06: **wopal.md 指针更新**——Mission 与 Conduct 中"本体进化方法由 space-master 承载"的表述改为 `ontology-evolution`；意图不清时先加载 space-master 的路由规则保持不变。
 - D-07: **提案命名契约落点为模板，不做机器强制**——契约写入 `templates/proposal.md`：该模板是技能脚本与 CLI `space evo new` 的**共同骨架源**（CLI `src/lib/space-evo-state.ts:90` 从本体侧解析该路径，helpText 明文「no inlined copy in the CLI」），故单点落笔即双端继承，无需两处重复维护。**拒绝超限 slug 的机器强制不在本提案内**：该逻辑属 CLI 机制面，而本提案 Out of Scope 已明文排除 wopal-cli 仓库（D-04 亦规定机制归 CLI），强行纳入会同时破坏本提案边界与配套 Plan `feature-cli-space-evo-state-machine-migration` 的验收范围——留待另案。命名规范本体对齐 dev-flow `references/plan-guide.md` 命名规则段（`<type>-<slug>`，slug = 1–2 核心名词 / kebab-case / ≤ 20 chars，丢弃动词与冠词）。
@@ -67,14 +67,30 @@ description: maintain ontology instance and collaboration
 行为：加载 ontology-evolution 技能，按 $ARGUMENTS（focus: update|contribute|sync|status，空 = 全量评估）执行技能的 Maintenance 协议。命令自身不承载任何规范。
 ```
 
-**`ontology-evolution` 技能章节结构**：Semantic lane（不变）→ Mechanism lane（补过渡实现标注 + CLI 唯一操作面指针）→ Maintenance Protocols（新增：六命令表、status 解读、contribute scope/PR 规则、双通道与上行闸、执行口径）→ Boundary（更新：`wopal/ontology-maintain` 薄触发、机制归 CLI、迁移期脚本说明）。
+**`ontology-evolution` 技能章节结构**：Semantic lane（不变）→ Mechanism lane（**完全改写为 `wopal space evo` 八命令调用协议**，零脚本命令残留）→ Maintenance Protocols（新增：六命令表、status 解读、contribute scope/PR 规则、双通道与上行闸、执行口径）→ Boundary（更新：`wopal/ontology-maintain` 薄触发、机制归 CLI、缺陷修复走 `space evo commit` instant 模式）。
+
+**`evo.sh` → `wopal space evo` 命令映射（D-04 硬约束）**：
+
+| 旧脚本命令 | CLI 对应物 | 备注 |
+|---|---|---|
+| `evo.sh new` | `wopal space evo new` | 骨架仍取本体侧 `templates/proposal.md` |
+| `evo.sh status` | `wopal space evo status` | 具名给详情，省名列全部 |
+| `evo.sh check` | `wopal space evo check` | |
+| `evo.sh advance --to <s>` | `wopal space evo advance --to <s>` | |
+| `evo.sh accept [--no-worktree]` | `wopal space evo accept [--no-worktree]` | |
+| `evo.sh commit` | `wopal space evo commit` | isolated 模式在隔离 worktree 内提交 |
+| `evo.sh integrate` | `wopal space evo integrate` | |
+| `evo.sh archive` | `wopal space evo archive` | |
+| **`evo.sh fix -m <m> (--paths/--all)`** | **`wopal space evo commit -m <m> (--paths/--all)`** | **CLI 无 `fix` 子命令**；instant 模式（不带提案名）承担缺陷即时修复 |
 
 **space-master 路由条目**：Skill Usage Scenarios 增补"本体维护与进化 → `ontology-evolution`"行；Ontology Maintenance 段压缩为路由说明（≤15 行），不含任何 CLI 用法示例。
 
 ## In Scope
 
-- `ontology-evolution` SKILL.md：机制章节过渡标注 + Maintenance Protocols 新增 + Boundary 更新
-- `ontology-evolution` references/commands.md：顶部过渡实现标注与 CLI 契约指针
+- `ontology-evolution` SKILL.md：机制章节**完全改写为 `wopal space evo` 调用协议**（非过渡标注）+ Maintenance Protocols 新增 + Boundary 更新
+- `ontology-evolution` references/commands.md：**整篇改写为 `wopal space evo` 命令参考**，脚本命令零残留
+- `ontology-evolution` AGENTS.md：清除全部 `evo.sh` / `evo.py` / `scripts/` 引用，保留仍为真的部分（结构契约、D-NN 纪律、双车道边界、缺陷即时修复改指 instant 模式）
+- `ontology-evolution` templates/proposal.md：提案命名契约（Task 3）
 - `wopal/ontology-maintain.md` 薄化重写
 - `space-master` SKILL.md / SKILL.zh-CN.md：本体段改写为路由；删除 `references/ontology-maintenance.md`
 - `agents/wopal.md`：两处技能指针更新
@@ -82,7 +98,8 @@ description: maintain ontology instance and collaboration
 ## Out of Scope
 
 - CLI `space evo` 状态机命令交付——配套 dev-flow Plan `feature-cli-space-evo-state-machine-migration` 承载，本提案不碰 wopal-cli 仓库
-- scripts/（evo.py / lib/）删除——CLI 命令族合入 main 后按 D-04 步骤二执行（quick 模式即可，无设计面）
+- **scripts/（evo.py / lib/）实体的删除**——按 D-04 属下一步独立 quick 模式操作；本提案只切文档，脚本留存
+- **tests/python/ 4 个测试文件的删除**——与脚本实体同批删除；脚本仍在则测试须留存
 - space-master 的 AGENTS.md / README / Skills 维护章节——非本体维护面
 - `dev-flow` / `agents-collab` 等其他技能
 - `docs/DESIGN-evolution.md` 等设计文档——收编表述已在设计定稿提交（1887130）中完成
@@ -91,9 +108,10 @@ description: maintain ontology instance and collaboration
 
 | Component | Files | Operation | Role |
 |-----------|-------|-----------|------|
-| ontology-evolution skill | `skills/ontology-evolution/SKILL.md` | 修改 | 机制过渡标注 + Maintenance 章节 + Boundary + 命名契约指针 |
+| ontology-evolution skill | `skills/ontology-evolution/SKILL.md` | 修改 | 机制章节完全改写为 `space evo` + Maintenance 章节 + Boundary + 命名契约指针 |
+| ontology-evolution skill | `skills/ontology-evolution/references/commands.md` | 重写 | 整篇改为 `wopal space evo` 命令参考（保留稀疏安全与语料断言知识）+ `new` 命名约束 |
+| ontology-evolution skill | `skills/ontology-evolution/AGENTS.md` | 修改 | 清除脚本架构描述，保留仍为真的规则 |
 | ontology-evolution skill | `skills/ontology-evolution/templates/proposal.md` | 修改 | 提案命名契约（双端共享骨架源） |
-| ontology-evolution skill | `skills/ontology-evolution/references/commands.md` | 修改 | 过渡实现标注 + CLI 契约指针 + `new` 命名约束 |
 | maintenance command | `commands/wopal/ontology-maintain.md` | 重写 | 薄触发器 |
 | space-master skill | `skills/space-master/SKILL.md`, `skills/space-master/SKILL.zh-CN.md` | 修改 | 本体段 → 路由 |
 | space-master skill | `skills/space-master/references/ontology-maintenance.md` | 删除 | 规范已收编 |
@@ -106,7 +124,7 @@ description: maintain ontology instance and collaboration
 1. [ ] 收编单点性：`rg -l "ontology (update|contribute)" .wopal/skills/space-master/` 零命中（space-master 不再持有维护协议）；`rg -c "space sync" .wopal/skills/ontology-evolution/SKILL.md` ≥ 1（维护协议在技能内）。
 2. [ ] 命令薄化：`wc -l` 报告 `commands/wopal/ontology-maintain.md` ≤ 30 行；文件含 "ontology-evolution" 加载指令；不含 "ontology apply"、"6.9.2"、"upstream-sync.md" 任何一处。
 3. [ ] 路由保留：`rg -c "ontology-evolution" .wopal/skills/space-master/SKILL.md` ≥ 1；`SKILL.zh-CN.md` 同步含对应路由条目；两文件的本体段均无 `--include` / `--confirm` 用法示例。
-4. [ ] 机制过渡标注：SKILL.md 含 "space evo" 与过渡实现表述；`references/commands.md` 顶部含过渡状态说明与 `projects/wopal-cli/docs/DESIGN-evolution.md` 指针。
+4. [ ] **机制文档完全切换到 CLI（D-04 核心判据）**：`rg -c 'evo\.sh|evo\.py' skills/ontology-evolution/SKILL.md skills/ontology-evolution/references/commands.md skills/ontology-evolution/AGENTS.md` 三文件**全部零命中**；`rg -c 'bash scripts/' skills/ontology-evolution/{SKILL.md,references/commands.md,AGENTS.md}` 零命中；`rg -c 'wopal space evo' skills/ontology-evolution/SKILL.md` ≥ 1（机制章节以 CLI 命令面叙述）；`rg -q 'space evo commit' skills/ontology-evolution/SKILL.md` 命中（缺陷即时修复改指 instant 模式，不得残留 `evo.sh fix`）；`rg -c 'wopal space evo' skills/ontology-evolution/references/commands.md` ≥ 8（整篇命令参考已切换，覆盖八条子命令）；`rg -q 'add --sparse|corpus assertion' skills/ontology-evolution/references/commands.md` 命中（改写命令面时**不得丢失**稀疏安全与语料断言的工程知识——该知识为本文件独占，`docs/DESIGN-evolution.md` 零覆盖）；**且** `python3 -m pytest tests/python -q` 仍全绿（脚本未删，测试不得被破坏）。
 5. [ ] 结构契约不破坏：`python3 -m pytest tests/python -q` 全绿（提案结构契约脚本未变更）。
 6. [ ] agent 指针：`agents/wopal.md` 中 "ontology capability evolution" 相关表述指向 `ontology-evolution`，无残留 "carried by the `space-master` skill"。
 7. [ ] 提案命名契约落地（可判定）：`rg -q "20 chars" skills/ontology-evolution/templates/proposal.md` 命中（slug 长度上限）；`rg -q "type>-<slug" skills/ontology-evolution/templates/proposal.md` 命中（命名结构）；`rg -qE "^\| .*\| .*\|$" skills/ontology-evolution/templates/proposal.md` 在命名契约段内至少命中 1 行（verbose→lean 对照表非空）；`rg -q "refactor-ontology-maintenance" skills/ontology-evolution/templates/proposal.md` 命中（对照表以本提案为反例）；`rg -q "templates/proposal.md" skills/ontology-evolution/SKILL.md` 命中（`new` 行指向模板契约）；`rg -qE "slug.{0,20}(20|noun)" skills/ontology-evolution/references/commands.md` 命中（`new` 条目补约束）。
@@ -129,32 +147,34 @@ description: maintain ontology instance and collaboration
 
 ## Implementation
 
-### Task 1: ontology-evolution 技能收编改写
+### Task 1: 机制文档完全切换到 space evo + 维护协议收编
 
 **Verification Intent**: AC#1, AC#4, AC#5
 
 **Behavior**:
-- SKILL.md Mechanism lane 章节含过渡实现标注（脚本为迁移期实现；唯一操作面 = CLI `space evo`，契约指针 `projects/wopal-cli/docs/DESIGN-evolution.md`）
-- SKILL.md 新增 Maintenance Protocols 章节：六命令表（space status/sync/capability、ontology capability list/update/contribute、space evo）、status 解读要点（Downstream/Upstream flow、localState 清单）、contribute scope determination 与主题化 PR 规则、双通道与上行闸、执行口径（D-05）
-- SKILL.md Boundary 更新：`wopal/ontology-maintain` 定位为薄触发；机制归 CLI；迁移期脚本说明
-- references/commands.md 顶部标注过渡实现状态 + CLI 契约指针
-- 结构契约测试保持全绿
+- **SKILL.md Mechanism lane 章节完全改写为 `wopal space evo` 调用协议**：八条子命令逐条给出调用形态（`new` / `status` / `check` / `advance --to` / `accept [--no-worktree]` / `commit` / `integrate` / `archive`），**零 `evo.sh` 残留**；契约指针指向 `projects/wopal-cli/docs/DESIGN-evolution.md`
+- **「Defect repair is immediate」整节改写**：CLI 无 `fix` 子命令，缺陷即时修复统一表述为 `wopal space evo commit -m "<msg>" (--paths <p>... | --all)` 的 instant 模式（不带提案名）
+- SKILL.md 新增 Maintenance Protocols 章节：六命令表（space status/sync/capability、ontology capability list/update/contribute）、status 解读要点（Downstream/Upstream flow、localState 清单）、contribute scope determination 与主题化 PR 规则、双通道与上行闸、执行口径（D-05）
+- SKILL.md Boundary 更新：`wopal/ontology-maintain` 定位为薄触发；机制归 CLI；**不得出现「迁移期脚本」或任何脚本存在性说明**
+- **references/commands.md 整篇改写为 `wopal space evo` 命令参考**：11 个章节中 9 个 `## evo.sh <cmd>` 标题全部改为 `wopal space evo <cmd>`；`State writes are script-only` 改写为 stage 只由命令写入；**稀疏安全工程知识必须原样保留**（`git add -A` 实测行为表、`git add --sparse` 不扩范围的陷阱、语料断言的不可替代性、integrate 的语料断言与回滚边界）——该知识为本文件独占，`docs/DESIGN-evolution.md` 零覆盖，改写命令面时不得丢失
+- 结构契约测试保持全绿（脚本未删，`tests/python/` 4 个测试文件仍须通过）
 
-**Pre-read**: `.wopal/docs/DESIGN-capabilities.md`；`.wopal/docs/DESIGN-evolution.md`；`projects/wopal-cli/docs/DESIGN-evolution.md`；现 `skills/ontology-evolution/SKILL.md` 全文
+**Pre-read**: `.wopal/docs/DESIGN-capabilities.md`；`.wopal/docs/DESIGN-evolution.md`；`projects/wopal-cli/docs/DESIGN-evolution.md`；现 `skills/ontology-evolution/SKILL.md` 全文；现 `references/commands.md` 全文；本提案 Key Interfaces 的 `evo.sh → space evo` 映射表
 
-**Design**: 在现有 SKILL.md 上增补与定点改写，不重写语义车道内容（已对齐）。Maintenance 章节内容以设计定稿为准，禁止从旧 `ontology-maintenance.md` 搬运旧命令面内容。机制章节不改写为 CLI 用法（那是 D-04 步骤二的事），只加标注与指针。
+**Design**: 在现有 SKILL.md 上增补与定点改写，不重写语义车道内容（已对齐）。Maintenance 章节内容以设计定稿为准，**禁止从旧 `ontology-maintenance.md` 搬运旧命令面内容**，且不得夹带已废弃引用（`ontology apply`、`DESIGN.md §6.9.2`、`upstream-sync.md`）——那些是 Task 2 的清理对象，但 Task 1 同样不得引入。机制章节按 D-04 从「标注过渡」升级为「完全切换」：不是加一句「脚本是过渡实现」，而是把整节操作面叙述改写成 CLI 形态后**删除**脚本存在的叙述。commands.md 改写遵循「命令面换、知识留」：`add --sparse` 实测表与语料断言段落描述的是稀疏装配的固有危险，与哪个实现无关，必须留存。测试超时是已知坑，见 Changes 第 1 项。
 
 **TDD**: false
 
 **Changes**:
-1. 运行结构契约测试确认基线全绿
-2. 按上述行为改写 SKILL.md 与 references/commands.md
-3. AC#1 / AC#4 的 grep 断言逐一通过
+1. 运行结构契约测试确认基线全绿（**注意超时**：`test_sparse_safety.py` 单文件约 81s、全量约 85s，须给 ≥180s 预算；默认 60s 会 kill 进程并误判为失败）
+2. 改写 SKILL.md：Mechanism lane → `space evo` 协议；缺陷修复节 → instant 模式；新增 Maintenance Protocols；更新 Boundary
+3. 整篇改写 references/commands.md 为 `space evo` 命令参考，保留稀疏安全与语料断言知识
+4. AC#1 / AC#4 断言逐一通过；确认两文件 `evo.sh` / `evo.py` / `bash scripts/` 零命中
 
-**Verify**: `python3 -m pytest tests/python -q` 全绿；`rg -n "space evo|过渡" skills/ontology-evolution/SKILL.md` 命中
+**Verify**: `python3 -m pytest tests/python -q` 全绿（≥180s 超时）；`rg -c 'evo\.sh|evo\.py' skills/ontology-evolution/SKILL.md skills/ontology-evolution/references/commands.md` 零命中；`rg -c 'wopal space evo' skills/ontology-evolution/references/commands.md` ≥ 8；`rg -q 'add --sparse|corpus assertion' skills/ontology-evolution/references/commands.md` 命中；`rg -n 'space evo' skills/ontology-evolution/SKILL.md` 命中
 
 **Done**:
-任务产出：技能文档收编改写完成，维护协议成为技能章节。
+任务产出：机制文档完成向 `wopal space evo` 的完全切换，脚本命令零残留；维护协议成为技能章节。
 实际触碰文件：（实施完成后由实施 Agent 回填）
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
@@ -224,15 +244,54 @@ description: maintain ontology instance and collaboration
 
 ---
 
+### Task 4: AGENTS.md 清除脚本架构描述
+
+**Verification Intent**: AC#4, AC#5
+
+**Behavior**:
+- `skills/ontology-evolution/AGENTS.md` 中 `evo.sh` / `evo.py` / `scripts/` / `bash scripts/` **全部零命中**（当前实测：`evo.sh`×6、`evo.py`×1、`scripts/`×10）
+- `Stage` 只由命令写入的规则保留，但归属改为 CLI 机制面（原表述指向 `scripts/lib/proposal.py`，随脚本删除将失效）
+- 「缺陷即时修复」小节改指 `wopal space evo commit` instant 模式
+- 仍然为真的开发规则原样保留：提案结构契约（必需章节 + Task 六元素）、`D-NN` 编号纪律、Semantic/Mechanism 双车道边界、脚本**尚存**这一事实不写进文档（D-04 容忍的短暂不一致）
+- `tests/python/` 4 个测试文件**保留不动**——脚本仍在，给活代码删测试是错的；二者同批删除属下一步
+
+**Pre-read**: 现 `skills/ontology-evolution/AGENTS.md` 全文；本提案 D-04；`projects/wopal-cli/docs/DESIGN-evolution.md`（确认 stage 写入的机制面归属）
+
+**Design**: AGENTS.md 是**开发规则**文档，其中关于 `sparse.py` / `worktree.py` / `proposal.py` 架构的描述随脚本删除即将全部失效。本任务按 D-04 提前清除，使技能文档整体达成零脚本引用；代价是改完后脚本实体与 `tests/python/` 仍存在却已无文档描述——这是 D-04 明示容忍的短暂不一致，下一步删除落地即消失。**不得**借机扩写新的架构章节，删除优先于重写；确实需要保留的规则用 CLI 表述重述一句即可。
+
+**TDD**: false
+
+**Changes**:
+1. 读 AGENTS.md 全文，标出全部脚本引用点
+2. 逐处清除或改写为 CLI 表述，保留仍为真的规则
+3. AC#4 中 AGENTS.md 相关的断言通过；确认 `tests/python/` 与 `scripts/` 文件树未被触碰
+
+**Verify**: `rg -c 'evo\.sh|evo\.py|bash scripts/' skills/ontology-evolution/AGENTS.md` 零命中；`rg -q 'space evo' skills/ontology-evolution/AGENTS.md` 命中；`python3 -m pytest tests/python -q` 全绿（≥180s 超时）；`git status --short` 不含 `scripts/` 与 `tests/`
+
+**Done**:
+任务产出：技能开发规则与用户文档一致，机制面描述全部指向 CLI。
+实际触碰文件：（实施完成后由实施 Agent 回填）
+- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+
+---
+
 ## Delegation Strategy
 
 | Wave | Task | 执行者 | 依赖 | 委派理由 |
 |------|------|--------|------|---------|
-| 1 | Task 1 | fae | 无 | 文档批量改写，文件集与 Task 2 无交集 |
-| 1 | Task 2 | fae | 无 | 同域文档工作，建议同一 fae 会话顺序执行以复用上下文 |
-| 1 | Task 3 | fae | 无 | 同属 ontology-evolution 技能文档面，与 Task 1 共享 SKILL.md 上下文，**必须同一 fae 会话顺序执行**——并发改同一文件必冲突 |
+| 1 | Task 1 | fae | 无 | 机制面完全切换，改写面最大；文件集与 T2/T4 无交集 |
+| 1 | Task 3 | fae | 无 | 与 T1 同改 SKILL.md / commands.md，**必须同一 fae 会话顺序执行**，不可并发 |
+| 1 | Task 4 | fae | 无 | 独立单文件（AGENTS.md），无共享文件面 |
+| 1 | Task 2 | fae | 无 | 文件集与 T1/T3/T4 无交集 |
 
-> Wave 1 三条同批：Task 1 与 Task 3 都改 `skills/ontology-evolution/SKILL.md`，须串行；本提案 Complexity 仍为 Medium，未因新增 Task 上调（文档层改写，无代码面）。
+**委派分批**（受 fae 上下文预算约束，单委派 ≤30 步）：
+
+| 轮次 | Task | fae 会话 | 说明 |
+|---|---|---|---|
+| 1 | T1 → T3 | 复用现有会话 | T1/T3 共享文件面，必须同会话串行 |
+| 2 | T4 → T2 | **新开** | 无共享上下文需求；按用户规则 fae 接近 40% 即新开，不 reply 复用 |
+
+> 四条 Task 同为 Wave 1（无相互阻塞），但**不得并行**：全部落在同一隔离 worktree 的同一 git index 上，并发提交会争抢 index.lock 并混合提交边界。
 
 ## Delivery
 
