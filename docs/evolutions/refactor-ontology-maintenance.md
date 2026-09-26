@@ -155,7 +155,7 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：技能文档收编改写完成，维护协议成为技能章节。
-实际触碰文件：<实施后回填>
+实际触碰文件：（实施完成后由实施 Agent 回填）
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
@@ -187,7 +187,7 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：维护入口三角（技能 / 命令 / 路由）职责清晰，旧协议副本清零。
-实际触碰文件：<实施后回填>
+实际触碰文件：（实施完成后由实施 Agent 回填）
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
@@ -219,7 +219,7 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：提案命名规范成为模板级契约，新增提案双端自动继承；本提案自身已改名并作为首个实例。
-实际触碰文件：<实施后回填>
+实际触碰文件：（实施完成后由实施 Agent 回填）
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
