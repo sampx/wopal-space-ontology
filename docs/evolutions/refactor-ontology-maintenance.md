@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-25
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-refactor-ontology-maintenance
 - **Branch**: ontology-refactor-ontology-maintenance
@@ -143,7 +143,7 @@ description: maintain ontology instance and collaboration
 - 通过判据: 回执含实况数据（`wopal ontology status` / `space status` 输出的解读），且决策建议以技能 Maintenance 协议口径给出（执行口径 = 定稿口径）；AC#1–AC#7 断言全部通过。
 - 失败反馈: 命令完整输出 + `git -C .wopal log --oneline -3`。
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
