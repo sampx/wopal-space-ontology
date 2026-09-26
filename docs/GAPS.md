@@ -53,20 +53,20 @@
 
 ---
 
-## Plugin Configuration Delivery
+## Plugin Configuration Consumption
 
-### ONT-G5: 插件配置各自读取，装配单插件声明未分段（P0）
+### ONT-G5: 三个本体插件各自读配置文件，wopal-plugin 的 id 与装配名不一致（P0）
 
-**Current**: 三个本体插件（dsh-adapter、wopal-plugin、tui-ellamaka）各自读三层 settings 的 `wopal.pluginConfig.<插件名>`，自行定位空间根、合并来源与校验取值；装配单的 `plugins` 是不分段的纯名字数组，插件声明不区分目标 settings 段；`wopal-plugin` 的运行时导出 id 为 `wopal-wopal-plugin`，与装配名、配置键不一致。
+**Current**: dsh-adapter、wopal-plugin、tui-ellamaka 三个插件各自定位空间根、读三层 settings 的 `wopal.pluginConfig.<插件名>`、合并来源并校验取值，配置从哪来由插件自己判断。装配单 `.wopal/assembly/archetypes/coding.yaml` 的 `plugins` 仍是不分段的纯名字数组。`wopal-plugin` 导出的运行时 id 是 `wopal-wopal-plugin`，与装配名、配置键对不上。
 
-**Target**: 装配单按「settings 段名 → 插件名列表」分段声明插件，物化时写入对应段的 `plugin` 数组。插件不读配置文件、不写配置：引擎把三层合并后的配置整表经 `PluginInput.pluginConfig`（server 插件）与 `TuiPluginApi.pluginConfig`（TUI 插件）交付，插件按自己的名字取用条目并校验，装配条目的内联 options 仅作兜底保留，`$VAR` 解析留在插件侧。`wopal-plugin` 导出 id 修正为 `wopal-plugin`。
+**Target**: 三个插件不读配置文件、不写配置：引擎把三层合并后的配置整表交给它们，插件按自己的名字取用条目并校验取值。装配单 `plugins` 切换为「settings 段名 → 插件名列表」映射。`wopal-plugin` 导出的运行时 id 修正为 `wopal-plugin`。
 
-**Design**: `./DESIGN-assembly.md`（装配单分段声明与物化）；`./DESIGN-wopal-plugin.md`（Configuration 节）
+**Design**: `./DESIGN-wopal-plugin.md`（Configuration 节）
 
 **Exit**:
-- [ ] 装配单 `plugins` 按段映射声明，物化结果写入对应 settings 段的 `plugin` 数组
-- [ ] 三个插件不读配置文件、不自行定位空间根，消费引擎交付的整表条目
-- [ ] 内联 options 兜底、`$VAR` 解析与取值校验行为保持
+- [ ] 三个插件不读配置文件、不自行定位空间根，只消费引擎交付的整表条目
+- [ ] 插件条目内联 options 兜底、`$VAR` 解析与取值校验行为保持
+- [ ] 装配单 `plugins` 为分段映射格式
 - [ ] `wopal-plugin` 运行时 id 与装配名、配置键一致
 
 ---
