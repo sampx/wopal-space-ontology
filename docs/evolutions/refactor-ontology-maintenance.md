@@ -239,8 +239,8 @@ description: maintain ontology instance and collaboration
 
 **Done**:
 任务产出：提案命名规范成为模板级契约，新增提案双端自动继承；本提案自身已改名并作为首个实例。
-实际触碰文件：（实施完成后由实施 Agent 回填）
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`skills/ontology-evolution/templates/proposal.md`、`skills/ontology-evolution/SKILL.md`、`skills/ontology-evolution/references/commands.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 
