@@ -499,11 +499,18 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             log_error("Scope required for no-issue plans. Add --scope <name> or use title pattern: type(scope): description")
             return 1
 
-        slug = _title_to_slug(title)
-        slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
+        # No-issue mode: an explicit --slug wins verbatim; only a slug
+        # derived from the title gets the leading type prefix stripped.
+        if slug_arg:
+            slug = slug_arg
+            slug_from_title = False
+        else:
+            slug = _title_to_slug(title)
+            slug = re.sub(r'^^(fix|feat|feature|enhance|refactor|docs|chore|test)-', '', slug)
+            slug_from_title = True
 
         try:
-            plan_name = make_plan_name(None, plan_type, scope, slug)
+            plan_name = make_plan_name(None, plan_type, scope, slug, slug_from_title=slug_from_title)
         except NamingValidationError as e:
             log_error(str(e))
             return 1
@@ -1050,7 +1057,7 @@ def register_plan_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     new_parser.add_argument(
         "--slug",
-        help="Slug identifier (required in Issue mode; no-issue mode derived from title)",
+        help="Slug identifier (required in Issue mode; no-issue mode: derived from title when omitted)",
     )
     new_parser.add_argument(
         "--product",

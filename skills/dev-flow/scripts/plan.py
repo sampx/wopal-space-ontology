@@ -266,6 +266,9 @@ class ValidationError(Exception):
     pass
 
 
+_SLUG_MAX_LENGTH = 20
+
+
 def validate_plan_name(name: str) -> None:
     """Validate Plan naming convention.
     
@@ -291,12 +294,29 @@ def make_plan_name(
     issue_number: int | None,
     plan_type: str,
     scope: str,
-    slug: str
+    slug: str,
+    slug_from_title: bool = False
 ) -> str:
     """Generate plan name from components.
 
     Type is normalized via labels.normalize_plan_type (single source of truth).
+    The slug segment is capped at 20 chars (references/plan-guide.md slug rules);
+    an over-long slug is rejected, never silently truncated.
+
+    slug_from_title marks a slug auto-derived from the title so the error can
+    point at the right input (the title vs an explicit --slug).
     """
+    if len(slug) > _SLUG_MAX_LENGTH:
+        if slug_from_title:
+            fix = "Shorten the title (the slug derives from its description)"
+        else:
+            fix = "Pass a shorter --slug"
+        raise ValidationError(
+            f"Slug too long: {len(slug)} chars (max {_SLUG_MAX_LENGTH}): '{slug}'. "
+            f"{fix}: keep 1-2 core nouns, drop verb phrases "
+            "(see references/plan-guide.md 'Slug rules')."
+        )
+
     normalized_type = normalize_plan_type(plan_type)
 
     if issue_number:
