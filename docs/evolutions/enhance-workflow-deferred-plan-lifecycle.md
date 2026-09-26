@@ -41,7 +41,7 @@
 
 **参考资料**：
 - [Plan Orchestration 设计](../../../docs/products/wopal-space/DESIGN-plan-orchestration.md)
-- [Plan Orchestration 阶段](../../../docs/products/wopal-space/phases/wopal-space-p3-plan-orchestration.md)
+- [Plan Orchestration 阶段](../../../docs/products/wopal-space/phases/wopal-space-p4-plan-orchestration.md)
 
 ### Key Decisions
 
