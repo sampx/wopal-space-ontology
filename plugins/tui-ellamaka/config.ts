@@ -32,9 +32,10 @@ function shapeOf(value: unknown): string {
  * Resolve the plugin's effective config.
  *
  * Precedence: built-in defaults < inline mount options (`rawOptions`) <
- * engine-delivered `pluginConfig["tui-ellamaka"]`, later wins per key. A
- * non-object table entry fails loud so a malformed settings value surfaces
- * instead of silently reverting to defaults.
+ * engine-delivered `pluginConfig["tui-ellamaka"]`, later wins per key. The
+ * table entry fails loud when it is not an object or when a known field
+ * (`enabled`, `label`) carries the wrong type, so a malformed settings value
+ * surfaces instead of silently reverting to defaults.
  */
 export function resolveTuiConfig(
   pluginConfig: Record<string, unknown> | undefined,
@@ -48,6 +49,16 @@ export function resolveTuiConfig(
   if (!isPlainObject(entry)) {
     throw new Error(
       `pluginConfig["${PLUGIN_KEY}"] must be an object, got ${shapeOf(entry)}`,
+    );
+  }
+  if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+    throw new Error(
+      `pluginConfig["${PLUGIN_KEY}"].enabled must be a boolean, got ${shapeOf(entry.enabled)}`,
+    );
+  }
+  if (entry.label !== undefined && typeof entry.label !== "string") {
+    throw new Error(
+      `pluginConfig["${PLUGIN_KEY}"].label must be a string, got ${shapeOf(entry.label)}`,
     );
   }
   Object.assign(config, entry);

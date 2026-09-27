@@ -113,7 +113,7 @@ ontology 命令可覆盖 ellamaka 内置命令。
 | 项目级规则 | 语言与框架约束 | `rules/typescript.md`、`rules/python.md` |
 | Agent 专属规则 | Wopal 记忆规则、Fae Astro 规则等定向约束 | `rules/wopal/mem-rule.md`、`rules/fae/astro.md` |
 
-规则通过 wopal-plugin 在 Agent 启动时注入，按条件匹配生效。规则注入为 opt-in，受 `wopal.rules.enabled` 控制，默认关闭。
+规则通过 wopal-plugin 在 Agent 启动时注入，按条件匹配生效。规则注入为 opt-in，受 `wopal.pluginConfig["wopal-plugin"].rules.enabled` 控制，默认关闭。
 
 ## Plugin System
 
@@ -122,11 +122,11 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | 模块 | 职责 | 可配置 |
 |------|------|--------|
 | Global（入口） | 构造 instance runtime、加载三层配置、检查开关、注册 Hooks/Tools | 无 |
-| Rules | 规则发现 → 条件匹配 → 注入用户消息 | `wopal.rules.enabled`（默认关闭，opt-in） |
-| Memory | LanceDB 存储、语义检索、记忆注入 | `wopal.memory.enabled`（总控）、`wopal.memory.injection`（仅注入） |
+| Rules | 规则发现 → 条件匹配 → 注入用户消息 | `wopal.pluginConfig["wopal-plugin"].rules.enabled`（默认关闭，opt-in） |
+| Memory | LanceDB 存储、语义检索、记忆注入 | `wopal.pluginConfig["wopal-plugin"].memory.enabled`（总控）、`.memory.injection`（仅注入） |
 | Task | 非阻塞子会话启动、状态监控、双向通信、并发控制 | 恒启用 |
 | Monitor | 周期性调度引擎，统一管理监控策略 | 恒启用 |
-| Context | 上下文压缩与恢复、标题生成、蒸馏 | `wopal.context.enabled`（门控标题/恢复/蒸馏，压缩恒启用） |
+| Context | 上下文压缩与恢复、标题生成、蒸馏 | `wopal.pluginConfig["wopal-plugin"].context.enabled`（门控标题/恢复/蒸馏，压缩恒启用） |
 
 每次 plugin invocation 以 `PluginInput.wopalSpaceRoot` 作为唯一空间根来源。字段缺失表示非 WopalSpace instance。effective env 由进程启动环境、`$WOPAL_HOME/.env` 与 `<wopalSpaceRoot>/.wopal/.env` 合并生成，并保持只读，不写回 `process.env`。
 

@@ -9,6 +9,7 @@
 import type {
   PluginInput,
   Hooks,
+  PluginOptions,
   SystemPromptMetadata,
 } from "@wopal/ellamaka-plugin";
 import type { OpenCodeClient } from "./types.js";
@@ -66,6 +67,11 @@ interface RuntimePluginInput {
    * (or undefined) means the space declares no entry; defaults apply.
    */
   pluginConfig?: Record<string, unknown>;
+  /**
+   * Inline mount options (the plugin's second argument), the compatibility
+   * layer between the built-in defaults and the engine-delivered slice.
+   */
+  inlineOptions?: Record<string, unknown>;
 }
 
 export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
@@ -78,6 +84,9 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
   });
   const env = loadRuntimeEnvironment(context);
   const config = loadWopalConfig({
+    ...(input.inlineOptions !== undefined
+      ? { inlineOptions: input.inlineOptions }
+      : {}),
     ...(input.pluginConfig !== undefined
       ? { pluginConfig: input.pluginConfig }
       : {}),
@@ -115,15 +124,17 @@ async function createPluginResources(
 
 const openCodeRulesPlugin = async (
   pluginInput: PluginInput,
+  options?: PluginOptions,
 ): Promise<Hooks> => {
   // `PluginInput` from `@wopal/ellamaka-plugin` already declares the fork's
   // `wopalSpaceRoot` and `pluginConfig` extensions, so no local cast is needed
   // to read them.
   const input = pluginInput;
   // The engine delivers the whole `wopal.pluginConfig` table (contract 2.0.7);
-  // the plugin takes its own entry. The optional chain tolerates an engine
-  // that predates the contract field — absent table / entry = built-in
-  // defaults.
+  // the plugin takes its own entry and keeps the inline mount options
+  // (`options`, the compatibility layer) beneath it. The optional chain
+  // tolerates an engine that predates the contract field — absent table /
+  // entry = inline options or built-in defaults.
   const pluginConfigSlice = input.pluginConfig?.["wopal-plugin"];
   const runtime = createPluginRuntime({
     directory: input.directory,
@@ -133,6 +144,7 @@ const openCodeRulesPlugin = async (
     ...(pluginConfigSlice !== undefined
       ? { pluginConfig: pluginConfigSlice }
       : {}),
+    ...(options !== undefined ? { inlineOptions: options } : {}),
   });
   const { context: runtimeCtx, loggers } = runtime;
   const {

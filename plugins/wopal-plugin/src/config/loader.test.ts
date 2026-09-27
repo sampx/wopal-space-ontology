@@ -44,6 +44,26 @@ describe("loadWopalConfig", () => {
     expect(loaded.rules).toEqual({ enabled: false });
   });
 
+  it("layers inline mount options beneath the engine slice", () => {
+    const inlineOnly = loadWopalConfig({
+      inlineOptions: { rules: { enabled: true } },
+    });
+    expect(inlineOnly.rules).toEqual({ enabled: true });
+
+    const sliceWins = loadWopalConfig({
+      inlineOptions: { logLevel: "debug", memory: { enabled: false } },
+      pluginConfig: { logLevel: "warn", memory: { injection: false } },
+    });
+    expect(sliceWins.logLevel).toBe("warn");
+    expect(sliceWins.memory).toEqual({ enabled: false, injection: false });
+  });
+
+  it("rejects non-object inline mount options", () => {
+    expect(() => loadWopalConfig({ inlineOptions: "nope" as never })).toThrow(
+      /inline options/,
+    );
+  });
+
   it("deep merges the delivered slice over the defaults", () => {
     const loaded = loadWopalConfig({
       pluginConfig: {

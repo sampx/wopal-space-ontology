@@ -72,7 +72,7 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 | `Resources resolved` | store / embedder / llm 中哪些已构建 |
 | `Plugin initialized` | 最终工具清单与 `memory` 标志 |
 
-配置驱动行为使用 `.wopal-space/.tmp/` 下的隔离 fixture 验证（禁止修改用户真实 `settings.local.jsonc`）；`loadWopalConfig` 支持注入 `pluginConfig` 切片 / `fallbackEnvironment` 用于此目的。
+配置驱动行为使用 `.wopal-space/.tmp/` 下的隔离 fixture 验证（禁止修改用户真实 `settings.local.jsonc`）；`loadWopalConfig` 支持注入 `pluginConfig` 切片 / `inlineOptions` / `fallbackEnvironment` 用于此目的。
 
 `WOPAL_HOME` 覆盖用户级配置与存储根，使沙箱化运行成为可能。
 
@@ -205,6 +205,6 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 | `embedding` | `baseUrl`, `model`, `apiKey` | `$VAR` 语义与 `llm` 相同 |
 | `logLevel` / `logFile` / `logModules` | — | 配置为默认来源；`WOPAL_PLUGIN_LOG_*` env 覆盖 |
 
-优先级：内置默认 < 引擎交付的 `pluginConfig["wopal-plugin"]`。插件将切片叠加在默认之上并严格校验——非法条目启动即失败。层级合并与 `wopal.pluginConfig` 外层表的形状归引擎所有。
+优先级：内置默认 < 内联挂载 options（兼容层）< 引擎交付的 `pluginConfig["wopal-plugin"]`。插件将两者叠加并严格校验——非法条目启动即失败。层级合并与 `wopal.pluginConfig` 外层表的形状归引擎所有。
 
 `.env` 文件仅承载经 `$VAR` 引用的密钥（如 `WOPAL_LLM_API_KEY`）与日志诊断覆盖项；功能开关一律不进 `.env`。

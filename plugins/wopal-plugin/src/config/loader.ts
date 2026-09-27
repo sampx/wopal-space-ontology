@@ -12,6 +12,13 @@ export interface LoadWopalConfigOptions {
    */
   pluginConfig?: Record<string, unknown>;
   /**
+   * Inline mount options passed by the engine as the plugin's second argument
+   * (`PluginOptions`); the compatibility layer beneath the engine-delivered
+   * slice (defaults < inline options < slice). `undefined` means the engine
+   * passed none.
+   */
+  inlineOptions?: Record<string, unknown>;
+  /**
    * Environment loaded from `.env` files by the runtime. Used as a fallback
    * source when resolving `$VAR` references, so secrets kept in `.env` stay
    * referenced from the config slice while `process.env` keeps precedence.
@@ -102,10 +109,11 @@ function validate(candidate: Record<string, unknown>): WopalPluginConfig {
  *
  * There are no settings-file inputs: the engine merges the three settings
  * layers and delivers `wopal.pluginConfig["wopal-plugin"]` through
- * `PluginInput.pluginConfig`. The delivered slice is layered over the
- * built-in defaults, `$VAR` references are resolved (`process.env` first,
- * the runtime-provided `.env` environment as fallback), and the result is
- * validated strictly — invalid config fails loud instead of degrading.
+ * `PluginInput.pluginConfig`. Layering order (D-01): built-in defaults <
+ * inline mount options < delivered slice. `$VAR` references are resolved
+ * (`process.env` first, the runtime-provided `.env` environment as
+ * fallback), and the result is validated strictly — invalid config fails
+ * loud instead of degrading.
  */
 export function loadWopalConfig(
   options: LoadWopalConfigOptions = {},
@@ -118,8 +126,15 @@ export function loadWopalConfig(
       "the plugin config entry must be an object",
     );
   }
+  const inlineOptions = options.inlineOptions;
+  if (inlineOptions !== undefined && !isPlainObject(inlineOptions)) {
+    throw new ConfigError(
+      "inline options",
+      "the plugin's inline mount options must be an object",
+    );
+  }
 
-  const merged = mergeConfigs(slice ?? {});
+  const merged = mergeConfigs(inlineOptions ?? {}, slice ?? {});
   const resolved = resolveVarReferences(
     merged,
     "",

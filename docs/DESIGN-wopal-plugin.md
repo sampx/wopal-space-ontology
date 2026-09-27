@@ -105,7 +105,7 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 Rules 模块发现全局（`~/.wopal/rules`）与空间（`<space>/.wopal/rules`）两级规则文件，按 Agent 作用域与关键词条件匹配，通过 `messages.transform` 注入用户消息。规则发现发生在插件初始化时，注入发生在每条消息周期。
 
-模块拥有开关 `wopal.rules.enabled`，**默认 `false`（关闭）**。开关为 opt-in：关闭时规则发现整体跳过，不产生注入。理由：规则注入直接占用每轮上下文预算，且规则体系依赖项目与语言约束，适合由使用方显式开启而非全局默认生效。
+模块拥有开关 `wopal.pluginConfig["wopal-plugin"].rules.enabled`，**默认 `false`（关闭）**。开关为 opt-in：关闭时规则发现整体跳过，不产生注入。理由：规则注入直接占用每轮上下文预算，且规则体系依赖项目与语言约束，适合由使用方显式开启而非全局默认生效。
 
 ### Memory Module
 

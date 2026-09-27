@@ -4,8 +4,9 @@ import { defaultWopalPluginConfig } from "./schema.js";
 
 describe("mergeConfigs", () => {
   // The engine owns the three settings layers (global → space-public →
-  // space-local); mergeConfigs only layers the delivered slice on top of the
-  // plugin's built-in defaults, so no `sources` attribution is recorded (D-02).
+  // space-local); mergeConfigs layers the inline mount options and the
+  // delivered slice over the plugin's built-in defaults, so no `sources`
+  // attribution is recorded (D-02).
 
   it("returns the built-in defaults for an empty fragment", () => {
     const merged = mergeConfigs({});
@@ -15,6 +16,20 @@ describe("mergeConfigs", () => {
       context: { enabled: true },
       rules: { enabled: false },
     });
+  });
+
+  it("layers inline options beneath the engine slice (D-01 order)", () => {
+    expect(
+      mergeConfigs({ logLevel: "debug" }, { logLevel: "warn" }).logLevel,
+    ).toBe("warn");
+    expect(mergeConfigs({ rules: { enabled: true } }).rules).toEqual({
+      enabled: true,
+    });
+    const merged = mergeConfigs(
+      { memory: { enabled: false } },
+      { memory: { injection: false } },
+    );
+    expect(merged.memory).toEqual({ enabled: false, injection: false });
   });
 
   it("deep merges a fragment over the defaults", () => {

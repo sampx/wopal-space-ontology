@@ -72,7 +72,7 @@ Output lands in `<space>/.wopal-space/logs/wopal-plugin.log`. Boot markers to lo
 | `Resources resolved` | Which of store / embedder / llm were constructed |
 | `Plugin initialized` | Final tool list and `memory` flag |
 
-Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts an injected `pluginConfig` slice / `fallbackEnvironment` for this purpose.
+Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts an injected `pluginConfig` slice / `inlineOptions` / `fallbackEnvironment` for this purpose.
 
 `WOPAL_HOME` overrides the user-level config and storage root, which makes sandboxed runs possible.
 
@@ -205,6 +205,6 @@ Feature switches and connection settings live in the `wopal.pluginConfig["wopal-
 | `embedding` | `baseUrl`, `model`, `apiKey` | Same `$VAR` semantics as `llm` |
 | `logLevel` / `logFile` / `logModules` | — | Config is the default source; `WOPAL_PLUGIN_LOG_*` env vars override |
 
-Precedence: built-in defaults < engine-delivered `pluginConfig["wopal-plugin"]`. The plugin layers the slice over its defaults and validates strictly — invalid entries fail startup. Layer merging and the shape of the outer `wopal.pluginConfig` table are engine-owned.
+Precedence: built-in defaults < inline mount options (compatibility layer) < engine-delivered `pluginConfig["wopal-plugin"]`. The plugin layers them and validates strictly — invalid entries fail startup. Layer merging and the shape of the outer `wopal.pluginConfig` table are engine-owned.
 
 `.env` files hold only secrets referenced via `$VAR` (e.g. `WOPAL_LLM_API_KEY`) plus the log diagnostic overrides; feature switches never go in `.env`.

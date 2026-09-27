@@ -8,8 +8,18 @@
  * fallback.
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { resolveTuiConfig } from "./config";
+
+// `@opentui/solid` ships its JSX runtime as types only in this package, so a
+// plain `bun test` cannot resolve it when importing the entry module. Stub it
+// before the dynamic import exercises the entry's registration path.
+mock.module("@opentui/solid/jsx-runtime", () => ({
+  Fragment: () => null,
+  jsx: () => null,
+  jsxs: () => null,
+  jsxDEV: () => null,
+}));
 
 /** Engine-delivered shape: the whole merged `wopal.pluginConfig` table. */
 function table(entry: unknown): Record<string, unknown> {
@@ -92,5 +102,67 @@ describe("resolveTuiConfig", () => {
       const expected = `pluginConfig["tui-ellamaka"] must be an object, got ${shape}`;
       expect(() => resolveTuiConfig(table(entry))).toThrow(expected);
     }
+  });
+
+  test("field-level validation: enabled must be a boolean", () => {
+    expect(() => resolveTuiConfig(table({ enabled: "false" }))).toThrow(
+      'pluginConfig["tui-ellamaka"].enabled must be a boolean, got string',
+    );
+    expect(() => resolveTuiConfig(table({ enabled: 0 }))).toThrow(
+      "enabled must be a boolean",
+    );
+  });
+
+  test("field-level validation: label must be a string", () => {
+    expect(() => resolveTuiConfig(table({ label: 42 }))).toThrow(
+      'pluginConfig["tui-ellamaka"].label must be a string, got number',
+    );
+  });
+
+  test("valid field types still pass", () => {
+    expect(resolveTuiConfig(table({ enabled: false, label: "X" }))).toEqual({
+      enabled: false,
+      label: "X",
+    });
+  });
+});
+
+describe("tui entry registration gate", () => {
+  function makeApi(entry: unknown) {
+    const calls: string[] = [];
+    const api = {
+      pluginConfig: entry === undefined ? undefined : table(entry),
+      attention: {
+        soundboard: {
+          registerPack: () => calls.push("registerPack"),
+          activate: () => calls.push("activate"),
+        },
+      },
+      theme: {
+        install: async () => {
+          calls.push("theme.install");
+        },
+        set: () => calls.push("theme.set"),
+        current: { primary: {}, background: {}, text: {}, textMuted: {} },
+      },
+      slots: { register: () => calls.push("slots.register") },
+    };
+    return { api, calls };
+  }
+
+  test("enabled: false prevents every registration call", async () => {
+    const { default: plugin } = await import("./index");
+    const { api, calls } = makeApi({ enabled: false });
+    await plugin.tui(api as never, undefined);
+    expect(calls).toEqual([]);
+  });
+
+  test("enabled: true runs the registration path", async () => {
+    const { default: plugin } = await import("./index");
+    const { api, calls } = makeApi({ enabled: true, label: "X" });
+    await plugin.tui(api as never, undefined);
+    expect(calls).toContain("registerPack");
+    expect(calls).toContain("theme.install");
+    expect(calls).toContain("slots.register");
   });
 });

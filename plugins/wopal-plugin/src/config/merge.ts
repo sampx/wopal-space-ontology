@@ -29,19 +29,24 @@ function deepMergeInto(
 }
 
 /**
- * Layers the engine-delivered config slice over the plugin's built-in
- * defaults: objects merge deeply, slice leaves win, arrays replace whole.
+ * Layers the plugin's config fragments over its built-in defaults in
+ * consumption order (D-01): defaults < inline mount options < engine-delivered
+ * slice. Objects merge deeply, later leaves win, arrays replace whole.
  *
  * The engine owns the three settings layers (global → space-public →
  * space-local) and delivers `wopal.pluginConfig["wopal-plugin"]` already
- * merged; the plugin only layers that slice onto its defaults (D-01
- * precedence). Layer provenance is engine-side, so no per-leaf `sources`
- * attribution is recorded (D-02).
+ * merged; the plugin layers the delivered slice over the defaults and the
+ * inline mount options. Layer provenance is engine-side, so no per-leaf
+ * `sources` attribution is recorded (D-02).
  */
-export function mergeConfigs(fragment: ConfigFragment = {}): WopalPluginConfig {
+export function mergeConfigs(
+  inlineOptions: ConfigFragment = {},
+  engineSlice: ConfigFragment = {},
+): WopalPluginConfig {
   const config: Record<string, unknown> = structuredClone(
     defaultWopalPluginConfig,
   );
-  deepMergeInto(config, fragment);
+  deepMergeInto(config, inlineOptions);
+  deepMergeInto(config, engineSlice);
   return config as WopalPluginConfig;
 }
