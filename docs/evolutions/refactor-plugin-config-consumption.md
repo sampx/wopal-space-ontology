@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-27
-- **Stage**: implementing
+- **Stage**: validating
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-refactor-plugin-config-consumption
 - **Branch**: ontology-refactor-plugin-config-consumption
@@ -84,11 +84,13 @@
 
 ### Agent Verification
 
-1. [ ] 依赖与契约：`.wopal` 根与三插件的 `@wopal/ellamaka-plugin` pin 统一为 2.0.7，`@wopal/ellamaka-sdk` 凡声明处（`.wopal` 根、wopal-plugin）同步为 2.0.7；安装后各处版本一致且 `pluginConfig` 类型可解析。验证：各处已安装 `node_modules/@wopal/ellamaka-plugin/package.json` 版本均为 2.0.7；`.wopal/node_modules/@wopal/ellamaka-plugin/dist/index.d.ts` 含 `pluginConfig`；`cd .wopal/plugins/wopal-plugin && bun run typecheck` 通过。
-2. [ ] dsh-adapter：注入 `pluginConfig["dsh-adapter"]` 切片 → 生效配置正确；无条目 → 内联 / 默认；非法值 fail loud（信息含插件名与字段路径）；源码不再出现 settings 文件读取（`settingsLayerPaths` / `loadPluginConfig` 删除）。验证：`cd .wopal/plugins/dsh-adapter && bun test`。
-3. [ ] wopal-plugin：注入切片 → 生效（deep merge、`$VAR`、zod、缺失默认）；源码不再读 settings 文件；旧顶层字段不再消费；`sources` 不再记录层级来源；导出 id = `wopal-plugin`，无 `wopal-wopal-plugin` 残留。验证：`cd .wopal/plugins/wopal-plugin && bun run test:run && bun run lint && bun run typecheck`。
-4. [ ] tui-ellamaka：`api.pluginConfig["tui-ellamaka"]` 的 `enabled` / `label` 生效；非法形状 fail loud；内联回退保留；`config.ts` 文件读取链（空间根定位、三层 merge）删除。验证：`cd .wopal/plugins/tui-ellamaka && bun test`。
-5. [ ] 回归与质量（cross-Task）：三插件测试全绿（`bun test` / `bun run test:run`）、wopal-plugin lint / typecheck、改动文件格式检查通过。
+1. [x] 依赖与契约：`.wopal` 根与三插件的 `@wopal/ellamaka-plugin` pin 统一为 2.0.7，`@wopal/ellamaka-sdk` 凡声明处（`.wopal` 根、wopal-plugin）同步为 2.0.7；安装后各处版本一致且 `pluginConfig` 类型可解析。验证：各处已安装 `node_modules/@wopal/ellamaka-plugin/package.json` 版本均为 2.0.7；`.wopal/node_modules/@wopal/ellamaka-plugin/dist/index.d.ts` 含 `pluginConfig`；`cd .wopal/plugins/wopal-plugin && bun run typecheck` 通过。
+2. [x] dsh-adapter：注入 `pluginConfig["dsh-adapter"]` 切片 → 生效配置正确；无条目 → 内联 / 默认；非法值 fail loud（信息含插件名与字段路径）；源码不再出现 settings 文件读取（`settingsLayerPaths` / `loadPluginConfig` 删除）。验证：`cd .wopal/plugins/dsh-adapter && bun test`。
+3. [x] wopal-plugin：注入切片 → 生效（deep merge、`$VAR`、zod、缺失默认）；源码不再读 settings 文件；旧顶层字段不再消费；`sources` 不再记录层级来源；导出 id = `wopal-plugin`，无 `wopal-wopal-plugin` 残留。验证：`cd .wopal/plugins/wopal-plugin && bun run test:run && bun run lint && bun run typecheck`。
+4. [x] tui-ellamaka：`api.pluginConfig["tui-ellamaka"]` 的 `enabled` / `label` 生效；非法形状 fail loud；内联回退保留；`config.ts` 文件读取链（空间根定位、三层 merge）删除。验证：`cd .wopal/plugins/tui-ellamaka && bun test`。
+5. [x] 回归与质量（cross-Task）：三插件测试全绿（`bun test` / `bun run test:run`）、wopal-plugin lint / typecheck、改动文件格式检查通过。
+
+（2026-09-27 主控实证：dsh 80 / wopal 998 / tui 10 全绿；wopal-plugin typecheck 0；改动文件 eslint 0、prettier 全过；整仓 `bun run lint` 存量债失败——宿主基线同因（11→10 errors），非本次引入。）
 
 ### User Validation
 
