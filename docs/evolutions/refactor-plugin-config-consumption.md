@@ -90,7 +90,7 @@
 4. [x] tui-ellamaka：`api.pluginConfig["tui-ellamaka"]` 的 `enabled` / `label` 生效；非法形状 fail loud；内联回退保留；`config.ts` 文件读取链（空间根定位、三层 merge）删除。验证：`cd .wopal/plugins/tui-ellamaka && bun test`。
 5. [x] 回归与质量（cross-Task）：三插件测试全绿（`bun test` / `bun run test:run`）、wopal-plugin lint / typecheck、改动文件格式检查通过。
 
-（2026-09-27 主控实证：dsh 80 / wopal 998 / tui 10 全绿；wopal-plugin typecheck 0；改动文件 eslint 0、prettier 全过；整仓 `bun run lint` 存量债失败——宿主基线同因（11→10 errors），非本次引入。）
+（2026-09-27 主控实证：dsh 80 / wopal 1003 / tui 17 全绿；wopal-plugin typecheck 0；改动文件 eslint 0、prettier 全过；整仓 `bun run lint` 存量债失败——宿主基线同因，非本次引入；两轮评审修正后复验同结果。）
 
 ### User Validation
 
@@ -189,6 +189,7 @@
 **Done**:
 任务产出：wopal-plugin 改为消费 `input.pluginConfig["wopal-plugin"]` 切片（TDD 全程：RED → GREEN，69 文件 / 998 用例全绿；typecheck 0；改动文件 eslint 0 且 prettier 通过）；settings 读取链与旧顶层字段回退删除、逐叶 `sources` 记录移除、日志改为生效快照；导出 id = `wopal-plugin`；AGENTS 双语配置节同步。整仓 `bun run lint` 存量债失败（宿主基线同因，非本次引入）。
 实际触碰文件：`plugins/wopal-plugin/AGENTS.md`、`plugins/wopal-plugin/AGENTS.zh-CN.md`、`plugins/wopal-plugin/src/config/index.ts`、`plugins/wopal-plugin/src/config/loader.ts`、`plugins/wopal-plugin/src/config/loader.test.ts`、`plugins/wopal-plugin/src/config/merge.ts`、`plugins/wopal-plugin/src/config/merge.test.ts`、`plugins/wopal-plugin/src/config/schema.ts`、`plugins/wopal-plugin/src/config/schema.test.ts`、`plugins/wopal-plugin/src/index.ts`、`plugins/wopal-plugin/src/index.test.ts`、`plugins/wopal-plugin/src/hooks/integration.test.ts`、`plugins/wopal-plugin/src/test-helpers.ts`
+评审修正（rook 两轮，均已自验）：补齐内联 options 链路（默认 < 内联 < 切片）、防原型污染加固、入口级 inline 传递直测；修正提交 `52985a7`、`eae4575`。
 - [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 3: tui-ellamaka 消费 TuiPluginApi 交付表
@@ -218,6 +219,7 @@
 **Done**:
 任务产出：tui-ellamaka 改为消费 `api.pluginConfig["tui-ellamaka"]` 切片（TDD：RED 0/10 → GREEN 10/10）；文件读取链（`findSpaceRoot` / `readWopalNode` / 三层 merge）与 `WOPAL_HOME` 定位删除；内联回退与 fail-loud 语义保留；死依赖 `jsonc-parser` 移除（隔离提交 `d5d8761`）。
 实际触碰文件：`plugins/tui-ellamaka/index.tsx`、`plugins/tui-ellamaka/config.ts`、`plugins/tui-ellamaka/config.test.ts`、`plugins/tui-ellamaka/package.json`、`plugins/tui-ellamaka/bun.lock`
+评审修正（rook 两轮，均已自验）：补已知字段类型校验（含内联通道）、注册路径与防污染回归测试；修正提交 `52985a7`、`eae4575`。
 - [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ## Delegation Strategy
