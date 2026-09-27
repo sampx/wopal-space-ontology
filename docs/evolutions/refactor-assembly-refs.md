@@ -5,11 +5,11 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-26
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: (accept 时记录)
+- **Stage**: accepted
+- **Mode**: quick
+- **Worktree**: (none)
+- **Branch**: (none)
+- **Base Commit**: (none)
 - **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
 
 ## Scope Assessment
