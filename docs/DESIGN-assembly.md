@@ -1,7 +1,7 @@
 # DESIGN — Assembly Model
 
 > **Status**: Active
-> **Updated**: 2026-09-25
+> **Updated**: 2026-09-27
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -54,29 +54,29 @@ description: 全栈工程研发空间
 
 # 该空间挂载的 Agent（四维核心角色跨类型常驻，不随类型变化）
 agents:
-  - wopal
-  - fae
-  - rook
-  - maka
+  - wopal.md
+  - fae.md
+  - rook.md
+  - maka.md
 
-# 该空间所需技能
+# 该空间所需技能（目录形态，无扩展名）
 skills:
   - dev-flow
   - agents-collab
   - git-worktrees
 
-# 该空间加载的规则
+# 该空间加载的规则（文件须显式扩展名）
 rules:
-  - typescript
-  - python
-  - business-rules
+  - typescript.md
+  - python.md
+  - business-rules.md
 
-# 该空间加载的命令
+# 该空间加载的命令（文件须显式扩展名；`wopal`、`wopal/`、`wopal/*` 等价声明整个命名空间）
 commands:
-  - init
-  - commit
-  - review
-  - wopal/memo
+  - init.md
+  - commit.md
+  - review.md
+  - wopal/memo.md
 
 # 该空间加载的插件：键 = settings 顶层段名，值 = 装配进该段的插件名。
 # 段名是开放的装配类目：今天 ellamaka / tui 两段，将来新的消费运行时
@@ -88,14 +88,16 @@ plugins:
   tui:
     - tui-ellamaka
 
-# 该空间加载的脚本
-scripts:
-  - emt
+# 类目之外的任意目录与文件：通用路径装配（见 Generic Path Assembly）
+paths:
+  - dsh                    # 整个 dsh 目录（dsh/ 与 dsh/* 等价）
+  # - docs/notes.md        # 单文件须显式扩展名
+  # - scripts/emt.noext    # 无扩展名文件用 .noext 标记
 ```
 
-装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`。前四类按名称声明；`plugins` 按「settings 段名 → 插件名列表」的映射声明，键是装配目标段名（`ellamaka` 段对应引擎的 server 插件装配，`tui` 段对应 TUI 插件装配），值是物化时在能力资产目录下解析为对应资产、并写入该段 `plugin` 数组的插件名。物化规则对每个段键一致：`settings[<段>].plugin += ../plugins/<插件名>`。
+装配单覆盖五类可装配能力：`agents`、`skills`、`rules`、`commands`、`plugins`，以及类目之外资产用的 `paths` 段。前四类按**能力引用**声明（语法见 Capability Reference Syntax and Resolution）；`plugins` 按「settings 段名 → 插件名列表」的映射声明，键是装配目标段名（`ellamaka` 段对应引擎的 server 插件装配，`tui` 段对应 TUI 插件装配），值是物化时在能力资产目录下解析为对应资产、并写入该段 `plugin` 数组的插件名。物化规则对每个段键一致：`settings[<段>].plugin += ../plugins/<插件名>`。`paths` 段声明五类之外的任意目录与文件，语法与能力引用一致（无类目前缀）。
 
-脚本等扩展类目的装配语义在后续演进中定义。
+类目之外的资产由 `paths` 段装配；新的类型化扩展类目（如 `scripts`）在出现真实需求时按后续演进定义。
 
 ## Space Schema
 
@@ -157,24 +159,46 @@ CLI 读取骨架后按以下规则消费：
 1. 读取 `.wopal/assembly/archetypes/<type>.yaml`，得到装配决策
 2. 按 `schema` 字段读取 `.wopal/assembly/schemas/<schema>.yaml`，得到空间骨架
 3. 按骨架创建目录、渲染模板文件到空间根与 `.wopal-space/`
-4. 按装配单通过 Git sparse-checkout 在 `<space>/.wopal/` worktree 内物化能力资产
-5. 生成 `.wopal-space/space-meta.json`，记录类型、骨架与装配快照
+4. 按装配单（能力类目与 `paths` 段）通过 Git sparse-checkout 在 `<space>/.wopal/` worktree 内物化对应资产
+5. 写入空间根仓库的装配状态记录，并仅提交 CLI 管理的 `space-meta.json`
 
-空间内正常修改与提交，进化经 `space sync` 汇入 local main。
+空间内正常修改与提交，进化经 `space sync` 汇入 local main。已有空间重复运行 `space init` 时，以当前空间分支的装配单和空间装配选择重装配；main 已更新而空间分支未接收时先完成显式 `space sync`。重复物化保留用户已编辑内容，只补齐缺失项和安全维护 CLI 拥有的规则，无变化时不写入状态或生成 Git 提交。
 
-### Capability Name Resolution
+### Capability Reference Syntax and Resolution
 
-装配单以**能力名**声明能力（如 `skills: [dev-flow]`），物化前解析为仓库内路径。解析按类目尝试候选形态，取第一个存在者：
+装配单与 `space capability` 用**能力引用**声明能力：`<kind>:<path>`——类目（`agent|skill|rule|command|plugin`）加仓库内相对路径。解析是**严格映射**：形态由结尾机械判定，逐项检查存在性；不隐式补扩展名、不做候选探测。
 
-| 类目 | 候选形态 | 例 |
-|------|----------|-----|
-| `skills` | `<cat>/<name>` | `dev-flow` → `skills/dev-flow/` |
-| `rules` | `<cat>/<name>`、`<cat>/<name>.md` | `typescript` → `rules/typescript.md` |
-| `commands` | `<cat>/<name>`、`<cat>/<name>.md` | `commit` → `commands/commit.md`；`wopal` → `commands/wopal/` |
-| `agents` | `<cat>/<name>`、`<cat>/<name>.md` | `wopal` → `agents/wopal.md` |
-| `plugins` | `<cat>/<name>`、`<cat>/<name>.md` | `wopal-plugin` → `plugins/wopal-plugin.md` |
+| 形态 | 写法 | 映射目标 |
+|------|------|----------|
+| 单文件 | `<path>.<ext>`（扩展名显式，不限类型） | `<cat>/<path>.<ext>`，须存在且为文件 |
+| 无扩展名文件 | `<path>.noext`（保留标记） | `<cat>/<path>`，须存在且为文件 |
+| 文件集合 | `<dir>/*.<ext>`（含 `*.<noext>`） | `<cat>/<dir>/` 下**一级**、对应形态的文件（不递归） |
+| 目录 | `<path>`、`<path>/`、`<path>/*`（三者等价） | `<cat>/<path>/`，须存在且为目录；物化整棵子树 |
 
-`commands` 与 `agents` 同时存在文件形态与目录形态，因此候选顺序不能按类目固定，须逐项探测。名称无法解析为任何存在路径时 fail fast，报告名称、类目与 ontology source。
+- **尾 `/` 是目录的权威标记**：名字自带扩展名形态的目录（如 `v1.2/`）须带 `/`，才能与同名文件区分。
+- **通配符只能出现在末段**且只取一级子项；不带扩展名的 `*`（`<dir>/*`）是目录的等价写法，不是文件集合。
+- **路径必须是仓库相对路径**：禁止前导 `/`、`.`/`..` 段、反斜杠与空段；扩展名不设白名单，任意文件都可装配。
+- **`.noext` 按末尾剥除一层解析**；真实名为 `x.noext` 的文件用 `x.noext.noext` 表达。
+- 目录引用规范化存储：`<path>/`、`<path>/*` 归一为 `<path>`；末段含 `.` 的目录名保留尾 `/` 消歧。
+- 任一引用无法解析为存在的文件或目录时 fail fast，报告引用、类目与 ontology source，并给出可操作提示（缺扩展名 → 补 `<ext>` 或 `.noext`；指向目录 → 补 `/`）。
+- 解析只产出仓库路径；消费方从路径派生运行时注册名的规则由各自加载器定义，不属于装配契约。
+
+### Generic Path Assembly
+
+`paths` 段在五类能力之外声明任意目录或文件，值是无类目前缀的仓库相对路径，形态语法与能力引用一致：
+
+| 形态 | 写法 | 例 |
+|------|------|-----|
+| 目录（含子树） | `<path>`、`<path>/`、`<path>/*` | `dsh` |
+| 单文件 | `<path>.<ext>` | `docs/notes.md` |
+| 无扩展名文件 | `<path>.noext` | `scripts/emt.noext` |
+| 一级文件集合 | `<dir>/*.<ext>` | `assets/*.json` |
+
+- **物化**：与能力引用共用同一条 sparse 机制，原样落到 `<space>/.wopal/<path>`。
+- **校验**：条目须存在于当前树；不得与装配定义层（`assembly/`、`config/`、`docs/`、仓库根文件）或五类能力类目目录（`agents/`、`skills/`、`rules/`、`commands/`、`plugins/`）重叠——冲突拒绝并提示改用对应类目。
+- **删除与重命名**：整条路径的删除须同步清理装配单引用（防悬空）；条目内部文件的增删改按普通内容变更处理。
+- **空间选择**：`path:<ref>` 与能力引用共用 `space capability add/remove --local`。`path:dsh` 指整个目录，`path:assets/catalog.json` 指单文件；无需额外的 `file:` 类别。共享池资产可由 `include` 额外挂载，装配单的完整路径声明可由 `exclude` 在本空间停用。`private` 保留给明确登记的未提交、未跟踪内容。装配单声明目录时，其内部文件增删改仍是内容变更，不生成逐文件选择。选择的最小单位是完整声明项或与既有声明不重叠的独立资产；重叠、父子包含与定义层引用在写入前拒绝。
+- **运行时消费**：不承诺被任何运行时自动加载；消费方式由使用方自行约定。
 
 ### Sparse Materialization Mechanics
 
@@ -191,91 +215,46 @@ CLI 读取骨架后按以下规则消费：
   | `AGENTS.md`、`AGENTS.zh-CN.md` | 工作契约 |
   | `config/`、`docs/` | 运行与设计契约 |
 
-  排除边界：仓库管理面（`.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json`）、扩展类目（`scripts/` 等）、能力资产、`localState` 各归其位。`.env.example` 属仓库管理面（模板），空间侧实例由 `space init` 从本体源模板幂等种子为 `.wopal/.env`（已存在则跳过；`.gitignore` 持续覆盖，不入版本控制）。
+  排除边界：仓库管理面（`.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json`）、扩展类目（`scripts/` 等）、能力资产和空间私有装配状态各归其位。`.env.example` 属仓库管理面（模板），空间侧实例由 `space init` 从本体源模板幂等种子为 `.wopal/.env`（已存在则跳过；`.gitignore` 持续覆盖，不入版本控制）。
 - **`.gitignore` 必须物化**：gitignore 规则只对工作区内存在的 `.gitignore` 生效。它若落在稀疏范围外，磁盘上不存在该文件，规则失效——用户放入的敏感文件（如 `.env`）会被当作普通游离文件纳入版本控制。这是安全约束，不是便利性选择。
 - **稀疏范围是白名单**：不在范围内的文件不会出现在磁盘上。装配区内的文件即该空间当前拥有的能力，运行时按目录扫描加载，无需读取装配记录做过滤。
-- **有效范围三要素**：稀疏范围 = 当前装配单基线 ∪ `localState.added` − `localState.shadowed`（见 Two-Layer Assembly Records）。基线取**当前**装配单（使其他空间经 `capability add` 的变更在各自下次同步时生效），本地增量取空间快照的 `localState`。范围重算只在 `space sync` 下行时执行，结果仅取决于这三项，不随提交历史变化。
-- **范围外新增须登记本地状态**：用户在装配区新增路径后，须记入 `localState.added` 并纳入稀疏范围，否则后续范围重算会将其从磁盘移除。登记入口是 `space capability add --local`（能力池内资产）或直接放入后由用户显式登记；未登记的未跟踪文件由 `space sync` 的范围重算保护不清扫，但不出现在任何清单中。
-- **移除装配项用范围遮蔽，不提交删除**：用户移除装配单声明的能力路径时，记入 `localState.shadowed` 并从稀疏范围排除；内容保留在对象库与空间分支树中，不作为删除提交上行。显式入口是 `space capability remove --local`。
-- **本地通道不进入空间分支树**：`localState` 两条目承载的能力调整（本地引入、本地移除）不产生提交。内容要么以未跟踪状态躺在磁盘（added），要么留在分支树但移出可见范围（shadowed）。空间分支树与 local main 的差异只包含共享通道（装配单声明变更、内容提交）的产物——「进 space 分支」是共享动作本身，本地通道的全部意义就是内容不进分支树。
+- **有效范围**：稀疏范围由当前空间分支的类型装配单（能力类目与 `paths` 段）、空间级能力与 `path:` 选择，以及尚未跟踪的私有内容和游离文件保盘路径共同确定。选择只影响本空间物化；已提交内容随 Git 进入 local main，其他空间仍须由其装配声明或本地选择决定是否物化。下行重算以合并后的同一棵树解析所有引用；冲突、悬空或能力缺失先拒绝，不能清扫私有内容。
+- **共享新增**：新内容通过空间分支提交。新增整项资产时由提案/集成上下文明确归属；类型默认挂载则同一变更更新装配单，仅当前空间挂载则登记完整能力或 `path:` 身份的 `include`。两种情况下内容都可上行，空间选择不是上行闸的保护对象。
+- **私有能力**：未提交的私有内容须显式登记完整能力身份、保留在本空间，且不得与本体 Git 树中已有的同名能力重叠。未登记的未跟踪文件在同步期间仅受保盘保护，不被自动收养；私有能力与上游新增能力同名时同步拒绝并给出人工选择，不覆盖文件。
+- **空间卸载**：显式 `space capability remove <kind>:<ref> --local` 记录或撤销完整资产的本地选择；`add --local` 恢复挂载。修改、删除已装配资产内部文件都是 Git 内容变更，不能被推断为卸载。共享删除完整资产时须满足全部适用装配单的引用完整性，否则拒绝提交或同步。
 
-## Two-Layer Assembly Records
+### Cross-Space Path Integrity
 
-装配记录分两层，各司其职：
+`paths` 是类型默认声明，不是普通目录扫描清单。已声明目录内部文件的增删改作为 Git 内容变更进入 local main；其他声明同一路径的空间在各自 sync 后接收。整条路径删除须在同一候选树中移除所有仍指向它的装配引用；整条路径重命名须同步更新引用。此规则同样适用于能力目录和单文件。写入、集成与 sync 上行先以候选结果树校验全部适用装配单，再推进 local main；引用形态、碰撞和缺失均是拒绝条件。
 
-1. **类型装配单**（本地中央仓库 `assembly/archetypes/<type>.yaml`）：声明空间类型的默认能力组合与所用骨架，是空间初始化与重建的模板；作为公共能力随中央库演进，可贡献升级。`space capability add/remove` 修改本层。
-2. **空间装配快照**（空间运行态 `.wopal-space/space-meta.json`）：记录本空间的实际装配，含装配单声明的基线、空间新增与空间遮蔽三类。由 CLI 维护，不手工编辑。
+其他空间尚未 sync 时，其旧分支上的资产和声明保持配对。下行先预测合并与未跟踪/私有路径碰撞，再以合并后的树及该空间选择计算范围；只有引用校验与索引预检全部通过才推进分支和物化。另一个空间对旧路径的独有修改若与删除或重命名冲突，sync 保持旧状态并报告冲突，绝不自动认领或覆盖。受保护的定义层由其专用规则管理，不进入通用 `path:` 选择。
 
-装配物化使用 Git `sparse-checkout`：空间 worktree 只物化由装配单派生、经空间本地状态调整后的路径，共享中央仓库对象库，不复制历史。
+## Assembly Facts and Ownership
 
-**本地状态是空间私有事实**：`space-meta.json` 位于空间仓库内，不属于本体仓库，因此不会随 `space sync` 上行。它记录"本空间实际持有与不持有哪些路径"，是范围重算的唯一输入之一，跨同步持久稳定。
+装配由两类持久事实和 Git refs 共同决定：
 
-**能力来源与收敛路径**：装配单声明的能力来自能力池。经装配单通道引入池中不存在的自有能力时（`space capability add`，无 `--local` 旗标），内容随装配单提交在同步时上行进入 local main，自此成为池中资产，可被任意空间经 `space capability add` 装配，也可经 `ontology contribute` 分享至 upstream。本地通道（`--local` 旗标）不产生提交、不上行，内容停留在本空间（见 Two-Layer Assembly Records 的差异收敛表）。空间遮蔽是对装配单基线的本地收窄，只作用于本空间，不影响能力池与同类型其他空间。
+| 事实 | 真相源 | 更新者 | 持久性与用途 |
+|------|--------|--------|-------------|
+| 共享内容与类型默认组合 | 本体 Git 分支中的资产与 `assembly/archetypes/<type>.yaml` | 本体能力编辑与 `space capability` 共享操作 | commit 携带内容差异，`space sync` 上行后在能力池复用 |
+| 空间身份与装配选择 | 空间根仓库跟踪的 `.wopal-space/space-meta.json` | CLI init、`space capability --local` 与新增共享资产的集成操作 | 类型、骨架、ontology 来源和能力/`path:` 级选择同文件保存，由 CLI 在实际变更时限定路径提交；其他空间不读此仓库的选择 |
 
-### Space Assembly Snapshot Structure
+`space sync` 的进度与对齐情况由本体 `main` 和 `space/<name>` refs 的祖先关系计算。上次同步提交可作为本地诊断记录，但不是下行决策输入，也不作为根仓库受跟踪文件的高频字段。状态显示分别报告双向提交差异、稀疏健康、本地挂载与私有内容，不使用一个混合含义的 revision 一致性布尔值。
 
-`space-meta.json` 是空间装配的机器可读事实，供 `space status`、`space sync` 与 `space capability` 消费：
+`space-meta.json` 的最小结构为 `version`、`type`、`schema`、`source.ontology` 与 `include`、`exclude`、`private` 三组规范引用身份（如 `skill:dev-flow`、`path:dsh`）。`include` 挂载未在类型默认组合中的已提交共享资产；`exclude` 仅在本空间停用类型默认的完整声明；`private` 登记明确保留、尚未进入本体 Git 的未跟踪内容。三组互斥，引用以其规范形态校验；`include` 在候选本体树中必须存在，`private` 不得与共享树同名。快照 revision、时间戳和物化能力清单均由 refs、当前装配单及选择计算，不作为持久判定输入。CLI 原子替换文件，状态缺失或损坏时拒绝重算，不用空集合修复。文件入空间根 Git 只备份装配选择；`private` 的实际未跟踪文件须单独导出/备份，元数据提交不代表内容已备份。有效装配按完整资产身份计算：
 
-```jsonc
-{
-  "version": 1,
-  "type": "coding",
-  "schema": "coding-space-schema.yaml",
-  "source": {
-    "ontology": "wopal-space-ontology",
-    "revision": "60a4cf5"
-  },
-  "assembledAt": "2026-09-14T10:30:00Z",
-  "capabilities": {
-    "agents": ["wopal", "fae", "rook", "maka"],
-    "skills": ["dev-flow", "agents-collab"],
-    "rules": ["typescript", "business-rules"],
-    "commands": ["init", "commit"],
-    "plugins": ["wopal-plugin"]
-  },
-  "localState": {
-    "added": [
-      { "path": "skills/newskill", "recordedAt": "2026-09-21T13:40:00Z" }
-    ],
-    "shadowed": [
-      { "path": "skills/dev-flow", "recordedAt": "2026-09-21T13:41:00Z" }
-    ]
-  }
-}
+```text
+物化资产 =（当前类型装配单的能力与 paths ∪ include ∪ private）− exclude
 ```
 
-字段语义：
+**本地选择读法**：`include` = 额外挂载（类型默认之外、额外要的共享资产），`exclude` = 本地停用（类型默认之内、本空间不要的），`private` = 私有持有（共享池之外、未提交的内容）。三组均为相对类型默认的**差量**，不是完整清单。内容进入 local main 但仅在一个空间选择挂载，属于**装配隔离**，不是资产保密；不执行 `ontology contribute` 仅阻止向上游传播，不阻止本机其他空间主动挂载。
 
-| 字段 | 含义 |
-|------|------|
-| `version` | 快照结构版本；`localState` 是向后兼容的字段扩充，不改版本号，读方缺失该字段时视为空 |
-| `type` | 空间类型，与装配单 `type` 一致 |
-| `schema` | 实际使用的骨架名，由装配单解析所得 |
-| `source.ontology` | 来源 ontology 名称 |
-| `source.revision` | 装配时的来源提交，供下行对齐判断 |
-| `assembledAt` | 装配时间，ISO 8601 |
-| `capabilities` | 装配单基线快照，按类目分组；物化时复制，此后不随空间本地变更 |
-| `localState.added` | 空间新增的仓库相对路径，含记录时间；范围重算时并入 |
-| `localState.shadowed` | 空间遮蔽的仓库相对路径，含记录时间；范围重算时排除 |
+稀疏范围由有效资产的路径、必要装配定义以及当前未登记未跟踪文件的临时保盘路径派生；状态只持有资产身份，不存资产内部文件路径。`include` 的共享文件即使仅本空间挂载，仍能随空间分支提交进入 local main；`private` 对应内容保持未跟踪，任何写入命令拒绝将它暂存。同步上行前用 Git 的无 rename 路径差异与私有资产根路径交叉检查，阻止手动提交泄漏；`include`、`exclude` 不参与上行闸。
 
-`capabilities` 是**物化时的基线副本**，`localState` 是其上的**本地增量**。三者的关系是：
+共享内容提交与装配状态调整互不暗示。`space evo commit/integrate` 对已装配目录内部普通文件的新增、修改、删除保留 Git 语义，不逐文件登记装配选择。新建整项能力或类目外资产由提案的 `Assembly Intent` 为每个规范引用明确 `type-default` 或 `space-local` 归属，一次登记完整身份与内容提交；无归属的新资产拒绝自动收养并提示补齐提案声明，即时修复模式只编辑已持有资产。整项共享删除/重命名同时处理全部适用装配单的引用与本空间无效选择，拒绝悬空结果。显式 `remove --local` 才能产生 `exclude`；恢复以完整资产身份匹配。内部文件删除既不能产生 `exclude`，也不能产生私有登记。
 
-```
-有效装配 = capabilities（装配单基线） ∪ localState.added − localState.shadowed
-```
+CLI 命令在同一操作中维护空间根仓库的 `space-meta.json`：只有状态字节变化才限定路径提交，保留其他已暂存与未提交文件。首次 init 创建尚无提交的根仓库时，CLI 先对新状态文件作 intent-to-add，再仅提交该文件；后续提交不再重复该初始化步骤。根仓库无有效分支、同一状态文件含未受本次操作管理的修改或处于未完成 Git 操作时先拒绝。操作回执分别报告本体内容提交、空间状态提交与各自的同步状态。状态提交不触发网络推送；本体上行由显式 `space sync` 与 `ontology contribute` 持有。空间根仓库的远端发布是独立动作，若提供 CLI 发布入口，须预览将随当前分支一同发布的全部提交，不得声称仅推送状态文件。跨两个仓库和网络不存在单一 Git 原子事务；CLI 在提交前完成预检，在未发布阶段按已记录的旧 refs 和文件内容安全恢复本次写入，已提交或推送的部分失败须明确回执和幂等重试入口，绝不静默覆写并发更新。
 
-由此产生四类差异，各有不同的收敛路径。装配单通道产生提交并随同步上行；本地通道不产生提交、不进入空间分支树，**构造上不可上行**：
-
-| 变更 | 记录位置 | 是否上行 local main | 收敛方式 |
-|------|----------|---------------------|----------|
-| **装配单新增能力**（`space capability add`） | `capabilities` 与装配单同步更新 | 是 | 同类型其他空间在各自下次 `space sync` 时跟进 |
-| **本地引入能力**（`space capability add --local`） | 仅记入 `localState.added` | **否** | 只扩本空间范围与磁盘物化；能力池不受影响；`capability add`（无旗标）转正为共享引入 |
-| **本地移除能力**（`space capability remove --local`） | 仅记入 `localState.shadowed` | **否** | 只收窄本空间范围；能力池与同类型空间不受影响；`capability add --local` 或 `capability add`（无旗标）恢复 |
-| **空间遮蔽基线能力**（用户直接删除装配单声明的路径，自动探测兜底） | 仅记入 `localState.shadowed` | 否 | 同本地移除；同步输出列出遮蔽项 |
-
-**本地状态的两个条目都是私有事实，不进入空间分支树**：`localState.added` 的路径以未跟踪状态存在于磁盘——它不在任何提交里，`git diff main...space` 看不到它，上行在构造上不可能发生；`localState.shadowed` 只收窄稀疏范围，内容留在对象库与空间分支树中，不产生删除提交。`localState` 本身存放于空间根目录 `.wopal-space/space-meta.json`（管理面），不属于本体仓库，永不随 `space sync` 上行。
-
-`source.revision` 是下行同步的判断依据：`space sync` 比较该提交与 local main 的关系，决定是否需要下行合入。
+未登记的游离文件只在当前同步中得到保盘保护，不被自动登记或提交。私有能力卸载时先把内容安全保留在 CLI 管理的 `.wopal-space/state/held/`，再撤销登记和收窄范围；不隐式删除用户文件。私有能力与本体将引入的同名资产发生碰撞时停止并列出双方路径，用户明确选择保持私有身份或转为共享；任何重算不得默默覆盖私有内容。
 
 ### Protected Paths
 
@@ -286,7 +265,7 @@ CLI 读取骨架后按以下规则消费：
 | 操作 | 受保护路径 | 装配单声明的能力路径 | 其他路径 |
 |------|-----------|---------------------|----------|
 | 修改内容 | 允许，随同步上行 | 允许，随同步上行 | 允许，随同步上行 |
-| 删除 | 恢复 | 记入 `localState.shadowed` | 正常删除 |
+| 删除 | 恢复 | 文件级删除作为共享内容变更；完整能力的本地卸载由显式 `remove --local` 执行 | 正常删除 |
 | 重命名 | 恢复 | 按遮蔽旧路径 + 新增新路径处理 | 正常重命名 |
 
 受保护路径的删除或重命名由写入命令在提交前从索引与工作区一并恢复，不产生提交。恢复使用路径级操作（`git restore --staged --worktree <path>`），不触碰用户的其他未提交改动。
@@ -329,6 +308,8 @@ CLI 只写 `settings.local.jsonc`，永不改写 `settings.jsonc`——后者随
 | 插件静态资源 | 所属插件目录 | 随插件走，如 `plugins/tui-ellamaka/asset/` |
 | `config/settings.jsonc` | 空间配置 | 空间共享运行配置，随 main 分发；不承载插件引用 |
 | `.env.example`、`README*`、`LICENSE`、`package.json`、`.skill-lock.json` | 仓库管理面 | 本体源仓库工具链消费；`.env.example` 的空间侧实例由 `space init` 种子为 `.env`，不随装配物化 |
+
+需要装配上表之外的任意目录或文件时，使用装配单 `paths` 段（见 Generic Path Assembly），不要借用现有类目目录；上表列出的专属通道保持不变。
 
 ## Permission Ownership and User Override
 

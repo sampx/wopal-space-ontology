@@ -1,5 +1,24 @@
 # {name}
 
+<!--
+Proposal naming contract — inherited by every new proposal from this shared
+skeleton.
+
+- Structure: `<type>-<slug>`; `type` uses the standard values, fully spelled
+  (feature / fix / enhance / refactor / docs / test / chore / perf).
+- `slug` = 1–2 core nouns, kebab-case, ≤ 20 chars. Drop verb phrases and
+  articles; never copy the title.
+- The name is load-bearing: `accept` derives the isolation branch and the
+  worktree directory by prefixing `ontology-` to the **entire proposal name**
+  (the stem): `refactor-ontology-maintenance` yields
+  `ontology-refactor-ontology-maintenance`, and a verbose name produces an
+  unreadable branch.
+
+| Verbose (forbidden) | Lean (target) |
+|---------------------|---------------|
+| `consolidate-ontology-maintenance-into-the-ontology-evolution-skill` | `refactor-ontology-maintenance` |
+-->
+
 ## Metadata
 
 - **Type**: {type}
