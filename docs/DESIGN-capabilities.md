@@ -121,7 +121,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
 | 模块 | 职责 | 可配置 |
 |------|------|--------|
-| Global（入口） | 构造 instance runtime、加载三层配置、检查开关、注册 Hooks/Tools | 无 |
+| Global（入口） | 构造 instance runtime、消费引擎交付的配置表切片与内联回退、检查开关、注册 Hooks/Tools | 无 |
 | Rules | 规则发现 → 条件匹配 → 注入用户消息 | `wopal.pluginConfig["wopal-plugin"].rules.enabled`（默认关闭，opt-in） |
 | Memory | LanceDB 存储、语义检索、记忆注入 | `wopal.pluginConfig["wopal-plugin"].memory.enabled`（总控）、`.memory.injection`（仅注入） |
 | Task | 非阻塞子会话启动、状态监控、双向通信、并发控制 | 恒启用 |
@@ -144,7 +144,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 
 插件静态资源（主题文件、音频）随插件目录放置，由插件按相对路径解析。
 
-插件的装配与配置消费与其他插件同一条契约：装配单的 `tui` 键物化为 settings 的 `tui.plugin` 条目（只含路径引用，见 `./DESIGN-assembly.md`）；行为配置放 `wopal.pluginConfig["tui-ellamaka"]`（`enabled` / `label` 等），由 TUI 配置链在三层 settings 中合并后经 `TuiPluginApi.pluginConfig` 整表交付，插件按自身配置键自取条目并 zod 校验，不读配置文件。装配条目的内联 options 保持为兼容 fallback，`pluginConfig` 的同名配置优先。
+插件的装配与配置消费与其他插件同一条契约：装配单的 `tui` 键物化为 settings 的 `tui.plugin` 条目（只含路径引用，见 `./DESIGN-assembly.md`）；行为配置放 `wopal.pluginConfig["tui-ellamaka"]`（`enabled` / `label` 等），由 TUI 配置链在三层 settings 中合并后经 `TuiPluginApi.pluginConfig` 整表交付，插件按自身配置键自取条目并做形状校验（条目为对象、已知字段类型正确），不读配置文件。装配条目的内联 options 保持为兼容 fallback（同样做已知字段校验），`pluginConfig` 的同名配置优先。
 
 ## Template System
 

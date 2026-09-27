@@ -1152,4 +1152,78 @@ describe("connection config migration", () => {
     expect(logContent).toContain("[REDACTED]");
     expect(logContent).not.toContain("boot-key");
   });
+
+  it("passes inline mount options into the runtime and lets the slice override them", async () => {
+    const wopalHome = path.join(testRoot, "wopal-home-inline");
+    const inlineRoot = path.join(testRoot, "space-inline");
+    const sliceRoot = path.join(testRoot, "space-slice");
+    mkdirSync(wopalHome, { recursive: true });
+    mkdirSync(inlineRoot, { recursive: true });
+    mkdirSync(sliceRoot, { recursive: true });
+
+    const baseInput = (directory: string) => ({
+      client: {} as never,
+      project: {} as never,
+      directory,
+      worktree: directory,
+      wopalSpaceRoot: directory,
+      $: {} as never,
+      serverUrl: new URL("http://localhost"),
+    });
+
+    // Phase 1 — inline options only: the second plugin argument reaches the
+    // runtime (compatibility layer beneath the engine slice).
+    const { default: inlineDef } = await import("./index.js?inline-opts=1");
+    const inlinePlugin = (inlineDef as { server: Function }).server.bind(
+      inlineDef,
+    );
+    await inlinePlugin(baseInput(inlineRoot) as never, {
+      llm: {
+        baseUrl: "http://inline-llm.invalid",
+        model: "inline-llm-model",
+        apiKey: "inline-secret",
+      },
+    });
+    const inlineLog = readFileSync(
+      path.join(inlineRoot, ".wopal-space", "logs", "wopal-plugin.log"),
+      "utf-8",
+    );
+    expect(inlineLog).toContain("http://inline-llm.invalid");
+    expect(inlineLog).toContain("inline-llm-model");
+    expect(inlineLog).not.toContain("inline-secret");
+
+    // Phase 2 — the engine slice wins over inline options for the same keys.
+    const { default: sliceDef } = await import("./index.js?inline-opts=2");
+    const slicePlugin = (sliceDef as { server: Function }).server.bind(
+      sliceDef,
+    );
+    await slicePlugin(
+      {
+        ...baseInput(sliceRoot),
+        pluginConfig: {
+          "wopal-plugin": {
+            llm: {
+              baseUrl: "http://slice-llm.invalid",
+              model: "slice-llm-model",
+              apiKey: "slice-secret",
+            },
+          },
+        },
+      } as never,
+      {
+        llm: {
+          baseUrl: "http://inline-lose.invalid",
+          model: "inline-lose-model",
+          apiKey: "inline-lose-secret",
+        },
+      },
+    );
+    const sliceLog = readFileSync(
+      path.join(sliceRoot, ".wopal-space", "logs", "wopal-plugin.log"),
+      "utf-8",
+    );
+    expect(sliceLog).toContain("http://slice-llm.invalid");
+    expect(sliceLog).toContain("slice-llm-model");
+    expect(sliceLog).not.toContain("http://inline-lose.invalid");
+  });
 });

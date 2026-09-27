@@ -12,12 +12,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
+/**
+ * Keys whose merge would walk (or write) the prototype chain: `__proto__` as
+ * an own key resolves to `Object.prototype` through the prototype getter, and
+ * `constructor` / `prototype` can reach it indirectly. A config fragment
+ * carrying them is ignored per-key, so no settings layer or inline payload
+ * can pollute `Object.prototype` (regression: the inline-options channel
+ * widened the merge input surface).
+ */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function deepMergeInto(
   target: Record<string, unknown>,
   fragment: Record<string, unknown>,
 ): void {
   for (const [key, value] of Object.entries(fragment)) {
-    const existing = target[key];
+    if (UNSAFE_KEYS.has(key)) continue;
+    const existing = Object.prototype.hasOwnProperty.call(target, key)
+      ? target[key]
+      : undefined;
     if (isPlainObject(value)) {
       const next = isPlainObject(existing) ? existing : {};
       deepMergeInto(next, value);

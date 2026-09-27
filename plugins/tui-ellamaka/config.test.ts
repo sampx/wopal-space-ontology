@@ -125,6 +125,25 @@ describe("resolveTuiConfig", () => {
       label: "X",
     });
   });
+
+  test("inline options with illegal known fields fail loud", () => {
+    expect(() => resolveTuiConfig(undefined, { enabled: "false" })).toThrow(
+      'inline options for tui-ellamaka.enabled must be a boolean, got string',
+    );
+    expect(() => resolveTuiConfig(undefined, { label: 42 })).toThrow(
+      'inline options for tui-ellamaka.label must be a string, got number',
+    );
+  });
+
+  test("prototype-polluting keys are ignored on both channels", () => {
+    const payload = () =>
+      JSON.parse('{"__proto__":{"polluted":true}}') as Record<string, unknown>;
+    const fromInline = resolveTuiConfig(undefined, payload());
+    const fromEntry = resolveTuiConfig(table(payload()));
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(fromInline)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(fromEntry)).toBe(Object.prototype);
+  });
 });
 
 describe("tui entry registration gate", () => {

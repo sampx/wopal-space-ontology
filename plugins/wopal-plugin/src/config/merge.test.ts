@@ -32,6 +32,19 @@ describe("mergeConfigs", () => {
     expect(merged.memory).toEqual({ enabled: false, injection: false });
   });
 
+  it("ignores prototype-polluting keys from any fragment", () => {
+    const payload = () =>
+      JSON.parse(
+        '{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}}}',
+      ) as Record<string, unknown>;
+    const fromInline = mergeConfigs(payload(), {});
+    const fromSlice = mergeConfigs({}, payload());
+    expect(Object.prototype).not.toHaveProperty("polluted");
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(fromInline)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(fromSlice)).toBe(Object.prototype);
+  });
+
   it("deep merges a fragment over the defaults", () => {
     const merged = mergeConfigs({
       llm: { baseUrl: "u1", model: "m1" },

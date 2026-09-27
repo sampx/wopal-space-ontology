@@ -29,20 +29,51 @@ function shapeOf(value: unknown): string {
 }
 
 /**
+ * Keys whose assignment would walk the prototype chain: assigning the own
+ * key `__proto__` invokes the inherited setter and swaps the object's
+ * prototype. Entry/inline payloads carrying them are ignored per-key.
+ */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function assignFields(target: JsonObject, source: JsonObject): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (UNSAFE_KEYS.has(key)) continue;
+    target[key] = value;
+  }
+}
+
+/** Known behavioural fields fail loud when their type is wrong. */
+function validateKnownFields(location: string, source: JsonObject): void {
+  if (source.enabled !== undefined && typeof source.enabled !== "boolean") {
+    throw new Error(
+      `${location}.enabled must be a boolean, got ${shapeOf(source.enabled)}`,
+    );
+  }
+  if (source.label !== undefined && typeof source.label !== "string") {
+    throw new Error(
+      `${location}.label must be a string, got ${shapeOf(source.label)}`,
+    );
+  }
+}
+
+/**
  * Resolve the plugin's effective config.
  *
  * Precedence: built-in defaults < inline mount options (`rawOptions`) <
- * engine-delivered `pluginConfig["tui-ellamaka"]`, later wins per key. The
- * table entry fails loud when it is not an object or when a known field
- * (`enabled`, `label`) carries the wrong type, so a malformed settings value
- * surfaces instead of silently reverting to defaults.
+ * engine-delivered `pluginConfig["tui-ellamaka"]`, later wins per key. A
+ * known field (`enabled`, `label`) carrying the wrong type fails loud on
+ * both channels; the table entry also fails loud when it is not an object.
+ * Malformed values surface instead of silently reverting to defaults.
  */
 export function resolveTuiConfig(
   pluginConfig: Record<string, unknown> | undefined,
   rawOptions?: unknown,
 ): TuiEllamakaConfig {
   const config: TuiEllamakaConfig = { enabled: true };
-  if (isPlainObject(rawOptions)) Object.assign(config, rawOptions);
+  if (isPlainObject(rawOptions)) {
+    validateKnownFields("inline options for tui-ellamaka", rawOptions);
+    assignFields(config, rawOptions);
+  }
 
   const entry = pluginConfig?.[PLUGIN_KEY];
   if (entry === undefined) return config;
@@ -51,16 +82,7 @@ export function resolveTuiConfig(
       `pluginConfig["${PLUGIN_KEY}"] must be an object, got ${shapeOf(entry)}`,
     );
   }
-  if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
-    throw new Error(
-      `pluginConfig["${PLUGIN_KEY}"].enabled must be a boolean, got ${shapeOf(entry.enabled)}`,
-    );
-  }
-  if (entry.label !== undefined && typeof entry.label !== "string") {
-    throw new Error(
-      `pluginConfig["${PLUGIN_KEY}"].label must be a string, got ${shapeOf(entry.label)}`,
-    );
-  }
-  Object.assign(config, entry);
+  validateKnownFields(`pluginConfig["${PLUGIN_KEY}"]`, entry);
+  assignFields(config, entry);
   return config;
 }
