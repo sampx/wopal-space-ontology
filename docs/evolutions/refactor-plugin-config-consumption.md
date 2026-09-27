@@ -157,9 +157,9 @@
 **Verify**: `cd .wopal/plugins/dsh-adapter && bun test`
 
 **Done**:
-任务产出：待实施后回填。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：dsh-adapter 改为消费 `input.pluginConfig["dsh-adapter"]` 整条目切片（TDD：RED 11 fail → GREEN 80 pass）；settings 读取链（`settingsLayerPaths` / `readPluginConfigLayer` / `loadPluginConfig` / `deepMerge`）与 `wopalSpaceRoot` 消费删除；死依赖 `jsonc-parser` 移除；source 守门测试新增（隔离提交 `aaffdeb`）。
+实际触碰文件：`plugins/dsh-adapter/index.ts`、`plugins/dsh-adapter/index.test.ts`、`plugins/dsh-adapter/package.json`、`plugins/dsh-adapter/bun.lock`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 2: wopal-plugin 消费引擎交付表与 id 对齐
 
