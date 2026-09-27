@@ -5,11 +5,11 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-27
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: (accept 时记录)
+- **Stage**: accepted
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-refactor-plugin-config-consumption
+- **Branch**: ontology-refactor-plugin-config-consumption
+- **Base Commit**: b014c58d99f62948609975a17e738a6e70970095
 - **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
 
 ## Scope Assessment
