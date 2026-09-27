@@ -10,7 +10,7 @@
 - **Worktree**: .worktrees/ontology-refactor-plugin-config-consumption
 - **Branch**: ontology-refactor-plugin-config-consumption
 - **Base Commit**: b014c58d99f62948609975a17e738a6e70970095
-- **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
+- **Final Commit**: ed0a0040c65b1dae0c6143adb2b782410223fe29
 
 ## Scope Assessment
 
