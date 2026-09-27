@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-26
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: (none)
