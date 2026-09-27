@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-09-26
+> **Updated**: 2026-09-27
 > **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -60,7 +60,7 @@ P1 目标语义：
 2. fork flow 是显式选择的替代模式
 3. 每个 space 拥有独立的 `space/<name>` 分支与装配 worktree
 4. `.wopal/` 是装配 worktree，不是复制目录，也不持有独立能力演化
-5. 空间根仓库跟踪 `.wopal-space/space-meta.json` 中的稳定身份；`.wopal-space/state/assembly.json` 由 CLI 在忽略的运行态中持有本地装配选择；本体 Git refs 提供同步进度
+5. 空间根仓库跟踪 `.wopal-space/space-meta.json` 中的身份和本空间装配选择，由 CLI 在变更时限定路径提交；本体 Git refs 提供同步进度
 
 ---
 

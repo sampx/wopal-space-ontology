@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-23
+> **Updated**: 2026-09-27
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -148,7 +148,7 @@ clone 模式为默认，`--fork` 进入 fork 模式（详见 `./DESIGN-evolution
 
 User 解析：fork 模式优先从 `origin` remote 解析 GitHub owner；clone 模式尝试 `gh api user`；fallback OS 用户名 slug 化。
 
-空间装配记录：空间根仓库跟踪 `.wopal-space/space-meta.json` 中稳定的类型、骨架与 ontology 来源；CLI 在忽略的 `.wopal-space/state/assembly.json` 持有本空间的装配选择。同步进度由本体 Git refs 计算，装配详情见 `./DESIGN-assembly.md`。
+空间装配记录：空间根仓库跟踪 `.wopal-space/space-meta.json` 中的类型、骨架、ontology 来源与本空间能力/通用路径的选择；CLI 只提交其管理的状态变更。同步进度由本体 Git refs 计算，装配详情见 `./DESIGN-assembly.md`。
 
 配置写入 `$WOPAL_HOME/config/settings.jsonc` 的 `ontologies.<name>` 节点（含 `path`、`origin`、`upstream`、`fork`）和 `spaces.<name>` 节点（含 `ontology`、`branch`、`user`、`type`）。
 
@@ -161,7 +161,7 @@ CLI 负责：
 5. 按骨架创建运行态目录与空间级目录。
 6. 首次渲染骨架声明的全部文件到空间根与 `.wopal-space/`。
 7. 按装配单生成空间特有插件配置到 `settings.local.jsonc`。
-8. 写入 `.wopal-space/space-meta.json` 的稳定空间身份，并初始化忽略的 `.wopal-space/state/assembly.json` 能力级选择。
+8. 写入并在空间根仓库提交 `.wopal-space/space-meta.json` 的空间身份与初始装配选择。
 9. rerun 时创建缺失项并保留已有文件内容。
 10. 在完整成功后注册 space 并设置 active space。
 11. 提供 `wopal space scan` 只读扫描入口，输出 repo / module JSON 事实。
@@ -207,8 +207,7 @@ ontology 本身是无状态的声明式能力包，不持有运行时状态：
 | 记忆数据 | `$WOPAL_HOME/storage/memory` 下的 LanceDB | memory_manage | ontology 提供工具，不持有数据 |
 | 会话状态 | ellamaka session | ellamaka | ontology 不持有 |
 | 空间结构 | `.wopal-space/STRUCTURE.md` | `/init` | ontology 提供模板，不持有实例 |
-| 空间身份声明 | `.wopal-space/space-meta.json` | `wopal space` CLI | 空间仓库跟踪稳定的类型、骨架与 ontology 来源 |
-| 空间装配状态 | `.wopal-space/state/assembly.json` | `wopal space` CLI | 忽略的本地状态；持有能力级挂载选择和私有能力登记 |
+| 空间身份与装配状态 | `.wopal-space/space-meta.json` | `wopal space` CLI | 空间根仓库跟踪身份与能力/通用路径级选择；仅由 CLI 限定路径提交 |
 | 空间守则 | `.wopal-space/REGULATIONS.md` | 用户 + `/wopal:evolve` | ontology 提供初始化模板，不持有实例 |
 
 Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal:memo`（日记暂存）、`/wopal:evolve`（经验沉淀）、`/wopal:distill`（记忆蒸馏）、`/cupdate-agent-rules`（项目规范更新）。

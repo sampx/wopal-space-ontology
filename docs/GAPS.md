@@ -1,7 +1,7 @@
 # GAPS — ontology Design vs Implementation Divergence
 
 > **Status**: Active
-> **Updated**: 2026-09-26
+> **Updated**: 2026-09-27
 > **Design Source**: `./DESIGN.md`（差距对照的设计真相源，子设计见其 Sub-DESIGNs）
 > **Companion**: 追踪 ontology 本体资产与 wopal-plugin 实现的目标态差距，逐项解决后关闭。
 
@@ -53,20 +53,36 @@
 
 ---
 
+## Assembly Carriers
+
+### ONT-G6: 类型装配载体与空间装配状态契约不一致（P0）
+
+**Current**: coding 装配单仍有省略文件扩展名的引用，也没有把通用 `dsh` 目录列入 `paths`；空间根模板和本体进化提案模板尚不能准确表达单文件状态、私有内容保盘与新资产归属。Agent 执行能力进化时缺少一次声明资产装配归属的固定槽位。
+
+**Target**: 类型装配单使用可严格解析的引用并声明实际通用目录；空间根模板保盘私有内容而不忽略受跟踪的装配状态；进化提案对新增整项资产声明 `type-default` 或 `space-local`，技能中的维护命令语义与 CLI 自动状态提交一致。
+
+**Design**: `./DESIGN-assembly.md`（引用、状态与 Generic Path Assembly）；`./DESIGN-evolution.md`（进化命令边界）。由本体提案 `refactor-assembly-refs`（显式扩展名前置迁移）与 `enhance-assembly-carriers`（paths、根模板、Assembly Intent、技能措辞）承载。
+
+**Exit**:
+- [ ] coding 装配单引用与目标资产形态一致，`paths` 声明的目录能在隔离空间完整物化
+- [ ] 根模板不忽略 `space-meta.json` 与用户文档，私有内容保盘路径被精确忽略
+- [ ] 新整项资产在提案模板有装配归属槽位，维护技能不误称本地选择零根仓库提交
+
+---
+
 ## Plugin Configuration Consumption
 
 ### ONT-G5: 三个本体插件各自读配置文件，wopal-plugin 的 id 与装配名不一致（P0）
 
-**Current**: dsh-adapter、wopal-plugin、tui-ellamaka 三个插件各自定位空间根、读三层 settings 的 `wopal.pluginConfig.<插件名>`、合并来源并校验取值，配置从哪来由插件自己判断。装配单 `.wopal/assembly/archetypes/coding.yaml` 的 `plugins` 仍是不分段的纯名字数组。`wopal-plugin` 导出的运行时 id 是 `wopal-wopal-plugin`，与装配名、配置键对不上。
+**Current**: dsh-adapter、wopal-plugin、tui-ellamaka 三个插件各自定位空间根、读三层 settings 的 `wopal.pluginConfig.<插件名>`、合并来源并校验取值，配置从哪来由插件自己判断。`wopal-plugin` 导出的运行时 id 是 `wopal-wopal-plugin`，与装配名、配置键对不上。
 
-**Target**: 三个插件不读配置文件、不写配置：引擎把三层合并后的配置整表交给它们，插件按自己的名字取用条目并校验取值。装配单 `plugins` 切换为「settings 段名 → 插件名列表」映射。`wopal-plugin` 导出的运行时 id 修正为 `wopal-plugin`。
+**Target**: 三个插件不读配置文件、不写配置：引擎把三层合并后的配置整表交给它们，插件按自己的名字取用条目并校验取值。`wopal-plugin` 导出的运行时 id 与装配名一致，为 `wopal-plugin`。
 
 **Design**: `./DESIGN-wopal-plugin.md`（Configuration 节）
 
 **Exit**:
 - [ ] 三个插件不读配置文件、不自行定位空间根，只消费引擎交付的整表条目
 - [ ] 插件条目内联 options 兜底、`$VAR` 解析与取值校验行为保持
-- [ ] 装配单 `plugins` 为分段映射格式
 - [ ] `wopal-plugin` 运行时 id 与装配名、配置键一致
 
 ---

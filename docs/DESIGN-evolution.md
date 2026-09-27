@@ -1,7 +1,7 @@
 # DESIGN — Evolution Loop
 
 > **Status**: Active
-> **Updated**: 2026-09-25
+> **Updated**: 2026-09-27
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -29,8 +29,8 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
 5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
 6. **机制安全，不设审批门控**：CLI 默认 dry-run 预览，`--confirm` 才落盘；agent 按用户意图直接执行 `--confirm`，不引入额外审批门控。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
-7. **共享内容与本地选择正交**：共享资产的 Git 新增、修改、删除随提交上行；本地装配选择以完整能力身份记录，只决定空间物化范围。共享能力可只在一个空间挂载，其选择不阻止内容上行。
-8. **显式私有化**：只有显式能力操作能更改本地挂载或私有内容登记。同步范围由当前装配单、能力级挂载选择及临时游离文件保护重算；私有内容不得进入 Git 提交，能力内部文件删除不触发私有卸载。
+7. **共享内容与空间选择正交**：共享资产的 Git 新增、修改、删除随提交上行；空间装配选择以完整能力或 `path:` 身份记录在空间根仓库，只决定当前空间物化范围。共享资产可只在一个空间挂载，其选择不阻止内容上行。
+8. **显式选择**：装配命令和新增整项资产的进化集成能更改空间挂载选择；已装配资产的内部文件编辑保持 Git 内容语义。同步范围由当前装配单、能力/`path:` 级选择及临时游离文件保护重算；未提交私有内容不得进入本体 Git，内部文件删除不触发本地卸载。
 
 ## Self-Evolution Loop
 
@@ -62,7 +62,7 @@ Maka 专职海关与提议-实施权责分立，空间运行中产生的能力�
 
 1. **提议权与实施权严格分离**：Maka 只出提案、不动刀（Propose Only，`edit` 仅放开 `docs/evolutions/`）；具体改动经用户批准后，由 Wopal 委派 Fae 在空间 worktree 内规范提交，Rook 审查把关。
 2. **进化先落在空间分支，再经 `space sync` 汇入**：空间内正常写改、提交（Agent 仅需 workspace 写权限）；`space sync` 时申请受控提权，将空间独有提交隔离整合进 local main。
-3. **空间私有资产物理隔离**：属于当前项目特有的架构规范，仅限写入本地 `.wopal-space/memory/` 或项目 `AGENTS.md`，不进入装配区。
+3. **项目经验物理隔离**：属于当前项目特有的架构规范写入空间记忆或项目 `AGENTS.md`。空间选择可以只挂载当前空间所需的共享资产；尚未提交的私有资产由显式 `private` 身份和独立内容备份管理，不把共享池内容误称私有内容。
 
 进化粒度遵循严格的海关检疫：空间私有经验物理锁死在本地，类型经验作用于类型装配，只有高度抽象且经受反污染审查的通用资产才允许回流中央。
 
@@ -135,13 +135,13 @@ draft → accepted → implementing → validating → archived
 |------|------|------|
 | `space status` | — | 只读：refs 双向差异、稀疏健康、当前有效装配与本地选择（include / exclude / private / 未登记未跟踪文件） |
 | `space sync` | 双向 | 先整合空间共享内容、再 fast-forward 下行；上行前阻止已登记的私有内容泄漏，按当前装配事实重算范围；CLI 默认 dry-run 预览，`--confirm` 落盘 |
-| `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常 Git 提交上行；`--local`：只改变本空间能力级挂载选择，或显式登记未跟踪私有能力；不生成内容提交 |
+| `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常本体 Git 提交上行；`--local`：以能力或 `path:<ref>` 完整身份调整本空间选择，CLI 提交空间根仓库状态，不生成本体内容提交 |
 | `space evo <family>` | — | 机制车道：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
-**内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力是否在本空间挂载由装配单和本地选择决定。`space capability` 无旗标调整类型装配单，变更按正常提交上行；`--local` 调整本空间能力级 `include` / `exclude` / `private`，不生成内容提交。显式卸载完整能力与共享删除其内部文件是不同操作。新建共享能力可只由当前空间挂载；相应 `include` 登记与提交原子发生，但不被当作内容私有化。
+**内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力或通用路径是否在本空间挂载由装配单和空间选择决定。`space capability` 无旗标调整类型装配单，变更按正常提交上行；`--local` 调整空间根仓库 `space-meta.json` 中的 `include` / `exclude` / `private`，由 CLI 限定路径提交。显式卸载完整资产与共享删除其内部文件是不同操作。新建共享资产可只由当前空间挂载；进化提交/集成根据明确的整项资产归属一次登记，无需对每个内部文件手动 add/remove。多空间目录删除与重命名以全部适用装配单的候选树引用完整性为门禁，详见 `./DESIGN-assembly.md`。
 
 **上行不泄漏私有内容（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）是否落在已登记的 `private` 能力根下；命中即拒绝并给出可执行的解除私有登记或撤出提交路径。`include` / `exclude` 只记录挂载选择，不进入内容泄漏判定。写入命令在提交前执行相同私有检查；sync 闸为手动 Git 提交兜底。
 
