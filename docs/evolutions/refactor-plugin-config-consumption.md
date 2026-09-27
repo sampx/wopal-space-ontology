@@ -214,9 +214,9 @@
 **Verify**: `cd .wopal/plugins/tui-ellamaka && bun test`
 
 **Done**:
-任务产出：待实施后回填。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：tui-ellamaka 改为消费 `api.pluginConfig["tui-ellamaka"]` 切片（TDD：RED 0/10 → GREEN 10/10）；文件读取链（`findSpaceRoot` / `readWopalNode` / 三层 merge）与 `WOPAL_HOME` 定位删除；内联回退与 fail-loud 语义保留；死依赖 `jsonc-parser` 移除（隔离提交 `d5d8761`）。
+实际触碰文件：`plugins/tui-ellamaka/index.tsx`、`plugins/tui-ellamaka/config.ts`、`plugins/tui-ellamaka/config.test.ts`、`plugins/tui-ellamaka/package.json`、`plugins/tui-ellamaka/bun.lock`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ## Delegation Strategy
 
