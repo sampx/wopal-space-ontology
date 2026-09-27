@@ -185,9 +185,9 @@
 **Verify**: `cd .wopal/plugins/wopal-plugin && bun run test:run && bun run lint && bun run typecheck`
 
 **Done**:
-任务产出：待实施后回填。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：wopal-plugin 改为消费 `input.pluginConfig["wopal-plugin"]` 切片（TDD 全程：RED → GREEN，69 文件 / 998 用例全绿；typecheck 0；改动文件 eslint 0 且 prettier 通过）；settings 读取链与旧顶层字段回退删除、逐叶 `sources` 记录移除、日志改为生效快照；导出 id = `wopal-plugin`；AGENTS 双语配置节同步。整仓 `bun run lint` 存量债失败（宿主基线同因，非本次引入）。
+实际触碰文件：`plugins/wopal-plugin/AGENTS.md`、`plugins/wopal-plugin/AGENTS.zh-CN.md`、`plugins/wopal-plugin/src/config/index.ts`、`plugins/wopal-plugin/src/config/loader.ts`、`plugins/wopal-plugin/src/config/loader.test.ts`、`plugins/wopal-plugin/src/config/merge.ts`、`plugins/wopal-plugin/src/config/merge.test.ts`、`plugins/wopal-plugin/src/config/schema.ts`、`plugins/wopal-plugin/src/config/schema.test.ts`、`plugins/wopal-plugin/src/index.ts`、`plugins/wopal-plugin/src/index.test.ts`、`plugins/wopal-plugin/src/hooks/integration.test.ts`、`plugins/wopal-plugin/src/test-helpers.ts`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 3: tui-ellamaka 消费 TuiPluginApi 交付表
 

@@ -14,12 +14,12 @@ Canonical references:
 
 | Module | Responsibility | Disable Switch |
 |--------|---------------|----------------|
-| Global (`index.ts`) | Load .env, load config, register Hooks/Tools | None |
-| Rules (`rules/`) | Rule discovery → condition matching → user message injection | `wopal.rules.enabled` — opt-in, default `false` |
-| Memory (`memory/`) | LanceDB storage, semantic retrieval, memory injection | `wopal.memory.enabled` (master), `wopal.memory.injection` (injection only) — config `wopal` node |
+| Global (`index.ts`) | Load .env, consume engine-delivered config, register Hooks/Tools | None |
+| Rules (`rules/`) | Rule discovery → condition matching → user message injection | `pluginConfig["wopal-plugin"].rules.enabled` — opt-in, default `false` |
+| Memory (`memory/`) | LanceDB storage, semantic retrieval, memory injection | `pluginConfig["wopal-plugin"].memory.enabled` (master), `.memory.injection` (injection only) |
 | Task (`tasks/`) | Non-blocking sub-sessions, state monitoring, bidirectional communication, concurrency control | None |
 | Monitor (`monitor/`) | Periodic scheduling engine, unified strategy management | None |
-| Context (`hooks/`, `context/`) | Session compaction and recovery, title generation, distillation | `wopal.context.enabled` — gates title/recovery/distillation; compaction always on |
+| Context (`hooks/`, `context/`) | Session compaction and recovery, title generation, distillation | `pluginConfig["wopal-plugin"].context.enabled` — gates title/recovery/distillation; compaction always on |
 
 | Directory | Responsibility |
 |-----------|---------------|
@@ -68,11 +68,11 @@ Output lands in `<space>/.wopal-space/logs/wopal-plugin.log`. Boot markers to lo
 | Marker | Meaning |
 |--------|---------|
 | `Runtime context initialized` | Space root and `wopalHome` resolved |
-| `Effective wopal config loaded` | Three-layer config merged; secrets redacted |
+| `Effective wopal config loaded` | Engine-delivered plugin config consumed; effective snapshot logged, secrets redacted |
 | `Resources resolved` | Which of store / embedder / llm were constructed |
 | `Plugin initialized` | Final tool list and `memory` flag |
 
-Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts injected `wopalHome` / `wopalSpaceRoot` / `fallbackEnvironment` for this purpose.
+Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts an injected `pluginConfig` slice / `fallbackEnvironment` for this purpose.
 
 `WOPAL_HOME` overrides the user-level config and storage root, which makes sandboxed runs possible.
 
@@ -138,7 +138,7 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 - **New memory category**: Add in `memory/categories.ts`; identifier in English, importance 0-1
 - **New monitoring strategy**: Implement `MonitorStrategy` interface, register with `MonitorEngine`
 - **New environment variable**: `WOPAL_` prefix + `UPPER_SNAKE_CASE`; must sync to the debug switch table. Feature switches belong in config, not env
-- **New config node**: Add to `src/config/schema.ts` with an explicit default; document it in section 8
+- **New config node**: Add to `src/config/schema.ts` with an explicit default (delivered via `pluginConfig["wopal-plugin"]`); document it in section 8
 - **New HookContext field**: Must be optional (`?: boolean`) for backward compatibility. Default `true` for capability gates that preserve existing behavior; default must be `false` for opt-in switches (e.g. `rulesInjectionEnabled`)
 
 ### Naming Conventions
@@ -188,22 +188,23 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | Log threshold: trace/debug/info/warn/error/fatal (env override; config `wopal.logLevel` is the default source) |
-| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | Log file path (env override; config `wopal.logFile` is the default source) |
-| `WOPAL_PLUGIN_LOG_MODULES` | (empty) | Module filter (comma-separated), empty=all. Options: core/rules/task/memory/context (env override; config `wopal.logModules` is the default source) |
+| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | Log threshold: trace/debug/info/warn/error/fatal (env override; config `pluginConfig["wopal-plugin"].logLevel` is the default source) |
+| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | Log file path (env override; config `pluginConfig["wopal-plugin"].logFile` is the default source) |
+| `WOPAL_PLUGIN_LOG_MODULES` | (empty) | Module filter (comma-separated), empty=all. Options: core/rules/task/memory/context (env override; config `pluginConfig["wopal-plugin"].logModules` is the default source) |
 
-## 8. Config Nodes (`wopal` node in settings.jsonc)
+## 8. Config Nodes (`wopal.pluginConfig["wopal-plugin"]`)
 
-Feature switches and connection settings live in the `wopal` node of the three-layer settings (`global` → `space-public` → `space-local`, later wins):
+Feature switches and connection settings live in the `wopal.pluginConfig["wopal-plugin"]` entry of the three-layer settings (`global` → `space-public` → `space-local`, later wins). The engine deep-merges the layers and delivers the effective entry through `PluginInput.pluginConfig`; the plugin consumes the in-memory slice and never reads settings files.
 
 | Node | Fields | Notes |
 |------|--------|-------|
 | `rules` | `enabled` | Default `false`. Opt-in: rule discovery and injection run only when set to `true` |
 | `memory` | `enabled`, `injection` | Default both `true`; `injection=false` stops auto-injection but keeps `memory_manage` and search |
 | `context` | `enabled` | Default `true`; gates title generation, auto-recovery, and distillation; compaction always on |
-| `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR` referencing process.env / `.env` files; never store plaintext keys |
+| `llm` | `baseUrl`, `model`, `apiKey` | apiKey supports `$VAR`: resolved from `process.env` first, `.env` files as fallback; never store plaintext keys |
 | `embedding` | `baseUrl`, `model`, `apiKey` | Same `$VAR` semantics as `llm` |
 | `logLevel` / `logFile` / `logModules` | — | Config is the default source; `WOPAL_PLUGIN_LOG_*` env vars override |
-| `pluginConfig` | `record<string, record<string, unknown>>` | Unified ONT-G4 channel for every plugin's behavior config. wopal-plugin reads its own config from `pluginConfig["wopal-plugin"]` (wins over the legacy top-level fields above, which remain as fallback). `$VAR` references resolve inside pluginConfig values too |
+
+Precedence: built-in defaults < engine-delivered `pluginConfig["wopal-plugin"]`. The plugin layers the slice over its defaults and validates strictly — invalid entries fail startup. Layer merging and the shape of the outer `wopal.pluginConfig` table are engine-owned.
 
 `.env` files hold only secrets referenced via `$VAR` (e.g. `WOPAL_LLM_API_KEY`) plus the log diagnostic overrides; feature switches never go in `.env`.

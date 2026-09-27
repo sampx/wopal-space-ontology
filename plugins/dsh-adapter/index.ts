@@ -61,10 +61,7 @@
  * adapter responsibilities (when added) stay mounted.
  */
 import type { Hooks, PluginInput, PluginOptions, ToolContext as PluginToolContext, ToolDefinition, ToolResult } from "@wopal/ellamaka-plugin"
-import { existsSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import path from "node:path"
-import { parse as parseJsonc, type ParseError } from "jsonc-parser"
 // Build projected tool schemas on the zod engine re-exported by
 // @wopal/ellamaka-plugin (`tool.schema`). A standalone `zod` import resolves
 // to a second copy whose classic types carry `_def` but no `_zod` marker; the
@@ -168,7 +165,8 @@ export interface DshAdapterConfig {
 /**
  * The legacy inline mount-options shape (`ellamaka.plugin[c][1]`). Kept as an
  * alias so existing callers keep type-checking; new configuration flows
- * through `wopal.pluginConfig["dsh-adapter"]` (ONT-G4).
+ * through the engine-delivered `PluginInput.pluginConfig["dsh-adapter"]`
+ * slice.
  */
 export type DshAdapterOptions = DshAdapterConfig
 
@@ -186,123 +184,41 @@ const dshAdapterConfigSchema = z.object({
   escalation: z.enum(["ask", "never"]).optional(),
 })
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
 /**
- * Expand a leading `~` in a `WOPAL_HOME` value the way `wopal-plugin`'s
- * `resolveWopalHome` does: an unexpanded `~/.wopal` template must never reach
- * `path.join`, or it becomes a cwd-relative junk path. Missing/blank falls
- * back to `<home>/.wopal`.
+ * Render zod issues as `field.path: message` pairs — the fail-loud detail
+ * both config channels report.
  */
-function resolveWopalHome(raw: string | undefined): string {
-  const trimmed = raw?.trim()
-  if (!trimmed) return path.join(homedir(), ".wopal")
-  if (trimmed === "~") return homedir()
-  if (trimmed.startsWith("~/")) return path.join(homedir(), trimmed.slice(2))
-  return path.resolve(trimmed)
+function formatIssues(issues: readonly { path: readonly PropertyKey[]; message: string }[]): string {
+  return issues
+    .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+    .join("; ")
 }
 
 /**
- * The three settings layers in load order (later wins, deep merge). Matches
- * `DESIGN-config-settings.md` and `wopal-plugin`'s loader:
- * global (`$WOPAL_HOME`) -> space-public -> space-local.
- */
-function settingsLayerPaths(wopalSpaceRoot: string | undefined): string[] {
-  const wopalHome = resolveWopalHome(process.env.WOPAL_HOME)
-  const layers = [path.join(wopalHome, "config", "settings.jsonc")]
-  if (wopalSpaceRoot !== undefined) {
-    const configDir = path.join(wopalSpaceRoot, ".wopal", "config")
-    layers.push(path.join(configDir, "settings.jsonc"), path.join(configDir, "settings.local.jsonc"))
-  }
-  return layers
-}
-
-/**
- * Read one layer's `wopal.pluginConfig["dsh-adapter"]` fragment. A missing file
- * or missing node yields `undefined`; a malformed file or a non-object
- * `pluginConfig` node fails loud (no silent degradation).
- */
-function readPluginConfigLayer(filepath: string): unknown {
-  if (!existsSync(filepath)) return undefined
-  let content: string
-  try {
-    content = readFileSync(filepath, "utf-8")
-  } catch (error) {
-    throw new Error(
-      `dsh-adapter config error in ${filepath}: cannot read file: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
-  const errors: ParseError[] = []
-  const parsed: unknown = parseJsonc(content, errors, { allowTrailingComma: true, disallowComments: false })
-  if (errors.length > 0 || !isPlainObject(parsed)) {
-    throw new Error(`dsh-adapter config error in ${filepath}: invalid JSONC content`)
-  }
-  const wopal = parsed["wopal"]
-  if (wopal === undefined) return undefined
-  if (!isPlainObject(wopal)) {
-    throw new Error(`dsh-adapter config error in ${filepath}: "wopal" node must be an object`)
-  }
-  const pluginConfig = wopal["pluginConfig"]
-  if (pluginConfig === undefined) return undefined
-  if (!isPlainObject(pluginConfig)) {
-    throw new Error(`dsh-adapter config error in ${filepath}: "wopal.pluginConfig" must be an object`)
-  }
-  const entry = pluginConfig[DSH_ADAPTER_PLUGIN_NAME]
-  return entry === undefined ? undefined : entry
-}
-
-/** Recursive later-wins merge; objects merge, everything else replaces. */
-function deepMerge(target: unknown, source: unknown): unknown {
-  if (!isPlainObject(target) || !isPlainObject(source)) return source
-  const merged: Record<string, unknown> = { ...target }
-  for (const [key, value] of Object.entries(source)) {
-    merged[key] = key in merged ? deepMerge(merged[key], value) : value
-  }
-  return merged
-}
-
-/**
- * Merge every layer's dsh-adapter fragment (later wins) and validate. Returns
- * `undefined` when no layer carries an entry — the caller then falls back to
- * the inline mount options. A present-but-invalid entry throws: a config typo
- * must stop startup rather than silently degrade the sandbox stance.
- */
-function loadPluginConfig(wopalSpaceRoot: string | undefined): DshAdapterConfig | undefined {
-  let merged: unknown
-  for (const filepath of settingsLayerPaths(wopalSpaceRoot)) {
-    const fragment = readPluginConfigLayer(filepath)
-    if (fragment === undefined) continue
-    merged = merged === undefined ? fragment : deepMerge(merged, fragment)
-  }
-  if (merged === undefined) return undefined
-  const result = dshAdapterConfigSchema.safeParse(merged)
-  if (!result.success) {
-    const detail = result.error.issues
-      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
-      .join("; ")
-    throw new Error(`dsh-adapter config validation failed (wopal.pluginConfig.${DSH_ADAPTER_PLUGIN_NAME}): ${detail}`)
-  }
-  return result.data
-}
-
-/**
- * Resolve the effective adapter config (ONT-G4). Priority 1: the three-layer
- * settings chain read through `input.wopalSpaceRoot`; Priority 2 (backward
- * compat): the inline mount options (`rawOptions`). Both absent -> built-in
- * defaults (empty: the sandbox is off, the adapter idles).
+ * Resolve the effective adapter config. Priority 1: the engine-delivered
+ * `PluginInput.pluginConfig["dsh-adapter"]` slice (the engine merges the
+ * three settings layers and hands the table over whole; the plugin reads no
+ * files). Priority 2 (backward compat): the inline mount options
+ * (`rawOptions`). Both absent -> built-in defaults (empty: the sandbox is
+ * off, the adapter idles). A present-but-invalid entry throws on either
+ * channel: a config typo must stop startup rather than silently degrade the
+ * sandbox stance.
  */
 function resolveDshAdapterConfig(input: PluginInput, rawOptions?: PluginOptions): DshAdapterConfig {
-  const fromSettings = loadPluginConfig(input.wopalSpaceRoot)
-  if (fromSettings !== undefined) return fromSettings
+  const entry = input.pluginConfig?.[DSH_ADAPTER_PLUGIN_NAME]
+  if (entry !== undefined) {
+    const result = dshAdapterConfigSchema.safeParse(entry)
+    if (!result.success) {
+      throw new Error(
+        `dsh-adapter config validation failed (pluginConfig.${DSH_ADAPTER_PLUGIN_NAME}): ${formatIssues(result.error.issues)}`,
+      )
+    }
+    return result.data
+  }
   if (rawOptions === undefined) return {}
   const result = dshAdapterConfigSchema.safeParse(rawOptions)
   if (!result.success) {
-    const detail = result.error.issues
-      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
-      .join("; ")
-    throw new Error(`dsh-adapter inline options validation failed: ${detail}`)
+    throw new Error(`dsh-adapter inline options validation failed: ${formatIssues(result.error.issues)}`)
   }
   return result.data
 }
@@ -951,10 +867,9 @@ async function askToolPermission(source: string, args: unknown, ctx: ToolContext
 }
 
 export async function dshAdapter(_input: PluginInput, rawOptions?: PluginOptions): Promise<Hooks> {
-  // ONT-G4: prefer `wopal.pluginConfig["dsh-adapter"]` from the three-layer
-  // settings chain; fall back to the legacy inline mount options. Invalid
-  // config throws here so startup fails loud rather than silently degrading
-  // the sandbox stance.
+  // Prefer the engine-delivered `input.pluginConfig["dsh-adapter"]` slice;
+  // fall back to the legacy inline mount options. Invalid config throws here
+  // so startup fails loud rather than silently degrading the sandbox stance.
   const options = resolveDshAdapterConfig(_input, rawOptions)
 
   // Sandbox OFF (`enabled: false` or absent): idle the tool projection

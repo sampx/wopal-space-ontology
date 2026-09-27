@@ -13,10 +13,15 @@ describe("wopalPluginConfigSchema", () => {
     // the SAME zod namespace object the SDK re-exports. A standalone `zod`
     // dependency would pass a mere `_zod` marker check but fail this.
     const probe = sdkZod.object({ v: sdkZod.string() });
-    const probeInternals = (probe.shape.v as unknown as { _zod: { def: { checks: unknown[] } } })._zod;
+    const probeInternals = (
+      probe.shape.v as unknown as { _zod: { def: { checks: unknown[] } } }
+    )._zod;
     const schemaInternals = (
-      (wopalPluginConfigSchema as unknown as { _zod: { def: { shape: Record<string, { _zod: unknown }> } } })
-        ._zod.def.shape.rules as unknown as { _zod: unknown }
+      (
+        wopalPluginConfigSchema as unknown as {
+          _zod: { def: { shape: Record<string, { _zod: unknown }> } };
+        }
+      )._zod.def.shape.rules as unknown as { _zod: unknown }
     )._zod;
     // The marker alone is insufficient; assert the schema was constructed by
     // the SDK's engine by checking its builders resolve to the SDK namespace.
@@ -32,7 +37,11 @@ describe("wopalPluginConfigSchema", () => {
 
   it("accepts arbitrary objects for embedding.options", () => {
     const result = wopalPluginConfigSchema.safeParse({
-      embedding: { baseUrl: "http://x", model: "m", options: { a: 1, b: [2], c: { d: true } } },
+      embedding: {
+        baseUrl: "http://x",
+        model: "m",
+        options: { a: 1, b: [2], c: { d: true } },
+      },
     });
     expect(result.success).toBe(true);
   });
@@ -64,55 +73,23 @@ describe("wopalPluginConfigSchema", () => {
   });
 
   it("exposes the same defaults as the exported default config", () => {
-    expect(defaultWopalPluginConfig.memory).toEqual({ enabled: true, injection: true });
+    expect(defaultWopalPluginConfig.memory).toEqual({
+      enabled: true,
+      injection: true,
+    });
     expect(defaultWopalPluginConfig.context).toEqual({ enabled: true });
     expect(defaultWopalPluginConfig.rules).toEqual({ enabled: false });
   });
 
-  // ONT-G4: `wopal.pluginConfig` is the single injection channel for ecosystem
-  // plugin behavior config. Outer key = plugin name, inner = free-form object
-  // each plugin validates itself. The node is optional and must not disturb
-  // existing config.
-  it("accepts a valid pluginConfig node keyed by plugin name", () => {
-    const result = wopalPluginConfigSchema.safeParse({
-      pluginConfig: {
-        "dsh-adapter": { sandbox: { enabled: true } },
-      },
+  // The engine owns `wopal.pluginConfig` as a whole and delivers this plugin's
+  // entry as a slice. The slice schema must not model the outer table: the
+  // table (and its per-plugin-name shape) is engine-side contract, not a field
+  // of the plugin's own configuration.
+  it("does not model the engine-owned pluginConfig table in the slice schema", () => {
+    const result = wopalPluginConfigSchema.parse({
+      pluginConfig: { "wopal-plugin": { memory: { enabled: false } } },
     });
-    expect(result.success).toBe(true);
-    expect(result.data?.pluginConfig?.["dsh-adapter"]).toEqual({
-      sandbox: { enabled: true },
-    });
-  });
-
-  it("accepts an arbitrary free-form object per plugin (inner shape is plugin-owned)", () => {
-    const result = wopalPluginConfigSchema.safeParse({
-      pluginConfig: {
-        "dsh-adapter": {
-          sandbox: { enabled: true, mode: "workspace-write" },
-          escalation: "ask",
-          nested: { deep: [1, 2, { three: 3 }] },
-        },
-      },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("leaves pluginConfig undefined when absent (optional node)", () => {
-    const result = wopalPluginConfigSchema.parse({});
     expect(result.pluginConfig).toBeUndefined();
-    expect(defaultWopalPluginConfig.pluginConfig).toBeUndefined();
-  });
-
-  it("rejects a non-object pluginConfig value", () => {
-    const result = wopalPluginConfigSchema.safeParse({ pluginConfig: 42 });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a non-object inner plugin config value", () => {
-    const result = wopalPluginConfigSchema.safeParse({
-      pluginConfig: { "dsh-adapter": "not-an-object" },
-    });
-    expect(result.success).toBe(false);
+    expect("pluginConfig" in defaultWopalPluginConfig).toBe(false);
   });
 });

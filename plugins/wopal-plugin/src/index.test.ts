@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import path from "path";
 import os from "os";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from "fs";
 import {
   resetSessionState,
   getSeedCount,
@@ -106,7 +112,6 @@ Do this always`,
 
     const originalHome = process.env.HOME;
     process.env.HOME = testDir;
-    enableRulesInjection(process.env.WOPAL_HOME!);
 
     const { default: pluginDef } = await import("./index.js");
     const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -119,6 +124,7 @@ Do this always`,
         worktree: testDir,
         $: {} as any,
         serverUrl: new URL("http://localhost:3000"),
+        ...enableRulesInjection(),
       });
 
       const messagesTransform = hooks[
@@ -668,7 +674,7 @@ describe("Per-invocation env loading", () => {
 // Capability switches wiring (config-driven, Plan 2 Task 1)
 // ---------------------------------------------------------------------------
 
-import type { LoadedConfig } from "./config/index.js";
+import type { WopalPluginConfig } from "./config/index.js";
 import type { PluginResources } from "./resources/index.js";
 
 interface ConfigSwitches {
@@ -678,22 +684,15 @@ interface ConfigSwitches {
   rulesEnabled?: boolean;
 }
 
-function buildTestConfig(switches: ConfigSwitches): LoadedConfig {
+function buildTestConfig(switches: ConfigSwitches): WopalPluginConfig {
   return {
-    config: {
-      rules: { enabled: switches.rulesEnabled ?? false },
-      memory: {
-        enabled: switches.memoryEnabled ?? true,
-        injection: switches.memoryInjection ?? true,
-      },
-      context: { enabled: switches.contextEnabled ?? true },
+    rules: { enabled: switches.rulesEnabled ?? false },
+    memory: {
+      enabled: switches.memoryEnabled ?? true,
+      injection: switches.memoryInjection ?? true,
     },
-    sources: {
-      global: undefined,
-      "space-public": undefined,
-      "space-local": undefined,
-    },
-  } as unknown as LoadedConfig;
+    context: { enabled: switches.contextEnabled ?? true },
+  };
 }
 
 function buildTestResources(store: unknown): PluginResources {
@@ -755,7 +754,7 @@ function teardownSwitchTestEnv(env: SwitchTestEnv): void {
 
 async function runPluginWithMocks(
   mockResources: PluginResources,
-  config: LoadedConfig,
+  config: WopalPluginConfig,
   cacheKey: string,
 ): Promise<{
   infoCalls: Array<{ data: Record<string, unknown>; msg: string }>;
@@ -764,7 +763,10 @@ async function runPluginWithMocks(
 }> {
   // Explicit isolated space root so space config never leaks in from the real
   // `.wopal/` tree; mirrors the tmpdir fixture convention.
-  const wopalSpaceRoot = path.join(os.tmpdir(), `wopal-plugin-space-${cacheKey}`);
+  const wopalSpaceRoot = path.join(
+    os.tmpdir(),
+    `wopal-plugin-space-${cacheKey}`,
+  );
   mkdirSync(wopalSpaceRoot, { recursive: true });
 
   vi.doMock("./resources/index.js", () => ({
@@ -888,11 +890,12 @@ describe("capability switches wiring", () => {
   it("does not register memory_manage when store is missing despite memory.enabled=true and logs init-failure", async () => {
     const switchEnv = setupSwitchTestEnv();
     try {
-      const { infoCalls, tools, injectorConstructions } = await runPluginWithMocks(
-        {},
-        buildTestConfig({ memoryEnabled: true }),
-        "mm-store-missing",
-      );
+      const { infoCalls, tools, injectorConstructions } =
+        await runPluginWithMocks(
+          {},
+          buildTestConfig({ memoryEnabled: true }),
+          "mm-store-missing",
+        );
 
       expect(tools.memory_manage).toBeUndefined();
       // Negative control: with no store the injector must not be assembled.
@@ -990,8 +993,8 @@ describe("capability switches wiring", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Connection config migration (llm/embedding values live in settings, .env
-// keeps only secrets referenced via $VAR)
+// Connection config consumption (llm/embedding values arrive in the
+// engine-delivered slice; .env keeps only secrets referenced via $VAR)
 // ---------------------------------------------------------------------------
 
 describe("connection config migration", () => {
@@ -1030,40 +1033,32 @@ describe("connection config migration", () => {
     resetSessionState();
   });
 
-  it("constructs llm/embedding from settings alone; .env holds only $VAR secret values", async () => {
+  it("resolves llm/embedding from the engine slice; .env holds only $VAR secret values", async () => {
     const wopalHome = path.join(testRoot, "wopal-home");
     const spaceRoot = path.join(testRoot, "space");
-    mkdirSync(path.join(wopalHome, "config"), { recursive: true });
-    mkdirSync(path.join(spaceRoot, ".wopal", "config"), { recursive: true });
+    mkdirSync(wopalHome, { recursive: true });
     mkdirSync(path.join(spaceRoot, ".wopal"), { recursive: true });
-    writeFileSync(
-      path.join(wopalHome, "config", "settings.jsonc"),
-      `{ "wopal": {} }`,
-      "utf-8",
-    );
-    writeFileSync(
-      path.join(spaceRoot, ".wopal", "config", "settings.local.jsonc"),
-      `{
-        "wopal": {
-          "llm": {
-            "baseUrl": "http://cfg-llm.invalid",
-            "model": "cfg-llm-model",
-            "apiKey": "$WOPAL_LLM_API_KEY"
-          },
-          "embedding": {
-            "baseUrl": "http://cfg-emb.invalid",
-            "model": "cfg-emb-model",
-            "apiKey": "$WOPAL_EMBEDDING_API_KEY"
-          }
-        }
-      }`,
-      "utf-8",
-    );
     writeFileSync(
       path.join(spaceRoot, ".wopal", ".env"),
       "WOPAL_LLM_API_KEY=emb-secret-llm\nWOPAL_EMBEDDING_API_KEY=emb-secret-emb\n",
       "utf-8",
     );
+
+    // The engine merges the three settings layers and delivers the effective
+    // `wopal.pluginConfig["wopal-plugin"]` entry; connection values arrive
+    // in-memory while secrets stay referenced via `$VAR`.
+    const slice = {
+      llm: {
+        baseUrl: "http://cfg-llm.invalid",
+        model: "cfg-llm-model",
+        apiKey: "$WOPAL_LLM_API_KEY",
+      },
+      embedding: {
+        baseUrl: "http://cfg-emb.invalid",
+        model: "cfg-emb-model",
+        apiKey: "$WOPAL_EMBEDDING_API_KEY",
+      },
+    };
 
     const { default: pluginDef } = await import("./index.js?conn-migrate=1");
     const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -1073,18 +1068,17 @@ describe("connection config migration", () => {
       directory: spaceRoot,
       worktree: spaceRoot,
       wopalSpaceRoot: spaceRoot,
+      pluginConfig: { "wopal-plugin": slice },
       $: {} as never,
       serverUrl: new URL("http://localhost"),
     } as never);
 
-    const { loadRuntimeEnvironment } = await import(
-      "./runtime-environment.js"
-    );
+    const { loadRuntimeEnvironment } = await import("./runtime-environment.js");
     const { createRuntimeContext } = await import("./runtime-context.js");
     const env = loadRuntimeEnvironment(
       createRuntimeContext({
         directory: spaceRoot,
-        wopalHome: path.join(testRoot, "wopal-home"),
+        wopalHome,
         wopalSpaceRoot: spaceRoot,
       }),
     );
@@ -1097,40 +1091,39 @@ describe("connection config migration", () => {
 
     const { loadWopalConfig } = await import("./config/index.js");
     const loaded = loadWopalConfig({
-      wopalHome: path.join(testRoot, "wopal-home"),
-      wopalSpaceRoot: spaceRoot,
+      pluginConfig: slice,
       fallbackEnvironment: env,
     });
-    expect(loaded.config.llm).toEqual({
+    expect(loaded.llm).toEqual({
       baseUrl: "http://cfg-llm.invalid",
       model: "cfg-llm-model",
       apiKey: "emb-secret-llm",
     });
-    expect(loaded.config.embedding).toEqual({
+    expect(loaded.embedding).toEqual({
       baseUrl: "http://cfg-emb.invalid",
       model: "cfg-emb-model",
       apiKey: "emb-secret-emb",
     });
-    expect(loaded.sources["llm.baseUrl"]).toBe("space-local");
-    expect(loaded.sources["embedding.baseUrl"]).toBe("space-local");
-    expect(loaded.sources["llm.apiKey"]).toBe("space-local");
   });
 
-  it("boots the plugin with connection values only in settings (no env at all)", async () => {
+  it("boots the plugin with connection values in the engine slice (no env at all)", async () => {
     const wopalHome = path.join(testRoot, "wopal-home");
     const spaceRoot = path.join(testRoot, "space");
-    mkdirSync(path.join(wopalHome, "config"), { recursive: true });
-    mkdirSync(path.join(spaceRoot, ".wopal", "config"), { recursive: true });
-    writeFileSync(
-      path.join(spaceRoot, ".wopal", "config", "settings.local.jsonc"),
-      `{
-        "wopal": {
-          "llm": { "baseUrl": "http://boot-llm.invalid", "model": "boot-llm-model", "apiKey": "boot-key" },
-          "embedding": { "baseUrl": "http://boot-emb.invalid", "model": "boot-emb-model", "apiKey": "boot-ekey" }
-        }
-      }`,
-      "utf-8",
-    );
+    mkdirSync(wopalHome, { recursive: true });
+    mkdirSync(spaceRoot, { recursive: true });
+
+    const slice = {
+      llm: {
+        baseUrl: "http://boot-llm.invalid",
+        model: "boot-llm-model",
+        apiKey: "boot-key",
+      },
+      embedding: {
+        baseUrl: "http://boot-emb.invalid",
+        model: "boot-emb-model",
+        apiKey: "boot-ekey",
+      },
+    };
 
     const { default: pluginDef } = await import("./index.js?conn-boot=1");
     const plugin = (pluginDef as { server: Function }).server.bind(pluginDef);
@@ -1140,11 +1133,23 @@ describe("connection config migration", () => {
       directory: spaceRoot,
       worktree: spaceRoot,
       wopalSpaceRoot: spaceRoot,
+      pluginConfig: { "wopal-plugin": slice },
       $: {} as never,
       serverUrl: new URL("http://localhost"),
     } as never);
 
     const tools = (hooks as { tool: Record<string, unknown> }).tool;
     expect(tools.memory_manage).toBeDefined();
+
+    // The effective-config snapshot lands in the space log: proves the engine
+    // slice reached the runtime (and that secrets stay redacted).
+    const logContent = readFileSync(
+      path.join(spaceRoot, ".wopal-space", "logs", "wopal-plugin.log"),
+      "utf-8",
+    );
+    expect(logContent).toContain("http://boot-llm.invalid");
+    expect(logContent).toContain("boot-emb-model");
+    expect(logContent).toContain("[REDACTED]");
+    expect(logContent).not.toContain("boot-key");
   });
 });

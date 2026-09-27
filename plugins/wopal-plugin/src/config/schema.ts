@@ -41,15 +41,10 @@ export const wopalPluginConfigSchema = z.object({
   logLevel: z.string().optional(),
   logFile: z.string().optional(),
   logModules: z.array(z.string()).optional(),
-  // ONT-G4: the single injection channel for ecosystem plugin behavior config.
-  // Outer key = plugin name; inner = free-form object each plugin validates
-  // itself. Plugin mount entries (settings `plugin`) stay option-free; plugin
-  // behavior is read from `wopal.pluginConfig.<pluginName>` (plugins read-only).
-  pluginConfig: z
-    .record(z.string(), z.record(z.string(), z.unknown()))
-    .optional(),
 });
 
-export type WopalPluginConfig = (typeof wopalPluginConfigSchema)["_zod"]["output"];
+export type WopalPluginConfig =
+  (typeof wopalPluginConfigSchema)["_zod"]["output"];
 
-export const defaultWopalPluginConfig: WopalPluginConfig = wopalPluginConfigSchema.parse({});
+export const defaultWopalPluginConfig: WopalPluginConfig =
+  wopalPluginConfigSchema.parse({});

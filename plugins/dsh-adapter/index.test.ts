@@ -27,9 +27,7 @@
  *    one start/end pair at the outermost nesting level
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { readFileSync } from "node:fs"
 
 type ContainerLogger = {
   info(message: string, extra?: unknown): void
@@ -187,24 +185,15 @@ async function invokeProvider(out: Record<string, unknown>): Promise<Record<stri
   return output.tools
 }
 
-// A process-wide WOPAL_HOME would make the config reader pick up the user's
-// real global settings and break hermeticity. Point it at an empty per-run dir
-// for the whole suite; the pluginConfig tests override it per-test as needed.
-let hermeticHome = ""
-let prevWopalHome: string | undefined
-
+// The adapter reads no config files: behavior config arrives on the
+// engine-delivered `PluginInput.pluginConfig` table, so the suite needs no
+// WOPAL_HOME / settings isolation.
 beforeEach(async () => {
-  prevWopalHome = process.env.WOPAL_HOME
-  hermeticHome = mkdtempSync(join(tmpdir(), "dsh-adapter-home-"))
-  process.env.WOPAL_HOME = hermeticHome
   mod = await import("./index")
 })
 
 afterEach(() => {
   delete globalThis.__ellamakaDshContainer
-  if (prevWopalHome === undefined) delete process.env.WOPAL_HOME
-  else process.env.WOPAL_HOME = prevWopalHome
-  rmSync(hermeticHome, { recursive: true, force: true })
 })
 
 describe("dsh-adapter projection", () => {
@@ -1856,14 +1845,14 @@ describe("facade rc.1 session contract", () => {
 })
 
 /**
- * ONT-G4 config consumption + dependency boundary.
+ * Engine-delivered pluginConfig consumption + dependency boundary.
  *
- * dsh-adapter behavior config must flow through
- * `wopal.pluginConfig["dsh-adapter"]` in the three-layer settings chain
- * resolved through the plugin's config chain (`wopalSpaceRoot`):
- * global -> space-public -> space-local, later layer wins (deep merge).
- * The legacy inline mount options (`rawOptions`) are honored only as the
- * fallback when no `pluginConfig` entry exists. Invalid config fails loud.
+ * dsh-adapter behavior config flows through the engine-delivered
+ * `PluginInput.pluginConfig["dsh-adapter"]` slice: the engine merges the
+ * three settings layers and hands over the whole table; the plugin reads no
+ * config files and never resolves a space root. The legacy inline mount
+ * options (`rawOptions`) are honored only as the fallback when the slice is
+ * absent. Invalid config fails loud on both channels.
  *
  * The upstream package scope string is assembled at runtime so this guard
  * file never matches itself when it scans `index.ts`.
@@ -1903,28 +1892,37 @@ describe("dsh-adapter dependency boundary", () => {
   })
 })
 
-type TempSpace = { root: string; home: string; cleanup: () => void }
+describe("dsh-adapter config source boundary", () => {
+  test("index.ts no longer carries the settings file-read chain", () => {
+    const source = indexSource()
+    for (const symbol of [
+      "settingsLayerPaths",
+      "readPluginConfigLayer",
+      "loadPluginConfig",
+      "jsonc-parser",
+      "readFileSync",
+      "wopalSpaceRoot",
+    ]) {
+      expect(source.includes(symbol)).toBe(false)
+    }
+  })
+
+  test("package.json no longer declares the jsonc-parser dependency", () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+    ) as { dependencies?: Record<string, string> }
+    expect(manifest.dependencies?.["jsonc-parser"]).toBeUndefined()
+  })
+})
 
 /**
- * Materialize a throwaway space + WOPAL_HOME on disk so the three settings
- * layers can be exercised in isolation. `global` lands in
- * `<home>/config/settings.jsonc` (WOPAL_HOME); `public` / `local` land in
- * `<root>/.wopal/config/settings.jsonc` / `settings.local.jsonc`.
+ * Build a PluginInput carrying the engine-delivered `pluginConfig` table.
+ * `pluginInput()` omits the table entirely (legacy caller shape); the engine
+ * itself always delivers an object — `{}` when no layer carries a `wopal`
+ * node — covered by `pluginInput({})`.
  */
-function makeTempSpace(files: { global?: string; public?: string; local?: string }): TempSpace {
-  const base = mkdtempSync(join(tmpdir(), "dsh-adapter-cfg-"))
-  const home = join(base, "home")
-  const root = join(base, "space")
-  mkdirSync(join(home, "config"), { recursive: true })
-  mkdirSync(join(root, ".wopal", "config"), { recursive: true })
-  if (files.global !== undefined) writeFileSync(join(home, "config", "settings.jsonc"), files.global)
-  if (files.public !== undefined) writeFileSync(join(root, ".wopal", "config", "settings.jsonc"), files.public)
-  if (files.local !== undefined) writeFileSync(join(root, ".wopal", "config", "settings.local.jsonc"), files.local)
-  return { root, home, cleanup: () => rmSync(base, { recursive: true, force: true }) }
-}
-
-function settingsWith(dshAdapter: unknown): string {
-  return JSON.stringify({ wopal: { pluginConfig: { "dsh-adapter": dshAdapter } } })
+function pluginInput(table?: Record<string, unknown>): unknown {
+  return table === undefined ? {} : { pluginConfig: table }
 }
 
 /**
@@ -1950,148 +1948,111 @@ async function mountSandboxEvents(
   return captured[0] ?? []
 }
 
-describe("dsh-adapter pluginConfig consumption (ONT-G4)", () => {
-  test("pluginConfig (wopalSpaceRoot settings) wins over inline rawOptions", async () => {
-    const space = makeTempSpace({ public: settingsWith({ sandbox: { enabled: true, mode: "read-only" } }) })
-    try {
-      const events = await mountSandboxEvents(
-        { wopalSpaceRoot: space.root },
-        { sandbox: { enabled: true, mode: "workspace-write" } },
-      )
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
-    } finally {
-      space.cleanup()
-    }
+/** Run the adapter with config expected to be invalid; return the error message. */
+async function configErrorMessage(input: unknown, options?: AdapterOptions): Promise<string> {
+  try {
+    await mod.dshAdapter(input, options)
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+  throw new Error("expected dshAdapter to reject, but it resolved")
+}
+
+describe("dsh-adapter pluginConfig consumption (engine-delivered slice)", () => {
+  test("engine-delivered slice wins over inline rawOptions", async () => {
+    const events = await mountSandboxEvents(
+      pluginInput({ "dsh-adapter": { sandbox: { enabled: true, mode: "read-only" } } }),
+      { sandbox: { enabled: true, mode: "workspace-write" } },
+    )
+    expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
   })
 
-  test("three-layer chain: space-local overrides space-public", async () => {
-    const space = makeTempSpace({
-      public: settingsWith({ sandbox: { enabled: true, mode: "read-only" } }),
-      local: settingsWith({ sandbox: { mode: "workspace-write" } }),
-    })
-    try {
-      const events = await mountSandboxEvents({ wopalSpaceRoot: space.root }, undefined)
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
-    } finally {
-      space.cleanup()
-    }
-  })
-
-  test("three-layer chain: space files override the global layer", async () => {
-    const space = makeTempSpace({
-      global: settingsWith({ sandbox: { enabled: true, mode: "read-only" } }),
-      public: settingsWith({ sandbox: { mode: "workspace-write" } }),
-    })
-    const prevHome = process.env.WOPAL_HOME
-    process.env.WOPAL_HOME = space.home
-    try {
-      const events = await mountSandboxEvents({ wopalSpaceRoot: space.root }, undefined)
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
-    } finally {
-      if (prevHome === undefined) delete process.env.WOPAL_HOME
-      else process.env.WOPAL_HOME = prevHome
-      space.cleanup()
-    }
-  })
-
-  test("rawOptions fallback: used when no pluginConfig entry exists (backward compat)", async () => {
-    const space = makeTempSpace({ public: JSON.stringify({ wopal: { memory: { injection: false } } }) })
-    try {
-      const events = await mountSandboxEvents(
-        { wopalSpaceRoot: space.root },
-        { sandbox: { enabled: true, mode: "read-only" } },
-      )
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
-    } finally {
-      space.cleanup()
-    }
-  })
-
-  test("rawOptions fallback: used when wopalSpaceRoot is absent", async () => {
-    const events = await mountSandboxEvents({}, { sandbox: { enabled: true, mode: "workspace-write" } })
-    expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
-  })
-
-  test("defaults: both channels absent idles the projection (no provider)", async () => {
-    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
-    const out = await mod.dshAdapter({}, undefined)
+  test("slice disables the sandbox even when inline options enable it (precedence, no merge)", async () => {
+    const out = await mod.dshAdapter(
+      pluginInput({ "dsh-adapter": { sandbox: { enabled: false } } }),
+      { sandbox: { enabled: true, mode: "read-only" } },
+    )
     expect(out).toEqual({})
   })
 
-  test("invalid pluginConfig sandbox.mode fails loud (startup error)", async () => {
-    const space = makeTempSpace({ public: settingsWith({ sandbox: { enabled: true, mode: "nope" } }) })
-    try {
-      await expect(mod.dshAdapter({ wopalSpaceRoot: space.root }, undefined)).rejects.toThrow()
-    } finally {
-      space.cleanup()
-    }
+  test("missing table or missing slice falls back to inline rawOptions", async () => {
+    const absentTable = await mountSandboxEvents({}, { sandbox: { enabled: true, mode: "read-only" } })
+    expect(absentTable[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
+
+    const emptyTable = await mountSandboxEvents(
+      pluginInput({}),
+      { sandbox: { enabled: true, mode: "workspace-write" } },
+    )
+    expect(emptyTable[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
+
+    const otherSliceOnly = await mountSandboxEvents(
+      pluginInput({ "wopal-plugin": { rules: { enabled: true } } }),
+      { sandbox: { enabled: true, mode: "read-only" } },
+    )
+    expect(otherSliceOnly[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
   })
 
-  test("invalid pluginConfig escalation value fails loud", async () => {
-    const space = makeTempSpace({ local: settingsWith({ escalation: "sometimes" }) })
-    try {
-      await expect(mod.dshAdapter({ wopalSpaceRoot: space.root }, undefined)).rejects.toThrow()
-    } finally {
-      space.cleanup()
-    }
+  test("empty slice is a present entry: sandbox off, no inline fallback", async () => {
+    const out = await mod.dshAdapter(
+      pluginInput({ "dsh-adapter": {} }),
+      { sandbox: { enabled: true, mode: "read-only" } },
+    )
+    expect(out).toEqual({})
   })
 
-  test("non-object pluginConfig entry fails loud", async () => {
-    const space = makeTempSpace({ public: settingsWith("on") })
-    try {
-      await expect(mod.dshAdapter({ wopalSpaceRoot: space.root }, undefined)).rejects.toThrow()
-    } finally {
-      space.cleanup()
-    }
+  test("both channels absent idles the projection (no provider)", async () => {
+    ;(globalThis as Record<string, unknown>).__ellamakaDshContainer = fakeContainer()
+    expect(await mod.dshAdapter(pluginInput(), undefined)).toEqual({})
+    expect(await mod.dshAdapter(pluginInput({}), undefined)).toEqual({})
   })
 
-  test("escalation flows through pluginConfig (never seeds approval/policy)", async () => {
-    const space = makeTempSpace({
-      public: settingsWith({ sandbox: { enabled: true, mode: "workspace-write" }, escalation: "never" }),
-    })
-    try {
-      const events = await mountSandboxEvents({ wopalSpaceRoot: space.root }, undefined)
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
-      expect(events[1]).toEqual({ type: "approval/policy", data: { policy: "never" } })
-    } finally {
-      space.cleanup()
-    }
+  test("invalid slice sandbox.enabled fails loud with plugin name and field path", async () => {
+    const message = await configErrorMessage(pluginInput({ "dsh-adapter": { sandbox: { enabled: "yes" } } }))
+    expect(message).toContain("dsh-adapter")
+    expect(message).toContain("sandbox.enabled")
   })
 
-  test("JSONC comments and trailing commas in settings are tolerated", async () => {
-    const jsonc = [
-      "{",
-      '  // sandbox policy for the dsh adapter',
-      '  "wopal": {',
-      '    "pluginConfig": {',
-      '      "dsh-adapter": { "sandbox": { "enabled": true, "mode": "read-only", }, },',
-      "    },",
-      "  },",
-      "}",
-    ].join("\n")
-    const space = makeTempSpace({ public: jsonc })
-    try {
-      const events = await mountSandboxEvents({ wopalSpaceRoot: space.root }, undefined)
-      expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "read-only" } })
-    } finally {
-      space.cleanup()
-    }
+  test("invalid slice sandbox.mode fails loud with field path", async () => {
+    const message = await configErrorMessage(
+      pluginInput({ "dsh-adapter": { sandbox: { enabled: true, mode: "yolo" } } }),
+    )
+    expect(message).toContain("dsh-adapter")
+    expect(message).toContain("sandbox.mode")
   })
 
-  test("malformed settings JSON fails loud (parse error surfaces, no silent fallback)", async () => {
-    const space = makeTempSpace({ public: "{ wopal: { pluginConfig: }" })
-    try {
-      await expect(mod.dshAdapter({ wopalSpaceRoot: space.root }, undefined)).rejects.toThrow()
-    } finally {
-      space.cleanup()
-    }
+  test("invalid slice escalation fails loud with field path", async () => {
+    const message = await configErrorMessage(pluginInput({ "dsh-adapter": { escalation: "sometimes" } }))
+    expect(message).toContain("dsh-adapter")
+    expect(message).toContain("escalation")
+  })
+
+  test("non-object slice fails loud", async () => {
+    await expect(mod.dshAdapter(pluginInput({ "dsh-adapter": "on" }), undefined)).rejects.toThrow(/dsh-adapter/)
+  })
+
+  test("invalid slice does not silently fall back to valid inline options", async () => {
+    await expect(
+      mod.dshAdapter(
+        pluginInput({ "dsh-adapter": { sandbox: { enabled: true, mode: "yolo" } } }),
+        { sandbox: { enabled: true, mode: "read-only" } },
+      ),
+    ).rejects.toThrow(/sandbox\.mode/)
+  })
+
+  test("escalation flows through the slice (never seeds approval/policy)", async () => {
+    const events = await mountSandboxEvents(
+      pluginInput({ "dsh-adapter": { sandbox: { enabled: true, mode: "workspace-write" }, escalation: "never" } }),
+      undefined,
+    )
+    expect(events[0]).toEqual({ type: "sandbox/mode", data: { mode: "workspace-write" } })
+    expect(events[1]).toEqual({ type: "approval/policy", data: { policy: "never" } })
   })
 
   test("invalid inline rawOptions fail loud (validation bypass guard)", async () => {
     await expect(
-      mod.dshAdapter({}, { sandbox: { enabled: true, mode: "nope" } } as AdapterOptions),
+      mod.dshAdapter(pluginInput(), { sandbox: { enabled: true, mode: "nope" } } as AdapterOptions),
     ).rejects.toThrow()
-    await expect(mod.dshAdapter({}, { escalation: "sometimes" } as AdapterOptions)).rejects.toThrow()
-    await expect(mod.dshAdapter({}, "on" as unknown as AdapterOptions)).rejects.toThrow()
+    await expect(mod.dshAdapter(pluginInput(), { escalation: "sometimes" } as AdapterOptions)).rejects.toThrow()
+    await expect(mod.dshAdapter(pluginInput(), "on" as unknown as AdapterOptions)).rejects.toThrow()
   })
 })

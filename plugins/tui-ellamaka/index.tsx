@@ -3,21 +3,15 @@
  * tui-ellamaka — WopalSpace TUI branding plugin.
  *
  * Registers the animated logo and label slots plus the attention sound pack.
- * Behavior config comes from the ONT-G4 unified channel
- * (`wopal.pluginConfig["tui-ellamaka"]`, see config.ts); the inline mount
- * entry stays as a fallback.
+ * Behavior config is delivered by the engine through `TuiPluginApi.pluginConfig`
+ * (the whole merged `wopal.pluginConfig` table, see config.ts); the inline
+ * mount entry stays as a fallback.
  */
 
 import type { TuiPlugin, TuiPluginModule, TuiSlotPlugin } from "@wopal/ellamaka-plugin/tui";
-import { join } from "node:path";
 import { extractTheme, type ThemeLike } from "./animation";
 import { resolveTuiConfig } from "./config";
 import { AnimatedLogo } from "./logo";
-
-// WOPAL_HOME default per the engine's Global.Path contract (~/.wopal); the
-// plugin has no env-independent way to read the engine's resolved value, and
-// every deployment so far uses the default.
-const WOPAL_HOME = join(process.env.HOME ?? "", ".wopal");
 
 const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
   slots: {
@@ -42,13 +36,9 @@ const branding = (theme: ThemeLike, label?: string): TuiSlotPlugin => ({
 });
 
 const tui: TuiPlugin = async (api, options) => {
-  // ONT-G4 unified channel: behavior config lives in
-  // `wopal.pluginConfig["tui-ellamaka"]` (three-layer settings resolved from
-  // the process cwd's space root); the inline mount entry (`rawOptions`)
-  // stays as a fallback. The engine only passes TUI options inline, so the
-  // plugin resolves its own config until the TuiPluginApi grows a config
-  // surface.
-  const config = resolveTuiConfig(WOPAL_HOME, options);
+  // Engine-delivered config: `api.pluginConfig["tui-ellamaka"]` (the merged
+  // wopal.pluginConfig table); the inline mount entry stays as a fallback.
+  const config = resolveTuiConfig(api.pluginConfig, options);
   if (config.enabled === false) return;
   api.attention.soundboard.registerPack({
     id: "wopal-space",

@@ -14,12 +14,12 @@ Wopal 专用 ellamaka 运行时插件 — 规则注入、任务委派、记忆�
 
 | 模块 | 职责 | 禁用开关 |
 |------|------|---------|
-| Global (`index.ts`) | 加载 .env、加载配置、注册 Hooks/Tools | 无 |
-| Rules (`rules/`) | 规则发现 → 条件匹配 → 注入用户消息 | `wopal.rules.enabled` — opt-in，默认 `false` |
-| Memory (`memory/`) | LanceDB 存储、语义检索、记忆注入 | `wopal.memory.enabled`（总控）、`wopal.memory.injection`（仅注入）— 配置 `wopal` 节点 |
+| Global (`index.ts`) | 加载 .env、消费引擎交付配置、注册 Hooks/Tools | 无 |
+| Rules (`rules/`) | 规则发现 → 条件匹配 → 注入用户消息 | `pluginConfig["wopal-plugin"].rules.enabled` — opt-in，默认 `false` |
+| Memory (`memory/`) | LanceDB 存储、语义检索、记忆注入 | `pluginConfig["wopal-plugin"].memory.enabled`（总控）、`.memory.injection`（仅注入） |
 | Task (`tasks/`) | 非阻塞子会话、状态监控、双向通信、并发控制 | 无 |
 | Monitor (`monitor/`) | 周期性调度引擎，统一管理监控策略 | 无 |
-| Context (`hooks/`, `context/`) | 会话压缩与恢复、标题生成、蒸馏 | `wopal.context.enabled` — 门控标题/恢复/蒸馏，压缩恒启用 |
+| Context (`hooks/`, `context/`) | 会话压缩与恢复、标题生成、蒸馏 | `pluginConfig["wopal-plugin"].context.enabled` — 门控标题/恢复/蒸馏，压缩恒启用 |
 
 | 目录 | 职责 |
 |------|------|
@@ -68,11 +68,11 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 | 标记 | 含义 |
 |------|------|
 | `Runtime context initialized` | 空间根与 `wopalHome` 已解析 |
-| `Effective wopal config loaded` | 三层配置已合并；密钥已脱敏 |
+| `Effective wopal config loaded` | 引擎交付的插件配置已消费；生效快照落日志，密钥已脱敏 |
 | `Resources resolved` | store / embedder / llm 中哪些已构建 |
 | `Plugin initialized` | 最终工具清单与 `memory` 标志 |
 
-配置驱动行为使用 `.wopal-space/.tmp/` 下的隔离 fixture 验证（禁止修改用户真实 `settings.local.jsonc`）；`loadWopalConfig` 支持注入 `wopalHome` / `wopalSpaceRoot` / `fallbackEnvironment` 用于此目的。
+配置驱动行为使用 `.wopal-space/.tmp/` 下的隔离 fixture 验证（禁止修改用户真实 `settings.local.jsonc`）；`loadWopalConfig` 支持注入 `pluginConfig` 切片 / `fallbackEnvironment` 用于此目的。
 
 `WOPAL_HOME` 覆盖用户级配置与存储根，使沙箱化运行成为可能。
 
@@ -138,7 +138,7 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 - **新增记忆分类**：在 `memory/categories.ts` 添加，标识符用英文，重要性 0-1
 - **新增监控策略**：实现 `MonitorStrategy` 接口，注册到 `MonitorEngine`
 - **新增环境变量**：`WOPAL_` 前缀 + `UPPER_SNAKE_CASE`；必须在调试开关表中同步补齐。功能开关归属配置，不进 env
-- **新增配置节点**：在 `src/config/schema.ts` 中添加并声明默认值；在第 8 节文档化
+- **新增配置节点**：在 `src/config/schema.ts` 中添加并声明默认值（经 `pluginConfig["wopal-plugin"]` 交付）；在第 8 节文档化
 - **新增 HookContext 字段**：必须可选（`?: boolean`），保持向后兼容。保持既有行为的能力门控默认 `true`；opt-in 开关（如 `rulesInjectionEnabled`）默认必须为 `false`
 
 ### 命名约定
@@ -188,22 +188,23 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | 日志阈值：trace/debug/info/warn/error/fatal（env 覆盖；配置 `wopal.logLevel` 为默认来源） |
-| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | 日志文件路径（env 覆盖；配置 `wopal.logFile` 为默认来源） |
-| `WOPAL_PLUGIN_LOG_MODULES` | (空) | 模块过滤（逗号分隔），空=全部。可选：core/rules/task/memory/context（env 覆盖；配置 `wopal.logModules` 为默认来源） |
+| `WOPAL_PLUGIN_LOG_LEVEL` | `info` | 日志阈值：trace/debug/info/warn/error/fatal（env 覆盖；配置 `pluginConfig["wopal-plugin"].logLevel` 为默认来源） |
+| `WOPAL_PLUGIN_LOG_FILE` | `<cwd>/.wopal-space/logs/wopal-plugin.log` | 日志文件路径（env 覆盖；配置 `pluginConfig["wopal-plugin"].logFile` 为默认来源） |
+| `WOPAL_PLUGIN_LOG_MODULES` | (空) | 模块过滤（逗号分隔），空=全部。可选：core/rules/task/memory/context（env 覆盖；配置 `pluginConfig["wopal-plugin"].logModules` 为默认来源） |
 
-## 8. 配置节点（settings.jsonc 的 `wopal` 节点）
+## 8. 配置节点（`wopal.pluginConfig["wopal-plugin"]`）
 
-功能开关与连接配置位于三层 settings 的 `wopal` 节点（`global` → `space-public` → `space-local`，后者覆盖前者）：
+功能开关与连接配置位于三层 settings 的 `wopal.pluginConfig["wopal-plugin"]` 条目（`global` → `space-public` → `space-local`，后者覆盖前者）。引擎深合并三层并经 `PluginInput.pluginConfig` 交付生效条目；插件只消费内存切片，不读任何 settings 文件。
 
 | 节点 | 字段 | 说明 |
 |------|------|------|
 | `rules` | `enabled` | 默认 `false`。opt-in 开关：仅在设为 `true` 时执行规则发现与注入 |
 | `memory` | `enabled`, `injection` | 默认均为 `true`；`injection=false` 停止自动注入但保留 `memory_manage` 与检索 |
 | `context` | `enabled` | 默认 `true`；门控标题生成、自动恢复与蒸馏；压缩恒启用 |
-| `llm` | `baseUrl`, `model`, `apiKey` | apiKey 支持 `$VAR` 引用 process.env / `.env` 文件；禁止存放明文密钥 |
+| `llm` | `baseUrl`, `model`, `apiKey` | apiKey 支持 `$VAR`：process.env 优先、`.env` 兜底；禁止存放明文密钥 |
 | `embedding` | `baseUrl`, `model`, `apiKey` | `$VAR` 语义与 `llm` 相同 |
 | `logLevel` / `logFile` / `logModules` | — | 配置为默认来源；`WOPAL_PLUGIN_LOG_*` env 覆盖 |
-| `pluginConfig` | `record<string, record<string, unknown>>` | 所有插件统一的 ONT-G4 行为配置通道。wopal-plugin 自身从 `pluginConfig["wopal-plugin"]` 读取（优先于上方遗留顶层字段，顶层字段保留为回退）；pluginConfig 值内同样支持 `$VAR` 引用 |
+
+优先级：内置默认 < 引擎交付的 `pluginConfig["wopal-plugin"]`。插件将切片叠加在默认之上并严格校验——非法条目启动即失败。层级合并与 `wopal.pluginConfig` 外层表的形状归引擎所有。
 
 `.env` 文件仅承载经 `$VAR` 引用的密钥（如 `WOPAL_LLM_API_KEY`）与日志诊断覆盖项；功能开关一律不进 `.env`。
