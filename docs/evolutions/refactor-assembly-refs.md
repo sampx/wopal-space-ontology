@@ -59,9 +59,9 @@
 
 ### Agent Verification
 
-1. [ ] 迁移后 `coding.yaml` 内文件引用均含显式扩展名、目录引用不变、分段插件内容不变（隔离环境）。
-2. [ ] 用现行解析器在隔离目录验证全部引用可消费，无悬空/错误形态。
-3. [ ] 变更范围限定在本表内单文件；文档与解析检查通过。
+1. [x] 迁移后 `coding.yaml` 内文件引用均含显式扩展名、目录引用不变、分段插件内容不变（隔离环境）。**实测：agents 4/4、rules 2/2、commands 20/20 均为显式扩展名；skills 10/10 目录形态与 `plugins` 分段逐字节不变。**
+2. [x] 用现行解析器在隔离目录验证全部引用可消费，无悬空/错误形态。**实测：项目现行解析器（候选探测）39/39 引用全部解析；迁移前后逐项解析为同一路径；materialization patterns 47 项前后一致；严格语法校验 39/39。**
+3. [x] 变更范围限定在本表内单文件；文档与解析检查通过。**实测：`git diff --stat` 仅 `assembly/archetypes/coding.yaml`（26+/26-）；`verify-docset.py` PASS。**
 
 ### User Validation
 
@@ -90,9 +90,9 @@
 **Verify**: 隔离目录构造旧解析器消费命令全绿；`python3 .wopal/skills/dev-doc-master/scripts/verify-docset.py .wopal/docs --main DESIGN.md` 通过；diff 仅含装配单。
 
 **Done**:
-任务产出：待实施后回填。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：`coding.yaml` 文件型能力引用迁移为显式扩展名；现行解析器隔离全量消费通过且与迁移前逐项解析等价；严格语法校验 39/39；未提前声明 `paths`。
+实际触碰文件：`assembly/archetypes/coding.yaml`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ## Delegation Strategy
 
