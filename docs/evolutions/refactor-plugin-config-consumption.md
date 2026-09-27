@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-27
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-refactor-plugin-config-consumption
 - **Branch**: ontology-refactor-plugin-config-consumption
