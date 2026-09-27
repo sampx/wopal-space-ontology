@@ -129,9 +129,9 @@
 **Verify**: 各处已安装 `@wopal/ellamaka-plugin` 版本核对 = 2.0.7；`.wopal/node_modules/@wopal/ellamaka-plugin/dist/index.d.ts` 含 `pluginConfig`；`cd .wopal/plugins/wopal-plugin && bun run typecheck` 通过。
 
 **Done**:
-任务产出：待实施后回填。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：三插件 `@wopal/ellamaka-plugin` / `@wopal/ellamaka-sdk` pin 对齐 2.0.7 并安装（隔离提交 `a2243c4`）；契约类型 `pluginConfig` 可解析、wopal-plugin typecheck 通过；`.wopal` 根 pin 与安装随验证阶段刷新。
+实际触碰文件：`plugins/dsh-adapter/package.json`、`plugins/dsh-adapter/bun.lock`、`plugins/wopal-plugin/package.json`、`plugins/wopal-plugin/bun.lock`、`plugins/tui-ellamaka/package.json`、`plugins/tui-ellamaka/bun.lock`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 1: dsh-adapter 消费引擎交付表
 
