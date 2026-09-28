@@ -110,11 +110,10 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal_task_reply` | 双向通信与恢复 |
 | `wopal_task_abort` | 任务终止 |
 | `wopal_task_finish` | 任务完成清理 |
-| `wopal_capability_list` | 列出空间武器库可用能力（含未授予任何角色的） |
 | `memory_manage` | LanceDB 记忆 CRUD 与语义检索（list/stats/search/add/update/delete/injected） |
 | `context_manage` | 会话上下文管理（status/dump/compact）+ 蒸馏（distill/confirm/cancel） |
 
-`wopal_capability_list` 暴露空间武器库全量能力，`wopal_task` 的装配参数只接受能力名称数组。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
+`wopal_task` 的装配参数只接受能力名称数组。武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载，真相源为 ellamaka 引擎发现层。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
 
 ### CLI Command Surface
 
@@ -124,6 +123,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal space status` | 只读空间状态与装配状态 |
 | `wopal space sync` | 与 local main 双向对齐 |
 | `wopal space capability add/remove` | 增删空间装配能力 |
+| `wopal space capability list` | 查询空间武器库有效能力集（四类武器，全局+空间） |
 | `wopal ontology install/update/contribute` | 本体安装、下行整合与上行贡献 |
 
 命令语义与边界see the Maintenance and Distribution Command Surface in `./DESIGN-evolution.md`.

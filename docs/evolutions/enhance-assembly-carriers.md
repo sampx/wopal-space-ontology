@@ -55,7 +55,7 @@ CLI 的 `refactor-space-assembly-state` Plan 全部交付后，一次性把 onto
 - CLI 严格解析、`path:` 选择、稀疏与状态机制：已交付 `refactor-space-assembly-state`。
 - `coding.yaml` 现有能力条目的显式扩展名迁移：已交付 `refactor-assembly-refs`。
 - 本体三个插件配置消费（ONT-G5）：独立提案 `refactor-plugin-config-consumption`。
-- 武器库清单、派发与会话规则注入（ONT-G1/G2/G3）：未定稿讨论。
+- 武器库清单、派发与会话规则注入（ONT-G2/G3）：未定稿讨论。
 - 既有空间 `.gitignore` 维护与真实空间迁移；上游交付由用户拍板。
 
 ## Affected Files

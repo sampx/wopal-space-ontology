@@ -1,7 +1,7 @@
 # DESIGN — Capability System
 
 > **Status**: Active
-> **Updated**: 2026-09-25
+> **Updated**: 2026-09-27
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -64,6 +64,26 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权限合成后覆盖基线——不配置就看不见，配置了就可用。
 
+#### Arsenal Scope and Truth Source
+
+武器库的范围是**全局层与空间层的有效能力集**——全局装的能力也算武器，空间层同名优先。四类武器：
+
+| 类别 | 内容 | 发现来源 |
+|------|------|---------|
+| 技能 | SKILL.md 定义的技能 | ellamaka `Skill` 引擎（多层目录扫描、空间优先去重） |
+| 规则 | 规则文件定义的约束 | ellamaka `Rule` 引擎（多层目录扫描、空间覆盖全局） |
+| 外部工具 | MCP 服务工具 + 文件注册的自定义工具 + 插件注册的工具 | ellamaka `ToolRegistry`（custom 部分）+ `MCP` 引擎 |
+| 内部工具 | 引擎内置工具（bash、read、edit、glob、grep、webfetch 等） | ellamaka `ToolRegistry`（builtin 部分） |
+
+四类武器全部从 ellamaka 引擎统一获取，通过 `@wopal/ellamaka-sdk` 向外暴露。引擎内部严格区分两个层次：
+
+- **发现层**——"引擎加载了什么"，返回完整列表，不过滤权限。武器库扫描只调这一层。
+- **运行时过滤层**——"这个 agent 这次能用什么"，按 agent 权限与 model 过滤。系统提示词生成、工具清单构建、执行授权全部走这一层。
+
+武器库扫描端点只调发现层方法，完全不触碰运行时过滤层。两条路径读不同的方法，互不干扰——武器库拿到完整能力列表，ellamaka 运行时的权限过滤逻辑不受影响。
+
+武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载。该命令通过 SDK 连接 ellamaka 引擎获取四类武器清单：引擎在运行时直连现有实例；引擎未运行时由 SDK 启动临时子进程。wopal-cli 裁剪输出为武器元数据（名称、描述、来源标注、路径），不传递工具的执行方法。命令契约见 `projects/wopal-cli/docs/DESIGN.md` 的 Space Capability。
+
 #### Session Assembly Injection Channel
 
 会话装配通过**会话级权限**实现。能力在会话创建时授予，会话生命周期内保持稳定，中途不改变装配。授予依据是 ellamaka 的权限合并规则：后者覆盖前者，因此会话级规则能够超越角色基线。
@@ -113,7 +133,11 @@ ontology 命令可覆盖 ellamaka 内置命令。
 | 项目级规则 | 语言与框架约束 | `rules/typescript.md`、`rules/python.md` |
 | Agent 专属规则 | Wopal 记忆规则、Fae Astro 规则等定向约束 | `rules/wopal/mem-rule.md`、`rules/fae/astro.md` |
 
-规则通过 wopal-plugin 在 Agent 启动时注入，按条件匹配生效。规则注入为 opt-in，受 `wopal.pluginConfig["wopal-plugin"].rules.enabled` 控制，默认关闭。
+规则发现由 ellamaka 引擎负责，扫描全局 `$WOPAL_HOME/rules/` 与空间 `<spaceRoot>/.wopal/rules/` 两层目录的 `**/*.{md,mdc}` 文件。空间层按相对路径覆盖全局同名；直接子目录名作为 agent 作用域（如 `rules/fae/astro.md` → scope=fae）。每项规则的身份是相对路径（含扩展名）。
+
+规则注入仍由 wopal-plugin 按 agent 与用户提示匹配执行。注入为 opt-in，受 `wopal.pluginConfig["wopal-plugin"].rules.enabled` 控制，默认关闭。
+
+引擎的规则发现端点返回完整列表，不按 agent 权限过滤——与技能、工具的发现层原则一致。注入时的条件匹配是运行时行为，与发现层分离。
 
 ## Plugin System
 
@@ -122,7 +146,7 @@ wopal-plugin 由 TypeScript 编写，Bun 执行，基于 EllaMaka Plugin SDK。
 | 模块 | 职责 | 可配置 |
 |------|------|--------|
 | Global（入口） | 构造 instance runtime、消费引擎交付的配置表切片与内联回退、检查开关、注册 Hooks/Tools | 无 |
-| Rules | 规则发现 → 条件匹配 → 注入用户消息 | `wopal.pluginConfig["wopal-plugin"].rules.enabled`（默认关闭，opt-in） |
+| Rules | 条件匹配 → 注入用户消息 | `wopal.pluginConfig["wopal-plugin"].rules.enabled`（默认关闭，opt-in） |
 | Memory | LanceDB 存储、语义检索、记忆注入 | `wopal.pluginConfig["wopal-plugin"].memory.enabled`（总控）、`.memory.injection`（仅注入） |
 | Task | 非阻塞子会话启动、状态监控、双向通信、并发控制 | 恒启用 |
 | Monitor | 周期性调度引擎，统一管理监控策略 | 恒启用 |
