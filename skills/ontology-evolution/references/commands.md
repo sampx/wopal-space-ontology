@@ -1,7 +1,6 @@
 # Command Reference
 
-The mechanism lane's operation surface is the CLI `wopal space evo` command
-family; its contract is `projects/wopal-cli/docs/DESIGN-evolution.md`. Run
+Landing proposals runs through the `wopal space evo` command family. Run
 from the space root — an effective space is resolved from the working
 directory, or targeted with `--space <name>`:
 
@@ -64,7 +63,7 @@ $ wopal space evo status refactor-ontology-maintenance
 - **Next**: wopal space evo advance refactor-ontology-maintenance --to validating
 ```
 
-Placeholder metadata (`(accept 时记录)`) is never printed as data. At the
+Placeholder metadata (`(none)`) is never printed as data. At the
 terminal stage it prints `none (terminal)` and the archive command.
 
 ## `wopal space evo advance <name> --to <state>`

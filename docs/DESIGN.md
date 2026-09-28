@@ -48,7 +48,7 @@ ontology 拥有的目标态能力组：
 | 灵魂与操作分离 | Agent 灵魂文件只定义角色边界与决策原则（"我是谁"），操作知识由技能承载（"我怎么做"）。 |
 | 提示词目标化（Outcome-Oriented）优于过程干涉（Hand-Holding） | 面向 2026 前沿模型原生推理与测试时计算（TTC），提示词只给目标与验证门禁，不承载操作说教，不干涉过程。 |
 | 中央能力池集中维护 + 空间装配 worktree（BOM 装配模型） | 本体资产在单一 `main` 分支集中维护，通过 `assembly/archetypes/*.yaml` 声明装配单，空间端以装配 worktree（sparse-checkout）按需物化。一处优化全域受益，进化经 `space sync` 汇入 local main。 |
-| 进化的"提议权"与"实施权"分离 | Maka 专职元认知分析、去特异化清洗与出提案（Propose Only，`edit` 仅放开提案目录）；落地由 Wopal 统筹、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
+| 提案与落地分离 | Maka 负责分析会话错误、用户纠偏与记忆经验并撰写提案，Wopal 也可以撰写；落地由 Wopal 主控、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
 | 本体进化与代码开发分流 | 本体能力进化的执行流程由 `ontology-evolution` 技能拥有，代码项目开发流程由 `dev-flow` 拥有。两条流程的对象不同，状态词汇互不重合。本体能力是全空间类型的常驻关注点，代码开发工作流属于 coding 类型，分流后每个空间只装配其实际需要的流程。 |
 | 插件适配原则 | wopal-plugin 是运行时插件，集中提供规则注入、任务委派、记忆系统和上下文管理，插件能实现尽量不改造 engine。 |
 | 运行时装配经会话级权限落地 | 能力装配以会话级权限为注入通道，会话创建时授予、生命周期内稳定。装配参数只接受能力名称，权限规则由插件构造，Agent 不接触权限细节。 |
@@ -69,7 +69,7 @@ ontology 由装配定义与六类能力资产构成。模块细节分见各子�
 | 规则体系 | 项目级、空间级与 Agent 专属规则 | `rules/` | `./DESIGN-capabilities.md` |
 | 插件体系 | wopal-plugin 与 TUI 品牌插件 | `plugins/<name>/` | `./DESIGN-wopal-plugin.md` |
 | 辅助脚本 | ontology 维护与开发辅助 | `scripts/` | `./DESIGN-capabilities.md` |
-| 进化闭环 | 能力演化、同步与海关检疫 | 跨模块 | `./DESIGN-evolution.md` |
+| 进化闭环 | 能力演化、同步与防污染审查 | 跨模块 | `./DESIGN-evolution.md` |
 
 装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义本身不作为能力资产被装配单声明；其内容作为基础定义层随装配无条件物化进空间（成员清单与物化机制见 `./DESIGN-assembly.md` 的 Sparse Materialization Mechanics）。
 

@@ -34,50 +34,50 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 
 ## Self-Evolution Loop
 
-Maka 专职海关与提议-实施权责分立，空间运行中产生的能力进化遵循严格的防特异性泄漏与海关检疫机制：
+提案撰写与落地分离：Maka 负责分析会话错误、用户纠偏与记忆中的经验教训，产出进化提案（Wopal 也可以撰写）；空间运行中产生的经验遵循防污染与隔离纪律：
 
 ```
 会话运行事实 / 报错日志 / 用户纠偏
   │
   ▼
-[Maka 独立元认知代理 + ontology-evolution 技能]
-  │  • 去特异化清洗 (De-contextualization): 抹除绝对路径与特定项目业务词
-  │  • 泛化性三问 (Generalization Gate): 验证是否具备跨空间通用性
-  │  • 三级分流判定: 空间私有 vs 类型专属 vs 公共核心
+[Maka：分析经验、撰写进化提案]（Wopal 也可以撰写）
+  │  • 去具体化：抹除绝对路径与仅在本处成立的业务词
+  │  • 泛化判断：是否具备跨空间通用性
+  │  • 归属判定：空间私有 / 类型级 / 公共池
   ▼
-生成《进化方案 (Evolution Plan)》呈交用户审查
+进化提案落盘 docs/evolutions/，呈交用户审查
   │
   ▼ 用户批准
-[Wopal 统筹调度] ──委派──> [Fae 规范实施落盘]（空间 worktree 内提交）
+[Wopal 主控] ──委派──> [Fae 规范实施落盘]（空间 worktree 内提交）
                                │
                                ├─ 进化提交落在 space/<name>（待贡献）
                                ├─ 执行 space sync 汇入 local main
                                ▼
-                        [Rook 正交质检守门]
+                        [Rook 审查守门]
                                │
-                               └─ 校验 frontmatter 语法合法性与反污染底线
+                               └─ 审查交付物质量与反污染底线
 ```
 
 核心进化规则：
 
-1. **提议权与实施权严格分离**：Maka 只出提案、不动刀（Propose Only，`edit` 仅放开 `docs/evolutions/`）；具体改动经用户批准后，由 Wopal 委派 Fae 在空间 worktree 内规范提交，Rook 审查把关。
+1. **提案与落地分离，且提案须经用户批准**：Maka 只出提案、不动刀（`edit` 仅放开 `docs/evolutions/`；Wopal 也可以撰写提案）；具体改动经用户批准后，由 Wopal 主控、委派 Fae 在空间 worktree 内规范提交，Rook 审查把关。
 2. **进化先落在空间分支，再经 `space sync` 汇入**：空间内正常写改、提交（Agent 仅需 workspace 写权限）；`space sync` 时申请受控提权，将空间独有提交隔离整合进 local main。
 3. **项目经验物理隔离**：属于当前项目特有的架构规范写入空间记忆或项目 `AGENTS.md`。空间选择可以只挂载当前空间所需的共享资产；尚未提交的私有资产由显式 `private` 身份和独立内容备份管理，不把共享池内容误称私有内容。
 
-进化粒度遵循严格的海关检疫：空间私有经验物理锁死在本地，类型经验作用于类型装配，只有高度抽象且经受反污染审查的通用资产才允许回流中央。
+进化粒度遵循严格的防污染纪律：空间私有经验锁死在本地，类型经验作用于类型装配，只有高度抽象且经受反污染审查的通用资产才允许回流中央。
 
 ## Capability Evolution Workflow
 
 本体能力进化的执行机制由 `ontology-evolution` 技能承载。该技能是四个核心角色在所有空间类型下的常驻能力：任意空间都能维护与补充自己的本体能力，无需装配代码开发工作流。代码项目开发流程由 `dev-flow` 拥有（见 `./DESIGN-capabilities.md`）；本体能力进化流程由 `ontology-evolution` 拥有。两条流程的对象不同——前者面向 `projects/` 下的代码仓库，后者面向空间自身的本体能力资产。技能同时承载本体维护操作的执行协议（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）——进化的机制操作与日常维护共用同一套命令面与安全纪律，规范单点维护在技能内。
 
-技能分两条车道，职责不重叠：
+技能覆盖这项工作的两个环节，职责不重叠：
 
-| 车道 | 承担者 | 产出 |
+| 环节 | 承担者 | 产出 |
 |------|--------|------|
-| 语义车道 | Maka 独立元认知代理 | 摩擦检测、去特异化清洗、泛化门判定、三级分流，输出《进化方案》 |
-| 机制车道 | Wopal 编排、Fae 实施、Rook 守门 | 提案落盘、状态推进、稀疏隔离实施、运行时验证、交付决策 |
+| 提案撰写 | Maka（分析会话错误、用户纠偏与记忆中的经验教训）；Wopal 也可以撰写 | `docs/evolutions/` 下的进化提案 |
+| 提案落地 | Wopal 主控编排、Fae 实施、Rook 审查；批准、验证与交付由用户掌握 | 经隔离实施、验证并归档的能力变更 |
 
-《进化方案》是机制车道的工作对象，不是代码任务。
+进化提案是落地环节的工作对象，不是代码任务。
 
 ### Evolution Workflow States
 
@@ -97,7 +97,7 @@ draft → accepted → implementing → validating → archived
 
 提案默认不创建 Issue 载体；用户明确要求时才引入评审与 Issue。
 
-推进状态记在提案的 `Stage` 字段。与代码开发流程相比，字段名与词表都不重叠；与设计文档的 `Status` 字段（Draft / Proposed / Active）相比，词表出现一个同形词 `draft`，靠字段名区分。三者同处 `docs/` 之下，字段名是主要的区分依据。状态推进由机制命令承担，Agent 不手改 `Stage` 字段；机制命令的唯一操作面是 CLI `space evo` 命令族（目标态，契约见 `../../projects/wopal-cli/docs/DESIGN-evolution.md`），迁移期技能内脚本为过渡实现，双实现不得长期并行。
+推进状态记在提案的 `Stage` 字段。与代码开发流程相比，字段名与词表都不重叠；与设计文档的 `Status` 字段（Draft / Proposed / Active）相比，词表出现一个同形词 `draft`，靠字段名区分。三者同处 `docs/` 之下，字段名是主要的区分依据。状态推进由机制命令承担，Agent 不手改 `Stage` 字段；机制命令的唯一操作面是 CLI `space evo` 命令族（契约见 `../../projects/wopal-cli/docs/DESIGN-evolution.md`）。
 
 ### Evolution Documents
 
@@ -136,7 +136,7 @@ draft → accepted → implementing → validating → archived
 | `space status` | — | 只读：refs 双向差异、稀疏健康、当前有效装配与本地选择（include / exclude / private / 未登记未跟踪文件） |
 | `space sync` | 双向 | 先整合空间共享内容、再 fast-forward 下行；上行前阻止已登记的私有内容泄漏，按当前装配事实重算范围；CLI 默认 dry-run 预览，`--confirm` 落盘 |
 | `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常本体 Git 提交上行；`--local`：以能力或 `path:<ref>` 完整身份调整本空间选择，CLI 提交空间根仓库状态，不生成本体内容提交 |
-| `space evo <family>` | — | 机制车道：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
+| `space evo <family>` | — | 提案落地：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
@@ -149,7 +149,7 @@ draft → accepted → implementing → validating → archived
 
 `ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对新建能力，内容先按共享提交或显式私有登记选定归属，再按能力身份确定本空间是否挂载。
 
-空间内日常能力进化通过 Maka 检疫提炼后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
+空间内日常能力进化由 Maka 提炼为提案、经用户批准后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 
 ## Distribution Boundary
 
@@ -184,7 +184,7 @@ Ontology 通过两层模型为 WopalSpace 提供可覆盖的能力分发：
 
 ## System Prompt Self-Evolution
 
-提示词是核心资产。Maka 检疫提炼并提出方案，经用户批准后由 Wopal 调度 Fae 更新中央仓库的提示词文件，实现跨空间协同进化。
+提示词是核心资产。Maka 提炼并提出提案，经用户批准后，由 Wopal 主控、Fae 更新中央仓库的提示词文件，实现跨空间协同进化。
 
 ## Design Knowledge Layering
 

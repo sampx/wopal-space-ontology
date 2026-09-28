@@ -19,7 +19,7 @@
 | **Wopal**（主控 / 统筹脑） | 意图解析、人机对齐、宏观规划、跨空间记忆承载、任务派发 | 全量感知与派发权 (`wopal_*`, `task`, `memory_manage`)，`question: allow` | 双模确认原则（自由对话须确认，工作流按 Plan 执行）；结论先行 |
 | **Fae**（执行手 / 全栈工兵） | 一切实施类工作：编码、重构、构建、测试、写作、编辑、数据处理 | `edit: allow`, `bash: allow`, `task: deny`（防套娃） | 必须产出客观证据；能通过真实验证的成果是唯一指标 |
 | **Rook**（审查眼 / 正交哨兵） | 一切产出质量的独立审计：方案、实施成果、文稿与数据 | 严格只读沙箱 (`read: allow`, `edit: deny`, `bash: allow` 仅限只读命令) | 严格遵守“无证据即无效”（Evidence-or-Downgrade），只认 `file:line` 事实 |
-| **Maka**（进化心 / 专职海关） | 会话摩擦检测、经验蒸馏、去特异化检疫、提出自进化提案 | 独立会话沙箱 (`read: allow`；`edit` 仅放开 `docs/evolutions/`) | **只出提案、不动刀**；执行严格的三级防污染分流检疫 |
+| **Maka**（进化心） | 分析会话错误、用户纠偏与记忆中的经验教训，形成自进化提案 | 独立会话沙箱 (`read: allow`；`edit` 仅放开 `docs/evolutions/`) | **只出提案、不动刀**；执行严格的防污染归属判定（空间私有 / 类型级 / 公共池） |
 
 ### Role Boundaries Defined by Responsibility
 
@@ -30,7 +30,7 @@
 - **规划与统筹**归 Wopal，规划流程由 `dev-flow` 承载；
 - **全栈实施**归 Fae，编码、重构、构建、测试在单一上下文内原子共变；
 - **独立审查**归 Rook，代码缺陷与安全风险的正交审计统一归口；
-- **经验进化**归 Maka，会话摩擦的蒸馏与检疫统一归口。
+- **提案撰写**由 Maka 主责：会话错误、用户纠偏与记忆经验的分析与提炼统一归口（Wopal 也可以撰写）。
 
 ### Dynamic Assembly
 
@@ -108,7 +108,7 @@ Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权�
 
 两个工作流技能按对象分工：`dev-flow` 面向 `projects/` 下的代码仓库，`ontology-evolution` 面向空间自身的本体能力资产。四个核心角色在所有空间类型常驻，本体能力进化因此对每个空间可用，不依赖空间是否装配代码开发工作流。两条流程的状态词汇互不重合，实施与交付纪律见 `./DESIGN-evolution.md`。
 
-本体资产的全部维护面由 `ontology-evolution` 技能单点拥有：能力进化的语义与机制两条车道（提案、状态机、隔离实施、交付终端），以及本体维护操作（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）的执行协议。`space-master` 只保留路由职责——把本体相关请求导向 `ontology-evolution`，不重复维护规范；`wopal/ontology-maintain` 命令是薄触发入口，加载该技能后按其协议执行，自身不承载规范。
+本体资产的全部维护面由 `ontology-evolution` 技能单点拥有：能力进化的完整流程（提案、状态机、隔离实施、交付终端），以及本体维护操作（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）的执行协议。`space-master` 只保留路由职责——把本体相关请求导向 `ontology-evolution`，不重复维护规范；`wopal/ontology-maintain` 命令是薄触发入口，加载该技能后按其协议执行，自身不承载规范。
 
 `space-master` 是 ontology 的根技能，定位为概念模型入口、流程选择器与核心技能路由器。本体维护规范收编至 `ontology-evolution` 后，其职责边界收窄为「选哪个技能」，不再持有任何执行协议的完整副本。
 
