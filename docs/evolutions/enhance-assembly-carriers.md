@@ -70,7 +70,7 @@ CLI 的 `refactor-space-assembly-state` Plan 全部交付后，一次性把 onto
 
 ### Agent Verification
 
-1. [ ] 隔离工作区内 `coding.yaml` 的 `paths: [dsh]` 经 CLI 物化出 `.wopal/dsh` 整目录，与能力类目/定义层无碰撞；引用缺失时 fail。
+1. [ ] 隔离工作区内 `coding.yaml` 的 `paths: [dsh]` 经 CLI 物化出 `.wopal/dsh` 整目录，与能力类目/保留目录无碰撞；引用缺失时 fail。
 2. [ ] 隔离空间 `git check-ignore` 只命中约定私有持有文件；`space-meta.json`、`REGULATIONS.md` 与用户文档不命中；两类骨架的模板引用核对一致。
 3. [ ] 新提案模板的 `Assembly Intent` 表格可被工具解析校验；技能文案不再出现「`--local` 零提交/永不上行」，且状态提交与用户逐次上行分开表达。
 
