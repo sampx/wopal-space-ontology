@@ -56,23 +56,6 @@
 
 ---
 
-## Plugin Configuration Consumption
-
-### ONT-G5: 三个本体插件各自读配置文件，wopal-plugin 的 id 与装配名不一致（P0）
-
-**Current**: dsh-adapter、wopal-plugin、tui-ellamaka 三个插件各自定位空间根、读三层 settings 的 `wopal.pluginConfig.<插件名>`、合并来源并校验取值，配置从哪来由插件自己判断。`wopal-plugin` 导出的运行时 id 是 `wopal-wopal-plugin`，与装配名、配置键对不上。
-
-**Target**: 三个插件不读配置文件、不写配置：引擎把三层合并后的配置整表交给它们，插件按自己的名字取用条目并校验取值。`wopal-plugin` 导出的运行时 id 与装配名一致，为 `wopal-plugin`。
-
-**Design**: `./DESIGN-wopal-plugin.md`（Configuration 节）
-
-**Exit**:
-- [ ] 三个插件不读配置文件、不自行定位空间根，只消费引擎交付的整表条目
-- [ ] 插件条目内联 options 兜底、`$VAR` 解析与取值校验行为保持
-- [ ] `wopal-plugin` 运行时 id 与装配名、配置键一致
-
----
-
 ## Reference Documents
 
 | 文档 | 说明 |
