@@ -24,9 +24,9 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | 任务委派 | 非阻塞子会话启动、状态监控、双向通信、并发控制、进程清理 | 不管理任务业务逻辑 |
 | 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD | 不持有记忆数据 |
 | 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储、蒸馏（preview → confirm） | 不改变模型行为 |
-| 能力装配 | 武器库扫描、能力清单暴露、派发时合成会话级权限、规则按会话注入 | 不定义能力内容，不决定中央能力池构成 |
+| 能力装配 | 派发时合成会话级权限、规则按会话注入 | 不定义能力内容，不决定中央能力池构成；武器库扫描与清单查询由 ellamaka 引擎与 wopal-cli 承载 |
 
-插件向 Agent 暴露 8 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`wopal_capability_list`、`memory_manage`、`context_manage`。
+插件向 Agent 暴露 7 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`memory_manage`、`context_manage`。
 
 ## Key Decisions
 
@@ -144,33 +144,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 ### Capability Assembly Module
 
-能力装配模块把空间武器库转化为具体会话的能力授予。它由武器库扫描、能力清单暴露、派发装配三部分组成。
-
-#### Arsenal Scan
-
-插件启动时扫描空间 worktree 构建武器库清单。技能从 `.wopal/skills/` 下的 `SKILL.md` 收集，规则从 `.wopal/rules/` 下的规则文件收集，MCP 从配置的服务声明收集。
-
-清单保留**全部**扫描结果，不做角色基线过滤——未授予任何角色的能力同样在列。每项记录名称、描述与物理路径。路径供规则注入读取与人工审计定位。
-
-#### Capability Listing Contract
-
-`wopal_capability_list` 无参数，返回武器库清单：
-
-```jsonc
-{
-  "skills": [
-    { "name": "content-writer", "description": "内容写作技能", "path": ".wopal/skills/content-writer/SKILL.md" }
-  ],
-  "rules": [
-    { "name": "typescript", "description": "TS 项目规则", "path": ".wopal/rules/typescript.md" }
-  ],
-  "mcp": [
-    { "name": "some-mcp", "description": "外部工具服务", "path": null }
-  ]
-}
-```
-
-命令行是界面功能而非 Agent 可用的武器，不进入清单。
+能力装配模块把空间武器库转化为具体会话的能力授予。武器库扫描与清单查询由 ellamaka 引擎的发现层与 wopal-cli 的 `wopal space capability list` 命令承载（见 `./DESIGN-capabilities.md` 的 Arsenal Scope and Truth Source）；本模块只负责派发装配。
 
 #### Dispatch Assembly Contract
 
@@ -333,7 +307,6 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 | `wopal_task_reply` | 始终 | 双向通信与恢复 |
 | `wopal_task_abort` | 始终 | 任务终止 |
 | `wopal_task_finish` | 始终 | 任务完成清理 |
-| `wopal_capability_list` | 始终 | 列出空间武器库可用能力（含未授予任何角色基线的） |
 | `memory_manage` | `memory.enabled` | 记忆 list/stats/search/add/update/delete/injected |
 | `context_manage` | 始终 | 会话 status/dump/compact + 蒸馏（distill/confirm/cancel） |
 
