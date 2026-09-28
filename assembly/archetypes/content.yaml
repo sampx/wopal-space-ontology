@@ -46,3 +46,4 @@ commands:
 plugins:
   ellamaka:
     - wopal-plugin
+    - dsh-adapter
