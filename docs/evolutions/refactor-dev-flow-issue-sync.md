@@ -152,35 +152,36 @@
 
 #### Scenario 1: 真实 Issue 的三章节同步与保全观察
 - Goal: 在 GitHub 真实渲染面上确认「三章节更新 + 其余保全 + 幂等 + checkbox 可勾选」。
-- 验证环境: 本空间；`gh` 已认证；实施阶段准备的 scratch 探针（`sync-probe` Plan + 关联 scratch Issue，Issue body 含 Context、Goal 前元信息行、Depends on/Demo 模拟段与额外表格行）。
-- Precondition: 探针处于 executing 状态；探针 Plan 含四个映射节内容；实施阶段已把探针名称与 Issue 编号回填到本节。
-- 启动命令: `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && bash scripts/flow.sh sync sync-probe --body-only`
+- 验证环境: 本空间；`gh` 已认证；scratch 探针已就绪——探针 Plan：`242-test-probe-sync-probe`（executing，approve --no-worktree 直达）；关联 scratch Issue：#242（body 含 Context、Goal 前元信息行、Depends on/Demo 模拟段与额外表格行）。
+- Precondition: 探针 Plan `242-test-probe-sync-probe` 处于 executing 状态且含四个映射节内容；Issue #242 已创建并关联。
+- 启动命令: `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && bash scripts/flow.sh sync 242-test-probe-sync-probe --body-only`
 - User Actions:
-  1. 在 GitHub 打开 scratch Issue，对照 Plan 检查 `## Goal` / `## Scope`（`### In`/`### Out`）/ `## Acceptance Criteria`（含两个子节、`- [ ]` 行）；
+  1. 在 GitHub 打开 Issue #242（https://github.com/sampx/wopal-space/issues/242），对照 Plan 检查 `## Goal` / `## Scope`（`### In`/`### Out`）/ `## Acceptance Criteria`（含两个子节、`- [ ]` 行）；
   2. 检查 `## Context`、Goal 前元信息行、`## Depends on` / `## Demo` 与其它表格行原样保留；
-  3. 再次执行启动命令，刷新 Issue 对比。
+  3. 再次执行启动命令，刷新 Issue 对比；
+  4. 清理（验证通过后由主控执行）：`bash scripts/flow.sh reset 242-test-probe-sync-probe`；`bash scripts/flow.sh issue close 242`；trash 探针 Plan 文件。
 - 通过判据: 三章节与 Plan 一致且 GitHub 上 checkbox 可交互渲染；非映射内容零变化；第二次运行后内容无差异（幂等）；无报错。
-- 失败反馈: 贴出 Issue body 原文（`bash scripts/flow.sh issue view` 的探针编号输出）与期望差异点。
+- 失败反馈: 贴出 Issue body 原文（`bash scripts/flow.sh issue view 242` 输出）与期望差异点。
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期（2026-09-29 用户确认；由主控自验并呈证据；因 CLI 缺陷 #243 未走验证视图，在隔离工作区等价执行）
 
 #### Scenario 2: approve 真机探针（成功路径 + 失败回滚）
 - Goal: 在真机上确认批准提交内含真实 `Base Commit`、无残留行；并确认 worktree 创建失败时状态回滚、提示真实。
-- 验证环境: 本空间；实施阶段准备的 scratch 探针（`approve-probe` Plan，reviewing 状态，目标项目为空间内一个 standard 项目，实施阶段回填探针名与项目名，派生 worktree 路径为 `wopal-cli-approve-probe` 形态）。
-- Precondition: 探针 Plan 通过 `plan check`；`.worktrees/` 下不存在探针目标路径。
+- 验证环境: 本空间；scratch 探针已就绪——探针 Plan：`test-probe-approve-probe`（reviewing，目标项目：wopal-cli）；派生 worktree 路径：`.worktrees/wopal-cli-test-probe-approve-probe`。
+- Precondition: 探针 Plan `test-probe-approve-probe` 已通过 `plan check` 且处于 reviewing；`.worktrees/wopal-cli-test-probe-approve-probe` 不存在。
 - 启动命令:
-  1. `touch /Volumes/U500G/coding/wopal-workspace/.worktrees/wopal-cli-approve-probe`
-  2. `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && bash scripts/flow.sh approve approve-probe --confirm`
-  3. `trash /Volumes/U500G/coding/wopal-workspace/.worktrees/wopal-cli-approve-probe`
-  4. `bash scripts/flow.sh approve approve-probe --confirm`
+  1. `touch /Volumes/U500G/coding/wopal-workspace/.worktrees/wopal-cli-test-probe-approve-probe`
+  2. `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && bash scripts/flow.sh approve test-probe-approve-probe --confirm`
+  3. `trash /Volumes/U500G/coding/wopal-workspace/.worktrees/wopal-cli-test-probe-approve-probe`
+  4. `bash scripts/flow.sh approve test-probe-approve-probe --confirm`
 - User Actions:
   1. 执行 1-2：确认命令失败且提示「已回滚 / 未进入 executing」，检查探针 Plan 的 `Status` 回到 reviewing；
-  2. 执行 3-4：确认成功；`git -C /Volumes/U500G/coding/wopal-workspace log -1 --stat -- .wopal-space/plans/wopal-cli/approve-probe.md` 查看批准提交含真实 `Base Commit`（等于 `git -C /Volumes/U500G/coding/wopal-workspace/projects/wopal-cli rev-parse main`），`git -C /Volumes/U500G/coding/wopal-workspace status --short` 无未提交的 Base Commit 行；
-  3. 清理：`bash scripts/flow.sh reset approve-probe`，按实施回填的清理步骤回收探针与 worktree。
+  2. 执行 3-4：确认成功；`git -C /Volumes/U500G/coding/wopal-workspace log -1 --stat -- .wopal-space/plans/wopal-cli/test-probe-approve-probe.md` 查看批准提交含真实 `Base Commit`（等于 `git -C /Volumes/U500G/coding/wopal-workspace/projects/wopal-cli rev-parse main`），且 `git -C /Volumes/U500G/coding/wopal-workspace status --short -- .wopal-space/plans/wopal-cli/test-probe-approve-probe.md` 无输出（无未提交的 Base Commit 行）；
+  3. 清理（验证通过后由主控执行）：`bash scripts/flow.sh reset test-probe-approve-probe`；`git -C /Volumes/U500G/coding/wopal-workspace/projects/wopal-cli worktree remove /Volumes/U500G/coding/wopal-workspace/.worktrees/wopal-cli-test-probe-approve-probe`；`git -C /Volumes/U500G/coding/wopal-workspace/projects/wopal-cli branch -D wopal-cli-test-probe-approve-probe`；trash 探针 Plan 文件。
 - 通过判据: 失败路径无 executing 残留、提示与真实状态一致；成功路径提交内容与工作区形态符合上述断言。
 - 失败反馈: 贴出命令输出、`git log -1 --stat` 与 `git status --short` 输出。
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期（2026-09-29 用户确认；由主控自验并呈证据；因 CLI 缺陷 #243 未走验证视图，在隔离工作区等价执行）
 
 ## Implementation
 
@@ -208,8 +209,8 @@
 
 **Done**:
 任务产出：三章节同步管线落地，`sync_plan_to_issue_body` 恢复正文同步。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`skills/dev-flow/scripts/issue.py`、`skills/dev-flow/scripts/plan.py`、`skills/dev-flow/tests/python/unit/test_issue_sync_sections.py`（新增）、`skills/dev-flow/tests/python/unit/test_plan_link_contract.py`、`skills/dev-flow/tests/fixtures/sync-sample/`（新增）。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 2: 消费者收敛与死代码归零
 
@@ -233,9 +234,9 @@
 **Verify**: `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && python -m pytest tests/python/unit/ -v && rg -n "_extract_subsection|_render_issue_section|build_issue_body_from_plan" scripts/`（rg 零命中）
 
 **Done**:
-任务产出：单实现收敛完成，死代码归零。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：单实现收敛完成，死代码归零——手动 sync / 自动同步 / 归档刷新 / `sync_plan_to_issue_body` 全走 `issue.py` 一处；三个死符号在 `scripts/` 零命中（fixture 历史样本数据除外）。
+实际触碰文件：`skills/dev-flow/scripts/commands/sync.py`、`skills/dev-flow/scripts/issue.py`、`skills/dev-flow/scripts/plan.py`、`skills/dev-flow/tests/python/unit/test_sync_preserves_context.py`。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 3: 文档对齐（双语 + 指南 + 参考 + help）
 
@@ -259,9 +260,9 @@
 **Verify**: `rg -n "Plan Related Resources" .wopal/skills/dev-flow/`（零命中）等逐项抽查
 
 **Done**:
-任务产出：五处文档与实现一致。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：五处文档与实现一致——三章节（Goal/Scope/AC）+ `| Plan |` 链接行表述统一，旧矛盾表述（`Plan Related Resources` 映射、旧 help 句）零命中。
+实际触碰文件：`skills/dev-flow/references/issue-guide.md`、`skills/dev-flow/SKILL.md`、`skills/dev-flow/SKILL.zh-CN.md`、`skills/dev-flow/references/commands.md`、`skills/dev-flow/scripts/flow.py`。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ### Task 4: approve 状态一致性（回滚 + Base Commit 前置）
 
@@ -286,9 +287,9 @@
 **Verify**: `cd /Volumes/U500G/coding/wopal-workspace/.wopal/skills/dev-flow && python -m pytest tests/python/unit/test_approve.py -v`
 
 **Done**:
-任务产出：approve 事务化，两缺陷消除。
-实际触碰文件：待实施后回填。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+任务产出：approve 事务化落地——状态写入后任何失败回滚到批准前字段形态（worktree 失败附 `rollback` 提交 + 真实提示；提交失败附暂存区复位，无半提交残留）；Base Commit 前置使批准提交内含真实 SHA。
+实际触碰文件：`skills/dev-flow/scripts/commands/approve.py`、`skills/dev-flow/tests/python/unit/test_approve.py`。
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ## Delegation Strategy
 
