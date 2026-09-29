@@ -5,11 +5,11 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-29
-- **Stage**: draft
-- **Mode**: (none)
-- **Worktree**: (none)
-- **Branch**: (none)
-- **Base Commit**: (none)
+- **Stage**: accepted
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-enhance-ontology-cli-alignment
+- **Branch**: ontology-enhance-ontology-cli-alignment
+- **Base Commit**: 6ede00a0f05967d9e3082f1d93b9b07f6b1ecc91
 - **Final Commit**: (none)
 
 ## Scope Assessment
