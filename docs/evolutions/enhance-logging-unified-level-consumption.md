@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-25
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: (none)
@@ -94,7 +94,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 4. [x] 回归与门禁：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过 `bun run lint` 与 `bun run typecheck`。
 5. [x] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链，且 Environment Variable Roles 表（`DESIGN-wopal-plugin.md:299-308` 附近）纳入 `ELLAMAKA_LOG_LEVEL` 行（角色：宿主统一级别兜底；来源：仅真实进程环境，不从 `.env` 读取）；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
 
-（2026-09-29 主控实证：焦点 55/55、全量 69 文件 / 1014 用例全绿；typecheck 0；改动文件 eslint 0；整仓 `bun run lint` 存量债失败——宿主基线同因，非本次引入；rook 实施评审 PASS（0 findings，待办 1 项：用户运行验证）；格式化按用户决定保留既有风格。）
+（2026-09-29 主控实证：焦点 55/55、全量 69 文件 / 1014 用例全绿；typecheck 0；改动文件 eslint 0；整仓 `bun run lint` 存量债失败——宿主基线同因，非本次引入；rook 实施评审 PASS（0 findings）；用户运行验证通过（2026-09-29）；格式化按用户决定保留既有风格。）
 
 ### User Validation
 
@@ -110,7 +110,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 - 通过判据: 步骤 2 出现插件 DEBUG 记录（证明统一级别兜底生效）；步骤 3 只保留 WARN 及以上（证明显式插件变量仍最高）。
 - 失败反馈: 提供两次运行的日志文件路径与 `grep -c "DEBUG"` / `grep -c "WARN"` 计数、`git diff -w` 输出。
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
