@@ -449,7 +449,9 @@ def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspa
                 text=True,
                 check=True
             )
-            current_body = result.stdout
+            # `gh --jq` appends one trailing newline; strip exactly that one so
+            # the row rewrite preserves the body's real trailing bytes.
+            current_body = result.stdout[:-1] if result.stdout.endswith("\n") else result.stdout
         except (subprocess.CalledProcessError, FileNotFoundError):
             print("Warning: gh CLI not available, skipping Plan link update")
             return

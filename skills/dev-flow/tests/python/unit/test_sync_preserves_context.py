@@ -13,6 +13,8 @@
 #      implementation, preserving non-mapped content
 #   2. Plan file missing -> exit code 1
 #   3. gh CLI unavailable -> exit code 0, no Issue write
+#   4. Editing sync preserves the stored body's trailing newlines (the
+#      `gh --jq .body` trailing newline must not be written back)
 
 import sys
 from pathlib import Path
@@ -81,6 +83,53 @@ def test_sync_applies_sections_and_row_through_unified_implementation(tmp_path):
     # Non-mapped content preserved
     assert "## Background" in body
     assert "当前 WSF 模板中的说明文字是英文" in body
+
+
+def test_edit_preserves_trailing_newlines_of_the_stored_body(tmp_path):
+    """A real `gh --jq .body` read appends one trailing newline; the sync must
+    not write it back — a stored body ending with N newlines stays at N after
+    an editing sync (previously each real edit grew the tail by one)."""
+    plan_file = tmp_path / "plan-240.md"
+    plan_file.write_text(SAMPLE_PLAN.read_text())
+
+    stored = LEGACY_ISSUE.read_text()  # sync edits it: legacy In/Out get updated
+    stored_trailing = len(stored) - len(stored.rstrip("\n"))
+    assert stored_trailing > 0  # the recorded sample ends with newline(s)
+
+    edited_bodies = []
+
+    def fake_gh(cmd, **kwargs):
+        if cmd[:2] == ["gh", "--version"]:
+            return MagicMock(returncode=0)
+        if cmd[:3] == ["gh", "issue", "view"]:
+            # real `gh --jq .body` output = stored body + one trailing newline
+            return MagicMock(returncode=0, stdout=stored + "\n")
+        if cmd[:3] == ["gh", "issue", "edit"]:
+            edited_bodies.append(cmd[cmd.index("--body") + 1])
+            return MagicMock(returncode=0)
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    with patch("subprocess.run", side_effect=fake_gh), \
+         patch("commands.sync.shutil.which", return_value=True), \
+         patch("commands.sync.find_workspace_root", return_value=str(tmp_path)), \
+         patch("plan.resolve_plan_location") as mock_loc:
+        mock_loc.return_value = PlanLocation(
+            path=plan_file.resolve(),
+            repo_root=tmp_path.resolve(),
+            repo_relative_path=".wopal-space/plans/wopal-cli/done/plan-240.md",
+            github_repo="sampx/wopal-space",
+            branch="main",
+            is_archived=True,
+        )
+        rc = sync_plan_to_issue("123", str(plan_file), "sampx/wopal-space")
+
+    assert rc == 0
+    assert len(edited_bodies) == 1
+    edited = edited_bodies[0]
+    # an edit actually happened (legacy In updated from the Plan)
+    assert "## In Scope\n\n- 记录保全：" in edited
+    edited_trailing = len(edited) - len(edited.rstrip("\n"))
+    assert edited_trailing == stored_trailing
 
 
 def test_plan_missing_returns_failure(tmp_path):

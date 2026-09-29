@@ -473,7 +473,10 @@ def _get_issue_body(issue_number: int, repo: str) -> str | None:
             ['gh', 'issue', 'view', str(issue_number), '--repo', repo, '--json', 'body', '--jq', '.body'],
             capture_output=True, text=True, check=True,
         )
-        return result.stdout
+        # `gh --jq` prints one trailing newline after the string; strip exactly
+        # that one so edits write back the body's real bytes (no +1 growth).
+        body = result.stdout
+        return body[:-1] if body.endswith("\n") else body
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
