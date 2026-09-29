@@ -216,7 +216,7 @@ Agents may perform validation actions and show results, but must wait for explic
 ### A. Planning
 
 ```bash
-flow.sh plan new <issue> --type <type> --slug <slug>  # Issue-driven (all three required, explicit)
+flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>  # Issue-driven (all three flags required, explicit)
 flow.sh plan new --title "..." --project <name> --type <type>  # no Issue
 ```
 

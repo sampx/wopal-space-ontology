@@ -214,7 +214,7 @@ Agent 可以执行验证动作、展示结果，但必须等用户明确确认�
 ### A. Planning
 
 ```bash
-flow.sh plan new <issue> --type <type> --slug <slug>  # Issue 驱动（三项必填，显式指定）
+flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>  # Issue 驱动（三个旗标必填，显式指定）
 flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue
 ```
 
