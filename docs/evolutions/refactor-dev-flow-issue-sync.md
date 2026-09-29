@@ -5,11 +5,11 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-09-28
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: (accept 时记录)
+- **Stage**: accepted
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-refactor-dev-flow-issue-sync
+- **Branch**: ontology-refactor-dev-flow-issue-sync
+- **Base Commit**: 65e074a3e63a7e9df9ccb8edaa11d158b1d8ade6
 - **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
 
 ## Scope Assessment
