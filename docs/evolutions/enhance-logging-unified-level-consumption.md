@@ -88,11 +88,13 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 
 ### Agent Verification
 
-1. [ ] 四层优先级：`WOPAL_PLUGIN_LOG_LEVEL=warn` + 配置 `debug` + `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `warn`；无显式 env 时配置 `debug` 胜 `ERROR`；两者皆缺时 `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `error`；全缺 → `info`。
-2. [ ] 归一化与回退：`ELLAMAKA_LOG_LEVEL=DEBUG` → 生效 `debug`；非法宿主值（如 `TRACE` 或空串）不破坏解析，回落至下一层或 `info`。
-3. [ ] allowlist：`ELLAMAKA_LOG_LEVEL` 从真实进程环境被读取；`.env` 文件中的同名键不生效（既有边界保持）。
-4. [ ] 回归与门禁：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过 `bun run lint` 与 `bun run typecheck`。
-5. [ ] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链，且 Environment Variable Roles 表（`DESIGN-wopal-plugin.md:299-308` 附近）纳入 `ELLAMAKA_LOG_LEVEL` 行（角色：宿主统一级别兜底；来源：仅真实进程环境，不从 `.env` 读取）；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
+1. [x] 四层优先级：`WOPAL_PLUGIN_LOG_LEVEL=warn` + 配置 `debug` + `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `warn`；无显式 env 时配置 `debug` 胜 `ERROR`；两者皆缺时 `ELLAMAKA_LOG_LEVEL=ERROR` → 生效 `error`；全缺 → `info`。
+2. [x] 归一化与回退：`ELLAMAKA_LOG_LEVEL=DEBUG` → 生效 `debug`；非法宿主值（如 `TRACE` 或空串）不破坏解析，回落至下一层或 `info`。
+3. [x] allowlist：`ELLAMAKA_LOG_LEVEL` 从真实进程环境被读取；`.env` 文件中的同名键不生效（既有边界保持）。
+4. [x] 回归与门禁：插件 logger 与 runtime-environment 既有测试全绿；改动文件通过 `bun run lint` 与 `bun run typecheck`。
+5. [x] 文档：`DESIGN-wopal-plugin.md` Logging System / Precedence 节呈现四层链，且 Environment Variable Roles 表（`DESIGN-wopal-plugin.md:299-308` 附近）纳入 `ELLAMAKA_LOG_LEVEL` 行（角色：宿主统一级别兜底；来源：仅真实进程环境，不从 `.env` 读取）；`plugins/wopal-plugin/AGENTS.md` Debug Switches 表含 `ELLAMAKA_LOG_LEVEL` 行（新 env 进 debug-switch 表的 AGENTS 契约）。
+
+（2026-09-29 主控实证：焦点 55/55、全量 69 文件 / 1014 用例全绿；typecheck 0；改动文件 eslint 0；整仓 `bun run lint` 存量债失败——宿主基线同因，非本次引入；rook 实施评审 PASS（0 findings，待办 1 项：用户运行验证）；格式化按用户决定保留既有风格。）
 
 ### User Validation
 
@@ -142,8 +144,8 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 
 **Done**:
 任务产出：插件级别兜底层 + allowlist + 测试 + 双文档同步
-实际触碰文件：待实施后回填
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
+实际触碰文件：`plugins/wopal-plugin/src/logger.ts`、`plugins/wopal-plugin/src/logger.test.ts`、`plugins/wopal-plugin/src/runtime-environment.ts`、`plugins/wopal-plugin/src/runtime-environment.test.ts`、`docs/DESIGN-wopal-plugin.md`、`plugins/wopal-plugin/AGENTS.md`、`plugins/wopal-plugin/AGENTS.zh-CN.md`
+- [x] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
 

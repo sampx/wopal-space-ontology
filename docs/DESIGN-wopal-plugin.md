@@ -272,18 +272,21 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 ### Environment Variable Roles
 
-环境变量收敛为两个角色，功能开关不使用环境变量：
+环境变量收敛为三个角色，功能开关不使用环境变量：
 
 | 角色 | 变量 | 说明 |
 |------|------|------|
 | 密钥 | `WOPAL_LLM_API_KEY`、`WOPAL_EMBEDDING_API_KEY` | 由配置 `apiKey` 字段以 `$` 引用 |
 | 日志诊断覆盖 | `WOPAL_PLUGIN_LOG_LEVEL` / `_FILE` / `_MODULES` | 运行时覆盖，供启动脚本动态传入，优先级高于配置文件 |
+| 宿主统一级别兜底 | `ELLAMAKA_LOG_LEVEL` | 宿主解析出的统一日志级别（大写 DEBUG/INFO/WARN/ERROR，读取时归一化）。仅当显式插件接口（`WOPAL_PLUGIN_LOG_LEVEL`、配置 `logLevel`）均无有效级别时消费；仅真实进程环境，不从 `.env` 读取 |
 
 日志诊断保留 env 通道：启动脚本按进程场景动态传入日志级别与位置，静态配置文件无法表达这种运行时变化。配置文件 `logLevel` 是声明式默认值，诊断 env 是运行时覆盖，二者定位不同，不重叠。
 
 ### Configuration Source Precedence
 
 一般配置：代码默认 < 全局 < 空间公共 < 空间私有。日志诊断：上述链条之上叠加 `WOPAL_PLUGIN_LOG_*` env 覆盖。
+
+日志级别解析链（命中即止）：`WOPAL_PLUGIN_LOG_LEVEL` > 配置 `logLevel`（`pluginConfig["wopal-plugin"]`，含旧顶层字段）> `ELLAMAKA_LOG_LEVEL`（宿主统一级别兜底；小写归一后匹配宿主词表 DEBUG/INFO/WARN/ERROR，TRACE/FATAL/非法值不命中）> `info`。`WOPAL_PLUGIN_LOG_FILE` / `_MODULES` 维持 env 覆盖配置。
 
 ## Interfaces and Contracts
 
@@ -322,7 +325,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 | `memoryLogger` | LanceDB/检索/注入 |
 | `contextLogger` | 会话状态/压缩/恢复/蒸馏 |
 
-日志级别 trace/debug/info/warn/error/fatal，默认 info。核心事件完成记录一条 info；关键数据点用 debug；详细流程用 trace。结构化字段通过 data 对象携带，字段名 snake_case。错误日志必须携带 `{ err: error }`。
+日志级别 trace/debug/info/warn/error/fatal，默认 info；生效级别由 Configuration Source Precedence 的四层链解析（含宿主统一级别兜底 `ELLAMAKA_LOG_LEVEL`）。核心事件完成记录一条 info；关键数据点用 debug；详细流程用 trace。结构化字段通过 data 对象携带，字段名 snake_case。错误日志必须携带 `{ err: error }`。
 
 ## Data and State Model
 
