@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-29
-- **Stage**: implementing
+- **Stage**: validating
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-enhance-ontology-cli-alignment
 - **Branch**: ontology-enhance-ontology-cli-alignment
