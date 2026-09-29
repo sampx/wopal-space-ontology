@@ -15,11 +15,11 @@
 ## Scope Assessment
 
 - **Complexity**: High
-- **Confidence**: Low — 讨论稿，产品行为未定稿，尚不可受理实施。
+- **Confidence**: High — 跨项目设计已完成源码验证并经用户评审通过；实施仍须由后续项目 Plan 承载。
 
 ## Goal
 
-在 Wopal 派发任务时，按会话装配本空间武器库中的技能、规则与外部服务，使未授予的武器对子会话不可见、不可用。引擎侧如何装配与动态配置能力尚未定论，本提案不在该结论之前受理实施；**目前仅作为待定设计讨论稿，不进入实施与验收。**
+在不推翻 ellamaka 静态 config / agent permission 体系的前提下，让 Wopal 在派发任务时为子 Session **增量授予**空间武器库中的 Skill/Tool 能力，并为 Rule/Skill 的 run-loop 动态上下文激活建立持久 eligibility 与 cache-safe 注入契约。该跨项目设计已于 2026-09-29 经用户评审通过并转为正式设计基线；实施仍须由各项目独立 Plan 承载。
 
 ## Technical Context
 
@@ -28,24 +28,26 @@
 - `projects/ellamaka` 现有 `feature-plugin-config` 交付插件配置整表；CLI `refactor-space-assembly-state` 交付空间物化并从隔离环境支持 `path`/`paths`。引擎会话级权限能力本文讨论尚未定稿，`.wopal-space/plans/ellamaka/feature-ellamaka-session-permissions.md` 尚处 planning，需先与用户完成设计确认。
 - 本提案不预先锁定以下未定问题，也不引用状态与边界作为已知事实；各接口与行为以最终设计为唯一依据。
 
-## Open Design Questions（待讨论定稿）
+## Design Decisions（正式设计基线）
 
-1. **角色基线与显式授予**：未传 `capabilities` 时按角色基线；显式输出应叠加基线还是精确替代？谱面（默认 deny / 默认 allow）如何与引擎现有 `Permission.evaluate` 语义对接？
-2. **会话持久的含义**：授予以 Session 持久权限为介质，还是以插件侧的会话数据为介质？压缩与恢复后哪个为准？源与派生冲突时怎么办？
-3. **可见性与执行边界**：未授予是仅隐藏工具提示，还是连直接调用也拒绝？引擎是否额外检查授权身份（服务/工具两层）？
-4. **外部服务身份**：服务名重名、连接重载、工具热更新下如何稳定解析同构键？是否需要在服务声明中携带稳定 `id`？
-5. **规则注入生命周期**：规则按会话装配记录过滤还是由引擎下放会话级规则集合？规则与技能/MCP 是否共用同一授予机制与失效时间？
-6. **失败与回滚**：授予失败、装配冲突时子会话如何终止？已 spawn 的子会话清理是否由插件负责？脱离上下文时如何防止幽灵任务？
-7. **与用户级/空间级默认的关系**：插件装配与角色基线、空间 settings 默认的优先级顺序是什么？是否允许模型在派发时从武器库自选未授予能力？
+1. **兼容优先**：不推翻 ellamaka 的 config / agent frontmatter / permission 体系；Session 动态能力是 additive overlay，没有新装配时 observable behavior 不变。
+2. **增量语义**：`wopal_task.capabilities` 在角色 baseline 上追加能力。P2 不做 exact-set、subtract、deny。
+3. **稳定 Envelope**：Skill/Tool 的 session-scoped 授权在首个模型请求前形成，Session 生命周期内冻结；复用 ellamaka 已有 `session.permission`，Wopal 私有意图使用 session metadata。
+4. **统一 effective view**：Tool/Skill 的模型可见性与执行门禁都必须消费 `agent.permission + session.permission`。ellamaka 只补 Skill catalog 当前未消费 session permission 的一致性缺口。
+5. **运行时激活**：Rule 不是创建时注入正文，而是只记录 eligibility；run loop 按 user intent、tool/action/path 动态 resolve。Skill 正文继续 progressive disclosure，需要的动态 guidance 与 Rule 一样在运行时追加。
+6. **缓存稳定性**：动态上下文不得回写旧消息、反复改 system prompt 或 tool schema。ellamaka 提供通用 request-tail context contribution seam，wopal-plugin 以 append-only snapshot/replacement 使用它。
+7. **持久与恢复**：session permission / metadata 是事实源；插件 cache 可丢弃。resume、restart、compaction 后按持久状态重新解析。
+8. **插件归属**：Rule/Skill resolver、digest、格式和 Wopal capability 语义全部属于 wopal-plugin；ellamaka core 只保留通用 permission 与 context extension seam。
 
-## Discussion Baseline（参考，非定稿）
+## Cross-project Contract
 
-以下条目仅为讨论起点，实施前必须回到对应设计文档确认，不写入最终提案接口：
+- **ellamaka**：保持既有 Session permission/API/SDK；统一 Skill visibility 与 execution 的 effective permission；增加 additive、默认空的 request-tail plugin contribution contract。
+- **wopal-plugin / ontology**：定义 `wopal_task.capabilities`、编译 Session Capability Envelope、持久 metadata、运行时 Rule/Skill 激活与恢复。
+- **wopal-cli**：只负责武器库 discovery/list，不进入 Session runtime。
 
-- `.wopal/docs/DESIGN-wopal-plugin.md` 的 Capability Assembly Module 目前描述 `wopal_task.capabilities` 只接受名称数组并由插件合成权限；若最终引擎会话权限载体不同，则该契约一并修改。
-- 引擎现有 `skill` 权限面位于 `packages/opencode/src/tool/skill.ts`、`src/session/system.ts`、`src/tool/registry.ts`；MCP 工具执行位于 `src/session/tools.ts`。上述文件是否可变、以何种方式扩展由引擎 Plan 决定。
+上述设计已转为正式设计基线；本 evolution 仍保持 `draft`，仅表示尚未进入实施生命周期，不否定设计定稿状态。后续实施必须拆入各项目 Plan 并单独受理。
 
-## In Scope（定稿后）
+## In Scope
 
 - `wopal_task.capabilities` 解析、会话装配、派发失败清理。
 - 规则注入按会话装配结果过滤。
@@ -53,7 +55,7 @@
 
 ## Out of Scope
 
-- 引擎权限、工具可见性、外部服务授权：属于 `feature-plugin-config` 与后续引擎 Plan（未定稿）。
+- ellamaka 的通用 Session permission 一致性与 request-tail contribution seam：由独立 ellamaka Plan 承载；本提案不直接修改 engine core。
 - CLI 装配与同步、通用 paths、私有持有：另有主体。
 - 面向用户的 UI/UX 与真实空间迁移落地顺序。
 
@@ -61,20 +63,20 @@
 
 ### Agent Verification
 
-待设计定稿后按新契约补写；讨论稿不定义最终 AC。
+由后续项目 Plan 按本设计基线分别定义可执行 AC；本跨项目 evolution 不重复定义项目级 AC。
 
 ### User Validation
 
-待设计定稿后按场景补写；讨论稿不定义最终验证。
+由后续项目 Plan 按本设计基线分别定义用户验证场景。
 
 ## Implementation
 
-待设计定稿后拆解为一次实施、一次验证的 Task；讨论稿不预写实现细节。
+不直接实施；按项目拆分 Plan 后分别实施与验证。
 
 ## Delegation Strategy
 
-待设计定稿后确定；讨论稿禁止委派实施。
+由各项目 Plan 决定；本跨项目 evolution 不直接委派实施。
 
 ## Delivery
 
-任何交付须在用户确认设计问题后有真实的实现载体并走一次验收；不得以本讨论稿为施工入口。
+任何交付必须由对应项目 Plan 承载并完成验收；不得以本跨项目设计文档直接作为施工入口。

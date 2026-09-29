@@ -45,52 +45,37 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 #### Four Assembly Layers
 
-能力装配分四层，各层职责与作用时机不同：
+能力装配分四层。前三层是静态事实，第四层是 Wopal 派发时对角色基线的**增量授予**：
 
-| 层级 | 决定什么 | 载体 | 作用时机 |
+| 层级 | 决定什么 | 载体 | 生命周期 |
 |------|---------|------|---------|
-| **能力池** | 中央仓库拥有的全部能力 | central `main` | 跨空间持续 |
-| **空间武器库** | 本空间物化了哪些能力 | `assembly/archetypes/<type>.yaml` 装配单 → sparse-checkout | 空间创建 / `space capability` |
-| **角色基线** | 每个角色默认能用哪些能力 | `agents/<name>.md` 的 `permission:` | 会话创建瞬间 |
-| **会话装配** | 本次任务实际授予哪些能力 | `wopal_task` 的 `capabilities` 参数 | 每次派发时 |
+| 能力池 | 中央仓库拥有的全部能力 | central `main` | 跨空间持续 |
+| 空间武器库 | 本空间物化了哪些能力 | archetype + sparse-checkout | 空间级 |
+| 角色基线 | 角色默认拥有的能力与限制 | `agents/<name>.md` 的 `permission:` | 角色级静态 |
+| Session Capability Envelope | 本次任务额外授予哪些能力 | `wopal_task.capabilities` → session-scoped state | 子会话生命周期 |
 
-上三层是静态声明，第四层是运行时装配。Wopal 在派发任务时，按任务性质从空间武器库中挑选能力，装配给子会话——这是「武器多态」的运行时落点。
+`capabilities` 不是角色能力的替代表。省略某类别表示只使用角色基线；显式列出的能力在基线上增量授予。P2 不提供 exact-set / subtract / deny 语义，收窄角色基线仍由 agent/config 的静态权限负责。
 
 #### Space Arsenal and Role Baseline
 
-物化进空间的武器库**不等于**全量授予任何角色。武器库是空间拥有的能力储备，角色基线是默认授予的子集。
-
-未进入任何角色基线的武器对相应角色不可见。这种默认不可见是刻意的：它让 Wopal 的上下文只承载当前角色真正需要的武器清单，避免无关能力占用推理预算。
-
-Wopal 的挑选权**不受角色基线限制**。装配给会话的能力经权限合成后覆盖基线——不配置就看不见，配置了就可用。
+物化进空间的武器库**不等于**全量授予任何角色。武器库是空间拥有的能力储备，角色基线是默认授予的子集。Wopal 可以从武器库中为具体任务追加角色基线之外的能力，但不能借 `capabilities` 绕过空间武器库、撤销角色限制或重写静态配置。
 
 #### Arsenal Scope and Truth Source
 
-武器库的范围是**全局层与空间层的有效能力集**——全局装的能力也算武器，空间层同名优先。四类武器：
+武器库是全局层与空间层的有效能力集，空间层同名优先。发现层回答“引擎加载了什么”，运行时过滤层回答“当前 agent/session 能用什么”；两者不得混用。Skills、Rules、外部工具与内部工具的发现继续由 ellamaka 现有引擎提供，`wopal space capability list` 只消费发现层，不改变运行时权限。
 
-| 类别 | 内容 | 发现来源 |
-|------|------|---------|
-| 技能 | SKILL.md 定义的技能 | ellamaka `Skill` 引擎（多层目录扫描、空间优先去重） |
-| 规则 | 规则文件定义的约束 | ellamaka `Rule` 引擎（多层目录扫描、空间覆盖全局） |
-| 外部工具 | MCP 服务工具 + 文件注册的自定义工具 + 插件注册的工具 | ellamaka `ToolRegistry`（custom 部分）+ `MCP` 引擎 |
-| 内部工具 | 引擎内置工具（bash、read、edit、glob、grep、webfetch 等） | ellamaka `ToolRegistry`（builtin 部分） |
+#### Session Capability Envelope and Runtime Activation
 
-四类武器全部从 ellamaka 引擎统一获取，通过 `@wopal/ellamaka-sdk` 向外暴露。引擎内部严格区分两个层次：
+P2 明确区分**能力边界**与**上下文激活**：
 
-- **发现层**——"引擎加载了什么"，返回完整列表，不过滤权限。武器库扫描只调这一层。
-- **运行时过滤层**——"这个 agent 这次能用什么"，按 agent 权限与 model 过滤。系统提示词生成、工具清单构建、执行授权全部走这一层。
+- Session Capability Envelope 在子会话首个模型请求之前形成，生命周期内保持稳定。Skill / Tool 的额外授予优先编译到 ellamaka 已有 session permission overlay；Wopal 专属的装配意图可存入 session metadata。
+- Runtime Context Activation 在 run loop 中按当前 intent、tool/action/path 等状态解析。Rule 正文与按需 Skill guidance 属于这一层，由 wopal-plugin 动态注入，不通过反复改写 session permission、tool schema 或 system prompt 来表达。
+- Tool schema 与轻量 Skill catalog 应在同一 Session 内保持稳定；Skill 正文采用 progressive disclosure，真正需要时再加载。动态上下文采用追加到当前 retained history 尾部的 cache-safe contribution，不回写较早消息。
+- 可见性与执行授权必须来自同一个 effective permission 视图。ellamaka 当前 Tool 已满足该原则；Skill catalog 必须与 Skill 执行门禁使用相同的 `agent.permission + session.permission` 合成结果。
 
-武器库扫描端点只调发现层方法，完全不触碰运行时过滤层。两条路径读不同的方法，互不干扰——武器库拿到完整能力列表，ellamaka 运行时的权限过滤逻辑不受影响。
+Rule 的“装配”只确定 eligibility / scope；真正匹配发生在运行过程中。Rule 不伪装成 permission。Skill 同时具有稳定的可用目录与运行时按需正文两层生命周期。
 
-武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载。该命令通过 SDK 连接 ellamaka 引擎获取四类武器清单：引擎在运行时直连现有实例；引擎未运行时由 SDK 启动临时子进程。wopal-cli 裁剪输出为武器元数据（名称、描述、来源标注、路径），不传递工具的执行方法。命令契约见 `projects/wopal-cli/docs/DESIGN.md` 的 Space Capability。
-
-#### Session Assembly Injection Channel
-
-会话装配通过**会话级权限**实现。能力在会话创建时授予，会话生命周期内保持稳定，中途不改变装配。授予依据是 ellamaka 的权限合并规则：后者覆盖前者，因此会话级规则能够超越角色基线。
-
-内置工具不进会话装配。角色基线已经完整控制工具的可见性与执行授权，重复装配只会引入歧义。
-
-装配对 skills / rules / mcp 三类能力分别生效，合成规则、注入方式与压缩后的行为细节see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
+没有 Session 增量授予、没有 runtime context contributor 时，ellamaka 的现有 config、agent frontmatter、permission、plugin 和 SDK 行为保持不变。
 
 ### Outcome-Oriented Prompts
 
