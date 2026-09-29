@@ -111,6 +111,26 @@ What is deliberately excluded and why. Keep "deliberately cut" separate from
 |-----------|-------|-----------|------|
 | <component> | `file1`, `file2` | create / modify / delete | <role in this change> |
 
+## Assembly Intent
+
+<!--
+Register only the new whole assets this proposal introduces — one
+canonical reference per asset (`skill:new-skill`, `path:assets`, ...) —
+and only when no held asset already covers the new path. A file inside
+an asset the space already holds is an ordinary content change; reserved
+content (`assembly/`, `config/`, `docs/`, repository-root files) is
+never claimable — neither belongs here. `type-default` writes the
+reference into the current type manifest, so every space of the type
+receives the asset; `space-local` records it in this space's `include`,
+so only this space mounts it. Each reference appears once; a whole asset
+left undeclared is refused when the proposal lands. Leave the table
+empty when nothing new is added; one row reads
+`skill:new-skill | space-local | why only this space`.
+-->
+
+| Ref | Scope | 理由 |
+|-----|-------|------|
+
 ## Acceptance Criteria
 
 ### Agent Verification
@@ -168,6 +188,14 @@ behavior unit, independently testable.
 **Verify**: <verification command>
 
 **Done**:
+<!--
+Record ownership: the 主控 (orchestrator) is the single author of this
+whole block — the completion checkbox, the task output and the files
+touched. The record is filled in the proposal copy on the working branch
+(the isolation worktree in isolated mode, the space worktree in quick
+mode), after the task passed verification and before its commit.
+Implementation agents do not edit any part of the proposal file.
+-->
 Task output: <one line>
 Files touched: <fill in after implementation>
 - [ ] The implementation agent has completed all development and verification steps above.

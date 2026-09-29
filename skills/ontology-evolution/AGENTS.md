@@ -42,6 +42,21 @@ state name is a contract change: it must be updated here, in
 the field; a proposal whose field cannot be found cannot be advanced. Command
 preconditions and refusal semantics are implemented by the wopal CLI.
 
+### Record Ownership
+
+The Done record of a task — its completion checkbox, task output and files
+touched — has a single author: the 主控 (orchestrator). The record is written
+in the proposal copy on the working branch (the isolation worktree in
+isolated mode, the space worktree in quick mode), after the task passed
+verification and before its commit. Implementation agents do not edit any
+part of the proposal file.
+
+### Commit Granularity
+
+Implementation does not commit. Each completed task lands as exactly one
+commit on the working branch — that task's content together with its
+proposal record. The command-level mechanics live in `SKILL.md`.
+
 ### Defect Repairs Are Immediate
 
 A defect — existing, already-agreed behavior that is wrong — is repaired

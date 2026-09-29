@@ -45,23 +45,41 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
   │  • 泛化判断：是否具备跨空间通用性
   │  • 归属判定：空间私有 / 类型级 / 公共池
   ▼
-进化提案落盘 docs/evolutions/，呈交用户审查
+进化提案落盘 docs/evolutions/，呈交用户审查                 Stage: draft
   │
   ▼ 用户批准
-[Wopal 主控] ──委派──> [Fae 规范实施落盘]（空间 worktree 内提交）
-                               │
-                               ├─ 进化提交落在 space/<name>（待贡献）
-                               ├─ 执行 space sync 汇入 local main
-                               ▼
-                        [Rook 审查守门]
-                               │
-                               └─ 审查交付物质量与反污染底线
+space evo accept <name>                                   Stage: accepted
+  │  解析实施模式：isolated（派生隔离 worktree，默认）/ quick（无隔离）
+  ▼
+space evo advance <name> --to implementing                Stage: implementing
+  │  [Wopal 主控] ──委派──> [Fae 规范实施]（不提交）
+  │  主控逐任务验证、回填记录，按任务一次提交（代码 + 记录）：
+  │    • isolated：提交逐次落隔离分支（空间分支不动）
+  │    • quick：直落空间分支
+  ▼
+[Rook 实施评审]（强制门，先于邀请用户验证；交付质量与反污染底线）
+  │  评审通过
+  ▼
+space evo advance <name> --to validating                  Stage: validating
+  │  用户验证：主控先询问验证方式，优先分支切换——
+  │    space evo switch <name> 进出隔离视图（.wopal 检出隔离分支、worktree 让位；验证后切回）
+  │    （或用户显式选择「先集成后验证」：先行 integrate --confirm，在空间分支上验证；集成已完成，跳过下方 integrate 节点）
+  ▼ 用户确认验证通过
+space evo integrate <name> --confirm（仅 isolated；「先集成后验证」已在验证前完成，跳过本条）
+  │    squash 隔离分支进空间分支（直连分支，无需 worktree；quick 无此步）
+  ▼
+space evo advance <name> --to archived                    Stage: archived
+  ▼
+space evo archive <name>（事务化归档 + 隔离清理）
+  ▼
+交付终端：space sync 汇入 local main / ontology contribute 回流上游
+  —— 由用户逐次拍板，不在实施路径内
 ```
 
 核心进化规则：
 
-1. **提案与落地分离，且提案须经用户批准**：Maka 只出提案、不动刀（`edit` 仅放开 `docs/evolutions/`；Wopal 也可以撰写提案）；具体改动经用户批准后，由 Wopal 主控、委派 Fae 在空间 worktree 内规范提交，Rook 审查把关。
-2. **进化先落在空间分支，再经 `space sync` 汇入**：空间内正常写改、提交（Agent 仅需 workspace 写权限）；`space sync` 时申请受控提权，将空间独有提交隔离整合进 local main。
+1. **提案与落地分离，且提案须经用户批准**：Maka 只出提案、不动刀（`edit` 仅放开 `docs/evolutions/`；Wopal 也可以撰写提案）；具体改动经用户批准后，由 Wopal 主控、委派 Fae 规范实施，提交由主控按任务落盘，Rook 审查把关。
+2. **进化先落在空间侧，再经 `space sync` 汇入**：空间内正常写改、提交（Agent 仅需 workspace 写权限）——isolated 的逐任务提交先落隔离分支、经 `integrate` squash 进空间分支，quick 直落空间分支；`space sync` 时申请受控提权，将空间独有提交隔离整合进 local main。
 3. **项目经验物理隔离**：属于当前项目特有的架构规范写入空间记忆或项目 `AGENTS.md`。空间选择可以只挂载当前空间所需的共享资产；尚未提交的私有资产由显式 `private` 身份和独立内容备份管理，不把共享池内容误称私有内容。
 
 进化粒度遵循严格的防污染纪律：空间私有经验锁死在本地，类型经验作用于类型装配，只有高度抽象且经受反污染审查的通用资产才允许回流中央。
@@ -92,10 +110,10 @@ draft → accepted → implementing → validating → archived
 | `draft` | 提案落盘于本体仓库 `docs/evolutions/`，等待用户审阅 |
 | `accepted` | 用户接受提案，进入实施 |
 | `implementing` | 实施进行中：隔离 worktree 内的实施提交（或 quick 模式直提空间分支） |
-| `validating` | 改动已集成到空间分支，等待用户重启运行时观察确认 |
+| `validating` | 验证期先行：用户可经验证视图（`switch`）在集成前观察确认；`integrate` 以用户 `--confirm` 为门、在用户确认后执行（亦支持用户显式选择「先集成后验证」） |
 | `archived` | 用户确认通过，提案归档 |
 
-提案默认不创建 Issue 载体；用户明确要求时才引入评审与 Issue。
+提案默认不创建 Issue 载体，Issue 仅在用户明确要求时引入；实施评审是落地流程内的强制门、不可跳过。
 
 推进状态记在提案的 `Stage` 字段。与代码开发流程相比，字段名与词表都不重叠；与设计文档的 `Status` 字段（Draft / Proposed / Active）相比，词表出现一个同形词 `draft`，靠字段名区分。三者同处 `docs/` 之下，字段名是主要的区分依据。状态推进由机制命令承担，Agent 不手改 `Stage` 字段；机制命令的唯一操作面是 CLI `space evo` 命令族（契约见 `../../projects/wopal-cli/docs/DESIGN-evolution.md`）。
 
@@ -111,13 +129,13 @@ draft → accepted → implementing → validating → archived
 
 ### Isolation Discipline
 
-本体能力的改动先在空间装配 worktree 内落地，再经 `space sync` 汇入 local main，最后由用户决定是否经 `ontology contribute` 回流上游。默认实施模式是**从 `.wopal` 派生稀疏 worktree**：派生的 worktree 继承空间的稀疏装配范围，实施边界因此天然等于空间确权的能力范围，宿主中央仓库无需切换分支。
+本体能力的改动先在空间侧落地，再经 `space sync` 汇入 local main，最后由用户决定是否经 `ontology contribute` 回流上游。默认实施模式是**从 `.wopal` 派生稀疏 worktree**：派生的 worktree 继承空间的稀疏装配范围，实施边界因此天然等于空间确权的能力范围，宿主中央仓库无需切换分支。
 
 快速模式在 `.wopal` 空间分支内直接小步提交，适用于 typo、bug-fix 与用户明确指定的小范围文件改动；判定不清时默认走隔离模式。
 
 稀疏装配带来三条硬约束：
 
-1. **范围外文件由 Git 原生拒绝暂存**。需要新增能力目录时，先在实施侧扩展装配范围以使内容可写；合并后扩展 `.wopal` 装配并重新物化，验证者才能看到新能力。
+1. **范围外文件由 Git 原生拒绝暂存**。需要新增能力目录时，提交前先扩宽实施侧稀疏范围以使内容可写，再按名暂存；验证期由 `switch`（或集成）扩宽 `.wopal` 稀疏范围并重新物化，验证者即可看到新能力。
 2. **skip-worktree 位是装配范围的派生状态，禁止批量清除**。调整可见范围一律通过扩展装配完成；配置缺失且位被批量清除时，全量暂存会把范围外文件记为删除。
 3. **合并与对象层不受稀疏影响**。分支推进、squash 合并与树比较都在对象层完成，稀疏只决定哪些文件落到磁盘。
 
@@ -136,7 +154,7 @@ draft → accepted → implementing → validating → archived
 | `space status` | — | 只读：refs 双向差异、稀疏健康、当前有效装配与本地选择（include / exclude / private / 未登记未跟踪文件） |
 | `space sync` | 双向 | 先整合空间共享内容、再 fast-forward 下行；上行前阻止已登记的私有内容泄漏，按当前装配事实重算范围；CLI 默认 dry-run 预览，`--confirm` 落盘 |
 | `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常本体 Git 提交上行；`--local`：以能力或 `path:<ref>` 完整身份调整本空间选择，CLI 提交空间根仓库状态，不生成本体内容提交 |
-| `space evo <family>` | — | 提案落地：提案状态机、隔离实施、稀疏安全落盘与集成；CLI `space evo` 命令族为唯一操作面 |
+| `space evo <family>` | — | 提案落地：提案状态机、隔离实施、稀疏安全落盘、集成与验证切换；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
@@ -149,7 +167,7 @@ draft → accepted → implementing → validating → archived
 
 `ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对新建能力，内容先按共享提交或显式私有登记选定归属，再按能力身份确定本空间是否挂载。
 
-空间内日常能力进化由 Maka 提炼为提案、经用户批准后，由 Fae 在空间 worktree 提交，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
+空间内日常能力进化由 Maka 提炼为提案、经用户批准后，由 Wopal 主控、委派 Fae 规范实施，提交由主控按任务落盘，再经 `space sync` 汇入 local main，最终经 `ontology contribute` 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 
 ## Distribution Boundary
 
