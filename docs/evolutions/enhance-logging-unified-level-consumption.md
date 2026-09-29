@@ -5,11 +5,11 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-09-25
-- **Stage**: draft
-- **Mode**: (accept 时记录：isolated | quick)
-- **Worktree**: (accept 时记录)
-- **Branch**: (accept 时记录)
-- **Base Commit**: (accept 时记录)
+- **Stage**: accepted
+- **Mode**: quick
+- **Worktree**: (none)
+- **Branch**: (none)
+- **Base Commit**: (none)
 - **Final Commit**: (integrate 时记录：集成到空间分支后的提交)
 
 ## Scope Assessment
@@ -142,7 +142,7 @@ function resolveLevel(environment: RuntimeEnvironment, config?: ResolvedLogConfi
 
 **Done**:
 任务产出：插件级别兜底层 + allowlist + 测试 + 双文档同步
-实际触碰文件：<实施后回填>
+实际触碰文件：待实施后回填
 - [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤
 
 ---
