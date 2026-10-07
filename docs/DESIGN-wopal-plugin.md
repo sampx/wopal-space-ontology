@@ -39,8 +39,8 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | compaction 不纳入开关 | 会话安全阀，永远启用 |
 | Prompt 模板按约定路径解析，不设配置项 | 空间级与用户级路径已覆盖自定义需求，配置项会为边缘场景增加心智负担 |
 | 插件能实现尽量不改造 engine | 所有能力以 Hook/Tool 注入，不改 ellamaka 核心 |
-| 能力装配以会话级权限为注入通道 | 会话级权限能超越角色基线，且持久化于会话记录，压缩不失效 |
-| 装配参数只接受能力名称 | 权限规则由插件按能力类型构造，调用方不接触权限细节，装配参数不可能出现语法形态错误 |
+| 能力边界与上下文激活分层 | Skill/Tool 增量授予复用 session permission；Rule/Skill 动态内容由插件在 run loop 追加，不把所有能力硬塞进权限 |
+| `capabilities` 采用 baseline + incremental | 参数只追加角色能力，不提供 exact-set/subtract；静态限制仍由 config/agent permission 拥有 |
 | Plugin instance 隔离 | 每个 instance 独立运行时上下文、配置、日志与资源 |
 
 ## Plugin SDK Contract
@@ -49,10 +49,11 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 ### 运行时契约：插件依赖的 fork 扩展
 
-插件在两个运行时表面依赖 fork 扩展，这些字段由 fork 引擎注入、插件被动接收：
+插件依赖少量通用 fork 扩展；这些扩展由引擎提供，且不得携带 Wopal 专属领域类型：
 
 - `PluginInput.wopalSpaceRoot`：`PluginInput` 契约本身已声明 `wopalSpaceRoot?` 字段（`@wopal/ellamaka-plugin` 导出），插件入口直接读取，无需本地交叉类型断言。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
 - `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 类型从 `@wopal/ellamaka-plugin` 导入，运行时值来自引擎注入。
+- request-tail context contribution：引擎在每个正常 model step 的 retained history 确定后调用可选插件 hook，并把贡献追加到当前 request 尾部。无 contributor 时 no-op；hook 只表达通用动态上下文，不认识 Rule/Skill/Wopal。wopal-plugin 用它承载运行时 Rule/Skill activation。
 
 ### 依赖声明
 
@@ -66,7 +67,7 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 ### 与 fork 扩展的关系边界
 
-插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前插件的消费面是 `wopalSpaceRoot` 与 `systemMetadata` 两项，`tool.provider` 与 `ToolContext.extra` 归属 `dsh-adapter`（见 `DESIGN-dsh-adapter.md`）。
+插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前插件的消费面是 `wopalSpaceRoot`、`systemMetadata` 与 request-tail context contribution 三项；`tool.provider` 与 `ToolContext.extra` 归属 `dsh-adapter`（见 `DESIGN-dsh-adapter.md`）。
 
 ## Module Architecture
 
@@ -144,11 +145,11 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 ### Capability Assembly Module
 
-能力装配模块把空间武器库转化为具体会话的能力授予。武器库扫描与清单查询由 ellamaka 引擎的发现层与 wopal-cli 的 `wopal space capability list` 命令承载（见 `./DESIGN-capabilities.md` 的 Arsenal Scope and Truth Source）；本模块只负责派发装配。
+能力装配模块把 Wopal 的任务意图编译成稳定的 **Session Capability Envelope**，并把运行期 Rule/Skill 选择交给动态上下文激活。武器库查询仍由 ellamaka discovery + wopal-cli 承载，本模块不复制发现逻辑。
 
-#### Dispatch Assembly Contract
+#### Dispatch Contract
 
-`wopal_task` 的 `capabilities` 参数只接受能力名称数组：
+`wopal_task.capabilities` 只接受空间武器库中的能力名称。字段按能力类别可选；省略表示只继承角色基线，显式值表示在基线上**增量授予**。P2 不提供精确替代、subtract 或 deny 语义。
 
 ```jsonc
 {
@@ -156,32 +157,30 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
   "prompt": "任务详情",
   "agent": "fae",
   "capabilities": {
-    "skills": ["content-writer", "youtube-master"],
+    "skills": ["youtube-master"],
     "rules": ["content-style"],
-    "mcp": ["some-mcp"]
+    "tools": ["github"]
   }
 }
 ```
 
-三个字段均可选，省略即采用角色基线。省略 `capabilities` 时装配结果与角色基线一致。
+插件在 spawn 前校验名称并编译 envelope：Skill/Tool 的额外授权写入 ellamaka session permission；Rule eligibility 与插件需要的动态 Skill intent 写入 session metadata。创建与首轮 prompt 之间不得再用会覆盖 session permission 的临时 `tools` rewrite；例如禁止子会话递归调用 `wopal_task` 的 deny 必须一并编入 envelope。任一编译/创建步骤失败则任务启动失败并清理已创建的子会话。
 
-参数只表达「要什么」，不表达「怎么设」。插件按能力类型把名称翻译成权限规则：
+Envelope 在子 Session 生命周期内冻结。这样同一 Session 的 tool schema、轻量 Skill catalog 与 system prefix 保持稳定，避免 run-loop 中动态改 permission 造成无谓的 prompt-cache 失效。
 
-| 能力类型 | 合成规则 | 生效方式 |
-|---------|---------|---------|
-| Skills | 会话级权限授予技能名 | 技能进入该会话可见清单，执行时授权通过 |
-| Rules | 会话级装配记录 | 规则注入按装配结果过滤 |
-| MCP | 会话级权限授予服务名 | 工具可见与执行授权通过 |
+#### Runtime Context Activation
 
-权限规则由插件构造，调用方不接触权限细节。装配参数因此不可能出现语法形态错误。
+Rule 与 Skill 正文不与 envelope 同生命周期。插件在每个 run-loop step 根据当前 user intent、最近 tool/action/path 与 session metadata 解析应激活的上下文：
 
-#### Assembly Injection
+- **Rule**：envelope 只限定 eligible scope；resolver 在运行中按事件匹配，命中的正文通过 request-tail contribution 追加到当前请求。
+- **Skill**：稳定 catalog 只暴露 effective permission 允许的 name/description；正文继续通过 Skill tool progressive disclosure。插件需要主动提示或补充 guidance 时，也走 request-tail contribution。
+- **Tool**：schema visibility 与 execution gate 都由 ellamaka effective permission 决定，插件不在 run loop 中重写工具集合。
 
-派发流程在会话创建后注入合成权限，经会话更新接口完成。该接口以合并语义追加规则，能与既有规则叠加而不替换。
+动态 contribution 必须是 append-only：不得为了更新 Rule/Skill 内容回写较早 user message、修改 system prompt 或重排 tool schema。相同解析结果可按 digest 去重；结果变化时追加新的 replacement/snapshot，让已有 retained prefix 继续可缓存。
 
-装配在会话创建时确定，会话生命周期内保持稳定。会话级权限持久化于会话记录，上下文压缩不改变它；系统提示词每轮重建，压缩后的下一轮依据既有权限重新渲染能力清单。会话结束即装配失效，后续派发由 Wopal 按当时任务性质重新装配。
+#### Recovery and Ownership
 
-内置工具的可见性与授权由角色基线完整控制，不进入会话装配。
+Session permission 与 metadata 是持久事实；插件进程内 cache 只是派生加速层。resume、plugin restart 与 compaction 后，resolver 必须能从 session 持久状态和当前 retained context 重建动态激活结果。Rule/Skill 的匹配算法、digest 与格式归 wopal-plugin；ellamaka core 只提供通用 request-tail contribution seam，不认识 Wopal capability 类型。
 
 ### Monitor Module
 
