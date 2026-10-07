@@ -106,7 +106,7 @@ Rule 的“装配”只确定 eligibility / scope；真正匹配发生在运行�
 | 唤醒与感知 | `/wopal:summon` | `commands/wopal/summon.md` |
 | 文档管理 | `/cupdate-prd`、`/cupdate-design`、`/cupdate-roadmap`、`/cupdate-readme`、`/cupdate-br`、`/cupdate-agent-rules` | `commands/cupdate-*.md` |
 | 开发支持 | `/commit`、`/review` | `commands/commit.md`、`commands/review.md` |
-| 上下文管理 | `/context-continue`、`/context-handoff`、`/context-recover` | `commands/context-*.md` |
+| 上下文管理 | `/context-continue`、`/context-handoff`、`/context-recover` | 薄命令入口 `commands/context-*.md` → `skills/context-manage` |
 | 其他 | `/evaluate-skill` | `commands/evaluate-skill.md` |
 
 ontology 命令可覆盖 ellamaka 内置命令。
