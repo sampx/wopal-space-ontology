@@ -22,9 +22,13 @@
 
 让 Wopal 在派发任务时，通过 `wopal_task.capabilities` 为这一个子会话追加 Skill、Tool 或明确声明的工具权限组。授权与装配意图在首个模型请求前保存，模型清单与实际调用消费同一个 Session 权限结果。
 
-Rule 继续由 wopal-plugin 处理。除已有关键词与 Agent 作用域外，本提案增加 tool/path 条件；每个模型请求根据当前用户提示与最近工具批次重新匹配，把一份完整的有效 Rule 快照通过既有 `messages.transform` 追加到请求末尾。Skill 全文继续由引擎 Skill 工具按需加载。
+> **当前交付切片（2026-10-08）**：本轮只实施 Skill 动态装配，并拆为两个独立 Plan：Ellamaka 先提供通用 `experimental.permission.rules` runtime overlay seam，wopal-plugin 再实现 Session Skill Overlay、request-tail name/description catalog 与创建时/运行时增量 grant。Tool 与 Rule 动态配置继续留在本提案中作为后续设计，不进入这两个 Plan；不得借 Skill 实施顺带落地。
 
-临时注入通过现有 context dump 观察。提案复用现有 Session API、Plugin hook、Skill loader 和 Chat 机制，不增加引擎钩子或合成消息生命周期。
+Skill 的当前定型方案不直接注入 SKILL.md body/path。Ellamaka discovery 是 Skill Pool；主 Agent 选择任务需要的 Skill，wopal-plugin 把额外激活的 name + description 追加到 request tail，并通过同一 Session Skill Overlay 生成 runtime skill allow；目标 Agent 仍调用原生 `skill(name)` 加载正文、base directory 与 scripts/references/assets。运行时 grant 不改写 `session.permission`，不要求修改 run loop。
+
+Rule 继续由 wopal-plugin 处理。除已有关键词与 Agent 作用域外，本提案增加 tool/path 条件；每个模型请求根据当前用户提示与最近工具批次重新匹配，把一份完整的有效 Rule 快照通过既有 `messages.transform` 追加到请求末尾。该 Rule/Tool 部分不属于当前 Skill-only 交付切片。
+
+临时注入通过现有 context dump 观察。Skill-only 切片复用现有 `messages.transform` 与原生 Skill loader，仅新增通用 runtime permission rules hook；不增加新的 run-loop 生命周期或合成消息持久化机制。
 
 ## Technical Context
 

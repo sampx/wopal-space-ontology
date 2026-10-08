@@ -52,9 +52,9 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 | 能力池 | 中央仓库拥有的全部能力 | central `main` | 跨空间持续 |
 | 空间武器库 | 本空间物化了哪些能力 | archetype + sparse-checkout | 空间级 |
 | 角色基线 | 角色默认拥有的能力与限制 | `agents/<name>.md` 的 `permission:` | 角色级静态 |
-| Session Capability Envelope | 本次任务额外授予哪些能力 | `wopal_task.capabilities` → session-scoped state | 子会话生命周期 |
+| Session Dynamic Overlay | 本次会话在角色基线之上额外激活哪些能力 | P2 首个切片：Skill Overlay（创建时 + 运行时增量 grant） | Session 生命周期 |
 
-`capabilities` 不是角色能力的替代表。省略某类别表示只使用角色基线；显式列出的能力在基线上增量授予。P2 不提供 exact-set / subtract / deny 语义，收窄角色基线仍由 agent/config 的静态权限负责。
+动态装配不是角色能力的替代表。当前已定型并进入实施的只有 Skill：省略 `capabilities.skills` 表示只使用角色基线；显式 Skill 在基线上增量激活，运行时还可继续追加。本切片不提供 exact-set / subtract / deny / revoke。Tool 与 Rule 的动态配置另行设计，不由本次 Skill 方案预设。
 
 #### Space Arsenal and Role Baseline
 
@@ -64,18 +64,20 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 武器库是全局层与空间层的有效能力集，空间层同名优先。发现层回答“引擎加载了什么”，运行时过滤层回答“当前 agent/session 能用什么”；两者不得混用。Skills、Rules、外部工具与内部工具的发现继续由 ellamaka 现有引擎提供，`wopal space capability list` 只消费发现层，不改变运行时权限。
 
-#### Session Capability Envelope and Runtime Activation
+#### Session Skill Overlay and Runtime Activation
 
-P2 明确区分**能力边界**与**上下文激活**：
+P2 先只落 Skill 动态装配。设计目标是让主 Agent 把 Ellamaka 已发现的 Skill Pool 当作可用武器库，在创建会话时和会话运行过程中，把任务真正需要的 Skill 叠加到默认 Agent 能力之上，同时不破坏 system/tool 前缀缓存。
 
-- Session Capability Envelope 在子会话首个模型请求之前形成，生命周期内保持稳定。Skill / Tool 的额外授予优先编译到 ellamaka 已有 session permission overlay；Wopal 专属的装配意图可存入 session metadata。
-- Runtime Context Activation 在 run loop 中按当前 intent、tool/action/path 等状态解析。Rule 正文与按需 Skill guidance 属于这一层，由 wopal-plugin 动态注入，不通过反复改写 session permission、tool schema 或 system prompt 来表达。
-- Tool schema 与轻量 Skill catalog 应在同一 Session 内保持稳定；Skill 正文采用 progressive disclosure，真正需要时再加载。动态上下文采用追加到当前 retained history 尾部的 cache-safe contribution，不回写较早消息。
-- 可见性与执行授权必须来自同一个 effective permission 视图。ellamaka 当前 Tool 已满足该原则；Skill catalog 必须与 Skill 执行门禁使用相同的 `agent.permission + session.permission` 合成结果。
+- **Skill Pool**：以 Ellamaka discovery 为唯一发现来源；Wopal 只消费 name/description 等元数据，不重新扫描或复制 Skill Registry。
+- **Agent baseline**：继续由 `agents/<name>.md` 的 `permission.skill` 表达默认能力；不因动态装配而改写 Agent 配置。
+- **Session Skill Overlay**：只保存额外激活的 Skill。创建子会话时由 `wopal_task.capabilities.skills` 写入 initial grants；运行时由主 Agent 的 skill-only grant 控制面继续追加 runtime grants。两者取并集，只增不减。
+- **模型可见性**：wopal-plugin 在既有 `experimental.chat.messages.transform` 中，把 overlay 的 `name + description` 作为 transient synthetic snapshot 追加到 retained history 尾部；不注入 SKILL.md body/path，不修改 system prompt、较早消息或 tool schema。
+- **正文与资源加载**：模型看到 overlay 后仍调用 Ellamaka 原生 `skill(name)`。原生 loader 负责 SKILL.md、base directory、scripts/references/assets 的 progressive disclosure；Skill grant 本身不隐式授予脚本执行所需的其他权限。
+- **加载授权**：新增通用 `experimental.permission.rules` 插件 hook。在 `ctx.ask()` 求值前，把 plugin runtime rules 合并在 agent/session rules 之后。wopal-plugin 只为 `permission=skill` 且 pattern 命中 Session Skill Overlay 的项贡献精确 allow；该 allow 仅参与本次求值，不写 `session.permission`，因此无需修改 Ellamaka run loop 或刷新 Session 对象。
+- **单一事实源**：request-tail catalog 与 runtime skill allow 必须读取同一个 Session Skill Overlay。Session metadata 是持久真相源，插件内 SessionStore/digest 仅是派生缓存。
+- **缓存语义**：动态 Skill snapshot 每个模型请求都从当前 overlay 重新生成并追加在尾部；由于 transform 内容不落 DB，digest 只能缓存格式化结果，不能做跨请求发送抑制。新增 Skill 因而只影响已有 retained prefix 之后的尾部。
 
-Rule 的“装配”只确定 eligibility / scope；真正匹配发生在运行过程中。Rule 不伪装成 permission。Skill 同时具有稳定的可用目录与运行时按需正文两层生命周期。
-
-没有 Session 增量授予、没有 runtime context contributor 时，ellamaka 的现有 config、agent frontmatter、permission、plugin 和 SDK 行为保持不变。
+Tool 与 Rule 的动态能力不属于本切片；现有 Tool/Rule 行为保持不变，后续单独设计。没有 Skill Overlay 时，ellamaka 的现有 config、agent frontmatter、permission、plugin 和 SDK 行为保持不变。
 
 ### Outcome-Oriented Prompts
 
