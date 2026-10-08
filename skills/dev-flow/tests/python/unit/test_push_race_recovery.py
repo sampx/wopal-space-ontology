@@ -131,7 +131,7 @@ class TestPushRaceRecoveryReal:
 
     def test_push_fails_cleanly_on_true_divergence_with_dirty_tree(self, tmp_path):
         """True divergence (both sides have unique commits) plus dirty tree:
-        push_repo must return False, leave the tree untouched, and not
+        push_repo must fail (falsy), leave the tree untouched, and not
         autostash/rebase/force."""
         remote, work = _make_bare_with_clone(tmp_path, "diverge")
 
@@ -147,7 +147,7 @@ class TestPushRaceRecoveryReal:
         (work / "dirty.txt").write_text("uncommitted\n")
 
         ok = push_repo(str(work), "main")
-        assert ok is False
+        assert not ok
         # Tree untouched: no autostash pop, no destructive recovery.
         assert (work / "dirty.txt").read_text() == "uncommitted\n"
         status = _git("status", "--porcelain", cwd=work).stdout
@@ -173,7 +173,7 @@ class TestPushRaceRecoveryReal:
         _commit_file(work, "mine.txt", "mine\n")
         ok = push_repo(str(work), "main")
         # Contract: no auto merge-commit creation; report failure for manual handling.
-        assert ok is False
+        assert not ok
 
 
 # ============================================
@@ -232,7 +232,7 @@ class TestPushRepoRetryContract:
         with patch("lib.git.subprocess.run", side_effect=always_reject), \
              patch("lib.git.PUSH_RETRY_LIMIT", 3), \
              patch("lib.git.PUSH_RETRY_DELAY", 0):
-            assert push_repo(str(work), "main") is False
+            assert not push_repo(str(work), "main")
         assert pushes["n"] == 3
 
     def test_no_retry_when_true_divergence(self, tmp_path):
@@ -257,7 +257,7 @@ class TestPushRepoRetryContract:
         with patch("lib.git.subprocess.run", side_effect=reject_no_recovery), \
              patch("lib.git.PUSH_RETRY_LIMIT", 3), \
              patch("lib.git.PUSH_RETRY_DELAY", 0):
-            assert push_repo(str(work), "main") is False
+            assert not push_repo(str(work), "main")
         assert pushes["n"] == 1
         # Both directions checked (ancestor of HEAD, HEAD ancestor of origin).
         assert merge_base_calls["n"] == 2
@@ -289,7 +289,7 @@ class TestPushRepoRetryContract:
              patch("lib.git.PUSH_RETRY_DELAY", 0):
             # merge --ff-only fails on this bare local repo shape; that's fine,
             # contract is: it was attempted and failure surfaces as False.
-            assert push_repo(str(work), "main") is False
+            assert not push_repo(str(work), "main")
         flat = [c[:3] for c in seen_cmds]
         assert ["git", "merge", "--ff-only"] in flat
         assert not any(c[:2] == ["git", "rebase"] for c in seen_cmds)

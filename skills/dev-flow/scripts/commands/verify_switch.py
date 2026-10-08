@@ -8,7 +8,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from lib.git import commit_paths, get_dirty_lines, get_relative_path
+from lib.git import commit_paths, get_dirty_lines, GitMutationFailure
+from lib.project import resolve_plan_location
 from lib.workspace import find_workspace_root
 from lib.worktree import parse_worktree_context
 from lib.logging import log_success, log_error, log_warn, log_step
@@ -25,14 +26,18 @@ def _git_fetch(cwd: str) -> bool:
     Returns:
         True if fetch succeeded
     """
+    cmd = ["git", "fetch"]
     result = subprocess.run(
-        ["git", "fetch"],
+        cmd,
         cwd=cwd,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        log_error(f"git fetch failed: {result.stderr.strip()}")
+        log_error(
+            "git fetch failed:\n"
+            f"{GitMutationFailure.from_completed(cmd, cwd, result)}"
+        )
         return False
     return True
 
@@ -47,16 +52,54 @@ def _git_checkout(branch: str, cwd: str) -> bool:
     Returns:
         True if checkout succeeded
     """
+    cmd = ["git", "checkout", branch]
     result = subprocess.run(
-        ["git", "checkout", branch],
+        cmd,
         cwd=cwd,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        log_error(f"git checkout {branch} failed: {result.stderr.strip()}")
+        log_error(
+            f"git checkout {branch} failed:\n"
+            f"{GitMutationFailure.from_completed(cmd, cwd, result)}"
+        )
         return False
     return True
+
+
+def _prune_worktrees(repo_root: str) -> list[str]:
+    """Prune stale worktree references; report failures, never swallow them.
+
+    `git worktree prune` may exit 0 while printing a deletion error to
+    stderr (e.g. Permission denied), so both the exit code and stderr are
+    inspected. Prune is janitorial: problems are returned for the caller to
+    report without aborting the switch.
+
+    Args:
+        repo_root: Path to the git repository root
+
+    Returns:
+        List of problem descriptions (empty when prune was clean).
+    """
+    cmd = ["git", "worktree", "prune"]
+    result = subprocess.run(
+        cmd,
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    problems: list[str] = []
+    if result.returncode != 0:
+        problems.append(
+            "git worktree prune failed:\n"
+            f"{GitMutationFailure.from_completed(cmd, repo_root, result)}"
+        )
+    elif result.stderr.strip():
+        problems.append(
+            f"git worktree prune reported errors: {result.stderr.strip()}"
+        )
+    return problems
 
 
 def _remove_worktree(repo_root: str, worktree_path: str) -> bool:
@@ -76,23 +119,23 @@ def _remove_worktree(repo_root: str, worktree_path: str) -> bool:
     if not target.exists():
         return True
 
+    cmd = ["git", "worktree", "remove", str(target), "--force"]
     result = subprocess.run(
-        ["git", "worktree", "remove", str(target), "--force"],
+        cmd,
         cwd=repo_root,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        log_error(f"Failed to remove worktree at {target}: {result.stderr.strip()}")
+        log_error(
+            f"Failed to remove worktree at {target}:\n"
+            f"{GitMutationFailure.from_completed(cmd, repo_root, result)}"
+        )
         return False
 
-    # Prune stale worktree references
-    subprocess.run(
-        ["git", "worktree", "prune"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-    )
+    # Prune stale worktree references; failures are reported (non-fatal).
+    for problem in _prune_worktrees(repo_root):
+        log_error(f"Worktree removed, but {problem}")
 
     return True
 
@@ -115,16 +158,30 @@ def _check_dirty(cwd: str) -> list[str]:
     return get_dirty_lines(cwd)
 
 
-def _update_plan_after_switch(plan_path: str, repo_root: str) -> None:
+def _update_plan_after_switch(
+    plan_path: str, workspace_root: Path, verification_dir: str
+) -> bool:
     """Update Plan Worktree metadata after switching.
 
     - Replace path: <original> → path: (removed)
     - Add Verification Dir metadata field after Worktree block
-    - Commit the Plan change
+    - Commit the Plan change in the Plan's own repo (space repo)
+
+    Plan files live under .wopal-space/plans/ in the space repo, not in the
+    project repo that was just switched. The owning repo is resolved from
+    the Plan path itself (same pattern as lib.plan_state.reset_plan_index);
+    committing anywhere else silently loses the metadata edit.
 
     Args:
         plan_path: Absolute path to the Plan file
-        repo_root: Git repo root where Plan lives (for commit)
+        workspace_root: Workspace root path
+        verification_dir: Directory where the user runs verification (the
+            switched project repo) — recorded as metadata, not committed there
+
+    Returns:
+        True when the metadata edit is committed in the Plan's repo; False
+        when the commit failed (the edit is on disk but uncommitted — the
+        caller exits non-zero with manual-commit guidance).
     """
     plan_file = Path(plan_path)
     content = plan_file.read_text()
@@ -145,18 +202,33 @@ def _update_plan_after_switch(plan_path: str, repo_root: str) -> None:
     wt_match = re.search(wt_pattern, content)
     if wt_match:
         end_pos = wt_match.end()
-        verification_line = f"- **Verification Dir**: {repo_root}\n"
+        verification_line = f"- **Verification Dir**: {verification_dir}\n"
         content = content[:end_pos] + verification_line + content[end_pos:]
 
     plan_file.write_text(content)
 
-    # Commit the Plan change
-    plan_file_rel = get_relative_path(str(plan_file), repo_root)
-    commit_paths(
-        repo_root,
-        [plan_file_rel],
+    # Commit the Plan change in the Plan's owning repo — a failed commit is
+    # reported, never silently swallowed.
+    location = resolve_plan_location(plan_file, workspace_root)
+    result = commit_paths(
+        str(location.repo_root),
+        [location.repo_relative_path],
         "docs(plan): verify-switch — update worktree metadata",
     )
+    if not result:
+        log_error("Failed to commit Plan metadata update after switch:")
+        log_error(str(result))
+        log_error(
+            f"Plan 元数据已写入磁盘但未提交（仓库: {location.repo_root}）"
+        )
+        log_error(
+            f"手动提交: git -C {location.repo_root} add "
+            f"{location.repo_relative_path} && git -C {location.repo_root} "
+            f'commit -m "docs(plan): verify-switch — update worktree metadata"'
+        )
+        return False
+
+    return True
 
 
 def _switch_standard(
@@ -214,8 +286,9 @@ def _switch_standard(
     if not _git_checkout(branch, repo_root):
         return False
 
-    # 5. Update Plan metadata
-    _update_plan_after_switch(plan_path, repo_root)
+    # 5. Update Plan metadata (committed in the Plan's own repo)
+    if not _update_plan_after_switch(plan_path, workspace_root, repo_root):
+        return False
 
     # 6. Print verification guidance
     log_success(f"Switched project repo to '{branch}'")

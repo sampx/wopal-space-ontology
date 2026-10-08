@@ -195,9 +195,9 @@ dev-flow 是跨引擎通用技能。它不能假设某个 Harness 存在 Codex �
 **Verify**: 正向 `rg -n 'sandbox|escalat|Git metadata|worktree|commit' SKILL.md SKILL.zh-CN.md references/commands.md`（应命中）；负向 `rg -n 'codex|opencode|danger-full-access|workspace-write|--elevate|--sandbox' SKILL.md SKILL.zh-CN.md references/commands.md`（应零命中，命中即回改措辞）
 
 **Done**:
-Task output: Harness-neutral 的 lifecycle Git mutation 权限指引。
-Files touched: 待实施后回填
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: Harness-neutral 的 lifecycle Git mutation 权限指引：中英 SKILL 新增「生命周期 Git mutation 的执行能力」节（surface 表 + 两档规则 + fail-loud）；commands.md 新增逐命令 mutation surface 审计表与失败语义。核验：正向 grep 命中、负向引擎词零命中、diff 纯新增 73 行。
+Files touched: `skills/dev-flow/SKILL.md`、`skills/dev-flow/SKILL.zh-CN.md`、`skills/dev-flow/references/commands.md`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -223,9 +223,9 @@ Files touched: 待实施后回填
 **Verify**: `python -m pytest tests/python/unit/test_git_semantics.py tests/python/unit/test_worktree_context.py -v`
 
 **Done**:
-Task output: lifecycle Git mutation fail-loud。
-Files touched: 待实施后回填
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: lifecycle Git mutation fail-loud：`GitMutationFailure` 结构体（command/cwd/exit/stdout/stderr，falsy 保持既有 `if not` 调用方零改动）；`commit_paths`/`commit_all` 补齐 `git add` 退出码检查；`plan_commit` 失败信息携带根因；worktree create/remove 双 attempt 证据全保留。核验：聚焦 69 passed、全量单测 503 passed（+5 新用例）、主控独立失败注入抽查通过。
+Files touched: `skills/dev-flow/scripts/lib/git.py`、`skills/dev-flow/scripts/lib/plan_commit.py`、`skills/dev-flow/scripts/lib/worktree.py`、`skills/dev-flow/tests/python/unit/test_git_semantics.py`、`skills/dev-flow/tests/python/unit/test_worktree_context.py`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -252,9 +252,9 @@ Files touched: 待实施后回填
 **Verify**: `python -m pytest tests/python/unit/test_approve.py -v`（AC#5 root-cause 保真）— `python -m pytest tests/python -k 'complete or archive' -v`（AC#3 durability gate / AC#4 destructive ordering）
 
 **Done**:
-Task output: lifecycle 关键事务顺序与失败一致性修复。
-Files touched: 待实施后回填
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: lifecycle 关键事务顺序与失败一致性修复：complete commit 失败 → 恢复 Plan + 清 index 残留 + 非零退出、不 Issue sync；archive 重排为 durability（commit+push）→ cleanup → close，push 失败阻断 cleanup/close 且重跑真正补推（含复审返工），失败指引给出归档名重跑命令；approve root failure 与 rollback outcome 分层输出。核验：26/51/513/522 全绿 + 主控独立重跑实验（origin 实收 archive commit）。
+Files touched: `skills/dev-flow/scripts/lib/plan_state.py`（新增）、`skills/dev-flow/scripts/commands/complete.py`、`skills/dev-flow/scripts/commands/archive.py`、`skills/dev-flow/scripts/commands/approve.py`、`skills/dev-flow/tests/python/unit/test_approve.py`、`skills/dev-flow/tests/python/unit/test_archive.py`、`skills/dev-flow/tests/python/unit/test_complete_verification_commit.py`、`skills/dev-flow/tests/python/integration/test_no_issue_lifecycle.py`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -280,9 +280,57 @@ Files touched: 待实施后回填
 **Verify**: `python -m pytest tests/python -v`
 
 **Done**:
-Task output: dev-flow lifecycle Git mutation 全量审计闭环。
-Files touched: 待实施后回填
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 全量审计闭环：审计矩阵覆盖全部 12 个 lifecycle 入口（command → 真实 mutation 调用链 → failure handling → 后继门 → 三态结论），确证 5 处缺口全部按 TDD 修复。缺陷修复：`verify --confirm` commit 失败由 warn 吞错改为快照回滚 + 清 index + 完整诊断 + 非零退出（不 Issue sync、不 close Issue）；`verify-switch` Plan 元数据 commit 从项目仓库改到 `resolve_plan_location` 解析出的 Plan 所属仓库，并检查结果、失败给出可执行手工提交指引。评估项：submit commit 失败确认可重试性被卡（半写 `reviewing` 使重跑报 "already submitted"）→ 快照恢复 planning + 清 index；complete `--pr` 顺序确认无法结构性重排（gh PR 先于 Plan commit）→ 补最小失败指引（点名已创建 PR URL + 重跑勿再传 `--pr`）；其余入口独立扫描确认零 git mutation。另修 archive `git mv` 失败丢 stderr（改用 `GitMutationFailure.from_completed`，保留 command/cwd/exit/stderr）。记录性结论 6 条（gh close 吞错、worktree prune、阶段文档 warn-only、branch delete 幂等语义、write_worktree_context 不可达分支、lib/git.py 死代码）均未改动并附理由。核验：聚焦 83 passed、全量 530 passed（基线 522，+8）、主控独立复核 diff 与异常处理路径（`archive_plan_file` 的 `RuntimeError` 仍被调用方 `except Exception` 捕获、`pr_url` 定义在 `create_pr` 分支内、`resolve_plan_location` 向上查找 `.git` 命中空间仓库）。
+Files touched: `skills/dev-flow/scripts/commands/verify.py`、`skills/dev-flow/scripts/commands/verify_switch.py`、`skills/dev-flow/scripts/commands/submit.py`、`skills/dev-flow/scripts/commands/complete.py`、`skills/dev-flow/scripts/commands/archive.py`、`skills/dev-flow/tests/python/unit/test_verify.py`、`skills/dev-flow/tests/python/unit/test_verify_switch.py`、`skills/dev-flow/tests/python/unit/test_submit.py`、`skills/dev-flow/tests/python/unit/test_complete_verification_commit.py`、`skills/dev-flow/tests/python/unit/test_archive.py`、`skills/dev-flow/tests/python/support/git_fixtures.py`（新增）
+- [x] The implementation agent has completed all development and verification steps above.
+
+---
+
+### Task 5: 实施审查返工（Rook BLOCK findings）
+
+**Origin**: mandatory implementation review 对 `8c8ead1..82d739a` 判 BLOCK（6 Blocker + 4 Warning）。评审总预算 2 次，返工须一轮做全。
+
+**Behavior**:
+- Given Rook 列出的 B-01～B-06 / W-01～W-04；When 逐项按 TDD 修复；Then durability 门、fail-loud、no-invalid-progression 三条契约在全部可达 mutation 路径上成立。
+
+**Pre-read**: Task 1–4 的 Done 记录、`scripts/commands/*.py`、`scripts/lib/*.py`、`references/commands.md`
+
+**Design**: 逐项落到既有 helper（`GitMutationFailure`、`plan_state`、`worktree`），不新建事务 framework；既有 push 策略（submit/approve warn-continue、archive 阻断）保留不动，只增强诊断与门控。审计矩阵落 `references/commands.md`（提案文件禁改）。
+
+**TDD**: true
+
+**Changes**:
+1. B-01 archive 的 Issue sync / labels / Plan link 后置到 durability 成功之后，数据源改用归档后路径；
+2. B-02 `delete_branch` 区分 deleted / absent / skipped / failed 四态，真失败触发 partial cleanup + 非零退出；
+3. B-03 archive push 显式绑定实际承载提交的分支，detached HEAD 拒绝，新增 `is_commit_pushed` 验证 origin 真收到归档 commit；
+4. B-04 `push_repo` / `is_commit_in_remote` / stage / fallback / fetch / checkout / remove / prune / reset 全部接通结构化诊断，fallback 保留双 attempt 证据；
+5. B-05 `commit_paths` 改 pathspec commit（`git commit -m … -- <paths>`），无关 staged 文件既不进提交也不被清掉；archive rename 同时处理旧新路径；
+6. B-06 PR 提交失败回滚后重新写回 PR 字段，区分保留成功/失败，指引改为「重跑勿传 --pr，将采用已有 PR」；
+7. W-01 `reset_plan_index` / `recover_plan_after_failed_commit` 分层返回文件恢复与 index 恢复结果，四个调用方改用分层报告；
+8. W-02 phase-doc 改 path-isolated 提交，失败不再输出假成功日志；
+9. W-03 switch 测试重写为行为断言（真实 worktree / HEAD / 落仓 / 文件内容），fixture 合并，1042 → 554 行；PR 样本改用有来源记录的 fixture；
+10. W-04 审计矩阵落 `references/commands.md`，六条记录性结论按修完后实际状态更新。
+
+**Verify**: `python -m pytest tests/python -q -p no:cacheprovider`
+
+**Done**:
+Task output: Rook 全部 10 项 finding 一轮修完并按 TDD 留证。B-01 archive 外部更新后置到 durability 之后（sync/labels/link 全用归档路径，durability 失败时 Issue 零触碰）；B-02 `BranchDeleteResult` 四态 + 真实 `.git/refs/heads/<branch>.lock` 注入验证 partial cleanup 与非零退出；B-03 detached HEAD 拒绝 + `is_commit_pushed` 验证 bare origin 真实收到归档 commit（修正了 push 到默认分支而归档提交落在当前分支的假 durability）；B-04 诊断接通 7 处调用链，并实测发现 `git worktree prune` 会 rc=0 但把错误写进 stderr，改为 rc + stderr 双检；B-05 pathspec commit 使 `foreign.txt` 在 `git status --porcelain` 仍为 `A ` 且不入 lifecycle commit；B-06 失败→照指引重跑→verify 仍以保留 URL 走 `_is_pr_merged` 的完整链路（含无 Issue 场景）；W-01 `PlanRecovery` 分层返回 + `index.lock` 真实注入验证不再输出「可直接重试」；W-02 忽略的未跟踪 phase doc 不再输出假成功；W-03 switch 测试删除固定下标与调用序列断言、fixture 全合并、行数降至 554；W-04 矩阵落入 `references/commands.md`。保留未改：push 策略、脏 worktree 警告后继续、gh close 吞错、写不出的不可达分支、lib 死代码，均附理由入矩阵。核验：全量 541 passed（基线 530，+11）、42 subtests、逐 finding 聚焦 42 passed；主控独立复跑全量 541 passed，核对提案文件零改动、`commit_paths` pathspec 实现、`BranchDeleteResult` / `PlanRecovery` 分层 API、R2 fixture 来源记录（`tests/fixtures/github/SOURCES.md`）。
+Files touched: `skills/dev-flow/references/commands.md`、`skills/dev-flow/scripts/commands/approve.py`、`skills/dev-flow/scripts/commands/archive.py`、`skills/dev-flow/scripts/commands/complete.py`、`skills/dev-flow/scripts/commands/submit.py`、`skills/dev-flow/scripts/commands/verify.py`、`skills/dev-flow/scripts/commands/verify_switch.py`、`skills/dev-flow/scripts/lib/git.py`、`skills/dev-flow/scripts/lib/plan_commit.py`、`skills/dev-flow/scripts/lib/plan_state.py`、`skills/dev-flow/scripts/lib/worktree.py`、`skills/dev-flow/tests/python/unit/test_archive.py`、`skills/dev-flow/tests/python/unit/test_complete_verification_commit.py`、`skills/dev-flow/tests/python/unit/test_git_semantics.py`、`skills/dev-flow/tests/python/unit/test_push_race_recovery.py`、`skills/dev-flow/tests/python/unit/test_verify_switch.py`、`skills/dev-flow/tests/python/unit/test_worktree_context.py`、`skills/dev-flow/tests/python/unit/test_plan_state_recovery.py`（新增）、`skills/dev-flow/tests/fixtures/github/pr-merged-recorded.json`（新增）、`skills/dev-flow/tests/fixtures/github/SOURCES.md`（新增）
+- [x] The implementation agent has completed all development and verification steps above.
+
+**Rework after Rook 终局 BLOCK（2 轮预算用尽后主控自修）**：
+
+Rook 终局复审仍判 BLOCK（3 Blocker + 4 Warning），评审预算 2 轮已用尽，用户指示主控自行修复。逐项修复与证据：
+
+- B-01（归档重跑漏提交旧路径删除）：`commit_archived_plan` 新增 `_recover_staged_archive_sources`，在重跑场景（`source_path == archived_file`）从 `git diff --cached --name-status` 读出已 staged 的旧路径删除（D 状态，文件名匹配），纳入 `commit_targets`，使 pathspec commit 携带完整 rename。测试：commit 失败→归档名重跑→origin/main 旧路径不存在、新路径存在、index 无 rename 残留、`foreign.txt` 仍为 `A `。
+- B-02（非默认分支归档生成错误链接）：`build_plan_blob_url` 接受可选 `branch` 参数；`update_issue_plan_link` 接受可选 `branch` 透传；`cmd_archive` 在 durability 成功后取 `get_current_branch` 传给 `update_issue_plan_link`，使链接指向实际承载归档提交的分支。测试：非默认分支 `work` 归档→`update_issue_plan_link` mock 的 `branch` kwarg == `"work"`。
+- B-03（Issue 同步失败仍报成功）：`cmd_archive` 消费 `sync_plan_to_issue_body` 返回值，失败时不输出 `log_success`、不执行 labels/link、明确报告「body sync failed」并给出重跑指引。测试：`sync_body` mock 返回 False→输出不含「Plan synced to Issue」、含「body sync failed」、labels/link 未调用。
+- W-01（`is_commit_pushed` 单分支 clone 误判）：改用 `git ls-remote origin <branch>` 直接查询远端 ref，不再依赖 tracking ref。测试：push 到 `work` 分支后删除 tracking ref→`is_commit_pushed` 仍返回 True；未 push 返回 False。
+- W-02（rev-parse 读取失败被误标 absent）：`delete_branch` 区分「ref 不存在」（stderr 空 → absent）与「rev-parse 本身失败」（stderr 非空 → failed）。测试：mock rev-parse 返回非空 stderr→`status == "failed"`。
+- W-03（测试 `log_error` mock 导致断言无效）：`test_reset_failure_not_reported_as_retry_ready` 将 mock 的调用内容拼入断言。
+- W-04（审计矩阵 approve 语义写错）：`references/commands.md` approve 行区分 commit/worktree 失败与 push 失败。
+
+核验：全量 547 passed（基线 541，+6 新测试）、42 subtests；主控独立复跑 547 passed。
 
 ---
 
@@ -294,6 +342,7 @@ Files touched: 待实施后回填
 | 1 | Task 2 | fae | none | Git helper 可独立 TDD |
 | 2 | Task 3 | fae | Task 2 | 事务修复依赖稳定的 mutation failure 传播 |
 | 3 | Task 4 | fae | Task 1, Task 2, Task 3 | 最终全量审计与回归 |
+| 4 | Task 5 | fae | Task 4 | Rook BLOCK 返工，预算内一轮做全 10 项 |
 
 ## Delivery
 

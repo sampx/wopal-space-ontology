@@ -25,6 +25,29 @@ All `flow.sh` commands must run from the skill root directory:
 
 Every `flow.sh xxx` reference in this document (e.g. `flow.sh plan new`, `flow.sh complete`, `flow.sh verify-switch`) runs this way. No `source`, no absolute-path invocation, never run from outside the skill directory.
 
+## Lifecycle Git mutations: execution capability
+
+dev-flow is harness-neutral by design: the same lifecycle runs on any execution engine, and the skill never names, detects, or targets a specific one. But some lifecycle commands write **Git metadata** — the repository's own bookkeeping — and a restricted environment may allow ordinary file edits while blocking exactly those writes. This section states the capability rule; `references/commands.md` audits the actual mutation surfaces per command.
+
+The surfaces at play:
+
+| Surface | What it covers |
+|---------|----------------|
+| index | staging-area writes (`git add`, path-scoped `git reset`) |
+| commit | creating commits |
+| refs | branch creation/deletion, `fetch`, local branch fast-forward, `push` |
+| worktree | worktree registration and removal |
+| checkout | switching HEAD and rewriting the working tree |
+
+Commands with real Git mutations: `submit`, `approve`, `complete`, `verify`, `verify-switch`, `archive`. A writable project workspace does not imply these surfaces are writable — Git metadata typically lives under the repository's `.git` directory.
+
+**Rule — secure the capability before executing:**
+
+1. **Unrestricted environment**: run the command directly. Do not request escalation for capability the environment already grants; a needless privilege request is noise, not safety.
+2. **Restricted / sandboxed environment**: before running the command, use **the current harness's own native escalation or approval mechanism** to obtain the required capability. Which mechanism that is depends on the harness you run on — dev-flow neither requires nor exposes any specific one, and has no dedicated flags or parameters for it. Do not bypass the restriction by editing permissions or configuration outside the harness's own flow.
+
+**Fail loud.** When a Git mutation in a lifecycle command exits non-zero, the diagnostic must retain the command, its working directory, the exit code, and the original stdout/stderr; the command must not continue along the success path. An operation that reports completion without that evidence is unproven — report the failure to the user rather than working around it by hand.
+
 ## When the lifecycle applies
 
 The lifecycle exists for **design-bearing work** — features, enhancements, refactors, contract changes: work whose outcome must be pinned down and reviewed before code exists.

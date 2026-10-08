@@ -35,6 +35,7 @@ from plan import (
     get_plan_worktree,
 )
 from lib.git import check_branch_merged, commit_paths, get_branch_head
+from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
 from lib.worktree import resolve_active_plan, ResolveActivePlanError
 from plan import set_plan_field
 from validation import (
@@ -228,6 +229,50 @@ def _record_final_commit(plan_path: str, workspace_root: Path, keep_worktree: bo
     return final_commit
 
 
+def _commit_plan_status_or_rollback(
+    active,
+    snapshot: "PlanFieldSnapshot | None",
+    commit_msg: str,
+    workspace_root: Path,
+) -> bool:
+    """Commit the Plan done transition; on failure restore a retryable state.
+
+    The Plan file was already rewritten (Final Commit and Status=done); if
+    the commit fails the command must not proceed to Issue sync/close.
+    Restore the pre-write content and drop any staged Plan residue, so a
+    re-run sees the same clean input.
+
+    Returns:
+        True when the Plan commit is durable; False when it failed and was
+        rolled back (caller exits non-zero without Issue sync/close).
+    """
+    result = commit_paths(
+        str(active.commit_repo_root),
+        [active.repo_relative_plan_path],
+        commit_msg,
+    )
+    if result:
+        return True
+
+    recovery = recover_plan_after_failed_commit(
+        str(active.active_plan_path), snapshot, workspace_root
+    )
+
+    log_error("Failed to commit Plan status=done in Plan's repo:")
+    log_error(str(result))
+    if not recovery.file_restored:
+        log_error("Plan 状态恢复失败，请手动恢复后重试")
+    elif not recovery.index_reset_ok:
+        log_error(
+            "Plan 文件已恢复为提交前状态，但 index 残留未清理"
+            "（重试前需手工清理）："
+        )
+        log_error(recovery.index_failure)
+    else:
+        log_error("Plan 已恢复为提交前状态，可直接重试")
+    return False
+
+
 # ============================================
 # verify command
 # ============================================
@@ -350,6 +395,10 @@ def cmd_verify(args: argparse.Namespace) -> int:
         log_info("Evolution mode (--keep-worktree): skipping merge check")
 
     # 7.5 Record Final Commit — integration branch HEAD after merge (or feature tip).
+    #      Snapshot first: this is the first Plan write of the command (before
+    #      the Status=done update below); a failed Plan commit must restore
+    #      both fields and stay retryable.
+    plan_snapshot = PlanFieldSnapshot.capture(plan_path)
     recorded_final = _record_final_commit(plan_path, workspace_root, keep_worktree=keep_worktree)
     if keep_worktree and not recorded_final:
         log_error("Aborting verify: could not record valid Final Commit for evolution mode.")
@@ -393,8 +442,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return 1
 
     # 11. Commit Plan status=done on integration branch (D-05)
-    plan_repo_root = str(active.commit_repo_root)
-    plan_rel = active.repo_relative_plan_path
     if plan_issue:
         plan_commit_msg = f"docs(plan): verify plan #{plan_issue}"
     else:
@@ -403,10 +450,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
         if len(plan_commit_msg) > max_total:
             prefix = "docs(plan): verify plan "
             plan_commit_msg = prefix + _get_plan_name(str(active.active_plan_path))[:max_total - len(prefix)]
-    if not commit_paths(plan_repo_root, [plan_rel], plan_commit_msg):
-        log_warn("Failed to commit Plan status=done in Plan's repo")
-    else:
-        log_success("Plan status=done committed to Plan's repo")
+    if not _commit_plan_status_or_rollback(
+        active, plan_snapshot, plan_commit_msg, workspace_root
+    ):
+        return 1
+    log_success("Plan status=done committed to Plan's repo")
 
     # 12. Sync Issue if exists
     if effective_issue and repo:

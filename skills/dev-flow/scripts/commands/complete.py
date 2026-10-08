@@ -30,6 +30,7 @@ from plan import (
     get_plan_field,
 )
 from lib.git import is_repo_dirty, commit_paths, get_dirty_lines
+from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
 from plan import resolve_project_path
 from lib.worktree import resolve_active_plan, parse_worktree_context, ResolveActivePlanError, ActivePlanInfo
 from validation import (
@@ -124,6 +125,71 @@ def _build_plan_only_commit_msg(plan_issue: int | None, plan_name: str) -> str:
         prefix = "docs(plan): complete plan "
         msg = prefix + plan_name[:max_total - len(prefix)]
     return msg
+
+
+def _commit_plan_status_or_rollback(
+    active: "ActivePlanInfo",
+    snapshot: "PlanFieldSnapshot | None",
+    commit_msg: str,
+    workspace_root: Path,
+    preserve_pr: str = "",
+) -> bool:
+    """Commit the Plan status change; on failure restore a retryable state.
+
+    The Plan file was already rewritten (status, and possibly PR /
+    Verification Commit fields); if the Plan commit fails the command must
+    not proceed to Issue sync. Restore the pre-write content and drop any
+    staged Plan residue, so a re-run sees the same clean input.
+
+    preserve_pr: a PR URL created just before this commit. The snapshot
+    restore would drop it; it is re-applied so the retry adopts the existing
+    PR instead of creating a duplicate (B-06). Recovery success and failure
+    are reported distinctly.
+
+    Returns:
+        True when the Plan commit is durable; False when it failed and was
+        rolled back (caller exits non-zero without Issue sync).
+    """
+    result = commit_paths(
+        str(active.commit_repo_root),
+        [active.repo_relative_plan_path],
+        commit_msg,
+    )
+    if result:
+        return True
+
+    recovery = recover_plan_after_failed_commit(
+        str(active.active_plan_path), snapshot, workspace_root
+    )
+
+    pr_retained = False
+    if recovery.file_restored and preserve_pr:
+        pr_retained = set_plan_field(
+            str(active.active_plan_path), "PR", preserve_pr
+        )
+
+    log_error("Failed to commit Plan status change:")
+    log_error(str(result))
+    if not recovery.file_restored:
+        log_error("Plan 状态恢复失败，请手动恢复后重试")
+    elif not recovery.index_reset_ok:
+        log_error(
+            "Plan 文件已恢复为提交前状态，但 index 残留未清理"
+            "（重试前需手工清理）："
+        )
+        log_error(recovery.index_failure)
+    elif preserve_pr and not pr_retained:
+        log_error(
+            "Plan 已恢复为提交前状态，但 PR 元数据恢复失败："
+            "请手动补写 PR 字段后重试"
+        )
+    elif pr_retained:
+        log_error(
+            "Plan 已恢复为提交前状态（executing），已保留本次创建的 PR 元数据"
+        )
+    else:
+        log_error("Plan 已恢复为提交前状态，可直接重试")
+    return False
 
 
 def _resolve_code_repo(
@@ -343,7 +409,12 @@ def cmd_complete(args: argparse.Namespace) -> int:
         log_error(f"Invalid state transition: {current_status} -> {target_status}")
         return 1
 
-    # 10. Two paths: with PR or without PR
+    # 10. Snapshot the Plan content before writing any state field, so a
+    #     failed Plan commit can restore the exact pre-write (retryable)
+    #     state instead of leaving a half-committed Plan behind.
+    snapshot = PlanFieldSnapshot.capture(str(active.active_plan_path))
+
+    # 11. Two paths: with PR or without PR
     if create_pr:
         project = get_plan_project(plan_path)
         if not project:
@@ -377,10 +448,21 @@ def cmd_complete(args: argparse.Namespace) -> int:
         # Persist PR URL in Plan metadata
         set_plan_field(str(active.active_plan_path), "PR", pr_url)
 
-        # Plan-only commit
+        # Plan-only commit (durability gate: no Issue sync when it fails)
         commit_msg = _build_plan_only_commit_msg(plan_issue, plan_name)
-        if not commit_paths(str(active.commit_repo_root), [active.repo_relative_plan_path], commit_msg):
-            log_warn("Failed to commit Plan status change")
+        if not _commit_plan_status_or_rollback(
+            active, snapshot, commit_msg, workspace_root, preserve_pr=pr_url
+        ):
+            # The PR was created before the Plan commit and is not rolled
+            # back: it is retained in the restored Plan so the plain retry
+            # adopts it instead of colliding with the same branch.
+            next_ref = str(plan_issue) if plan_issue else plan_name
+            log_error(f"PR 已创建且仍然存在：{pr_url}")
+            log_error(
+                f"重跑时请勿再次传 --pr（将采用该已有 PR）；"
+                f"修复后执行: flow.sh complete {next_ref}"
+            )
+            return 1
 
         # Sync Issue
         if plan_issue and repo:
@@ -411,10 +493,12 @@ def cmd_complete(args: argparse.Namespace) -> int:
             str(active.active_plan_path), workspace_root, active
         )
 
-        # Plan-only commit
+        # Plan-only commit (durability gate: no Issue sync when it fails)
         commit_msg = _build_plan_only_commit_msg(plan_issue, plan_name)
-        if not commit_paths(str(active.commit_repo_root), [active.repo_relative_plan_path], commit_msg):
-            log_warn("Failed to commit Plan status change")
+        if not _commit_plan_status_or_rollback(
+            active, snapshot, commit_msg, workspace_root
+        ):
+            return 1
 
         # Sync Issue if exists
         if plan_issue and repo:

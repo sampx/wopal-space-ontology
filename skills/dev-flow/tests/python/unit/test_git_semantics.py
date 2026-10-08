@@ -8,6 +8,7 @@
 # - verify: Plan status=done committed to Plan's repo
 # - archive: repo-aware git mv/commit/push
 
+import shlex
 import subprocess
 import sys
 from datetime import date
@@ -20,7 +21,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
-from lib.git import commit_paths, push_repo, commit_all, get_current_branch, is_repo_dirty
+from lib.git import (
+    commit_paths, push_repo, commit_all, get_current_branch, is_repo_dirty,
+    is_commit_in_remote,
+)
+from lib.plan_commit import commit_and_push_plan, RESULT_COMMIT_FAILED, RESULT_PUSH_FAILED
 from lib.project import resolve_plan_location
 from workflow import update_plan_status
 from lib.worktree import write_worktree_context, resolve_active_plan, ResolveActivePlanError
@@ -46,6 +51,18 @@ def _git_init(path: Path, branch: str = "main") -> None:
                    capture_output=True, check=True)
     subprocess.run(["git", "commit", "-m", "init"], cwd=str(path),
                    capture_output=True, check=True)
+
+
+def _install_failing_pre_commit_hook(repo: Path, message: str) -> None:
+    """Install a pre-commit hook that aborts the commit with `message`.
+
+    Real failure injection: git itself produces the non-zero exit code and
+    the stderr text, so no mock output is involved.
+    """
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(f"#!/bin/sh\necho {shlex.quote(message)} >&2\nexit 1\n")
+    hook.chmod(0o755)
 
 
 def _make_plan_file(plan_path: Path, status: str = "executing") -> Path:
@@ -130,25 +147,196 @@ class TestCommitPaths:
         # Already committed init, no changes
         assert commit_paths(str(repo), ["README.md"], "noop") is True
 
+    def test_does_not_sweep_unrelated_staged_entries(self, tmp_path):
+        """Only the named paths enter the commit; a foreign staged file
+        keeps its index state (B-05)."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        (repo / "plan.md").write_text("v1\n")
+        (repo / "other.txt").write_text("v1\n")
+        subprocess.run(["git", "add", "plan.md", "other.txt"], cwd=str(repo),
+                       capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "add both"], cwd=str(repo),
+                       capture_output=True, check=True)
+
+        # plan.md modified (to be committed); other.txt staged (foreign)
+        (repo / "plan.md").write_text("v2\n")
+        (repo / "other.txt").write_text("v2\n")
+        subprocess.run(["git", "add", "other.txt"], cwd=str(repo),
+                       capture_output=True, check=True)
+
+        result = commit_paths(str(repo), ["plan.md"], "test: commit plan only")
+
+        assert result is True
+        files = _get_last_commit_files(repo)
+        assert files == ["plan.md"]
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(repo), capture_output=True, text=True,
+        ).stdout
+        # The foreign staged file is untouched and still staged.
+        assert "M  other.txt" in status
+
+
+class TestCommitPathsFailureDiagnostics:
+    """commit_paths failures retain command, cwd, exit code, stdout/stderr."""
+
+    def test_add_failure_returns_diagnostics(self, tmp_path):
+        """git add non-zero: the failure carries the add command's diagnostics."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+
+        failure = commit_paths(str(repo), ["missing.txt"], "test: add missing file")
+
+        # Falsy: legacy `if not commit_paths(...)` callers keep failing.
+        assert not failure
+        assert failure.command[0] == "git"
+        assert "add" in failure.command
+        assert "missing.txt" in failure.command
+        assert failure.cwd == str(repo)
+        assert failure.exit_code != 0
+        assert "pathspec" in failure.stderr
+        assert "missing.txt" in failure.stderr
+
+    def test_commit_failure_returns_diagnostics(self, tmp_path):
+        """git commit non-zero (failing hook): diagnostics survive, not bare False."""
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        (repo / "hooked.txt").write_text("change\n")
+        _install_failing_pre_commit_hook(repo, "injected pre-commit failure")
+
+        failure = commit_paths(
+            str(repo), ["hooked.txt"], "test: commit with failing hook",
+        )
+
+        assert not failure
+        assert failure.command[0] == "git"
+        assert "commit" in failure.command
+        assert failure.cwd == str(repo)
+        assert failure.exit_code != 0
+        assert "injected pre-commit failure" in failure.stderr
+        # Hook output is routed to git stderr; raw stdout is still captured.
+        assert failure.stdout == ""
+
 
 class TestPushRepo:
     """Tests for push_repo() in lib/git.py."""
 
-    def test_push_repo_no_remote_returns_false(self, tmp_path):
-        """push_repo returns False when there's no remote."""
+    def test_push_repo_no_remote_returns_diagnostics(self, tmp_path):
+        """push failure returns a structured failure with command/cwd/exit/
+        stderr, not a bare False (B-04)."""
         repo = tmp_path / "repo"
         _git_init(repo)
-        # No remote configured — push should fail gracefully
-        assert push_repo(str(repo), "main") is False
+        # No remote configured — push fails with real git diagnostics
+        failure = push_repo(str(repo), "main")
 
-    def test_push_repo_no_branch_returns_false(self, tmp_path):
-        """push_repo with None branch and no current branch returns False."""
+        assert not failure
+        assert failure.command[:3] == ["git", "push", "origin"]
+        assert failure.cwd == str(repo)
+        assert failure.exit_code != 0
+        assert (failure.stderr or failure.stdout).strip()
+
+    def test_push_repo_no_branch_returns_diagnostics(self, tmp_path):
+        """push_repo with None branch and no current branch returns a
+        structured failure naming the detached HEAD cause."""
         repo = tmp_path / "repo"
         _git_init(repo)
         # Detach HEAD to simulate no branch
         subprocess.run(["git", "checkout", "--detach", "HEAD"],
                        cwd=str(repo), capture_output=True)
-        assert push_repo(str(repo)) is False
+        failure = push_repo(str(repo))
+
+        assert not failure
+        assert "branch" in (failure.stderr + failure.stdout).lower()
+
+
+class TestIsCommitInRemote:
+    """is_commit_in_remote must not trust a stale tracking ref when the
+    fetch that should refresh it failed (B-04)."""
+
+    def test_fetch_failure_reported_not_confirmed(self, tmp_path, capsys):
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        origin = tmp_path / "origin.git"
+        subprocess.run(["git", "init", "--bare", "-b", "main", str(origin)],
+                       capture_output=True, check=True)
+        subprocess.run(["git", "remote", "add", "origin", str(origin)],
+                       cwd=str(repo), capture_output=True, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "main"],
+                       cwd=str(repo), capture_output=True, check=True)
+        # Remote becomes unreachable: the stale origin/main still contains
+        # HEAD, but fetch can no longer confirm it.
+        subprocess.run(
+            ["git", "remote", "set-url", "origin", str(tmp_path / "gone.git")],
+            cwd=str(repo), capture_output=True, check=True,
+        )
+
+        assert is_commit_in_remote(str(repo), "origin", "main") is False
+        out, err = capsys.readouterr()
+        assert "fetch" in (out + err)
+
+
+class TestPlanCommitFailureDiagnostics:
+    """commit_and_push_plan surfaces the underlying Git diagnostics on failure."""
+
+    def test_commit_failure_message_carries_diagnostics(self, tmp_path, capsys):
+        """A failed Plan commit logs the git command, cwd, exit code and stderr
+        instead of a bare 'Commit failed'."""
+        repo = tmp_path / "projects" / "myproject"
+        _git_init(repo)
+        plans_dir = repo / "docs" / "plans"
+        plans_dir.mkdir(parents=True)
+        plan_file = plans_dir / "test-plan.md"
+        _make_plan_file(plan_file, status="executing")
+        subprocess.run(["git", "add", "."], cwd=str(repo),
+                       capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "add plan"], cwd=str(repo),
+                       capture_output=True, check=True)
+
+        # Dirty the Plan so commit_and_push_plan attempts a commit.
+        plan_file.write_text(plan_file.read_text() + "\n- **PR**: none\n")
+        _install_failing_pre_commit_hook(repo, "injected pre-commit failure")
+
+        result = commit_and_push_plan(str(plan_file), None, tmp_path)
+
+        assert result == RESULT_COMMIT_FAILED
+        stderr = capsys.readouterr().err
+        assert "injected pre-commit failure" in stderr  # raw git stderr
+        assert "git commit" in stderr                    # failing command
+        assert str(repo) in stderr                       # cwd
+        assert "exit code" in stderr                     # exit code retained
+
+    def test_push_failure_message_carries_diagnostics(self, tmp_path, capsys):
+        """A failed Plan push logs the push command, cwd, exit code and raw
+        stderr — the warn-and-continue policy stays, the diagnostics do not
+        shrink (B-04)."""
+        repo = tmp_path / "projects" / "myproject"
+        _git_init(repo)
+        plans_dir = repo / "docs" / "plans"
+        plans_dir.mkdir(parents=True)
+        plan_file = plans_dir / "test-plan.md"
+        _make_plan_file(plan_file, status="executing")
+        subprocess.run(["git", "add", "."], cwd=str(repo),
+                       capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "add plan"], cwd=str(repo),
+                       capture_output=True, check=True)
+
+        # Origin path exists but is not a git repository: fetch and push both
+        # fail with real git diagnostics.
+        subprocess.run(
+            ["git", "remote", "add", "origin", str(tmp_path / "not-a-repo.git")],
+            cwd=str(repo), capture_output=True, check=True,
+        )
+        # Dirty the Plan so the commit step runs first and succeeds.
+        plan_file.write_text(plan_file.read_text() + "\n- **PR**: none\n")
+
+        result = commit_and_push_plan(str(plan_file), None, tmp_path)
+
+        assert result == RESULT_PUSH_FAILED
+        stderr = capsys.readouterr().err
+        assert "command: git push" in stderr
+        assert str(repo) in stderr
+        assert "exit code" in stderr
 
 
 # ============================================
@@ -1041,3 +1229,58 @@ class TestCheckBranchMerged:
         mock_log.assert_any_call(
             "Failed to check merge status for branch 'feature/test-1-slug'"
         )
+
+
+class TestIsCommitPushed:
+    """W-01: is_commit_pushed must verify via ls-remote, not a tracking ref
+    that may not exist in single-branch clones or after manual ref deletion."""
+
+    def _repo_with_origin(self, tmp_path):
+        origin = tmp_path / "origin.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "main", str(origin)],
+            check=True, cwd=tmp_path,
+        )
+        clone = tmp_path / "clone"
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(clone)],
+            check=True, cwd=tmp_path,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "t@t.com"], cwd=clone, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "T"], cwd=clone, check=True)
+        (clone / "f.txt").write_text("x")
+        subprocess.run(["git", "add", "f.txt"], cwd=clone, check=True)
+        subprocess.run(["git", "commit", "-qm", "init"], cwd=clone, check=True)
+        subprocess.run(["git", "push", "-q", "origin", "main"], cwd=clone, check=True)
+        return clone
+
+    def test_works_without_tracking_ref(self, tmp_path):
+        """A pushed commit is detected even when the tracking ref is missing
+        (ls-remote queries the remote directly)."""
+        from lib.git import is_commit_pushed
+        clone = self._repo_with_origin(tmp_path)
+        subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=clone, check=True)
+        (clone / "f2.txt").write_text("y")
+        subprocess.run(["git", "add", "f2.txt"], cwd=clone, check=True)
+        subprocess.run(["git", "commit", "-qm", "work"], cwd=clone, check=True)
+        subprocess.run(["git", "push", "-q", "origin", "work"], cwd=clone, check=True)
+        # Remove the tracking ref to simulate a single-branch clone that
+        # doesn't map 'work'.
+        subprocess.run(
+            ["git", "update-ref", "-d", "refs/remotes/origin/work"],
+            cwd=clone, check=False,
+        )
+        assert is_commit_pushed(str(clone), "work")
+
+    def test_unpushed_commit_returns_false(self, tmp_path):
+        """A commit that was never pushed must return False."""
+        from lib.git import is_commit_pushed
+        clone = self._repo_with_origin(tmp_path)
+        subprocess.run(["git", "checkout", "-q", "-b", "work"], cwd=clone, check=True)
+        (clone / "f2.txt").write_text("y")
+        subprocess.run(["git", "add", "f2.txt"], cwd=clone, check=True)
+        subprocess.run(["git", "commit", "-qm", "work"], cwd=clone, check=True)
+        # Not pushed.
+        assert not is_commit_pushed(str(clone), "work")

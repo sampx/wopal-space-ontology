@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
@@ -59,7 +58,7 @@ from lib.git import (
     get_common_git_dir,
 )
 from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
-from lib.project import resolve_plan_location
+from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
 from lib.worktree import create_worktree, write_worktree_context
 from plan import set_plan_field
 
@@ -106,64 +105,6 @@ def _has_unmerged_files(repo_path: str) -> bool:
 # Plan field snapshot / rollback
 # ============================================
 
-@dataclass
-class PlanFieldSnapshot:
-    """Pre-approval Plan field shape (Status / Worktree / Base Commit).
-
-    Captured before the approve transaction writes any state field. Restore
-    rewrites the captured content, so Status reverts to its original value, a
-    Worktree block added by this run is removed (a pre-existing one keeps its
-    original form), Base Commit returns to its original value, and every
-    other byte of the document stays untouched.
-    """
-
-    content: str
-
-    @classmethod
-    def capture(cls, plan_path: str) -> "PlanFieldSnapshot | None":
-        """Read the Plan's pre-approval content; None when unreadable."""
-        try:
-            return cls(content=Path(plan_path).read_text())
-        except OSError:
-            return None
-
-    def restore(self, plan_path: str) -> bool:
-        """Write the pre-approval content back; False on failure."""
-        try:
-            Path(plan_path).write_text(self.content)
-            return True
-        except OSError:
-            return False
-
-
-def _reset_plan_index(plan_path: str, workspace_root: Path) -> None:
-    """Drop the staged Plan entry left behind by a failed approval commit.
-
-    `commit_and_push_plan` stages the Plan before committing; when that
-    commit fails the index keeps the staged (executing) content, so the Plan
-    would sit in a half-committed state that a later unrelated commit could
-    pick up. Reset only this one path in the Plan's owning repo — never the
-    whole index.
-
-    Best-effort: never raises; a failure only logs the manual command.
-    """
-    try:
-        location = resolve_plan_location(Path(plan_path), workspace_root)
-        result = subprocess.run(
-            ["git", "reset", "--", location.repo_relative_path],
-            cwd=str(location.repo_root),
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            log_warn(
-                "Failed to reset staged Plan entry; run manually: "
-                f"git -C {location.repo_root} reset -- {location.repo_relative_path}"
-            )
-    except Exception as e:
-        log_warn(f"Failed to reset staged Plan entry: {e}")
-
-
 def _abort_after_state_write(
     plan_path: str,
     snapshot: "PlanFieldSnapshot | None",
@@ -173,6 +114,7 @@ def _abort_after_state_write(
     *,
     rollback_commit: bool,
     reset_index: bool = False,
+    root_failure: str = "",
 ) -> int:
     """Roll a failed approval back to the pre-approval Plan field shape.
 
@@ -185,13 +127,22 @@ def _abort_after_state_write(
     staged index entry is reset as well, so no half-committed residue
     remains.
 
+    root_failure carries the original failure (e.g. the worktree creation
+    error with both attempts). It is echoed first so the root cause stays
+    complete and clearly distinct from the rollback outcome; a failed
+    rollback never replaces or obscures it.
+
     Returns:
         1 — the failure exit code; the Plan stays retryable.
     """
-    restored = snapshot is not None and snapshot.restore(plan_path)
+    if root_failure:
+        log_error(root_failure)
+        log_error("")
 
-    if restored and reset_index:
-        _reset_plan_index(plan_path, workspace_root)
+    recovery = recover_plan_after_failed_commit(
+        plan_path, snapshot, workspace_root, reset_index=reset_index
+    )
+    restored = recovery.file_restored
 
     if restored and rollback_commit:
         result = commit_and_push_plan(
@@ -203,15 +154,24 @@ def _abort_after_state_write(
         elif result != RESULT_OK:
             log_warn(f"回滚提交失败；Plan 已恢复批准前字段形态，请手动提交: {plan_path}")
 
-    if restored:
+    if restored and recovery.index_reset_ok:
         log_error(
-            f"Plan 已回滚，未进入 executing（当前状态: {original_status}），可直接重试"
+            f"Rollback outcome: Plan 已回滚，未进入 executing（当前状态: {original_status}），可直接重试"
         )
+    elif restored:
+        log_error(
+            "Rollback outcome: Plan 已回滚，但 index 残留未清理（重试前需手工清理）："
+        )
+        log_error(recovery.index_failure)
+        if root_failure:
+            log_error("（上方 root failure 仍为原始失败原因；此处仅报告回滚结果）")
     else:
         log_error(
-            f"Plan 回滚失败：Status / Worktree / Base Commit 可能仍为本次写入值，"
-            f"请手动恢复后重试: {plan_path}"
+            f"Rollback outcome: Plan 回滚失败：Status / Worktree / Base Commit "
+            f"可能仍为本次写入值，请手动恢复后重试: {plan_path}"
         )
+        if root_failure:
+            log_error("（上方 root failure 仍为原始失败原因；此处仅报告回滚结果）")
     return 1
 
 
@@ -219,29 +179,33 @@ def _abort_after_state_write(
 # Worktree Creation
 # ============================================
 
-def _create_worktree(project_dir: Path, branch: str, workspace_root: Path) -> Path | None:
+def _create_worktree(
+    project_dir: Path, branch: str, workspace_root: Path
+) -> tuple[Path | None, str]:
     """Create isolated worktree for project execution.
-    
+
     Args:
         project_dir: Resolved project git root path
         branch: Branch name for worktree
         workspace_root: Workspace root path
-        
+
     Returns:
-        Path to created worktree, or None on failure
+        (worktree_path, "") on success; (None, error_message) on failure.
+        The error message carries the full create_worktree diagnostics
+        (both attempts) for the caller to surface.
     """
     worktree_base = workspace_root / ".worktrees"
-    
+
     log_step("Pre-flight: creating worktree...")
     log_info(f"Project: {project_dir.name}, Branch: {branch}")
-    
+
     try:
         wt_path = create_worktree(project_dir, branch, worktree_base)
-        log_success(f"Worktree created successfully: {wt_path}")
-        return wt_path
     except Exception as e:
-        log_error(f"Worktree creation failed - aborting approve: {e}")
-        return None
+        return None, str(e)
+
+    log_success(f"Worktree created successfully: {wt_path}")
+    return wt_path, ""
 
 
 # ============================================
@@ -548,16 +512,22 @@ def cmd_approve(args: argparse.Namespace) -> int:
             )
 
         log_step("Creating worktree from committed baseline...")
-        actual_wt_path = _create_worktree(project_path, branch, workspace_root)
+        actual_wt_path, wt_failure = _create_worktree(
+            project_path, branch, workspace_root
+        )
         if actual_wt_path is not None:
             worktree_created = True
             worktree_path = actual_wt_path
             log_success(f"Worktree created: {worktree_path}")
         else:
-            log_error("Worktree creation failed - aborting approve")
             return _abort_after_state_write(
                 plan_path, snapshot, current_status, workspace_root,
                 issue_number, rollback_commit=True,
+                root_failure=(
+                    f"Worktree creation failed - aborting approve:\n{wt_failure}"
+                    if wt_failure
+                    else "Worktree creation failed - aborting approve"
+                ),
             )
 
     # ============================================

@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 # test_verify_switch.py - TDD tests for verify_switch (unified switching)
+#
+# Behavior-assertion tests: the switch is exercised on a real workspace repo
+# plus a project repo with a real registered worktree, so worktree removal,
+# checkout and the Plan metadata commit are verified by their actual results
+# (HEAD branch, git registry, final file content), not by call sequences.
+# A small set of gate tests keeps mocked boundaries where no local
+# construction exists (gh merge queries, user validation).
 
+import json
+import os
+import shutil
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -11,7 +21,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
+from support.git_fixtures import (
+    init_repo as _vs_init_repo,
+    install_failing_hook as _vs_failing_hook,
+    shell_git as _vs_shell_git,
+)
+
 from lib.worktree import WorktreeContext, parse_worktree_context
+
+
+# -- Shared recorded samples (R2) ---------------------------------------------
+
+PR_SAMPLE = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures" / "github" / "pr-merged-recorded.json"
+)
+RECORDED_PR_URL = json.loads(PR_SAMPLE.read_text())[0]["url"]
 
 
 # -- Fixtures -----------------------------------------------------------------
@@ -28,6 +53,31 @@ PLAN_STANDARD = """\
   - path: .worktrees/gesp-issue-1-slug
 """
 
+PLAN_VERIFYING = """\
+- **Status**: verifying
+- **Type**: feature
+- **Target Project**: gesp
+- **Project Type**: standard
+- **Issue**: #42
+- **Worktree**:
+  - enabled: true
+  - branch: feature/test-1-slug
+  - path: .worktrees/gesp-issue-1-slug
+  - repo_root: /workspace/projects/gesp
+  - base_branch: main
+  - merge_target: main
+  - verify_mode: direct
+  - cleanup_policy: archive
+"""
+
+PLAN_VERIFYING_NO_ISSUE = """\
+- **Status**: verifying
+- **Type**: refactor
+- **Target Project**: wopal-space
+- **Created**: 2026-05-13
+"""
+
+
 def _write_plan(tmp_path, content: str, name: str = "42-feature-dev-flow-test.md") -> Path:
     """Write a Plan file with given content and return its path."""
     plan_dir = tmp_path / "plans"
@@ -35,234 +85,6 @@ def _write_plan(tmp_path, content: str, name: str = "42-feature-dev-flow-test.md
     plan_file = plan_dir / name
     plan_file.write_text(content)
     return plan_file
-
-
-def _make_standard_ctx():
-    """Create a standard project WorktreeContext for testing."""
-    return WorktreeContext(
-        branch="feature/test-1-slug",
-        path=Path(".worktrees/gesp-issue-1-slug"),
-        project_type="standard",
-    )
-
-
-def _setup_standard_with_worktree(tmp_path):
-    """Create worktree directory on disk so _remove_worktree calls subprocess."""
-    wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
-    wt_dir.mkdir(parents=True, exist_ok=True)
-    return wt_dir
-
-
-def _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path):
-    """Set up common mocks for standard project tests."""
-    plan_path = _write_plan(tmp_path, PLAN_STANDARD)
-    ws_root = tmp_path
-    mock_ws_root.return_value = ws_root
-    mock_find_plan.return_value = str(plan_path)
-    mock_parse_ctx.return_value = _make_standard_ctx()
-    mock_resolve_project.return_value = Path("/workspace/projects/gesp")
-    mock_subprocess.return_value = MagicMock(returncode=0)
-    return plan_path
-
-
-# -- Test: standard project unified switch ------------------------------------
-
-class TestStandardSwitch:
-    """Test verify-switch for standard project: checkout project repo + worktree cleanup."""
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_checkout_project_repo_to_feature_branch(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: checkouts project repo to feature branch after confirmation.
-        New order: fetch → dirty check → remove worktree → checkout → commit."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _write_plan(tmp_path, PLAN_STANDARD)
-        ws_root = tmp_path
-        mock_ws_root.return_value = ws_root
-        mock_find_plan.return_value = str(plan_path)
-        mock_parse_ctx.return_value = _make_standard_ctx()
-        mock_subprocess.return_value = MagicMock(returncode=0)
-
-        _setup_standard_with_worktree(tmp_path)
-
-        result = run_verify_switch("42")
-
-        assert result is True
-
-        # subprocess.run should have been called: fetch + dirty check + remove + prune + checkout
-        calls = mock_subprocess.call_args_list
-        assert len(calls) == 5
-
-        # First call: git fetch (in project repo)
-        assert "fetch" in calls[0][0][0]
-        assert calls[0][1]["cwd"] == "/workspace/projects/gesp"
-
-        # Second call: git status --porcelain (dirty check)
-        assert "status" in calls[1][0][0]
-        assert calls[1][1]["cwd"] == "/workspace/projects/gesp"
-
-        # Third call: git worktree remove
-        assert "worktree" in calls[2][0][0]
-        assert "remove" in calls[2][0][0]
-        assert calls[2][1]["cwd"] == "/workspace/projects/gesp"
-
-        # Fourth call: git worktree prune
-        assert "worktree" in calls[3][0][0]
-        assert "prune" in calls[3][0][0]
-
-        # Fifth call: git checkout (in project repo)
-        assert calls[4][0][0] == ["git", "checkout", "feature/test-1-slug"]
-        assert calls[4][1]["cwd"] == "/workspace/projects/gesp"
-
-        # commit_paths should have been called
-        mock_commit_paths.assert_called_once()
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_removes_worktree_after_checkout(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: removes worktree after successful checkout."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-        _setup_standard_with_worktree(tmp_path)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        calls = mock_subprocess.call_args_list
-        # Third call: git worktree remove
-        wt_remove_call = calls[2]
-        assert "worktree" in wt_remove_call[0][0]
-        assert "remove" in wt_remove_call[0][0]
-        # cwd should be repo_root from resolve_project_path
-        assert wt_remove_call[1]["cwd"] == "/workspace/projects/gesp"
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_worktree_cleanup_skipped_on_checkout_failure(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: worktree remove happens before checkout, so remove still
-        runs even when checkout fails. 5 subprocess calls: fetch, dirty check, remove, prune, checkout."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-        _setup_standard_with_worktree(tmp_path)
-
-        # fetch ok, dirty check clean, worktree remove ok, prune, checkout fails
-        mock_subprocess.side_effect = [
-            MagicMock(returncode=0),  # fetch
-            MagicMock(returncode=0, stdout=""),  # git status --porcelain (clean)
-            MagicMock(returncode=0),  # worktree remove
-            MagicMock(returncode=0),  # worktree prune
-            MagicMock(returncode=1, stderr="checkout error"),  # checkout
-        ]
-
-        result = run_verify_switch("42")
-        assert result is False
-
-        # 5 calls: fetch + dirty check + worktree remove + prune + checkout
-        assert len(mock_subprocess.call_args_list) == 5
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_worktree_cleanup_failure_returns_false(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path, capsys
-    ):
-        """Standard: worktree remove failure returns False immediately."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-        _setup_standard_with_worktree(tmp_path)
-
-        # fetch ok, dirty check clean, worktree remove fails
-        mock_subprocess.side_effect = [
-            MagicMock(returncode=0),  # fetch
-            MagicMock(returncode=0, stdout=""),  # git status --porcelain (clean)
-            MagicMock(returncode=1, stderr="worktree remove error"),  # worktree remove --force
-        ]
-
-        result = run_verify_switch("42")
-        assert result is False
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_git_commands_run_in_project_repo(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: git fetch, dirty check, worktree remove, and checkout run in project repo root."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        # All subprocess calls use project repo cwd
-        for call in mock_subprocess.call_args_list:
-            assert call[1]["cwd"] == "/workspace/projects/gesp"
-
-
-# -- Test: verification guidance output ---------------------------------------
-
-class TestVerificationGuidance:
-    """Test that verification guidance is printed after successful switch."""
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_prints_merge_guidance(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path, capsys
-    ):
-        """Standard: prints merge guidance after switch."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-
-        run_verify_switch("42")
-
-        output = capsys.readouterr().out
-        # Verify correct verify command (issue ref, not branch name)
-        assert "flow.sh verify 42 --confirm" in output
-        # Verify correct merge guidance (checkout integration branch first)
-        assert "git checkout main" in output
-        assert "git merge feature/test-1-slug" in output
-        # Verify merge is in the correct repo
-        assert "/workspace/projects/gesp" in output
 
 
 # -- Test: error cases -------------------------------------------------------
@@ -298,13 +120,11 @@ class TestErrorCases:
         result = run_verify_switch("42")
         assert result is False
 
-    @patch("commands.verify_switch.subprocess.run")
     @patch("commands.verify_switch.parse_worktree_context")
     @patch("commands.verify_switch.find_plan")
     @patch("commands.verify_switch.find_workspace_root")
     def test_empty_branch_errors_out(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx,
-        mock_subprocess, tmp_path
+        self, mock_ws_root, mock_find_plan, mock_parse_ctx, tmp_path
     ):
         """Returns False when WorktreeContext has empty branch."""
         from commands.verify_switch import run_verify_switch
@@ -312,19 +132,13 @@ class TestErrorCases:
         plan_path = _write_plan(tmp_path, PLAN_STANDARD)
         mock_ws_root.return_value = tmp_path
         mock_find_plan.return_value = str(plan_path)
-        # WorktreeContext with empty branch — git checkout "" fails
-        ctx = WorktreeContext(
+        mock_parse_ctx.return_value = WorktreeContext(
             branch="",
             path=Path(".worktrees/empty-branch"),
         )
-        mock_parse_ctx.return_value = ctx
-        mock_subprocess.return_value = MagicMock(returncode=0)
 
         result = run_verify_switch("42")
         assert result is False
-
-
-
 
 
 # -- Test: no --merge references ----------------------------------------------
@@ -341,126 +155,11 @@ class TestNoMergeArgument:
         params = list(sig.parameters.keys())
         assert "merge" not in params
 
-    def test_verify_switch_module_no_merge_string(self):
-        """Module source has no --merge references."""
-        from commands import verify_switch
-        import inspect
 
-        source = inspect.getsource(verify_switch)
-        assert "--merge" not in source
-
-
-# -- Test: verify --confirm integration tests ---------------------------------
-
-PLAN_VERIFYING = """\
-- **Status**: verifying
-- **Type**: feature
-- **Target Project**: gesp
-- **Project Type**: standard
-- **Issue**: #42
-- **Worktree**:
-  - enabled: true
-  - branch: feature/test-1-slug
-  - path: .worktrees/gesp-issue-1-slug
-  - repo_root: /workspace/projects/gesp
-  - base_branch: main
-  - merge_target: main
-  - verify_mode: direct
-  - cleanup_policy: archive
-"""
-
-PLAN_VERIFYING_NO_ISSUE = """\
-- **Status**: verifying
-- **Type**: refactor
-- **Target Project**: wopal-space
-- **Created**: 2026-05-13
-"""
-
+# -- Test: verify --confirm gates ---------------------------------------------
 
 class TestVerifyConfirmDirectMerge:
     """Test verify --confirm after verify-switch succeeded."""
-
-    @patch("plan.get_plan_worktree", return_value=None)
-    @patch("commands.verify.get_plan_worktree", return_value=None)
-    @patch("commands.verify.sync_plan_to_issue_body")
-    @patch("commands.verify.sync_status_label")
-    @patch("commands.verify.commit_paths", return_value=True)
-    @patch("commands.verify.update_plan_status", return_value=True)
-    @patch("commands.verify.check_user_validation")
-    @patch("commands.verify.resolve_active_plan")
-    @patch("commands.verify.find_workspace_root")
-    @patch("commands.verify.find_plan")
-    def test_direct_merge_verify_uses_resolve_active_plan(
-        self, mock_find_plan, mock_ws_root, mock_resolve, mock_check_uv,
-        mock_update_status, mock_commit, mock_sync_label, mock_sync_body,
-        mock_no_wt, mock_plan_wt,
-        tmp_path
-    ):
-        """verify --confirm uses resolve_active_plan to enforce merged state."""
-        from commands.verify import cmd_verify
-        from lib.worktree import ActivePlanInfo
-
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING)
-        mock_find_plan.return_value = str(plan_path)
-        mock_ws_root.return_value = tmp_path
-
-        mock_resolve.return_value = ActivePlanInfo(
-            active_plan_path=Path(plan_path),
-            commit_repo_root=tmp_path,
-            repo_relative_plan_path=f"plans/{Path(plan_path).name}",
-            branch_context="integration",
-        )
-
-        args = MagicMock()
-        args.target = "42"
-        args.confirm = True
-
-        result = cmd_verify(args)
-        assert result == 0
-
-        mock_resolve.assert_called_once_with(str(plan_path), "verify", tmp_path)
-
-    @patch("plan.get_plan_worktree", return_value=None)
-    @patch("commands.verify.get_plan_worktree", return_value=None)
-    @patch("commands.verify.sync_plan_to_issue_body")
-    @patch("commands.verify.sync_status_label")
-    @patch("commands.verify.commit_paths", return_value=True)
-    @patch("commands.verify.update_plan_status", return_value=True)
-    @patch("commands.verify.check_user_validation")
-    @patch("commands.verify.resolve_active_plan")
-    @patch("commands.verify.find_workspace_root")
-    @patch("commands.verify.find_plan")
-    def test_direct_merge_commits_on_integration_branch(
-        self, mock_find_plan, mock_ws_root, mock_resolve, mock_check_uv,
-        mock_update_status, mock_commit, mock_sync_label, mock_sync_body,
-        mock_no_wt, mock_plan_wt,
-        tmp_path
-    ):
-        """verify --confirm commits Plan-only on the integration branch repo root."""
-        from commands.verify import cmd_verify
-        from lib.worktree import ActivePlanInfo
-
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING)
-        mock_find_plan.return_value = str(plan_path)
-        mock_ws_root.return_value = tmp_path
-
-        mock_resolve.return_value = ActivePlanInfo(
-            active_plan_path=Path(plan_path),
-            commit_repo_root=tmp_path,
-            repo_relative_plan_path=f"plans/{Path(plan_path).name}",
-            branch_context="integration",
-        )
-
-        args = MagicMock()
-        args.target = "42"
-        args.confirm = True
-
-        result = cmd_verify(args)
-        assert result == 0
-
-        mock_commit.assert_called_once()
-        call_args = mock_commit.call_args
-        assert call_args[0][0] == str(tmp_path)
 
     @patch("commands.verify.get_plan_worktree", return_value=None)
     @patch("commands.verify.resolve_active_plan")
@@ -517,7 +216,7 @@ class TestVerifyConfirmPRMerge:
         from commands.verify import cmd_verify
         from lib.worktree import ActivePlanInfo
 
-        plan_content = PLAN_VERIFYING + "\n- **PR**: https://github.com/owner/repo/pull/99\n"
+        plan_content = PLAN_VERIFYING + f"\n- **PR**: {RECORDED_PR_URL}\n"
         plan_path = _write_plan(tmp_path, plan_content)
         mock_find_plan.return_value = str(plan_path)
         mock_ws_root.return_value = tmp_path
@@ -546,7 +245,7 @@ class TestVerifyConfirmPRMerge:
         """PR not yet merged: verify --confirm returns error."""
         from commands.verify import cmd_verify
 
-        plan_content = PLAN_VERIFYING + "\n- **PR**: https://github.com/owner/repo/pull/99\n"
+        plan_content = PLAN_VERIFYING + f"\n- **PR**: {RECORDED_PR_URL}\n"
         plan_path = _write_plan(tmp_path, plan_content)
         mock_find_plan.return_value = str(plan_path)
         mock_ws_root.return_value = tmp_path
@@ -601,157 +300,158 @@ class TestVerifyNoIssuePlan:
         mock_sync_body.assert_not_called()
 
 
-# -- Test: real Plan parsing + dispatch (no parse_worktree_context mock) --------
+# ============================================
+# Real construction: space repo + project repo with a registered worktree
+# ============================================
+#
+# A workspace repo holds the Plan (space repo); an independent project repo
+# carries the feature branch really checked out in a registered worktree at
+# the Plan-declared path (as after approve). fetch / worktree removal /
+# checkout and the Plan metadata commit all run for real; only workspace and
+# Plan lookup are injected.
 
-class TestDispatchFromRealPlan:
-    """Verify that real Plan files drive the switch through the parse chain.
+VS_BRANCH = "feature/test-1-slug"
+VS_PLAN_REL = ".wopal-space/plans/gesp/42-feature-dev-flow-test.md"
+VS_WT_REL = ".worktrees/gesp-issue-1-slug"
 
-    These tests deliberately do NOT mock parse_worktree_context — they verify
-    the full parse→switch chain: Plan metadata → WorktreeContext → switch function.
-    """
+VS_PLAN_TEMPLATE = """\
+# 42-feature-dev-flow-test
 
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_plan_dispatches_with_worktree_cleanup(
-        self, mock_ws_root, mock_find_plan, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
+## Metadata
+
+- **Status**: verifying
+- **Type**: feature
+- **Target Project**: gesp
+- **Project Type**: standard
+- **Project Path**: projects/gesp
+- **Issue**: #42
+- **Worktree**:
+  - branch: {branch}
+  - path: .worktrees/gesp-issue-1-slug
+"""
+
+
+def _make_switch_workspace(tmp_path):
+    ws = tmp_path / "ws"
+    _vs_init_repo(ws)
+
+    project = ws / "projects" / "gesp"
+    _vs_init_repo(project)
+    origin = tmp_path / "gesp-origin.git"
+    _vs_shell_git("init", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    _vs_shell_git("remote", "add", "origin", str(origin), cwd=project)
+    _vs_shell_git("push", "-u", "origin", "main", cwd=project)
+    _vs_shell_git("remote", "set-head", "origin", "main", cwd=project)
+    # The feature branch is really checked out in a registered worktree at
+    # the Plan-declared path, so removal and checkout are exercised for real.
+    wt_dir = ws / VS_WT_REL
+    wt_dir.parent.mkdir(parents=True, exist_ok=True)
+    _vs_shell_git("worktree", "add", "-q", str(wt_dir), "-b", VS_BRANCH, cwd=project)
+
+    plan = ws / VS_PLAN_REL
+    plan.parent.mkdir(parents=True)
+    plan.write_text(VS_PLAN_TEMPLATE.format(branch=VS_BRANCH))
+    _vs_shell_git("add", VS_PLAN_REL, cwd=ws)
+    _vs_shell_git("commit", "-m", "add plan", cwd=ws)
+    return ws, project, plan
+
+
+def _run_switch(ws, project, target="42"):
+    """Run the switch with workspace/Plan lookup mocked; the real Plan file
+    drives parsing and every git step runs for real."""
+    from commands.verify_switch import run_verify_switch
+
+    with patch.multiple(
+        "commands.verify_switch",
+        find_workspace_root=MagicMock(return_value=ws),
+        find_plan=MagicMock(return_value=str(ws / VS_PLAN_REL)),
+        resolve_project_path=MagicMock(return_value=project),
     ):
-        """PLAN_STANDARD dispatches to standard path with worktree removal before checkout."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _write_plan(tmp_path, PLAN_STANDARD)
-        ws_root = tmp_path
-        mock_ws_root.return_value = ws_root
-        mock_find_plan.return_value = str(plan_path)
-        mock_subprocess.return_value = MagicMock(returncode=0)
-
-        # Create worktree dir so _remove_worktree triggers
-        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
-        wt_dir.mkdir(parents=True, exist_ok=True)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        # Standard path: fetch + dirty check + worktree remove + prune + checkout
-        calls = mock_subprocess.call_args_list
-        assert len(calls) == 5
-        # fetch + dirty check + worktree remove + prune + checkout all in project repo
-        for call in calls:
-            assert call[1]["cwd"] == "/workspace/projects/gesp"
-        # worktree remove before checkout
-        assert "worktree" in calls[2][0][0]
-        assert "prune" in calls[3][0][0]
-        assert "checkout" in calls[4][0][0]
+        return run_verify_switch(target)
 
 
-# -- Test: dirty check on verify-switch --------------------------------------
+class TestPlanMetadataCommitsToSpaceRepo:
+    """The switch result is verified by real state: the worktree is gone from
+    disk and from git's registry, HEAD sits on the feature branch, the Plan
+    file reached its final shape and the metadata commit lands in the space
+    repo (never in the project repo)."""
 
-class TestDirtyCheckOnVerifySwitch:
-    """Test that _check_dirty is called and warns when repo is dirty."""
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_dirty_warns_but_proceeds(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path, capsys
+    def test_switch_removes_worktree_and_checks_out_feature_branch(
+        self, tmp_path, capsys
     ):
-        """Standard: dirty canonical path warns but switch still succeeds."""
-        from commands.verify_switch import run_verify_switch
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        wt_dir = ws / VS_WT_REL
+        assert wt_dir.exists()
 
-        plan_path = _write_plan(tmp_path, PLAN_STANDARD)
-        ws_root = tmp_path
-        mock_ws_root.return_value = ws_root
-        mock_find_plan.return_value = str(plan_path)
-        mock_parse_ctx.return_value = _make_standard_ctx()
+        result = _run_switch(ws, project)
 
-        # Create worktree dir so _remove_worktree triggers
-        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
-        wt_dir.mkdir(parents=True, exist_ok=True)
-
-        # fetch ok, dirty check returns dirty files, worktree remove ok, prune ok, checkout ok
-        mock_subprocess.side_effect = [
-            MagicMock(returncode=0),  # fetch
-            MagicMock(returncode=0, stdout=" M src/foo.py\n?? src/bar.py"),  # dirty
-            MagicMock(returncode=0),  # worktree remove
-            MagicMock(returncode=0),  # prune
-            MagicMock(returncode=0),  # checkout
-        ]
-
-        result = run_verify_switch("42")
         assert result is True
+        # The real registered worktree is gone from disk and from git.
+        assert not wt_dir.exists()
+        listed = _vs_shell_git(
+            "worktree", "list", "--porcelain", cwd=project
+        ).stdout
+        assert "gesp-issue-1-slug" not in listed
+        # The canonical checkout now sits on the feature branch — only
+        # possible after the worktree was released first.
+        assert _vs_shell_git(
+            "branch", "--show-current", cwd=project
+        ).stdout.strip() == VS_BRANCH
+        # Final Plan content and commit target.
+        content = plan.read_text()
+        assert "path: (removed)" in content
+        assert f"- **Verification Dir**: {project}" in content
+        show = _vs_shell_git(
+            "show", "HEAD", "--name-only", "--format=%s", cwd=ws
+        ).stdout
+        assert "verify-switch" in show
+        assert VS_PLAN_REL in show
+        assert _vs_shell_git(
+            "log", "-1", "--format=%s", cwd=project
+        ).stdout.strip() == "init"
+        # Merge/verify guidance reaches the user.
+        out = capsys.readouterr().out
+        assert "flow.sh verify 42 --confirm" in out
+        assert "git checkout main" in out
+        assert f"git merge {VS_BRANCH}" in out
 
-        output = capsys.readouterr().out
-        assert "WARN" in output
-        assert "uncommitted" in output
+    def test_dirty_canonical_warns_but_switches(self, tmp_path, capsys):
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        (project / "untracked.txt").write_text("dirty\n")
 
+        result = _run_switch(ws, project)
 
-# -- Test: Plan metadata update after switch ----------------------------------
-
-class TestUpdatePlanMetadata:
-    """Test that _update_plan_after_switch updates Plan metadata correctly."""
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_updates_path_to_removed(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: Plan Worktree path is updated to '(removed)' after switch."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-
-        result = run_verify_switch("42")
         assert result is True
+        assert _vs_shell_git(
+            "branch", "--show-current", cwd=project
+        ).stdout.strip() == VS_BRANCH
+        out = capsys.readouterr().out
+        assert "uncommitted" in out
 
-        plan_content = plan_path.read_text()
-        assert "path: (removed)" in plan_content
-        # Original path should no longer be present
-        assert "path: .worktrees/gesp-issue-1-slug" not in plan_content
+    def test_eof_plan_no_trailing_newline(self, tmp_path):
+        """Worktree block at EOF without trailing newline: Verification Dir
+        is still placed after the block, not inside it (R-01 regression).
 
-        # Structural assertion: WorktreeContext still parses correctly
-        # (Verification Dir is NOT inside the Worktree block)
-        ctx = parse_worktree_context(str(plan_path))
-        assert ctx is not None, "WorktreeContext should parse after metadata update"
-        # path is intentionally "(removed)" — worktree has been cleaned up
-        assert ctx.branch == "feature/test-1-slug", "branch preserved"
+        The real parser requires the block's trailing newline (pre-existing
+        limitation, out of this change's scope), so the parsed context is
+        pinned here; the switch and the metadata update run for real.
+        """
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        plan.write_text(VS_PLAN_TEMPLATE.format(branch=VS_BRANCH).rstrip("\n"))
+        _vs_shell_git("add", VS_PLAN_REL, cwd=ws)
+        _vs_shell_git("commit", "-qm", "no trailing newline", cwd=ws)
 
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_adds_verification_dir(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: Plan gets Verification Dir metadata field after switch."""
-        from commands.verify_switch import run_verify_switch
+        with patch(
+            "commands.verify_switch.parse_worktree_context",
+            return_value=WorktreeContext(
+                branch=VS_BRANCH, path=Path(VS_WT_REL), project_type="standard"
+            ),
+        ):
+            result = _run_switch(ws, project)
 
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-
-        result = run_verify_switch("42")
         assert result is True
-
-        plan_content = plan_path.read_text()
-        assert "Verification Dir" in plan_content
-        assert "/workspace/projects/gesp" in plan_content
-
-        # Structural assertion: Verification Dir is a top-level field (0-indent),
-        # NOT accidentally inserted inside the Worktree block (2-indent).
-        for line in plan_content.splitlines():
+        content = plan.read_text()
+        for line in content.splitlines():
             if "Verification Dir" in line:
                 assert not line.startswith(" "), (
                     f"Verification Dir should be top-level, got: {line!r}"
@@ -759,113 +459,96 @@ class TestUpdatePlanMetadata:
                 break
         else:
             pytest.fail("Verification Dir not found in plan")
+        assert parse_worktree_context(str(plan)) is not None
 
-        # Verify WorktreeContext still parses correctly
-        ctx = parse_worktree_context(str(plan_path))
-        assert ctx is not None, "WorktreeContext should parse after metadata update"
+    def test_commit_failure_is_loud_and_actionable(self, tmp_path, capsys):
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        _vs_failing_hook(ws, "injected verify-switch failure")
 
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_plan_committed_after_switch(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: commit_paths called with correct args after switch."""
-        from commands.verify_switch import run_verify_switch
+        result = _run_switch(ws, project)
 
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        mock_commit_paths.assert_called_once()
-        call_args = mock_commit_paths.call_args
-        # First arg: repo_root
-        assert call_args[0][0] == "/workspace/projects/gesp"
-        # Second arg: list of paths (plan file relative)
-        paths = call_args[0][1]
-        assert len(paths) == 1
-        assert plan_path.name in paths[0]
-        # Third arg: commit message
-        msg = call_args[0][2]
-        assert "verify-switch" in msg
-
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_eof_plan_no_trailing_newline(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Worktree block at EOF without trailing newline: Verification Dir
-        is still placed after the block, not inside it (R-01 regression)."""
-        from commands.verify_switch import run_verify_switch
-
-        # Remove trailing newline from PLAN_STANDARD
-        plan_content = PLAN_STANDARD.rstrip("\n")
-        plan_path = _write_plan(tmp_path, plan_content)
-        ws_root = tmp_path
-        mock_ws_root.return_value = ws_root
-        mock_find_plan.return_value = str(plan_path)
-        mock_parse_ctx.return_value = _make_standard_ctx()
-        mock_resolve_project.return_value = Path("/workspace/projects/gesp")
-        mock_subprocess.return_value = MagicMock(returncode=0)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        updated = plan_path.read_text()
-        # Verification Dir must appear after the Worktree block
-        assert "Verification Dir" in updated
-        # WorktreeContext must still parse correctly
-        ctx = parse_worktree_context(str(plan_path))
-        assert ctx is not None
+        assert result is False
+        out, err = capsys.readouterr()
+        combined = out + err
+        # Full mutation diagnostics reach the surface.
+        assert "injected verify-switch failure" in combined
+        # The edit is on disk but not committed; guidance names the repo and
+        # the manual command.
+        assert "path: (removed)" in plan.read_text()
+        assert "verify-switch" not in _vs_shell_git(
+            "log", "-1", "--format=%s", cwd=ws
+        ).stdout
+        assert str(ws) in combined
+        assert f"git -C {ws}" in combined
+        assert VS_PLAN_REL in combined
 
 
-# -- Test: remove before checkout ordering -------------------------------------
+# ============================================
+# Failure diagnostics on the switch mutation chain (B-04)
+# ============================================
 
-class TestRemoveBeforeCheckout:
-    """Test the fixed ordering: remove worktree BEFORE checkout."""
+class TestSwitchMutationDiagnostics:
+    """fetch / worktree remove / checkout failures keep full diagnostics
+    (command / cwd / exit / stderr); a prune failure is reported, not
+    silently ignored."""
 
-    @patch("commands.verify_switch.commit_paths", return_value=True)
-    @patch("commands.verify_switch.resolve_project_path", return_value=Path("/workspace/projects/gesp"))
-    @patch("commands.verify_switch.subprocess.run")
-    @patch("commands.verify_switch.parse_worktree_context")
-    @patch("commands.verify_switch.find_plan")
-    @patch("commands.verify_switch.find_workspace_root")
-    def test_standard_remove_before_checkout(
-        self, mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess,
-        mock_resolve_project, mock_commit_paths, tmp_path
-    ):
-        """Standard: worktree remove subprocess call happens before checkout."""
-        from commands.verify_switch import run_verify_switch
-
-        plan_path = _setup_standard_mocks(mock_ws_root, mock_find_plan, mock_parse_ctx, mock_subprocess, mock_resolve_project, tmp_path)
-        _setup_standard_with_worktree(tmp_path)
-
-        result = run_verify_switch("42")
-        assert result is True
-
-        calls = mock_subprocess.call_args_list
-        # Order: fetch(0) → dirty_check(1) → worktree_remove(2) → checkout(3)
-        remove_indices = [
-            i for i, c in enumerate(calls)
-            if "worktree" in c[0][0] and "remove" in c[0][0]
-        ]
-        checkout_indices = [
-            i for i, c in enumerate(calls)
-            if c[0][0] == ["git", "checkout", "feature/test-1-slug"]
-        ]
-        assert len(remove_indices) == 1
-        assert len(checkout_indices) == 1
-        assert remove_indices[0] < checkout_indices[0], (
-            "worktree remove must happen before checkout"
+    def test_fetch_failure_keeps_full_diagnostics(self, tmp_path, capsys):
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        # Unreachable origin URL: fetch fails with real git diagnostics.
+        _vs_shell_git(
+            "remote", "set-url", "origin", str(tmp_path / "gone.git"),
+            cwd=project,
         )
 
+        result = _run_switch(ws, project)
+
+        assert result is False
+        combined = "".join(capsys.readouterr())
+        assert "command: git fetch" in combined
+        assert "exit code" in combined
+
+    def test_worktree_remove_failure_keeps_full_diagnostics(self, tmp_path, capsys):
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        wt_dir = ws / VS_WT_REL
+        _vs_shell_git("worktree", "lock", str(wt_dir), cwd=project)
+
+        result = _run_switch(ws, project)
+
+        assert result is False
+        combined = "".join(capsys.readouterr())
+        assert "command: git worktree remove" in combined
+        assert "locked" in combined.lower()
+
+    def test_checkout_failure_keeps_full_diagnostics(self, tmp_path, capsys):
+        ws, project, plan = _make_switch_workspace(tmp_path)
+        wt_dir = ws / VS_WT_REL
+        (wt_dir / "README.md").write_text("# feature\n")
+        _vs_shell_git("commit", "-qam", "feature change", cwd=wt_dir)
+        # Canonical checkout has a conflicting uncommitted change.
+        (project / "README.md").write_text("# local dirty\n")
+
+        result = _run_switch(ws, project)
+
+        assert result is False
+        combined = "".join(capsys.readouterr())
+        assert "command: git checkout" in combined
+        assert "exit code" in combined
+
+    def test_prune_failure_reported_not_ignored(self, tmp_path):
+        from commands.verify_switch import _prune_worktrees
+
+        repo = tmp_path / "project"
+        _vs_init_repo(repo)
+        wt_dir = tmp_path / "stale-wt"
+        _vs_shell_git("worktree", "add", "-q", "-b", "stale", str(wt_dir), cwd=repo)
+        shutil.rmtree(wt_dir)  # leave a stale registration behind
+        worktrees_meta = repo / ".git" / "worktrees"
+        os.chmod(worktrees_meta, 0o555)
+        try:
+            problems = _prune_worktrees(str(repo))
+        finally:
+            os.chmod(worktrees_meta, 0o755)
+
+        assert problems, "prune failure must be reported, not ignored"
+        assert any("prune" in p for p in problems)
+        assert any("Permission denied" in p for p in problems)

@@ -23,6 +23,29 @@ description: >
 
 本文档中所有 `flow.sh xxx` 引用（如 `flow.sh plan new`、`flow.sh complete`、`flow.sh verify-switch`）均按此方式执行。禁止 `source`、禁止绝对路径直接调用、禁止在非技能目录下执行。
 
+## 生命周期 Git mutation 的执行能力
+
+dev-flow 按设计就是跨引擎通用的：同一套生命周期在任何执行引擎上语义一致，技能从不点名、检测或针对某个具体引擎。但部分生命周期命令会写入 **Git metadata**——仓库自身的元数据——而受限环境可能允许普通文件编辑，却恰好拦截这些写入。本节给出能力规则；逐命令的真实 mutation surface 审计见 `references/commands.md`。
+
+涉及的 surface：
+
+| Surface | 覆盖范围 |
+|---------|----------|
+| index | 暂存区写入（`git add`、按路径的 `git reset`） |
+| commit | 创建提交 |
+| refs | 分支创建/删除、`fetch`、本地分支 fast-forward、`push` |
+| worktree | worktree 注册与移除 |
+| checkout | 切换 HEAD 并重写工作区 |
+
+存在真实 Git mutation 的命令：`submit`、`approve`、`complete`、`verify`、`verify-switch`、`archive`。项目工作区可写，不代表这些 surface 可写——Git metadata 通常位于仓库的 `.git` 目录下。
+
+**规则——执行前先确保能力：**
+
+1. **环境无限制**：直接执行命令。环境已经授予的能力不要申请提权；无意义的提权请求是噪音，不是安全。
+2. **受限 / 沙箱环境**：执行命令前，先用**当前 Harness 原生的 escalation/approval 机制**取得所需能力。具体是哪种机制取决于你所在的 Harness——dev-flow 既不要求、也不暴露任何特定机制，更不提供专属旗标或参数。禁止绕开 Harness 自身的流程去改权限或改配置。
+
+**失败必须响亮。** 生命周期命令中的 Git mutation 非零退出时，诊断必须保留 command、cwd、exit code 与原始 stdout/stderr；命令不得沿成功路径继续。没有这些证据就报告"已完成"的操作视为未证实——失败要如实上报用户，而不是手动绕开。
+
 ## 何时适用本生命周期
 
 生命周期服务于**带设计面的工作**——新功能、增强、重构、契约变更：这些工作的结果需要在写代码之前钉死并评审。
