@@ -153,7 +153,7 @@ dev-flow 是跨引擎通用技能。它不能假设某个 Harness 存在 Codex �
 - Pass criteria: 受限 Harness 通过自身权限机制完成操作；dev-flow 输出/参数保持 Harness-neutral；无 `.git/index.lock` 等权限错误被吞掉或误报成功。
 - Failure feedback: 提供 Harness 的权限请求/拒绝证据、dev-flow 完整 stdout/stderr、运行前后 Git/Plan 状态。
 
-- [ ] The user has validated the behavior above and confirmed the result.
+- [x] The user has validated the behavior above and confirmed the result.
 
 #### Scenario 2: 无额外沙箱限制的 Harness / host
 - Goal: 验证新增权限指引不会让正常环境多出无意义的提权步骤。
@@ -167,7 +167,7 @@ dev-flow 是跨引擎通用技能。它不能假设某个 Harness 存在 Codex �
 - Pass criteria: 正常环境行为不退化，技能规则只在实际受限时要求 Agent 使用其 Harness 权限机制。
 - Failure feedback: 提供完整 stdout/stderr 与前后状态差异。
 
-- [ ] The user has validated the behavior above and confirmed the result.
+- [x] The user has validated the behavior above and confirmed the result.
 
 ## Implementation
 
