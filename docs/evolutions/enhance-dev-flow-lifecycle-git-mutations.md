@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-10-02
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-enhance-dev-flow-lifecycle-git-mutations
 - **Branch**: ontology-enhance-dev-flow-lifecycle-git-mutations
