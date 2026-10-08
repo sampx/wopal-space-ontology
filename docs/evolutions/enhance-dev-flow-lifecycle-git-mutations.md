@@ -130,13 +130,13 @@ dev-flow 是跨引擎通用技能。它不能假设某个 Harness 存在 Codex �
 
 ### Agent Verification
 
-1. [ ] **跨引擎技能契约**：中英文 dev-flow 技能明确 lifecycle Git mutation 需要真实 Git metadata 写能力；受限环境要求 Agent 使用“当前 Harness 原生 escalation/approval mechanism”，正文不出现要求某一 Harness 的专属命令、配置或 API。（→ Task 1）
-2. [ ] **Git mutation 不吞错**：注入 `git add` / `git commit` / worktree mutation 非零退出，最终错误保留 command、cwd、exit code 与原始 stderr/stdout；关键调用方非零退出，不以裸 warn/False 继续成功路径。（→ Task 2）
-3. [ ] **complete durability gate**：Plan commit 失败时不执行 Issue sync、不返回 0；状态恢复或失败后可重试状态有 deterministic 测试覆盖。成功路径保持现有 executing→verifying 语义。（→ Task 3）
-4. [ ] **archive destructive ordering**：在 archive commit 前注入失败，断言 worktree/branch 未删除、Issue 未关闭；archive record 达到既定 durability point 后才允许 cleanup；cleanup 自身失败明确报告 partial cleanup，不伪装成未归档。（→ Task 3）
-5. [ ] **approve root-cause 保真**：worktree 双尝试失败保留首个失败证据；root failure 与 rollback outcome 独立；rollback 成败均不覆盖 root cause。（→ Task 3）
-6. [ ] **lifecycle mutation 全量审计**：对 `approve/complete/archive/verify/verify-switch/submit` 及实际调用链发现的其他 mutation 入口形成测试/代码结论；不存在“关键 Git mutation 失败但继续外部 side effect 并 return 0”的已知路径。（→ Task 4）
-7. [ ] **全量回归**：dev-flow Python suite 全绿；普通无限制 host 环境下既有 lifecycle 成功路径不退化。（→ Task 4）
+1. [x] **跨引擎技能契约**：中英文 dev-flow 技能明确 lifecycle Git mutation 需要真实 Git metadata 写能力；受限环境要求 Agent 使用“当前 Harness 原生 escalation/approval mechanism”，正文不出现要求某一 Harness 的专属命令、配置或 API。（→ Task 1）
+2. [x] **Git mutation 不吞错**：注入 `git add` / `git commit` / worktree mutation 非零退出，最终错误保留 command、cwd、exit code 与原始 stderr/stdout；关键调用方非零退出，不以裸 warn/False 继续成功路径。（→ Task 2）
+3. [x] **complete durability gate**：Plan commit 失败时不执行 Issue sync、不返回 0；状态恢复或失败后可重试状态有 deterministic 测试覆盖。成功路径保持现有 executing→verifying 语义。（→ Task 3）
+4. [x] **archive destructive ordering**：在 archive commit 前注入失败，断言 worktree/branch 未删除、Issue 未关闭；archive record 达到既定 durability point 后才允许 cleanup；cleanup 自身失败明确报告 partial cleanup，不伪装成未归档。（→ Task 3）
+5. [x] **approve root-cause 保真**：worktree 双尝试失败保留首个失败证据；root failure 与 rollback outcome 独立；rollback 成败均不覆盖 root cause。（→ Task 3）
+6. [x] **lifecycle mutation 全量审计**：对 `approve/complete/archive/verify/verify-switch/submit` 及实际调用链发现的其他 mutation 入口形成测试/代码结论；不存在“关键 Git mutation 失败但继续外部 side effect 并 return 0”的已知路径。（→ Task 4）
+7. [x] **全量回归**：dev-flow Python suite 全绿；普通无限制 host 环境下既有 lifecycle 成功路径不退化。（→ Task 4）
 
 ### User Validation
 
