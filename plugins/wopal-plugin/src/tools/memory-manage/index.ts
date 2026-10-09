@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin";
+import { tool, type ToolDefinition, type ToolContext } from "@wopal/ellamaka-plugin";
 import type { MemoryStore, MemoryCategory } from "../../memory/store.js";
 import type { EmbeddingClient } from "../../memory/embedder.js";
 import type { SessionStore } from "../../session-store.js";

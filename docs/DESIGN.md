@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-23
+> **Updated**: 2026-09-27
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -35,7 +35,7 @@ ontology 拥有的目标态能力组：
 | 命令体系 | 覆盖空间维护、自进化、项目管理、开发支持、上下文管理，可覆盖内置命令 | 不实现命令执行引擎 |
 | 规则体系 | 项目级 + 空间级 + 领域专属规则，wopal-plugin 条件匹配注入 | 不修改 ellamaka 核心行为 |
 | 运行时插件 | wopal-plugin 提供规则注入、任务委派、记忆系统、上下文管理四大能力，8 个 plugin tools | 仅限插件内部，不侵入技能/规则/命令 |
-| 模板与装配 | 空间骨架与模板 + 类型装配单（`assembly/archetypes/*.yaml`，声明 agents / skills / rules / commands / plugins / scripts） | 不持有空间运行态实例 |
+| 模板与装配 | 空间骨架与模板 + 类型装配单（`assembly/archetypes/*.yaml`，声明 agents / skills / rules / commands / plugins 五类能力与 `paths` 通用路径） | 不持有空间运行态实例 |
 | 辅助脚本 | ontology 维护、git hooks 与辅助自动化脚本 | 仅承担辅助维护动作 |
 
 ---
@@ -48,7 +48,7 @@ ontology 拥有的目标态能力组：
 | 灵魂与操作分离 | Agent 灵魂文件只定义角色边界与决策原则（"我是谁"），操作知识由技能承载（"我怎么做"）。 |
 | 提示词目标化（Outcome-Oriented）优于过程干涉（Hand-Holding） | 面向 2026 前沿模型原生推理与测试时计算（TTC），提示词只给目标与验证门禁，不承载操作说教，不干涉过程。 |
 | 中央能力池集中维护 + 空间装配 worktree（BOM 装配模型） | 本体资产在单一 `main` 分支集中维护，通过 `assembly/archetypes/*.yaml` 声明装配单，空间端以装配 worktree（sparse-checkout）按需物化。一处优化全域受益，进化经 `space sync` 汇入 local main。 |
-| 进化的"提议权"与"实施权"分离 | Maka 专职元认知分析、去特异化清洗与出提案（Propose Only，`edit` 仅放开提案目录）；落地由 Wopal 统筹、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
+| 提案与落地分离 | Maka 负责分析会话错误、用户纠偏与记忆经验并撰写提案，Wopal 也可以撰写；落地由 Wopal 主控、Fae 在空间 worktree 内规范提交、Rook 审查守门。 |
 | 本体进化与代码开发分流 | 本体能力进化的执行流程由 `ontology-evolution` 技能拥有，代码项目开发流程由 `dev-flow` 拥有。两条流程的对象不同，状态词汇互不重合。本体能力是全空间类型的常驻关注点，代码开发工作流属于 coding 类型，分流后每个空间只装配其实际需要的流程。 |
 | 插件适配原则 | wopal-plugin 是运行时插件，集中提供规则注入、任务委派、记忆系统和上下文管理，插件能实现尽量不改造 engine。 |
 | 运行时装配经会话级权限落地 | 能力装配以会话级权限为注入通道，会话创建时授予、生命周期内稳定。装配参数只接受能力名称，权限规则由插件构造，Agent 不接触权限细节。 |
@@ -69,9 +69,9 @@ ontology 由装配定义与六类能力资产构成。模块细节分见各子�
 | 规则体系 | 项目级、空间级与 Agent 专属规则 | `rules/` | `./DESIGN-capabilities.md` |
 | 插件体系 | wopal-plugin 与 TUI 品牌插件 | `plugins/<name>/` | `./DESIGN-wopal-plugin.md` |
 | 辅助脚本 | ontology 维护与开发辅助 | `scripts/` | `./DESIGN-capabilities.md` |
-| 进化闭环 | 能力演化、同步与海关检疫 | 跨模块 | `./DESIGN-evolution.md` |
+| 进化闭环 | 能力演化、同步与防污染审查 | 跨模块 | `./DESIGN-evolution.md` |
 
-装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义本身不作为能力资产被装配单声明；其内容作为基础定义层随装配无条件物化进空间（成员清单与物化机制见 `./DESIGN-assembly.md` 的 Sparse Materialization Mechanics）。
+装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义本身不作为能力资产被装配单声明；其内容作为始终装配清单成员无条件物化进空间（清单与机制见 `./DESIGN-assembly.md` 的 Sparse Materialization Mechanics）。
 
 ---
 
@@ -110,11 +110,10 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal_task_reply` | 双向通信与恢复 |
 | `wopal_task_abort` | 任务终止 |
 | `wopal_task_finish` | 任务完成清理 |
-| `wopal_capability_list` | 列出空间武器库可用能力（含未授予任何角色的） |
 | `memory_manage` | LanceDB 记忆 CRUD 与语义检索（list/stats/search/add/update/delete/injected） |
 | `context_manage` | 会话上下文管理（status/dump/compact）+ 蒸馏（distill/confirm/cancel） |
 
-`wopal_capability_list` 暴露空间武器库全量能力，`wopal_task` 的装配参数只接受能力名称数组。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
+`wopal_task` 的装配参数只接受能力名称数组。武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载，真相源为 ellamaka 引擎发现层。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
 
 ### CLI Command Surface
 
@@ -124,6 +123,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal space status` | 只读空间状态与装配状态 |
 | `wopal space sync` | 与 local main 双向对齐 |
 | `wopal space capability add/remove` | 增删空间装配能力 |
+| `wopal space capability list` | 查询空间武器库有效能力集（四类武器，全局+空间） |
 | `wopal ontology install/update/contribute` | 本体安装、下行整合与上行贡献 |
 
 命令语义与边界see the Maintenance and Distribution Command Surface in `./DESIGN-evolution.md`.
@@ -148,7 +148,7 @@ clone 模式为默认，`--fork` 进入 fork 模式（详见 `./DESIGN-evolution
 
 User 解析：fork 模式优先从 `origin` remote 解析 GitHub owner；clone 模式尝试 `gh api user`；fallback OS 用户名 slug 化。
 
-空间装配记录：`.wopal-space/space-meta.json` 记录类型、骨架、来源 revision、装配时间与装配快照。
+空间装配记录：空间根仓库跟踪 `.wopal-space/space-meta.json` 中的类型、骨架、ontology 来源与本空间能力/通用路径的选择；CLI 只提交其管理的状态变更。同步进度由本体 Git refs 计算，装配详情见 `./DESIGN-assembly.md`。
 
 配置写入 `$WOPAL_HOME/config/settings.jsonc` 的 `ontologies.<name>` 节点（含 `path`、`origin`、`upstream`、`fork`）和 `spaces.<name>` 节点（含 `ontology`、`branch`、`user`、`type`）。
 
@@ -161,7 +161,7 @@ CLI 负责：
 5. 按骨架创建运行态目录与空间级目录。
 6. 首次渲染骨架声明的全部文件到空间根与 `.wopal-space/`。
 7. 按装配单生成空间特有插件配置到 `settings.local.jsonc`。
-8. 写入 `.wopal-space/space-meta.json`（类型、骨架与装配快照）。
+8. 写入并在空间根仓库提交 `.wopal-space/space-meta.json` 的空间身份与初始装配选择。
 9. rerun 时创建缺失项并保留已有文件内容。
 10. 在完整成功后注册 space 并设置 active space。
 11. 提供 `wopal space scan` 只读扫描入口，输出 repo / module JSON 事实。
@@ -207,7 +207,7 @@ ontology 本身是无状态的声明式能力包，不持有运行时状态：
 | 记忆数据 | `$WOPAL_HOME/storage/memory` 下的 LanceDB | memory_manage | ontology 提供工具，不持有数据 |
 | 会话状态 | ellamaka session | ellamaka | ontology 不持有 |
 | 空间结构 | `.wopal-space/STRUCTURE.md` | `/init` | ontology 提供模板，不持有实例 |
-| 空间装配快照 | `.wopal-space/space-meta.json` | `wopal space` CLI | 记录空间类型、骨架、来源 revision、装配时间与装配快照 |
+| 空间身份与装配状态 | `.wopal-space/space-meta.json` | `wopal space` CLI | 空间根仓库跟踪身份与能力/通用路径级选择；仅由 CLI 限定路径提交 |
 | 空间守则 | `.wopal-space/REGULATIONS.md` | 用户 + `/wopal:evolve` | ontology 提供初始化模板，不持有实例 |
 
 Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal:memo`（日记暂存）、`/wopal:evolve`（经验沉淀）、`/wopal:distill`（记忆蒸馏）、`/cupdate-agent-rules`（项目规范更新）。

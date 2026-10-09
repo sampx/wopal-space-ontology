@@ -1,4 +1,4 @@
-import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin"
+import { tool, type ToolContext, type ToolDefinition } from "@wopal/ellamaka-plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import { getErrorMessage, extractMessages, extractAssistantContent, extractBySection, type OutputSection } from "../tasks/session-messages.js"
 import { consumeNewMessages } from "../tasks/session-cursor.js"

@@ -214,6 +214,8 @@ If a mechanism the validation depends on is not yet documented in the project's 
 
 ## Metadata rules
 
+`Product` and `Phase` items are always present in a Plan — creation renders both lines even when empty. The pair is atomic: a phase-linked plan declares both values, an unlinked plan leaves both empty. Values come from the Issue body or the `--product`/`--phase` flags at creation (flags override the body); a half-declared pair is rejected at creation, and `check_doc_plan` gates item presence and pair atomicity at submit/approve. Declaring them only when truly linked matters: archive locates the plan's row in the phase's `Related Plans` table by the `Phase` value — a missing item or half-declared pair silences that sync.
+
 `Project Path`, `Project Type`, `Target Project` are looked up from the space's `STRUCTURE.md`:
 
 1. Determine the domain from the code paths involved (projects / contents / ...)
@@ -231,9 +233,9 @@ Common mistakes: treating a subdirectory (e.g. `projects/<name>/packages/app/`) 
 
 Plans add no Gap-related metadata fields. The phase–Gap relationship is carried naturally by product phase documents; a Plan only states its phase in Goal or Context.
 
-- **Plan phase**: the `Phase` metadata field (inherited from the Issue body). A phase splits into multiple Plans by scope area; the phase's `Related Plans` table is the aggregate view.
+- **Plan phase**: the `Phase` metadata field (declared at creation from the Issue body or `--product`/`--phase`). A phase splits into multiple Plans by scope area; the phase's `Related Plans` table is the aggregate view.
 - **Phase table registration**: only Plans linked to a phase (metadata carrying `Product` + `Phase`) trigger phase-doc sync at archive — `archive` locates the row by the ` · <plan-name>` suffix of the slot label and writes `done`. Format spec in dev-doc-master skill `references/phase.md`.
-- **Unlinked Plans** get no phase-doc handling at archive (skipped silently, no warnings, no errors). Ordinary feature/fix/refactor Plans neither need nor should write `Product`/`Phase`, and never invent rows in phase tables.
+- **Unlinked Plans** get no phase-doc handling at archive (skipped silently, no warnings, no errors). Ordinary feature/fix/refactor Plans leave `Product`/`Phase` empty and never invent rows in phase tables.
 - **Gaps**: the single source of truth is the project's `GAPS.md`. Plans reference the Gap identifier they close (e.g. `CLI-G3`) in Goal or Context without copying the description. When a Plan reaches `done` and its Exit criteria hold, the entry is removed from `GAPS.md` (the number retires, never reused).
 
 ## Delegation prompt format

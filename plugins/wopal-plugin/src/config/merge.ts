@@ -1,21 +1,7 @@
 import type { WopalPluginConfig } from "./schema.js";
 import { defaultWopalPluginConfig } from "./schema.js";
 
-export type ConfigLayer =
-  | "global"
-  | "space-public"
-  | "space-local";
-
-export type ConfigSource = ConfigLayer | "default";
-
 export type ConfigFragment = Record<string, unknown>;
-
-export type ConfigSourceFile = Record<string, ConfigSource>;
-
-export interface MergedConfig {
-  config: WopalPluginConfig;
-  sources: ConfigSourceFile;
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
@@ -26,58 +12,54 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
-function recordLeaves(
-  value: unknown,
-  prefix: string,
-  sources: ConfigSourceFile,
-  layer: ConfigSource,
-): void {
-  if (!isPlainObject(value)) {
-    sources[prefix] = layer;
-    return;
-  }
-  const entries = Object.entries(value);
-  if (entries.length === 0) {
-    sources[prefix] = layer;
-  }
-  for (const [key, child] of entries) {
-    recordLeaves(child, prefix === "" ? key : `${prefix}.${key}`, sources, layer);
-  }
-}
+/**
+ * Keys whose merge would walk (or write) the prototype chain: `__proto__` as
+ * an own key resolves to `Object.prototype` through the prototype getter, and
+ * `constructor` / `prototype` can reach it indirectly. A config fragment
+ * carrying them is ignored per-key, so no settings layer or inline payload
+ * can pollute `Object.prototype` (regression: the inline-options channel
+ * widened the merge input surface).
+ */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 function deepMergeInto(
   target: Record<string, unknown>,
   fragment: Record<string, unknown>,
-  sources: ConfigSourceFile,
-  layer: ConfigLayer,
-  prefix: string,
 ): void {
   for (const [key, value] of Object.entries(fragment)) {
-    const path = prefix === "" ? key : `${prefix}.${key}`;
-    const existing = target[key];
+    if (UNSAFE_KEYS.has(key)) continue;
+    const existing = Object.prototype.hasOwnProperty.call(target, key)
+      ? target[key]
+      : undefined;
     if (isPlainObject(value)) {
       const next = isPlainObject(existing) ? existing : {};
-      deepMergeInto(next, value, sources, layer, path);
+      deepMergeInto(next, value);
       target[key] = next;
       continue;
     }
     target[key] = Array.isArray(value) ? [...value] : value;
-    recordLeaves(value, path, sources, layer);
   }
 }
 
-export function mergeConfigs(layers: {
-  layer: ConfigLayer;
-  fragment: ConfigFragment;
-}[]): MergedConfig {
+/**
+ * Layers the plugin's config fragments over its built-in defaults in
+ * consumption order (D-01): defaults < inline mount options < engine-delivered
+ * slice. Objects merge deeply, later leaves win, arrays replace whole.
+ *
+ * The engine owns the three settings layers (global → space-public →
+ * space-local) and delivers `wopal.pluginConfig["wopal-plugin"]` already
+ * merged; the plugin layers the delivered slice over the defaults and the
+ * inline mount options. Layer provenance is engine-side, so no per-leaf
+ * `sources` attribution is recorded (D-02).
+ */
+export function mergeConfigs(
+  inlineOptions: ConfigFragment = {},
+  engineSlice: ConfigFragment = {},
+): WopalPluginConfig {
   const config: Record<string, unknown> = structuredClone(
     defaultWopalPluginConfig,
   );
-  const sources: ConfigSourceFile = {};
-  recordLeaves(defaultWopalPluginConfig, "", sources, "default");
-
-  for (const { layer, fragment } of layers) {
-    deepMergeInto(config, fragment, sources, layer, "");
-  }
-  return { config: config as WopalPluginConfig, sources };
+  deepMergeInto(config, inlineOptions);
+  deepMergeInto(config, engineSlice);
+  return config as WopalPluginConfig;
 }

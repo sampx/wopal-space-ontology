@@ -9,9 +9,10 @@ import { createHash } from 'node:crypto';
 
 import type { SessionStore } from "../session-store.js";
 import type { LoggerInstance } from "../logger.js";
-import type { SystemPromptMetadata, OpenCodeClient } from "../types.js";
+import type { OpenCodeClient } from "../types.js";
 import type { MessageWithInfo } from "./message-context.js";
-import type { Model } from "@opencode-ai/sdk";
+import type { SystemPromptMetadata } from "@wopal/ellamaka-plugin";
+import type { Model } from "@wopal/ellamaka-sdk";
 import { writeContextDump } from "../tools/dump-formatter.js";
 import {
   isChildSession,

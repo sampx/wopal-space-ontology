@@ -1,33 +1,34 @@
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
-import { parse, type ParseError } from "jsonc-parser";
 import { wopalPluginConfigSchema, type WopalPluginConfig } from "./schema.js";
-import {
-  mergeConfigs,
-  type ConfigFragment,
-  type ConfigLayer,
-  type ConfigSourceFile,
-} from "./merge.js";
+import { mergeConfigs } from "./merge.js";
 
-export interface LoadedConfig {
-  config: WopalPluginConfig;
-  sources: ConfigSourceFile;
-}
+const PLUGIN_NAME = "wopal-plugin";
 
 export interface LoadWopalConfigOptions {
-  wopalHome: string;
-  wopalSpaceRoot?: string;
   /**
-   * Environment loaded from `.env` files. Used as a fallback source when
-   * resolving `$VAR` references, so secrets kept in `.env` stay referenced
-   * from settings while `process.env` keeps precedence.
+   * Engine-delivered slice `PluginInput.pluginConfig["wopal-plugin"]`, already
+   * deep-merged across the three settings layers (global → space-public →
+   * space-local) by the engine. `undefined` means the space declares no entry
+   * for this plugin — the built-in defaults apply.
+   */
+  pluginConfig?: Record<string, unknown>;
+  /**
+   * Inline mount options passed by the engine as the plugin's second argument
+   * (`PluginOptions`); the compatibility layer beneath the engine-delivered
+   * slice (defaults < inline options < slice). `undefined` means the engine
+   * passed none.
+   */
+  inlineOptions?: Record<string, unknown>;
+  /**
+   * Environment loaded from `.env` files by the runtime. Used as a fallback
+   * source when resolving `$VAR` references, so secrets kept in `.env` stay
+   * referenced from the config slice while `process.env` keeps precedence.
    */
   fallbackEnvironment?: NodeJS.ProcessEnv;
 }
 
 class ConfigError extends Error {
-  constructor(path: string, detail: string) {
-    super(`wopal config error in ${path}: ${detail}`);
+  constructor(location: string, detail: string) {
+    super(`${PLUGIN_NAME} config error at ${location}: ${detail}`);
     this.name = "ConfigError";
   }
 }
@@ -39,59 +40,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
     !Array.isArray(value) &&
     !(value instanceof Date)
   );
-}
-
-interface LayerDefinition {
-  layer: ConfigLayer;
-  path: string;
-}
-
-function layerPaths(options: LoadWopalConfigOptions): LayerDefinition[] {
-  const paths: LayerDefinition[] = [
-    {
-      layer: "global",
-      path: join(options.wopalHome, "config", "settings.jsonc"),
-    },
-  ];
-  if (options.wopalSpaceRoot !== undefined) {
-    const configDir = join(options.wopalSpaceRoot, ".wopal", "config");
-    paths.push(
-      { layer: "space-public", path: join(configDir, "settings.jsonc") },
-      { layer: "space-local", path: join(configDir, "settings.local.jsonc") },
-    );
-  }
-  return paths;
-}
-
-function extractWopalNode(content: string, path: string): ConfigFragment {
-  const errors: ParseError[] = [];
-  const parsed: unknown = parse(content, errors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  if (errors.length > 0 || !isPlainObject(parsed)) {
-    throw new ConfigError(path, "invalid JSONC content");
-  }
-  const wopalNode = parsed["wopal"];
-  if (wopalNode === undefined) return {};
-  if (!isPlainObject(wopalNode)) {
-    throw new ConfigError(path, `"wopal" node must be an object`);
-  }
-  return wopalNode;
-}
-
-function readLayer(definition: LayerDefinition): ConfigFragment | undefined {
-  if (!existsSync(definition.path)) return undefined;
-  let content: string;
-  try {
-    content = readFileSync(definition.path, "utf-8");
-  } catch (err) {
-    throw new ConfigError(
-      definition.path,
-      `cannot read file: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-  return extractWopalNode(content, definition.path);
 }
 
 function resolveVarReferences(
@@ -106,7 +54,7 @@ function resolveVarReferences(
     const resolved = environment[varName] ?? fallbackEnvironment[varName];
     if (resolved === undefined || resolved === "") {
       throw new ConfigError(
-        path,
+        path || "(root)",
         `environment variable "${varName}" referenced by "${value}" is not set in process.env or the .env files`,
       );
     }
@@ -114,7 +62,12 @@ function resolveVarReferences(
   }
   if (Array.isArray(value)) {
     return value.map((item, index) =>
-      resolveVarReferences(item, `${path}[${index}]`, environment, fallbackEnvironment),
+      resolveVarReferences(
+        item,
+        `${path}[${index}]`,
+        environment,
+        fallbackEnvironment,
+      ),
     );
   }
   if (isPlainObject(value)) {
@@ -122,7 +75,7 @@ function resolveVarReferences(
     for (const [key, child] of Object.entries(value)) {
       resolved[key] = resolveVarReferences(
         child,
-        `${path}.${key}`,
+        path === "" ? key : `${path}.${key}`,
         environment,
         fallbackEnvironment,
       );
@@ -132,50 +85,63 @@ function resolveVarReferences(
   return value;
 }
 
-function formatZodIssues(error: { issues: { path: PropertyKey[]; message: string }[] }): string {
+function formatZodIssues(error: {
+  issues: { path: PropertyKey[]; message: string }[];
+}): string {
   return error.issues
     .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
     .join("; ");
 }
 
-function validate(
-  merged: Record<string, unknown>,
-  originPaths: string,
-): WopalPluginConfig {
-  const result = wopalPluginConfigSchema.safeParse(merged);
+function validate(candidate: Record<string, unknown>): WopalPluginConfig {
+  const result = wopalPluginConfigSchema.safeParse(candidate);
   if (!result.success) {
-    throw new Error(
-      `wopal config validation failed (${originPaths}): ${formatZodIssues(result.error)}`,
+    throw new ConfigError(
+      "plugin config",
+      `validation failed: ${formatZodIssues(result.error)}`,
     );
   }
   return result.data;
 }
 
+/**
+ * Resolves the effective wopal-plugin configuration.
+ *
+ * There are no settings-file inputs: the engine merges the three settings
+ * layers and delivers `wopal.pluginConfig["wopal-plugin"]` through
+ * `PluginInput.pluginConfig`. Layering order (D-01): built-in defaults <
+ * inline mount options < delivered slice. `$VAR` references are resolved
+ * (`process.env` first, the runtime-provided `.env` environment as
+ * fallback), and the result is validated strictly — invalid config fails
+ * loud instead of degrading.
+ */
 export function loadWopalConfig(
-  options: LoadWopalConfigOptions,
+  options: LoadWopalConfigOptions = {},
   environment: NodeJS.ProcessEnv = process.env,
-): LoadedConfig {
-  const definitions = layerPaths(options);
-  const layers: { layer: ConfigLayer; fragment: ConfigFragment }[] = [];
-  for (const definition of definitions) {
-    const fragment = readLayer(definition);
-    if (fragment === undefined) continue;
-    layers.push({ layer: definition.layer, fragment });
+): WopalPluginConfig {
+  const slice = options.pluginConfig;
+  if (slice !== undefined && !isPlainObject(slice)) {
+    throw new ConfigError(
+      `pluginConfig["${PLUGIN_NAME}"]`,
+      "the plugin config entry must be an object",
+    );
+  }
+  const inlineOptions = options.inlineOptions;
+  if (inlineOptions !== undefined && !isPlainObject(inlineOptions)) {
+    throw new ConfigError(
+      "inline options",
+      "the plugin's inline mount options must be an object",
+    );
   }
 
-  const merged = mergeConfigs(layers);
-
-  const validated = validate(
-    resolveVarReferences(
-      merged.config,
-      "config",
-      environment,
-      options.fallbackEnvironment ?? {},
-    ) as Record<string, unknown>,
-    definitions.map(({ path }) => path).join(", "),
+  const merged = mergeConfigs(inlineOptions ?? {}, slice ?? {});
+  const resolved = resolveVarReferences(
+    merged,
+    "",
+    environment,
+    options.fallbackEnvironment ?? {},
   );
-
-  return { config: validated, sources: merged.sources };
+  return validate(resolved as Record<string, unknown>);
 }
 
 export { ConfigError };

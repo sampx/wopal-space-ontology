@@ -3,6 +3,8 @@
 ## Metadata
 
 - **Type**: test
+- **Product**:
+- **Phase**:
 - **Created**: 2026-05-16
 - **Status**: planning
 

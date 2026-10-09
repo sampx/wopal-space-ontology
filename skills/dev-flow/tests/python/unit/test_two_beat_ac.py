@@ -45,6 +45,8 @@ VALID_META = """# test-plan
 ## Metadata
 
 - **Type**: test
+- **Product**:
+- **Phase**:
 - **Project Path**: .
 - **Status**: planning
 

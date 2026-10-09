@@ -211,26 +211,14 @@ ERR notification arrives
 
 Wopal owns delegation rules, review conclusions, and the decision to reuse or replace a task. Fae and rook do not summarize delegation lessons. After receiving a review result, Wopal must actively drive the next step instead of waiting for the user to repeat authorization.
 
-### Reuse priority
+### Reuse or spawn — the context budget
 
-As long as the task is still alive, the scope has not materially changed, and context remains healthy, prefer `reply` reuse:
-
-| Scenario | Preferred | Avoid |
-|------|------|--------|
-| Small fae rework | `reply` to continue | Opening a new fae task |
-| Rook returned REVISE/BLOCK and code is fixed | `reply` the original rook task | Opening a new rook task |
-| Supplying more information / continuing work | `reply` | Finishing then recreating |
-
-### When to stop reusing a task
-
-Open a new task, or have Wopal finish the work directly, when any of these is true:
-
-1. Context > 50% (hard threshold)
-2. One rework cycle already happened and context is 45%+
-3. The task scope materially changed, such as moving from code fixing to rule writing
-4. The sub-agent is clearly drifting, looping, or degrading in quality
-
-Rule of thumb: do not interrupt a healthy running task. If quality is poor after IDLE and context is already high, avoid forcing another hard reply cycle.
+- Small rework and review re-reviews: `reply` the original task — fast, keeps context.
+- Heavy rounds first: project `current + this round's estimate` — multi-finding fix batches and large TDD rounds each cost 20–40%.
+- Projection above ~50–60% → spawn a fresh fae with a complete handover prompt, or Wopal finishes directly; **never continue the historical task**.
+- IDLE above ~50–60% → the session is spent; do not feed it another round.
+- Spawn fresh also when scope materially changed, or the sub-agent is drifting, looping, or degrading.
+- Do not interrupt a healthy running task — except under the rescue rule below.
 
 ---
 
@@ -238,18 +226,26 @@ Rule of thumb: do not interrupt a healthy running task. If quality is poor after
 
 When receiving `[WOPAL TASK PROGRESS]`, check context usage:
 
-| Usage | Recommendation |
+| Context | Action |
 |------|------|
-| < 45% | No action needed |
-| 45-55% | Evaluate remaining workload |
-| ≥ 55% | Consider compaction |
+| ≤ 60% | No action needed |
+| > 60% and completion low with heavy work ahead | Mandatory rescue (below) |
 | ≥ 75% | Urgent compaction |
 
-Before compacting, confirm there are no uncommitted changes, no blocking dependencies, and the task is not stuck.
+Before compacting: no uncommitted changes, no blocking dependencies, task not stuck.
 
 **Main session**: `context_manage(action="compact")`. After compaction, the plugin sends recovery instructions automatically.
 
 **Child session**: `context_manage(action="compact", session_id="wopal-task-xxx")`. After compaction, the plugin sends `[WOPAL TASK COMPACTED]`, and Wopal should use `reply` with precise recovery instructions.
+
+### Context rescue (suspend → compact → resume)
+
+A running fae above ~60% with low completion and heavy work ahead degrades fast — the rescue is **mandatory**. The user may also order it directly:
+
+1. `wopal_task_abort` (pure stop), then immediately `git status` the task's project. The tree is the recovery point: clean, or carrying this run's uncommitted changes.
+2. Confirm that state before touching anything.
+3. `context_manage(action="compact", session_id="wopal-task-xxx")`; wait for `[WOPAL TASK COMPACTED]`. No tool calls to the task meanwhile.
+4. `wopal_task_reply` with self-contained recovery: worktree path, HEAD, remaining work, probe conclusions, resume point. Compacted sessions keep a summary only — assume they remember nothing.
 
 ---
 

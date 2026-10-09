@@ -82,21 +82,21 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 
 ### Dev-flow Worktree Lifecycle
 
-dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约：
+The dev-flow skill's worktree Plan lifecycle follows the **Plan branch ownership** contract:
 
-- `planning` 和已批准的 `executing` 基线位于集成分支（main 或 space/<name>）
-- `approve --confirm` 先在集成分支提交 `executing` + Worktree 元数据，再创建 worktree
-- `complete` 在 feature 分支上提交 Plan-only commit（`verifying`），脏实施树报错退出
-- 用户验证在 feature 分支上进行
-- `verify-switch --merge` 在用户明确确认后将 feature 分支集成到 main
-- `verify --confirm` 在集成分支上提交 Plan-only commit（`done`）
-- `archive` 在集成分支上将已接受 Plan 移至 `done/`，清理 worktree
+- `planning`, and the approved `executing` baseline, live on the integration branch (main or space/<name>)
+- `approve --confirm` first commits `executing` + worktree metadata on the integration branch, then creates the worktree
+- `complete` commits a Plan-only commit (`verifying`) on the feature branch, and exits with an error on a dirty work tree
+- User validation happens on the feature branch
+- `verify-switch --merge` integrates the feature branch into main only after explicit user confirmation
+- `verify --confirm` commits a Plan-only commit (`done`) on the integration branch
+- `archive` moves the accepted Plan to `done/` on the integration branch and cleans up the worktree
 
-**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent 负责。
+**Plan-only commit principle**: lifecycle scripts commit Plan status changes only, never implementation code. Implementation commits belong to the implementing agent.
 
-**Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
+**Plan path**: Plan files live in the space repository under `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. Subagent prompts must reference the Plan by its absolute path in the space repository; when fae ticks a Done checkbox it edits that file and must not mutate Plan Status metadata.
 
-权威细节见 `skills/dev-flow/SKILL.md` 的「Plan 分支归属」、「Wopal 编排规则」和「委派用 Plan 路径」章节。
+Authoritative details live in the "Plan branch ownership", "Wopal orchestration rules" and "Delegation Plan path" sections of `skills/dev-flow/SKILL.md`.
 
 ### Plugin
 
@@ -106,6 +106,7 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 
 - **Event-log folds are LAST-wins**: per-message sandbox overrides append `sandbox/mode` unconditionally, including values equal to the space default — "restore default" requires an explicit event; skipping same-as-default appends leaves a prior override in force. Only a missing `extra.sandboxMode` means "keep current fold" (see poc DESIGN-dsh-poc §4.5).
 - **Permission frontmatter carries no wildcards**: agent `permission:` blocks must not declare `"*": allow`-style entries (engine defaults already provide them). Evaluation is LAST-wins over deep-merged multi-copy frontmatter, so a wildcard can silently override an explicit `ask` depending on key order (see poc DESIGN-dsh-poc §6.8). After any permission change, verify merged rule order via `GET /agent` on a live instance.
+- **Projected tool schemas must stay faithful to the container declaration**: the JSON Schema→zod conversion preserves `oneOf`/`anyOf` (null branch → nullable), `enum`, `const`, and every property `description`, degrading to `z.unknown()` only for genuinely unsupported nodes. dsh re-validates every call against its own schema, so a constraint the model cannot see is one it will guess wrong and dsh will then reject (`insert_line` projected as `any` → the model sends strings → `oneOf branch (matched 0)`). Fidelity belongs in the converter, not in per-tool patches — the provider re-reads live container schemas per request, so one converter fix covers every projected tool and every future parameter. Verify against the installed dsh runtime schemas of all projected tools (schema checks plus accept/reject parity with `validateJsonSchemaValue`), never against hand-written samples.
 
 ## 5. Testing
 

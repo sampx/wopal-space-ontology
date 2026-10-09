@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@opencode-ai/plugin"
+import type { ToolDefinition } from "@wopal/ellamaka-plugin"
 import type { SimpleTaskManager } from "../tasks/simple-task-manager.js"
 import type { MemoryStore } from "../memory/store.js"
 import type { EmbeddingClient } from "../memory/embedder.js"

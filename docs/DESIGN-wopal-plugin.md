@@ -24,9 +24,9 @@ wopal-plugin 是 WopalSpace 在 ellamaka 运行时上的专用插件，以 TypeS
 | 任务委派 | 非阻塞子会话启动、状态监控、双向通信、并发控制、进程清理 | 不管理任务业务逻辑 |
 | 记忆系统 | LanceDB 持久化、语义检索、自动注入、CRUD | 不持有记忆数据 |
 | 上下文管理 | 会话摘要、上下文压缩与恢复、标题生成、会话转储、蒸馏（preview → confirm） | 不改变模型行为 |
-| 能力装配 | 武器库扫描、能力清单暴露、派发时合成会话级权限、规则按会话注入 | 不定义能力内容，不决定中央能力池构成 |
+| 能力装配 | 派发时合成会话级权限、规则按会话注入 | 不定义能力内容，不决定中央能力池构成；武器库扫描与清单查询由 ellamaka 引擎与 wopal-cli 承载 |
 
-插件向 Agent 暴露 8 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`wopal_capability_list`、`memory_manage`、`context_manage`。
+插件向 Agent 暴露 7 个工具：`wopal_task`、`wopal_task_output`、`wopal_task_reply`、`wopal_task_abort`、`wopal_task_finish`、`memory_manage`、`context_manage`。
 
 ## Key Decisions
 
@@ -51,14 +51,15 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 插件在两个运行时表面依赖 fork 扩展，这些字段由 fork 引擎注入、插件被动接收：
 
-- `PluginInput.wopalSpaceRoot`：插件入口断言 `PluginInput & { wopalSpaceRoot?: string }` 读取空间根。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
-- `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` 结构由插件在本地 `types.ts` 定义（与 fork 契约层同构），运行时值来自引擎注入。
+- `PluginInput.wopalSpaceRoot`：`PluginInput` 契约本身已声明 `wopalSpaceRoot?` 字段（`@wopal/ellamaka-plugin` 导出），插件入口直接读取，无需本地交叉类型断言。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
+- `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 类型从 `@wopal/ellamaka-plugin` 导入，运行时值来自引擎注入。
 
 ### 依赖声明
 
-插件声明 `@wopal/ellamaka-plugin` 为直接依赖，版本跟随产品主版本。声明后：
+插件声明 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk` 为直接依赖，版本跟随产品主版本（纯 `x.y.z`，如 `2.0.5`）。声明后：
 
-- 不再复制 `SystemPromptMetadata` 等类型，从 `@wopal/ellamaka-plugin` 导入
+- 契约层类型（`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 等）与 `tool` 等辅助 API 全部从 `@wopal/ellamaka-plugin` 导入，仓库内零手抄 fork 类型
+- SDK 消费点（`createOpencodeClient` 的 `/v2` client、`Model` 类型等）从 `@wopal/ellamaka-sdk` 导入，与上游 `@opencode-ai/sdk` 彻底脱钩
 - 运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致
 
 依赖随插件 package.json 分发。空间级依赖安装在 `.wopal/` 的运行时 node_modules，由引擎的插件依赖收集机制统一安装。
@@ -104,7 +105,7 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 Rules 模块发现全局（`~/.wopal/rules`）与空间（`<space>/.wopal/rules`）两级规则文件，按 Agent 作用域与关键词条件匹配，通过 `messages.transform` 注入用户消息。规则发现发生在插件初始化时，注入发生在每条消息周期。
 
-模块拥有开关 `wopal.rules.enabled`，**默认 `false`（关闭）**。开关为 opt-in：关闭时规则发现整体跳过，不产生注入。理由：规则注入直接占用每轮上下文预算，且规则体系依赖项目与语言约束，适合由使用方显式开启而非全局默认生效。
+模块拥有开关 `wopal.pluginConfig["wopal-plugin"].rules.enabled`，**默认 `false`（关闭）**。开关为 opt-in：关闭时规则发现整体跳过，不产生注入。理由：规则注入直接占用每轮上下文预算，且规则体系依赖项目与语言约束，适合由使用方显式开启而非全局默认生效。
 
 ### Memory Module
 
@@ -143,33 +144,7 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 ### Capability Assembly Module
 
-能力装配模块把空间武器库转化为具体会话的能力授予。它由武器库扫描、能力清单暴露、派发装配三部分组成。
-
-#### Arsenal Scan
-
-插件启动时扫描空间 worktree 构建武器库清单。技能从 `.wopal/skills/` 下的 `SKILL.md` 收集，规则从 `.wopal/rules/` 下的规则文件收集，MCP 从配置的服务声明收集。
-
-清单保留**全部**扫描结果，不做角色基线过滤——未授予任何角色的能力同样在列。每项记录名称、描述与物理路径。路径供规则注入读取与人工审计定位。
-
-#### Capability Listing Contract
-
-`wopal_capability_list` 无参数，返回武器库清单：
-
-```jsonc
-{
-  "skills": [
-    { "name": "content-writer", "description": "内容写作技能", "path": ".wopal/skills/content-writer/SKILL.md" }
-  ],
-  "rules": [
-    { "name": "typescript", "description": "TS 项目规则", "path": ".wopal/rules/typescript.md" }
-  ],
-  "mcp": [
-    { "name": "some-mcp", "description": "外部工具服务", "path": null }
-  ]
-}
-```
-
-命令行是界面功能而非 Agent 可用的武器，不进入清单。
+能力装配模块把空间武器库转化为具体会话的能力授予。武器库扫描与清单查询由 ellamaka 引擎的发现层与 wopal-cli 的 `wopal space capability list` 命令承载（见 `./DESIGN-capabilities.md` 的 Arsenal Scope and Truth Source）；本模块只负责派发装配。
 
 #### Dispatch Assembly Contract
 
@@ -230,24 +205,45 @@ Task 模块提供非阻塞子会话委派。`SimpleTaskManager` 是唯一公开�
 
 合并规则：deep merge，后者覆盖前者的叶子值。文件缺失则跳过该层。优先级：代码默认 < 全局 < 空间公共 < 空间私有。
 
-插件启动时读取三层配置，输出 effective config 日志，标明每项配置的来源层级。
+引擎在配置加载期完成三层合并并记录来源层级；插件经 `PluginInput.pluginConfig` 取得生效表，按自身配置键自取条目。
 
 ### Configuration Schema
 
 ```jsonc
 "wopal": {
-  "llm":       { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_LLM_API_KEY" },
-  "embedding": { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_EMBEDDING_API_KEY" },
-  "rules":     { "enabled": false },
-  "memory":    { "enabled": true, "injection": true },
-  "context":   { "enabled": true },
-  "logLevel":  "info"
+  "pluginConfig": {
+    "wopal-plugin": {
+      "llm":       { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_LLM_API_KEY" },
+      "embedding": { "baseUrl": "...", "model": "...", "apiKey": "$WOPAL_EMBEDDING_API_KEY" },
+      "rules":     { "enabled": false },
+      "memory":    { "enabled": true, "injection": true },
+      "context":   { "enabled": true },
+      "logLevel":  "info"
+    }
+  }
 }
 ```
 
 Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在启动时报错，不静默降级。未配置的字段使用默认值。
 
 `apiKey` 支持 `$VAR` 环境变量引用：以 `$` 开头从 `process.env` 解析，未设置时启动报错；不以 `$` 开头按字面值处理。配置文件即使进 git 也不承载明文密钥。
+
+### Plugin Config Node (`wopal.pluginConfig`)
+
+`wopal` 节点支持可选的 `pluginConfig` 子节点，作为本体生态插件行为配置的统一载体：
+
+```jsonc
+"wopal": {
+  "pluginConfig": {
+    "dsh-adapter": { "sandbox": { "enabled": true, "mode": "workspace-write" } }
+  }
+}
+```
+
+- Schema：`z.record(z.string(), z.record(z.string(), z.unknown())).optional()` — 外层 key 为插件名，内层为该插件的自由配置对象，由各插件自行定义与校验
+- 定位：**所有 ellamaka 插件统一的插件行为配置格式**。wopal-plugin 消费 `wopal.pluginConfig["wopal-plugin"]`，dsh-adapter 等生态插件消费 `wopal.pluginConfig.<插件名>`。判定规则：插件条目（settings `plugin` 数组）保持零内联 options；插件只读不写
+- 继承：随三层 settings 走 deep merge（代码默认 < 全局 < 空间公共 < 空间私有），生态插件配置天然获得继承与覆盖能力
+- 写入端：由 wopal-cli `config` 命令族（见 `projects/wopal-cli/docs/DESIGN-config-cli.md`）承载；在此之前该节点的值由用户手工维护
 
 ### Prompt Template Resolution
 
@@ -276,18 +272,21 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 
 ### Environment Variable Roles
 
-环境变量收敛为两个角色，功能开关不使用环境变量：
+环境变量收敛为三个角色，功能开关不使用环境变量：
 
 | 角色 | 变量 | 说明 |
 |------|------|------|
 | 密钥 | `WOPAL_LLM_API_KEY`、`WOPAL_EMBEDDING_API_KEY` | 由配置 `apiKey` 字段以 `$` 引用 |
 | 日志诊断覆盖 | `WOPAL_PLUGIN_LOG_LEVEL` / `_FILE` / `_MODULES` | 运行时覆盖，供启动脚本动态传入，优先级高于配置文件 |
+| 宿主统一级别兜底 | `ELLAMAKA_LOG_LEVEL` | 宿主解析出的统一日志级别（大写 DEBUG/INFO/WARN/ERROR，读取时归一化）。仅当显式插件接口（`WOPAL_PLUGIN_LOG_LEVEL`、配置 `logLevel`）均无有效级别时消费；仅真实进程环境，不从 `.env` 读取 |
 
 日志诊断保留 env 通道：启动脚本按进程场景动态传入日志级别与位置，静态配置文件无法表达这种运行时变化。配置文件 `logLevel` 是声明式默认值，诊断 env 是运行时覆盖，二者定位不同，不重叠。
 
 ### Configuration Source Precedence
 
 一般配置：代码默认 < 全局 < 空间公共 < 空间私有。日志诊断：上述链条之上叠加 `WOPAL_PLUGIN_LOG_*` env 覆盖。
+
+日志级别解析链（命中即止）：`WOPAL_PLUGIN_LOG_LEVEL` > 配置 `logLevel`（`pluginConfig["wopal-plugin"]`，含旧顶层字段）> `ELLAMAKA_LOG_LEVEL`（宿主统一级别兜底；小写归一后匹配宿主词表 DEBUG/INFO/WARN/ERROR，TRACE/FATAL/非法值不命中）> `info`。`WOPAL_PLUGIN_LOG_FILE` / `_MODULES` 维持 env 覆盖配置。
 
 ## Interfaces and Contracts
 
@@ -311,7 +310,6 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 | `wopal_task_reply` | 始终 | 双向通信与恢复 |
 | `wopal_task_abort` | 始终 | 任务终止 |
 | `wopal_task_finish` | 始终 | 任务完成清理 |
-| `wopal_capability_list` | 始终 | 列出空间武器库可用能力（含未授予任何角色基线的） |
 | `memory_manage` | `memory.enabled` | 记忆 list/stats/search/add/update/delete/injected |
 | `context_manage` | 始终 | 会话 status/dump/compact + 蒸馏（distill/confirm/cancel） |
 
@@ -327,7 +325,7 @@ Schema 由 zod 定义，每个字段声明类型与默认值。非法配置在�
 | `memoryLogger` | LanceDB/检索/注入 |
 | `contextLogger` | 会话状态/压缩/恢复/蒸馏 |
 
-日志级别 trace/debug/info/warn/error/fatal，默认 info。核心事件完成记录一条 info；关键数据点用 debug；详细流程用 trace。结构化字段通过 data 对象携带，字段名 snake_case。错误日志必须携带 `{ err: error }`。
+日志级别 trace/debug/info/warn/error/fatal，默认 info；生效级别由 Configuration Source Precedence 的四层链解析（含宿主统一级别兜底 `ELLAMAKA_LOG_LEVEL`）。核心事件完成记录一条 info；关键数据点用 debug；详细流程用 trace。结构化字段通过 data 对象携带，字段名 snake_case。错误日志必须携带 `{ err: error }`。
 
 ## Data and State Model
 

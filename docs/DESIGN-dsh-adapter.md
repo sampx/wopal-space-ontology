@@ -108,13 +108,23 @@ dsh-adapter 消费 ellamaka fork 的插件契约层扩展，经 npm 包 `@wopal/
 
 ### 依赖声明
 
-插件声明 `@wopal/ellamaka-plugin` 为直接依赖，版本跟随产品主版本。声明后运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致。
+插件声明 `@wopal/ellamaka-plugin` 为直接依赖（纯 `x.y.z` 精确版本，须与 wopal-plugin 严格一致——引擎 `collectPluginDeps` 按名聚合、后者覆盖前者）。运行时引擎以 `InstallationVersion` 剥离 rc/beta 后的纯主版本兜底 pin（见 `projects/ellamaka/docs/DESIGN-distribution.md` 的 npm 包发布机制），保证插件拿到的契约层类型与引擎一致。
 
 插件依赖随其 package.json 分发，不再依赖同目录其他插件的依赖安装结果。
 
+### 行为配置消费
+
+沙箱与升级策略的行为配置遵循统一配置链，插件条目保持零内联 options：
+
+1. **优先**：引擎在配置加载期把三层 `wopal.pluginConfig` 深合并为生效表，经 `PluginInput.pluginConfig` 整表交付；插件按自身配置键 `dsh-adapter` 取条目（全局 → 空间公共 → 空间私有，后者覆盖前者，deep merge）
+2. **回退**：插件挂载条目的内联 options（`rawOptions`，兼容既有部署）
+3. **缺省**：内置默认（sandbox 关闭，适配器闲置）
+
+插件对取到的条目 zod 校验，非法即报错（fail loud，不静默降级）。插件只读不写；`wopal.pluginConfig` 的写入端归 wopal-cli `config` 命令族（见 `projects/wopal-cli/docs/DESIGN-config-cli.md`）。
+
 ### 与 fork 扩展的关系边界
 
-插件消费面是 `tool.provider` 与 `ToolContext.extra` 两项。`wopalSpaceRoot` 与 `systemMetadata`（会话转储链路）归属 `wopal-plugin`（见 `DESIGN-wopal-plugin.md`）。沙箱关闭时插件不消费任何扩展，行为等价于未加载。
+插件消费面是 `tool.provider`、`ToolContext.extra` 与 `PluginInput.pluginConfig` 三项。插件行为配置经 `PluginInput.pluginConfig` 交付（见 Configuration 章节）：引擎完成三层合并并整表注入，插件不读配置文件。`systemMetadata`（会话转储链路）归属 `wopal-plugin`（见 `DESIGN-wopal-plugin.md`）。沙箱关闭时插件不消费 `tool.provider` 与 `ToolContext.extra`，行为等价于未加载。
 
 ---
 

@@ -6,9 +6,14 @@
  * Task is a perpetual dialog channel - no terminal states, only running/waiting/error.
  */
 
-import type { PluginInput, Hooks } from "@opencode-ai/plugin";
-import type { SystemPromptMetadata, OpenCodeClient } from "./types.js";
-import { createOpencodeClient as createV2OpencodeClient } from "@opencode-ai/sdk/v2";
+import type {
+  PluginInput,
+  Hooks,
+  PluginOptions,
+  SystemPromptMetadata,
+} from "@wopal/ellamaka-plugin";
+import type { OpenCodeClient } from "./types.js";
+import { createOpencodeClient as createV2OpencodeClient } from "@wopal/ellamaka-sdk/v2";
 import { discoverRuleFiles, type DiscoveredRule } from "./rules/index.js";
 import { createHookContext, createAllHooks } from "./hooks/index.js";
 import { sessionStore } from "./session-store-instance.js";
@@ -34,7 +39,7 @@ import { createContextPrompts, type ContextPrompts } from "./context/index.js";
 import { MemoryInjector } from "./memory/injector.js";
 import { MemoryRetriever } from "./memory/retriever.js";
 import { DistillEngine } from "./context/index.js";
-import { loadWopalConfig, type LoadedConfig } from "./config/index.js";
+import { loadWopalConfig, type WopalPluginConfig } from "./config/index.js";
 import {
   resolveResources,
   type PluginResources,
@@ -50,12 +55,23 @@ export interface PluginRuntime {
   env: RuntimeEnvironment;
   loggers: PluginLoggers;
   prompts: ContextPrompts;
-  config: LoadedConfig;
+  config: WopalPluginConfig;
 }
 
 interface RuntimePluginInput {
   directory: string;
   wopalSpaceRoot?: string;
+  /**
+   * Engine-delivered slice `PluginInput.pluginConfig["wopal-plugin"]` —
+   * already merged across the three settings layers by the engine. Absent
+   * (or undefined) means the space declares no entry; defaults apply.
+   */
+  pluginConfig?: Record<string, unknown>;
+  /**
+   * Inline mount options (the plugin's second argument), the compatibility
+   * layer between the built-in defaults and the engine-delivered slice.
+   */
+  inlineOptions?: Record<string, unknown>;
 }
 
 export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
@@ -68,13 +84,15 @@ export function createPluginRuntime(input: RuntimePluginInput): PluginRuntime {
   });
   const env = loadRuntimeEnvironment(context);
   const config = loadWopalConfig({
-    wopalHome: context.wopalHome,
-    ...(context.wopalSpaceRoot !== undefined
-      ? { wopalSpaceRoot: context.wopalSpaceRoot }
+    ...(input.inlineOptions !== undefined
+      ? { inlineOptions: input.inlineOptions }
+      : {}),
+    ...(input.pluginConfig !== undefined
+      ? { pluginConfig: input.pluginConfig }
       : {}),
     fallbackEnvironment: env,
   });
-  const { logLevel, logFile, logModules } = config.config;
+  const { logLevel, logFile, logModules } = config;
   const logConfig = {
     ...(logLevel !== undefined ? { level: logLevel } : {}),
     ...(logFile !== undefined ? { file: logFile } : {}),
@@ -101,18 +119,32 @@ async function createPluginResources(
       memory: runtime.loggers.memory,
     },
   };
-  return resolveResources(runtime.config.config, resourceRuntime);
+  return resolveResources(runtime.config, resourceRuntime);
 }
 
 const openCodeRulesPlugin = async (
   pluginInput: PluginInput,
+  options?: PluginOptions,
 ): Promise<Hooks> => {
-  const input = pluginInput as PluginInput & { wopalSpaceRoot?: string };
+  // `PluginInput` from `@wopal/ellamaka-plugin` already declares the fork's
+  // `wopalSpaceRoot` and `pluginConfig` extensions, so no local cast is needed
+  // to read them.
+  const input = pluginInput;
+  // The engine delivers the whole `wopal.pluginConfig` table (contract 2.0.7);
+  // the plugin takes its own entry and keeps the inline mount options
+  // (`options`, the compatibility layer) beneath it. The optional chain
+  // tolerates an engine that predates the contract field — absent table /
+  // entry = inline options or built-in defaults.
+  const pluginConfigSlice = input.pluginConfig?.["wopal-plugin"];
   const runtime = createPluginRuntime({
     directory: input.directory,
     ...(input.wopalSpaceRoot !== undefined
       ? { wopalSpaceRoot: input.wopalSpaceRoot }
       : {}),
+    ...(pluginConfigSlice !== undefined
+      ? { pluginConfig: pluginConfigSlice }
+      : {}),
+    ...(options !== undefined ? { inlineOptions: options } : {}),
   });
   const { context: runtimeCtx, loggers } = runtime;
   const {
@@ -133,14 +165,12 @@ const openCodeRulesPlugin = async (
     "Runtime context initialized",
   );
 
-  coreLogger.info(
-    { config: runtime.config.config, sources: runtime.config.sources },
-    "Effective wopal config loaded",
-  );
+  coreLogger.info({ config: runtime.config }, "Effective wopal config loaded");
 
-  // Rules injection is opt-in: config `wopal.rules.enabled` defaults to false,
-  // so discovery is skipped entirely unless the switch is turned on.
-  const rulesInjectionEnabled = runtime.config.config.rules.enabled === true;
+  // Rules injection is opt-in: config `pluginConfig["wopal-plugin"].rules.enabled`
+  // defaults to false, so discovery is skipped entirely unless the switch is
+  // turned on.
+  const rulesInjectionEnabled = runtime.config.rules.enabled === true;
   let ruleFiles: DiscoveredRule[] = [];
   if (rulesInjectionEnabled) {
     ruleFiles = await discoverRuleFiles(undefined, rulesLogger, {
@@ -179,7 +209,7 @@ const openCodeRulesPlugin = async (
   // Context capability (D-04): LLM-driven context abilities (distillation,
   // title generation, auto-recovery) are gated by context.enabled. Compaction
   // is never gated (D-05).
-  const contextEnabled = runtime.config.config.context.enabled !== false;
+  const contextEnabled = runtime.config.context.enabled !== false;
   const distillEngine =
     contextEnabled && resources.store && resources.embedder && resources.llm
       ? new DistillEngine(
@@ -268,7 +298,7 @@ const openCodeRulesPlugin = async (
     systemMetadataMap,
     systemInjectionsMap,
     capabilities: {
-      memoryInjectionEnabled: runtime.config.config.memory.injection,
+      memoryInjectionEnabled: runtime.config.memory.injection,
       contextEnabled,
       rulesInjectionEnabled,
     },
@@ -299,7 +329,7 @@ const openCodeRulesPlugin = async (
   // of truth — resolveResources already consulted config.memory.enabled).
   if (!tools.memory_manage) {
     const reason =
-      runtime.config.config.memory.enabled === false
+      runtime.config.memory.enabled === false
         ? "disabled_by_config"
         : "initialization_failed";
     coreLogger.info(
@@ -350,6 +380,6 @@ const openCodeRulesPlugin = async (
 };
 
 export default {
-  id: "wopal-wopal-plugin",
+  id: "wopal-plugin",
   server: openCodeRulesPlugin,
 };

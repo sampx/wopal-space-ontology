@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { SystemPromptMetadata } from '../types.js';
+import type { SystemPromptMetadata } from '@wopal/ellamaka-plugin';
 import type { MessageWithInfo } from './message-context.js';
 import type { LoggerInstance } from '../logger.js';
 import { SessionStore } from '../session-store.js';
