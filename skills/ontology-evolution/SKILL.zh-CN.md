@@ -337,7 +337,7 @@ wopal space evo archive enhance-example
 | `wopal space sync [--confirm]` | 双向 | 与 `local main` 对齐：先把空间独有的进化向上整合（隔离工作树、冲突即停），再快进向下 |
 | `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | 共享通道：编辑原型 manifest 并重新物化；只接受能力池已有的能力（池中不存在的名字在触碰 manifest 之前就被拒绝），且**不产生 Git 提交**——提交 manifest 是单独的显式步骤。`--local`：把完整资产挂载或卸载为本空间的本地选择（include / exclude / private）；状态变化时，CLI 限路径提交空间根仓库——这是状态记录，不是内容。内容上行始终只经用户自己的 `space sync` / `ontology contribute` 决定，与该状态提交分开 |
 | `wopal ontology capability list` | — | 只读：能力池拥有什么——`space capability add` 的选择清单 |
-| `wopal ontology update [--confirm]` | 向下 | `upstream/main` → `local main` |
+| `wopal ontology sync [--confirm]` | 三角 | `local main` 与来源链路 `upstream ⇄ origin ⇄ local main` 三步对齐（fork：①origin fast-forward upstream → ②origin/main merge 进 local main → ③local push origin；clone 塌缩为仅②）。`ontology update` 是其兼容别名 |
 | `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | 向上 | `local main` → 上游 PR（fork 模式；在隔离工作树中 squash 合并；冲突时 `--resume` / `--abort`） |
 
 ## 读状态

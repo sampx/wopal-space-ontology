@@ -95,7 +95,7 @@ Tool 与 Rule 的动态能力不属于本切片；现有 Tool/Rule 行为保持�
 
 两个工作流技能按对象分工：`dev-flow` 面向 `projects/` 下的代码仓库，`ontology-evolution` 面向空间自身的本体能力资产。四个核心角色在所有空间类型常驻，本体能力进化因此对每个空间可用，不依赖空间是否装配代码开发工作流。两条流程的状态词汇互不重合，实施与交付纪律见 `./DESIGN-evolution.md`。
 
-本体资产的全部维护面由 `ontology-evolution` 技能单点拥有：能力进化的完整流程（提案、状态机、隔离实施、交付终端），以及本体维护操作（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）的执行协议。`space-master` 只保留路由职责——把本体相关请求导向 `ontology-evolution`，不重复维护规范；`wopal/ontology-maintain` 命令是薄触发入口，加载该技能后按其协议执行，自身不承载规范。
+本体资产的全部维护面由 `ontology-evolution` 技能单点拥有：能力进化的完整流程（提案、状态机、隔离实施、交付终端），以及本体维护操作（`ontology sync` / `space sync` / `ontology contribute` / 能力装配增删）的执行协议。`space-master` 只保留路由职责——把本体相关请求导向 `ontology-evolution`，不重复维护规范；`wopal/ontology-maintain` 命令是薄触发入口，加载该技能后按其协议执行，自身不承载规范。
 
 `space-master` 是 ontology 的根技能，定位为概念模型入口、流程选择器与核心技能路由器。本体维护规范收编至 `ontology-evolution` 后，其职责边界收窄为「选哪个技能」，不再持有任何执行协议的完整副本。
 

@@ -86,7 +86,7 @@ space evo archive <name>（事务化归档 + 隔离清理）
 
 ## Capability Evolution Workflow
 
-本体能力进化的执行机制由 `ontology-evolution` 技能承载。该技能是四个核心角色在所有空间类型下的常驻能力：任意空间都能维护与补充自己的本体能力，无需装配代码开发工作流。代码项目开发流程由 `dev-flow` 拥有（见 `./DESIGN-capabilities.md`）；本体能力进化流程由 `ontology-evolution` 拥有。两条流程的对象不同——前者面向 `projects/` 下的代码仓库，后者面向空间自身的本体能力资产。技能同时承载本体维护操作的执行协议（`ontology update` / `space sync` / `ontology contribute` / 能力装配增删）——进化的机制操作与日常维护共用同一套命令面与安全纪律，规范单点维护在技能内。
+本体能力进化的执行机制由 `ontology-evolution` 技能承载。该技能是四个核心角色在所有空间类型下的常驻能力：任意空间都能维护与补充自己的本体能力，无需装配代码开发工作流。代码项目开发流程由 `dev-flow` 拥有（见 `./DESIGN-capabilities.md`）；本体能力进化流程由 `ontology-evolution` 拥有。两条流程的对象不同——前者面向 `projects/` 下的代码仓库，后者面向空间自身的本体能力资产。技能同时承载本体维护操作的执行协议（`ontology sync` / `space sync` / `ontology contribute` / 能力装配增删）——进化的机制操作与日常维护共用同一套命令面与安全纪律，规范单点维护在技能内。
 
 技能覆盖这项工作的两个环节，职责不重叠：
 
@@ -156,14 +156,14 @@ draft → accepted → implementing → validating → archived
 | `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常本体 Git 提交上行；`--local`：以能力或 `path:<ref>` 完整身份调整本空间选择，CLI 提交空间根仓库状态，不生成本体内容提交 |
 | `space evo <family>` | — | 提案落地：提案状态机、隔离实施、稀疏安全落盘、集成与验证切换；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
-| `ontology update` | 下行 | upstream/main → local main，本地中央仓库整合 |
+| `ontology sync` | 三角 | `upstream ⇄ origin ⇄ local main` 三步双向对齐（fork：origin fast-forward upstream → origin/main merge 进 local → local push origin；clone 塌缩为仅中段），`ontology update` 为兼容别名 |
 | `ontology contribute` | 上行 | local main → upstream PR（fork 模式；clone 模式不支持） |
 
 **内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力或通用路径是否在本空间挂载由装配单和空间选择决定。`space capability` 无旗标调整类型装配单，变更按正常提交上行；`--local` 调整空间根仓库 `space-meta.json` 中的 `include` / `exclude` / `private`，由 CLI 限定路径提交。显式卸载完整资产与共享删除其内部文件是不同操作。新建共享资产可只由当前空间挂载；进化提交/集成根据明确的整项资产归属一次登记，无需对每个内部文件手动 add/remove。多空间目录删除与重命名以全部适用装配单的候选树引用完整性为门禁，详见 `./DESIGN-assembly.md`。
 
 **上行不泄漏私有内容（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）是否落在已登记的 `private` 能力根下；命中即拒绝并给出可执行的解除私有登记或撤出提交路径。`include` / `exclude` 只记录挂载选择，不进入内容泄漏判定。写入命令在提交前执行相同私有检查；sync 闸为手动 Git 提交兜底。
 
-`space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式只支持 `ontology update`。
+`space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。`ontology contribute` 仅在 fork 模式下可用，clone 模式 `ontology sync` 塌缩为单向下行拉取。
 
 `ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对新建能力，内容先按共享提交或显式私有登记选定归属，再按能力身份确定本空间是否挂载。
 

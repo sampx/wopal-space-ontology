@@ -103,7 +103,7 @@ macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应
 | `ontologies/wopal-space-ontology/plugins/` | `plugins/` |
 | `ontologies/wopal-space-ontology/dsh/agents-presets/` | `dsh/agents-presets/` |
 
-> **注**：user-level base capabilities 是跨空间共享的**只读入口**，物化为 symlink 合理——它们由 `ontology update` 统一推进，不经由空间内修改。空间内可写的装配资产位于 `<space>/.wopal/`（sparse-checkout 真实文件），两者职责不同。
+> **注**：user-level base capabilities 是跨空间共享的**只读入口**，物化为 symlink 合理——它们由 `ontology sync` 统一推进，不经由空间内修改。空间内可写的装配资产位于 `<space>/.wopal/`（sparse-checkout 真实文件），两者职责不同。
 
 ### DSH Profiles Materialization Contract
 
