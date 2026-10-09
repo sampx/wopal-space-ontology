@@ -1,6 +1,6 @@
 ---
 name: context-manage
-description: Manage working context across session handoffs and context compaction. Use for three workflows: save the current context before a handoff (handoff), restore and resume from .working-context.md in a new session (continue), or reload essential files, memories, and skills after context compaction (recover). Trigger when the user asks to save context, continue previous work, recover after compaction, or when invoked by /context-handoff, /context-continue, or /context-recover.
+description: Preserve and restore working context across sessions, covering session handoffs and post-compaction recovery. Use this skill whenever the user asks to save the current session state before ending or switching sessions, to continue unfinished work in a new session, or to reload essential files, memories, and skills after context compaction.
 ---
 
 # context-manage

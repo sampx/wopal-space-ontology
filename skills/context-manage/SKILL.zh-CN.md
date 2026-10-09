@@ -1,6 +1,6 @@
 ---
 name: context-manage
-description: 管理跨会话与上下文压缩后的工作上下文。用于三种场景：交接前保存当前上下文（handoff）、新会话从 .working-context.md 恢复并继续（continue）、上下文压缩后重新加载关键文件/记忆/技能（recover）。当用户要求保存上下文、继续上次工作、恢复压缩后的上下文，或由 /context-handoff、/context-continue、/context-recover 入口调用时使用。
+description: 跨会话保存与恢复工作上下文，覆盖会话交接与上下文压缩两类场景。当用户要求在结束或切换会话前保存当前状态以便日后继续、在新会话中接着上次未完成的工作继续、或上下文压缩后需要恢复关键文件/记忆/技能时，必须使用本技能。
 ---
 
 # context-manage
