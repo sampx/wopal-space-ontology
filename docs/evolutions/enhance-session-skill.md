@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-10-08
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-enhance-session-skill
 - **Branch**: ontology-enhance-session-skill
