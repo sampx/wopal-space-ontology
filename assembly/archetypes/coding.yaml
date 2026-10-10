@@ -60,7 +60,6 @@ commands:
 plugins:
   ellamaka:
     - wopal-plugin
-    - dsh-adapter
   tui:
     - tui-ellamaka
 paths:

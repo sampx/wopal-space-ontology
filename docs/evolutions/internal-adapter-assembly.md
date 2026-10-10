@@ -67,17 +67,17 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 
 ### Agent Verification
 
-1. [ ] `assembly/archetypes/coding.yaml` 的 Ellamaka 默认插件列表不再包含 `dsh-adapter`。
-2. [ ] 当前空间 `.wopal/config/settings.local.jsonc` 的 `ellamaka.plugin` 不再包含 `../plugins/dsh-adapter`，其他插件保持。
-3. [ ] `wopal.pluginConfig.dsh-adapter` 参数和旧 `plugins/dsh-adapter` 源码/依赖保持不变；其他已有空间本次不迁移。
-4. [ ] 复用 Ellamaka unified-sdk Task 4 已通过的内部 adapter 回归证据，本提案不重复改造 SDK / CLI / materializer。
+1. [x] `assembly/archetypes/coding.yaml` 的 Ellamaka 默认插件列表不再包含 `dsh-adapter`。
+2. [x] 当前空间 `.wopal/config/settings.local.jsonc` 的 `ellamaka.plugin` 不再包含 `../plugins/dsh-adapter`，其他插件保持。
+3. [x] `wopal.pluginConfig.dsh-adapter` 参数和旧 `plugins/dsh-adapter` 源码/依赖保持不变；其他已有空间本次不迁移。
+4. [x] 复用 Ellamaka unified-sdk Task 4 已通过的内部 adapter 回归证据，本提案不重复改造 SDK / CLI / materializer。
 
 ### User Validation
 
 #### Scenario 1: 更新装配后的正常使用
 - Goal: 观察已有空间的参数与助理交互；与 Ellamaka 主计划联合验收，不重复做一轮。
 - 验证环境：当前 wopal-workspace 的演进验证视图，WOPAL_HOME 为 `/Users/sam/tmp/wopal-e2e/home`，不清空或重置。
-- Precondition：候选 Ellamaka 内部 adapter 已通过自动验收，装配已重新物化；Agent 检查有效配置与进程占用。
+- Precondition：候选 Ellamaka 内部 adapter 已通过自动验收，当前空间已手工同步本地装配结果；Agent 检查有效配置与进程占用。
 - 启动命令：`WOPAL_HOME=/Users/sam/tmp/wopal-e2e/home ./.worktrees/ellamaka-feature-upgrade-dsh-v0.2/scripts/dev.sh serve --port 3018 --app-port 3019`，从空间根执行；若候选脚本在另一个工作树，Agent 交付前回填实际路径。
 - User Actions：打开脚本输出的 Workbench 地址，进入当前空间，观察 sandbox 参数与一次正常助理交互。
 - 通过判据：无需外部 adapter 的装配提示，现有模式可识别，工具交互和错误说明可理解。
@@ -111,8 +111,12 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 **Verify**: 静态核对默认装配、本地有效插件列表、参数保留和旧源码 Git 摘要；运行 `wopal space evo check internal-adapter-assembly`。
 
 **Done**:
-任务产出与实际触碰文件：实施完成后记录。
-- [ ] 实施 Agent 已完成上述变更和验证。
+- 产出：coding 默认装配已移除外部 `dsh-adapter`；当前空间本地 `ellamaka.plugin` 已手工移除 `../plugins/dsh-adapter`。
+- 实际触碰：`assembly/archetypes/coding.yaml`、`config/settings.local.jsonc`（本地生成配置，不提交）、`docs/evolutions/internal-adapter-assembly.md`。
+- 保留：`wopal.pluginConfig.dsh-adapter` 仍存在；`plugins/dsh-adapter` 无 Git diff。
+- 验证：默认装配无 `dsh-adapter`；本地插件列表仅保留 `../plugins/wopal-plugin`；`wopal space evo check internal-adapter-assembly` → `OK`。
+- 内部 adapter 行为复用 Ellamaka unified-sdk Task 4 已通过的交付 `a4b57723bc`，本提案未重复修改 SDK / CLI / materializer。
+- [x] 实施 Agent 已完成上述变更和验证。
 
 ## Delegation Strategy
 
