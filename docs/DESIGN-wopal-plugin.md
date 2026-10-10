@@ -1,7 +1,7 @@
 # DESIGN — wopal-plugin Overall Design
 
 > **Status**: Active
-> **Updated**: 2026-09-19
+> **Updated**: 2026-10-10
 > **Parent**: `./DESIGN.md`（ontology overall design: Plugin System and Configuration sections）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -70,7 +70,7 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 ### 与 fork 扩展的关系边界
 
-插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前 wopal-plugin 的消费面是 `wopalSpaceRoot`、`systemMetadata`、既有 `experimental.chat.messages.transform` 与新增 `experimental.permission.rules`；`tool.provider` 与 `ToolContext.extra` 归属 `dsh-adapter`（见 `DESIGN-dsh-adapter.md`）。`experimental.permission.rules` 是 additive optional hook：旧插件运行在新引擎上无行为变化；依赖该 hook 的新版 wopal-plugin 需要与提供该契约的 Ellamaka 主版本配套分发。
+插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前 wopal-plugin 的消费面是 `wopalSpaceRoot`、`systemMetadata`、既有 `experimental.chat.messages.transform` 与新增 `experimental.permission.rules`；`tool.provider` 与 `ToolContext.extra` 归属 Ellamaka 内部 dsh-adapter（见 `../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter`）。`experimental.permission.rules` 是 additive optional hook：旧插件运行在新引擎上无行为变化；依赖该 hook 的新版 wopal-plugin 需要与提供该契约的 Ellamaka 主版本配套分发。
 
 ## Module Architecture
 

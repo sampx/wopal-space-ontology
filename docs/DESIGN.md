@@ -1,14 +1,13 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-09-27
+> **Updated**: 2026-10-10
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
 > - `./DESIGN-assembly.md` — Assembly model: manifest, schema, template and configuration layers
 > - `./DESIGN-capabilities.md` — Capability system: Agent, skill, command, rule, plugin and script
 > - `./DESIGN-distribution.md` — Distribution contract: source input, materialization and runtime loading
-> - `./DESIGN-dsh-adapter.md` — DSH adapter plugin design
 > - `./DESIGN-evolution.md` — Evolution loop: collaboration model, self-evolution and design knowledge layering
 > - `./DESIGN-wopal-plugin.md` — wopal-plugin overall design
 
@@ -16,7 +15,9 @@
 
 ## Project Role
 
-ontology 是 WopalSpace 的 Space Ontology 层，也是空间灵魂、规约与能力基因工具包的承载面。Agent 身份、规则、技能、命令、插件、模板与辅助脚本在这里沉淀和分发；ellamaka 负责解释执行，wopal-cli 负责确定性操作编排，space runtime 负责当前空间运行态。
+新版 dsh-adapter 由 Ellamaka 的 ellamaka-cordis 内置；ontology 默认装配不再引用它，参数仍在 settings.jsonc 的 wopal.pluginConfig.dsh-adapter。plugins/dsh-adapter 暂留为旧产品兼容源码，不由新版装配或执行；旧产品需兼容的旧装配声明。实现与权限契约统一见 [工具容器设计](../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter)，ontology 不维护独立 adapter 设计。
+
+ontology 是 WopalSpace 的 Space Ontology 层，也是空间灵魂、规约与能力基因工具包的承载面。Agent 身份、规则、技能、命令、插件、模板与辅助脚本在这里沉淀和分发；ellamaka 负责解释执行和共享的确定性本地业务服务，wopal-cli 负责命令行呈现及调用，space runtime 负责当前空间运行态。
 
 核心职责：空间灵魂可复用、空间规约可分发、空间能力可编排、空间经验可延续。Fork 一个 ontology = 复制一套可持续演化的空间起点。
 
@@ -130,7 +131,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 
 ### Initialization and Maintenance Targets
 
-Ontology 提供初始化协议，wopal-cli 负责确定性 materialize，`/init` 负责智能校准。CLI 实现建立在 ontology 装配定义与 `/init` 维护机制逐步验证成熟的基础上。
+Ontology 提供初始化协议，Ellamaka 共享业务服务负责确定性 materialize，Wopal CLI 与远程 onboarding 调用同一服务，`/init` 负责智能校准。CLI 实现建立在 ontology 装配定义与 `/init` 维护机制逐步验证成熟的基础上。
 
 `wopal space init` 是创建/初始化入口。新建、已有目录补齐、合法 space 注册与 active space 设置均由 `space init` 承载。
 

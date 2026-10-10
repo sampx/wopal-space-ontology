@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-09-27
+> **Updated**: 2026-10-10
 > **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -46,7 +46,7 @@ P1 canonical identity 是 `wopal-space-ontology`。同一个 identity 用于默�
 
 ontology 的安装形态是 Git 仓库 + 装配 worktree。
 
-`wopal space init` / `wopal setup` 负责：
+Ellamaka 共享本地服务实现以下步骤，Wopal CLI 与远程 onboarding 调用同一服务：
 
 1. 解析目标 ontology source
 2. 准备本地 ontology repo（clone/fork，物化 local main）
@@ -110,7 +110,7 @@ macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应
 DSH Profile（`web` 与 `ellamaka-tools`）的基准声明属于本体能力基因，但其执行环境必须位于本地运行态：
 
 1. **基准源**：`ontologies/wopal-space-ontology/dsh/profiles/<profile>/` 仅受版本控制维护 `package.json`（bundles 依赖）与 `cordis.patch.yml`（参数与规则补丁）。
-2. **确定性物化**：`wopal setup` / `space init` 将基准源文件物理复制（Copy）到 `$WOPAL_HOME/dsh/home/profiles/<profile>/`，支持增量合并（bundles 去重合并、用户自定义 patch 保护）。
+2. **确定性物化**：共享服务将基准源文件物理复制（Copy）到 SDK 返回的当前环境 `home/profiles/<profile>/`，支持增量合并（bundles 去重合并、用户自定义 patch 保护）。
 3. **运行时闭环**：物理文件就位后，由 `ellamaka dsh init` 执行闭包依赖解析、本地 `node_modules` 安装及 fallback 符号链接自愈，并在启动时动态生成 `cordis.yml` 锚点。禁止对 profiles 根目录进行跨文件系统软链接。
 
 ### Space Overlay
@@ -140,7 +140,7 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 1. plugin 依赖由 ellamaka 在启动时按 path plugin 语义处理。
 2. `~/.wopal/ellamaka/*` 全局运行目录由 ellamaka 管理。
-3. CLI 的 global setup 由 wopal-cli 负责。
+3. global setup 由共享SDK服务完成，Wopal CLI负责终端呈现。
 4. `/init` 的结构维护与差异吸收由 ontology command 在运行时承接。
 
 ---
