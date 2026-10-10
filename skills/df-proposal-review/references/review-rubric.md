@@ -1,101 +1,78 @@
-# Plan Review Rubric — Detailed Procedures
+# Proposal Review Rubric — Procedures by Mode
 
-Procedures for the three questions. Load this when a question needs its full method, the command cookbook, or a worked example.
+Detail behind the questions, per mode. Load this when a question needs its full method, the command cookbook, or a worked example.
 
-**Purpose reminder**: this review answers "will this Plan work if executed literally". It does not audit form — `flow.sh plan check` owns form and has already passed.
+**Purpose reminder**: this review answers "will this work if executed or adopted as written". Form is owned elsewhere — `flow.sh plan check` for dev-flow Plans, `wopal space evo check` for evolution proposals, `scripts/verify-docset.py` for the doc-master document set.
 
 Contents:
-1. [Reading the Plan](#1-reading-the-plan)
-2. [Q1 — parts fit together](#2-q1--do-the-parts-fit-together)
-3. [Q2 — statements about the repo](#3-q2--are-the-plans-statements-about-the-repo-true)
-4. [Q3 — delivering the goal](#4-q3--will-executing-it-deliver-the-goal)
-5. [Severity calibration](#5-severity-calibration)
-6. [Worked Examples](#6-worked-examples)
+1. [Reading the artifact](#1-reading-the-artifact)
+2. [Plan mode — Q1](#2-plan-mode--q1-do-the-parts-fit-together)
+3. [Plan mode — Q2](#3-plan-mode--q2-are-its-statements-about-the-repo-true)
+4. [Plan mode — Q3](#4-plan-mode--q3-will-executing-it-deliver-the-goal)
+5. [Plan mode — Q4 Lean](#5-plan-mode--q4-lean)
+6. [Document mode — D1–D4](#6-document-mode--d1d4)
+7. [Severity calibration](#7-severity-calibration)
+8. [Worked examples](#8-worked-examples)
 
 ---
 
-## 1. Reading the Plan
+## 1. Reading the artifact
 
-Read the whole Plan once, with line numbers, before running any command. Build the three lists as you read:
+Read the whole artifact once, with line numbers, before running any command. Build the three lists as you read:
 
-1. **Facts** — every concrete claim about the repo (counts, paths, line anchors, document sections, IDs, commands, flags).
-2. **Symbols** — every code-like name in backticks, with the Task that uses it and the Task that should create it.
-3. **Files** — every file path mentioned anywhere, with where it was mentioned (Task `Files`, `Changes`, `Affected Files` row, `Pre-read`, test path).
+1. **Facts** — every concrete claim about the repo, the system, or other documents (counts, paths, line anchors, doc sections, IDs, commands, flags).
+2. **Symbols** — Plan mode: every code-like backticked name, with the Task that uses it and the Task that creates it. Document mode: every named component, capability, or contract, with where the document gives it an owner.
+3. **Files** — every file path mentioned anywhere, with where it was mentioned.
 
-Then run commands. Do not alternate between reading and verifying — each return to the Plan costs more than the command saved.
-
-Keep the Plan's own declared execution mode in mind from the start: a Plan may declare that "waves are dependency layers, not parallel batches", executed sequentially in one shared worktree. That one sentence changes how file overlap is judged in Q1.
+Then run commands. Do not alternate between reading and verifying — each return costs more than the command saved. Keep the artifact's declared execution mode in mind from the start (sequential waves tolerate same-wave file overlap; claimed parallel waves require file-disjointness).
 
 ---
 
-## 2. Q1 — Do the parts fit together?
+## 2. Plan mode — Q1: Do the parts fit together?
 
-Needs the Plan only. Run it right after reading — pure mechanics, and it catches the most common cross-task defect class.
+Needs the artifact only. Run it right after reading — pure mechanics, and it catches the most common cross-task defect class.
 
 ### 2.1 Expected file scope (no audit)
 
-Tasks no longer carry a Files field. The `## Affected Files` table is the expected footprint, not a contract: the implementing agent adjusts file choices on the real code and backfills actuals at Done. **Do not diff task-level file lists against the table — that audit is retired.** Two things remain checkable:
+The `## Affected Files` table is the expected footprint, not a contract; the implementing agent backfills actuals at Done. **Do not diff task-level file lists against the table.** Two things remain checkable:
 
-1. **Stale operation premises**: a table row declaring "create" for a file that already exists, or "delete" for a file that is absent — the implementer will hit a wrong turn on a false premise (WARNING).
-2. **Parallel overlap**: when the Plan declares parallel execution, files overlapping between waves are a conflict (BLOCKER). When the Plan states waves are sequential dependency layers, overlap is the Plan's design — not a finding.
+1. **Stale operation premises**: a row declaring "create" for a file that exists, or "delete" for a file that is absent — the implementer hits a wrong turn on a false premise (WARNING).
+2. **Parallel overlap**: files overlapping between waves under declared parallel execution (BLOCKER). Under declared sequential layers, overlap is the Plan's design — not a finding.
 
-**Common false positive**: table rows sometimes name artifacts the code creates at runtime, not files the Plan writes — a row documenting a generated artifact needs no producer.
-
-| Condition | Severity |
-|---|---|
-| Affected Files row with a stale operation premise (create-but-exists / delete-but-missing) | WARNING |
-| File overlap under declared parallel execution | BLOCKER |
-| File overlap under declared sequential layers | not a finding |
-| Task-level file list disagrees with the table | not a finding (audit retired) |
+**Common false positive**: rows naming artifacts the code creates at runtime, not files the Plan writes — a generated artifact needs no producer.
 
 ### 2.2 Symbols have producers
 
-1. Walk the Tasks in order. Collect code-like backticked names that a task *uses*: function and method calls, upper-snake constants, exported types, fixtures, CLI flags, env vars.
-2. Collect the names each task *declares*: "register X", "create Y", "export Z", new files that will hold them.
-3. Match each used name to a producer. Confirm:
-   - a producer exists somewhere in the Plan
-   - the spelling matches exactly
-   - the producer's Task precedes the consumer's Task
-4. When a task registers a *set* of names ("registers the five codes: A, B, C, D, E"), verify every name used elsewhere in the Plan appears in that set — and that no task registers into a file the Plan never lists.
+1. Walk the Tasks in order. Collect code-like backticked names a task *uses*: function calls, upper-snake constants, exported types, fixtures, CLI flags, env vars.
+2. Collect the names each task *declares*: "register X", "create Y", "export Z".
+3. Match each used name to a producer: a producer exists, spelling matches exactly, the producer's Task precedes the consumer's.
+4. When a task registers a *set* of names, verify every name used elsewhere appears in that set.
 
 | Condition | Severity |
 |---|---|
-| Used name with no producer anywhere in the Plan | BLOCKER |
+| Used name with no producer anywhere | BLOCKER |
 | Producer name differs from the consumer's expected name | BLOCKER |
 | Producer sits in a later wave than its consumer | BLOCKER |
-| Producer exists but where it is exported/registered is unstated and matters to wiring | WARNING |
-| Producer's file missing from `Affected Files` | report under 2.1 instead |
+| Producer exists but its export/registration site is unstated and matters to wiring | WARNING |
 
 ### 2.3 Every AC has an owner, in the right bucket
 
-1. List every AC in `### Agent Verification`, by number.
+1. List every AC in `### Agent Verification`.
 2. Collect the referenced set from every Task's `**Verification Intent**`.
-3. Diff them. Unreferenced ACs have no owner.
-4. ACs that genuinely span tasks must be explicitly marked as cross-task.
-5. Check the bucket: tests, lint, typecheck, static checks, scriptable assertions belong in Agent Verification; only human observation belongs in User Validation. A criterion in the wrong bucket wastes the responsible party's effort.
+3. Diff them. Unreferenced ACs have no owner. Cross-task ACs must be marked as such.
+4. Check the bucket: tests, lint, typecheck, scriptable assertions belong in Agent Verification; only human observation belongs in User Validation.
 
-**Two-beat context**: beat-1 entries are criterion-style (behavioral pass criteria) — legal by design; the real command is written back at the RED stage (beat 2), and the complete gate enforces commands on checked entries. Never flag a criterion-style entry itself as a defect — flag only criteria that cannot catch a bad implementation (no observable outcome, restates the change).
-
-| Condition | Severity |
-|---|---|
-| AC owned by no task | WARNING |
-| Automatable verification sitting in User Validation | WARNING |
-| Human-observation-only criterion claimed as agent-verifiable | WARNING |
-| Criterion-style AC (legal beat-1 form) | not a finding |
+**Two-beat context**: beat-1 entries are criterion-style — legal by design; the real command is written back at the RED stage. Never flag a criterion-style entry itself; flag only criteria that cannot catch a bad implementation.
 
 ### 2.4 Order matches dependencies
 
 - Declared wave/dependency order must match the dependency table: no consumer before its producer.
-- The declared execution mode must match reality: sequential waves tolerate same-wave file overlap; claimed parallel waves require file-disjointness.
-- No task depends on an artifact whose creation the Plan never schedules.
-
-| Condition | Severity |
-|---|---|
-| Declared order contradicts declared dependencies | BLOCKER |
+- Declared execution mode must match reality: sequential waves tolerate same-wave overlap; claimed parallel waves require disjoint files.
+- No task depends on an artifact the Plan never schedules for creation.
 
 ---
 
-## 3. Q2 — Are the Plan's statements about the repo true?
+## 3. Plan mode — Q2: Are its statements about the repo true?
 
 The repo is the only authority. Check each claim mechanically — never wave one through because it looks right.
 
@@ -103,212 +80,272 @@ The repo is the only authority. Check each claim mechanically — never wave one
 
 | Claim class | Command | Notes |
 |---|---|---|
-| Counts ("36 capabilities", "8 skills") | count them in the source of truth | the count motivates work — get it right |
+| Counts ("36 capabilities") | count them in the source of truth | the count motivates work — get it right |
 | Paths / filenames | `test -e`, `ls`, `rg --files` | |
-| Line anchors ("`file.ts:619-669`") | `sed -n 'Np' file` at the target revision | see anchor-drift judgement below |
-| Document sections cited | `rg -n '^#{2,3} Section' doc.md` | it is the Plan's authority citation |
-| Decision / issue IDs (`D-xx`, gap IDs) | `rg -n` the ID in its source of truth | |
+| Line anchors ("`file.ts:619-669`") | `sed -n 'Np' file` at the target revision | see anchor-drift judgement |
+| Document sections cited | `rg -n '^#{2,3} Section' doc.md` | the Plan's authority citation |
+| Decision / issue IDs | `rg -n` the ID in its source of truth | |
 | Commands and flags named in ACs | check the command exists and accepts the arguments | |
 | Menu of "new" vs existing files | `test -e` | |
-| Environment state claims ("the symlinks exist") | inspect the live environment | only when it justifies work |
 
-**Revision discipline**: state which revision every check ran against — the Plan's `Base Commit`, the worktree HEAD, or the integration HEAD. Facts drift with commits; an unanchored finding is untrustworthy the moment anyone commits. When a Plan declares a worktree, facts must be probed **at that worktree's HEAD**, not on the integration branch.
+**Revision discipline**: state which revision every check ran against — Base Commit, worktree HEAD, or integration HEAD. When the artifact declares a worktree, probe at the worktree's HEAD, not the integration branch.
 
 ### 3.2 Anchor-drift judgement
 
-Line anchors exist to locate code, not to be exact. Probe the anchor and read a few lines around it:
+Line anchors locate code; they are not contracts. Probe the anchor and read a few lines around it:
 
-- Lands on the described construct → pass
-- Lands nearby, construct clearly identifiable → pass
+- Lands on the described construct, or nearby with the construct clearly identifiable → pass
 - Lands on unrelated code, or the construct is elsewhere → WARNING
 - Construct does not exist at the stated revision → BLOCKER if the premise leans on it, else WARNING
 
 ### 3.3 Agreement with authorities
 
-1. From Technical Context and `Pre-read`, list the design docs, rule files, and interfaces the Plan names as its basis.
-2. Confirm the cited sections actually exist and say what the Plan claims they say.
-3. For each decision the Plan makes, find the governing statement in those authorities and compare.
-4. Classify any divergence:
-   - **Acknowledged** — the Plan states the divergence and justifies it, or states it updates the doc → not a finding
-   - **Deferred** — the Plan explicitly excludes it (Out of Scope with a reason) → not a finding
-   - **Silent** — neither acknowledged nor justified → finding
+1. From Technical Context and `Pre-read`, list the design docs, rule files, and interfaces the artifact names as its basis.
+2. Confirm the cited sections exist and say what is claimed.
+3. For each decision, find the governing statement in the authorities and compare.
+4. Classify divergence: **Acknowledged** (stated and justified → not a finding), **Deferred** (explicitly out of scope with a reason → not a finding), **Silent** (→ finding).
 
-Judgement note: not every document statement is binding. Older documents may describe a superseded model while the Plan implements the current one. Establish which document is authoritative *for the model this Plan implements* before calling a conflict.
-
-| Condition | Severity |
-|---|---|
-| False premise the Plan leans on | BLOCKER |
-| False claim a task would wrongly build on | BLOCKER |
-| Divergence breaking a stated safety or security constraint | BLOCKER |
-| AC command cannot run as written in the declared environment | BLOCKER |
-| Citation of a document section that does not exist or does not say what is claimed | WARNING |
-| Silent divergence from a design doc or project rule | WARNING |
-| Descriptive drift with no effect on the work (anchor slightly off) | WARNING |
-| Cosmetic drift (imprecise count, ordering difference) | INFO |
-| Claim not settleable from the workspace | `Unverified` — not a finding |
+Judgement note: not every document statement is binding — older docs may describe a superseded model. Establish which document is authoritative *for the model this artifact implements* before calling a conflict.
 
 ---
 
-## 4. Q3 — Will executing it deliver the goal?
+## 4. Plan mode — Q3: Will executing it deliver the goal?
 
-Needs the Plan only (plus the goal decomposition — zero repo commands). Catches what structural checks cannot: a Plan that passes and still under-delivers.
+Needs the artifact only (plus goal decomposition — zero repo commands).
 
 ### 4.1 Goal covered
 
-1. Split `## Goal` into its independently meaningful parts.
-2. For each part, find the Task(s) that deliver it.
-3. A part with no task is an intention, not a plan.
+Split `## Goal` into independently meaningful parts; find the Task(s) delivering each. A part with no task is an intention, not a plan (BLOCKER).
 
 ### 4.2 Decisions delivered
 
-1. For each `D-xx` in Key Decisions, find the task(s) that implement it.
+1. For each `D-xx`, find the task(s) implementing it.
 2. Confirm the delivery matches the decision's scope.
-3. Scan task text for shrink words: `v1`, `v2`, `simplified`, `static for now`, `hardcoded`, `placeholder`, `basic version`, `minimal`, `NOT wired to`, `NOT connected to`, `stub`, `future enhancement`, `will be wired later`, `skip for now`, `for now`.
-4. Adjudicate each hit, two questions in order:
-   - Does the shrink contradict the Goal or a `D-xx`? If not → not a finding.
-   - Does a `D-xx` or scope statement **sanction** the shrink? If yes → not a finding. Plans legitimately deliver phased work when the Plan says so.
+3. Scan task text for shrink words: `v1`, `simplified`, `static for now`, `hardcoded`, `placeholder`, `basic version`, `minimal`, `stub`, `not wired to`, `for now`.
+4. Adjudicate, two questions in order: does the shrink contradict the Goal or a `D-xx`? Does a `D-xx` or scope statement **sanction** it? A sanctioned shrink is phased delivery — not a finding.
+
+**Why a silent shrink is BLOCKER**: a reduced deliverable that reaches `verify` has already spent the execution budget. Phased delivery is fine when the artifact *says* it is a phase.
 
 ### 4.3 ACs that can fail
 
-For each AC, ask: if the feature were broken, would this check catch it?
-
-- An AC that asserts existence where behavior is the claim ("the file exists") proves nothing about the behavior.
-- An AC that restates the change ("the function is added") proves nothing at all.
-- An AC that passes whether or not the feature works is decoration.
-
-The strongest AC names a failure it would detect. Weak falsifiability is WARNING, not BLOCKER — `plan check` owns command presence; you own whether the command proves anything.
+For each AC: if the feature were broken, would this check catch it? An AC asserting existence where behavior is the claim proves nothing; one that restates the change proves less. Weak falsifiability is WARNING — `plan check` owns command presence; you own whether the command proves anything.
 
 ### 4.4 Handoff possible
 
-For each Task, ask whether whoever implements it, knowing only the Plan and the declared `Pre-read`, could start work:
+For each Task: knowing only the artifact and the declared `Pre-read`, could a competent implementer start?
 
-- Are the interfaces, types, and outputs of earlier Tasks **named**, not implied ("uses the response shape from Task 2" is weak; "calls `parseConfig(path)` returning a `ParsedConfig`" is ready)?
-- Is the Task's own output defined well enough that the *next* Task can consume it?
-- Does `Pre-read` list the right files — and do those files exist?
+- Interfaces, types, and outputs of earlier Tasks are **named**, not implied ("uses the shape from Task 2" is weak; "calls `parseConfig(path)` returning a `ParsedConfig`" is ready).
+- The Task's own output is defined well enough for the next Task to consume.
+- `Pre-read` files exist.
 
-Resist flagging Tasks that are one step of an obvious sequence. The bar is "could a competent implementer proceed". Flag only where the missing information would cause a wrong turn — an interface that must be guessed, an output shape that is ambiguous, or a dependency the implementer cannot discover.
-
-| Condition | Severity |
-|---|---|
-| Goal part with no covering task | BLOCKER |
-| Decision reduced without the Plan acknowledging it | BLOCKER |
-| Shrink language sanctioned by a `D-xx` or scope statement | not a finding |
-| AC that cannot fail | WARNING |
-| Task not startable from Plan + declared `Pre-read` alone | WARNING |
-| `Pre-read` names a file that does not exist | WARNING |
-
-**Why a silent decision shrink is BLOCKER**: a reduced deliverable that reaches `verify` has already spent the execution budget. Catching it before execution is the whole value of this review. Phased delivery is fine when the Plan *says* it is a phase — adjust the Goal or split an explicit follow-up. A silent shrink is not.
+Flag only where the missing information would cause a wrong turn.
 
 ---
 
-## 5. Severity calibration
+## 5. Plan mode — Q4: Lean
+
+For every new artifact the Plan creates — module, class, interface, config surface, dependency, extension point — climb the ladder. Stop at the first rung that holds; the artifact must land at that rung.
+
+### The ladder
+
+1. **Does it need to exist at all?** One-implementation interfaces, one-product factories, config for values that never change, extension points with no consumer, layers with one caller. Speculative need = cut it, name the trigger that would justify it later.
+2. **Already in this repo?** The Plan builds what a few files over already ships. Probe with `rg <pattern>` before flagging — the finding must name the existing implementation (`file:line`), or it is at most Info.
+3. **Stdlib does it?** The Plan adds a dependency whose job the standard library already does. Name the stdlib function in the finding.
+4. **Native platform covers it?** Code or a dependency doing what the platform ships (CSS over a JS polyfill, a DB constraint over app-side checks, built-in CLI flags over hand-rolled parsing).
+5. **Fewest moving parts?** The same logic a shorter, more direct form delivers. Show the shorter form in the finding.
+
+### Dependency admission
+
+Any new third-party dependency in the Plan needs a stated reason the ladder cannot satisfy: why stdlib, native platform, and every already-installed dependency fall short. A Plan that adds a dependency with no reason → WARNING. A Plan adding a dependency while rungs 3–4 hold → WARNING, and the finding names what it should have used.
+
+### Severity
+
+| Condition | Severity |
+|---|---|
+| Speculative abstraction or extension point | WARNING |
+| Re-implementation of existing repo infrastructure (named `file:line`) | WARNING |
+| New dependency while stdlib / installed packages cover it | WARNING |
+| Same logic in a shorter form | INFO |
+| Style or naming preference | not a finding |
+
+Q4 never blocks: the fix is shrinking the Plan, and lean findings are judgement calls, not execution failures. Report the total as `net: -N lines, -M dependencies possible` in the report Summary; nothing to cut → `Lean already`.
+
+### Evolution-proposal capability gate
+
+On top of Q1–Q4, an ontology evolution proposal's deliverable must satisfy the platform's own capability standards:
+
+- frontmatter `name` + `description`; triggering conditions live in the description
+- body = workflow, output, notes; long content offloaded to `references/`
+- scripts/ holds only deterministic, reusable logic
+- no invented structure beyond the platform's asset anatomy
+
+Violation → WARNING. This gate checks the *proposal's stated deliverable*; the implementation review (df-implement-review) re-checks the landed files.
+
+---
+
+## 6. Document mode — D1–D4
+
+No tasks to schedule, so the questions reshape. Q4's name and severity cap carry over.
+
+### D1 — Does the document cohere?
+
+Read for: contradictions between sections; terms used before definition or used two ways; components, states, or contracts the document introduces without an owner; sections that depend on context the document never provides.
+
+**Structure conformance**: when the document belongs to the `dev-doc-master` set, structural rules (header zones, bidirectional index, naming, field vocabulary) are governed by `dev-doc-master/references/consistency.md`. The mechanical part is already scanned by its quality gate (`scripts/verify-docset.py`) — run it when available and spend your review on what the script cannot see: whether the *content* honors the structure (a header pointing at a document that no longer governs this one, a companion misclassified as a sub-design).
+
+| Condition | Severity |
+|---|---|
+| Internal contradiction on a load-bearing statement | BLOCKER |
+| Undefined term with real ambiguity | WARNING |
+| Component or state introduced without an owner | WARNING |
+| Structure drift the gate script already catches | report only if the gate was not run |
+
+### D2 — Are its statements about reality true?
+
+Same mechanical probes as Q2 (command cookbook, revision discipline, anchor drift). Additional checks in document mode:
+
+- **Sibling-document conflicts**: two documents describing the same system differently. Apply the authority rule from 3.3 first; a silent divergence is a finding.
+- **Target-state writing** (doc-master set): "deprecated", "legacy", "moved from", "migration" narration is a finding — the reader learns the current structure, not the history.
+
+| Condition | Severity |
+|---|---|
+| Claim the code contradicts on a load-bearing path | BLOCKER |
+| Stale claim with no effect on decisions | WARNING |
+| Process-state narration (doc-master set) | WARNING |
+| Cosmetic drift | INFO |
+
+### D3 — Is the goal sound?
+
+- **Decidable goal**: an observer can tell whether the goal was met. "Make the system more robust" is not decidable; "submits with zero schema errors" is.
+- **Stated boundary**: the document says what it does not cover, or points where the boundary lives. A missing boundary is a blank check the implementer will cash.
+- **Requirement gaps**: a user problem stated with no requirement answering it. The consumer of this document fills the hole silently, with their own guess.
+- **Silent decisions**: choices a reader must make are stated or flagged, not buried in prose.
+
+| Condition | Severity |
+|---|---|
+| Goal that cannot be judged met or unmet | BLOCKER |
+| Missing boundary on a load-bearing area | WARNING |
+| Requirement gap (problem without an answer) | WARNING |
+| Silent decision the reader must make | WARNING |
+
+### D4 — Is it lean?
+
+Every feature, section, and abstraction earns its place against the goal:
+
+- features answering no stated problem
+- extension points for phases that may never come
+- boilerplate structure the template suggested but the content does not need
+- configuration surfaces with no reader
+
+Template conformance is not a goal — structure serves the document's content, not the other way around. Severity: same table as Q4 (WARNING cap, INFO for shorter forms), with `net: -N sections possible` in place of the line count where applicable.
+
+### Writing style gate (both modes)
+
+The artifact's language is part of its quality: plain, concrete, one idea per sentence, affirmative over negative, ownership over exclusion. This gate flags:
+
+- jargon or invented abstractions a reader must decode twice
+- machine-sounding prose (nominalization stacks, passive voice chains)
+- negative definitions ("X does not do Y") where ownership ("Y is owned by Z") says it better
+
+Severity: a paragraph a reader must decode twice → **WARNING**; isolated awkward phrasing → **INFO**. For skill deliverables in evolution proposals, the bar is explicit: description and body must be plain and precise enough that an agent knows what to do after one read.
+
+---
+
+## 7. Severity calibration
 
 Four classes, defined by what the reader should do:
 
 | Class | Meaning | Test to apply |
 |---|---|---|
-| **BLOCKER** | Executing as written will fail, violate a contract, or under-deliver the Goal | "If this ships, is it broken or dishonest?" |
-| **WARNING** | Execution succeeds but the Plan is unsafe, ambiguous, or unverified where it should be verified | "Will this cost rework or hide a gap?" |
+| **BLOCKER** | Executing or adopting as written will fail, violate a contract, or under-deliver the goal | "If this ships, is it broken or dishonest?" |
+| **WARNING** | Execution succeeds but the artifact is unsafe, bloated, ambiguous, or unverified where it should be verified | "Will this cost rework, bloat, or hide a gap?" |
 | **INFO** | Improvement worth knowing, no action required | "Would a reasonable author shrug?" |
 | **Unverified** | Claim could not be settled from the workspace | "Could I not check this?" |
 
-Deliberately absent: **size/count thresholds**. Context budget is managed per Task, not per Plan; a large cohesive Plan is normal. Never report task count, file count, or wave count as a finding.
+Deliberately absent: **size/count thresholds**. Task count, file count, wave count, document length are never defects. Context budget is managed per task; a large cohesive artifact is normal.
 
 ### Calibration drills
 
 | Situation | Correct verdict |
 |---|---|
-| Plan has 12 tasks, all mutually dependent; the Plan states it will not split and why | no finding (size is not a defect) |
-| Plan declares a file as newly created, but the file already exists | WARNING (stale premise; the implementer will improvise) |
-| Task references a function no other task creates | BLOCKER |
-| Task registers 5 error codes, a later task uses a 6th | BLOCKER |
+| Task references a function no other task creates | BLOCKER (Q1) |
+| Task registers 5 error codes, a later task uses a 6th | BLOCKER (Q1) |
 | Anchor `file.ts:964` lands at 967 on the described function | no finding |
-| Anchor `file.ts:964` lands in an unrelated block; the function is at 1200 | WARNING |
-| Plan contradicts a design doc it also cites, without acknowledgement | WARNING |
+| Plan contradicts a design doc it also cites, without acknowledgement | WARNING (Q2) |
 | Plan contradicts a design doc and states "this supersedes §X of doc Y" | no finding |
-| AC is `rg -c 'pattern' file ≥ 1` for a behavior the file could contain while the feature is broken | WARNING (weak falsifiability) |
-| Reduction to "v1" where `D-04` says "start with static data, dynamic later — this Plan delivers the static layer" | no finding |
-| Reduction to "v1" where `D-04` says "config displays calculated costs" | BLOCKER |
+| Reduction to "v1" where `D-04` sanctions the static layer | no finding (Q3) |
+| Reduction to "v1" where `D-04` says "config displays calculated costs" | BLOCKER (Q3) |
+| Plan adds `fast-xml-parser` while stdlib ships no XML parser and none is installed | no finding (Q4 — rung 5 legitimately holds) |
+| Plan adds a new utility module duplicating `src/lib/hash.ts:12` | WARNING (Q4 — rung 2) |
+| Plan creates `AbstractStore` with a single `FileStore` implementation | WARNING (Q4 — rung 1) |
+| Design doc's §2 says the scheduler owns retries; §5 hand-wires a retry loop in the worker | BLOCKER (D1 — load-bearing contradiction) |
+| Design doc narrates "the old monolith path is deprecated" | WARNING (D2 — target-state violation) |
+| Design doc's goal is "improve developer experience" with no observable outcome | BLOCKER (D3 — undecidable goal) |
+| Proposal deliverable is a skill whose body buries triggering conditions in section 4 | WARNING (capability gate) |
+| Proposal body uses "leverage synergistic alignment layers" | WARNING (style gate) |
 | A concern you could not check for lack of a sandbox | `Unverified`, never a finding |
 
 ---
 
-## 6. Worked Examples
+## 8. Worked examples
 
-### Example A — Symbol with no producer (Q1)
+### Example A — Symbol with no producer (Q1, Plan mode)
 
-**Plan shape**: Task 2 creates an error-code module and registers five codes: `A_MISSING`, `A_INVALID`, `S_MISSING`, `S_INVALID`, `C_UNRESOLVED`. Task 4 describes a failure branch "fail fast with `TEMPLATE_MISSING`".
-
-**Check**: list the registered set, list every upper-snake name used across the Plan, diff.
+Task 2 registers five error codes: `A_MISSING`, `A_INVALID`, `S_MISSING`, `S_INVALID`, `C_UNRESOLVED`. Task 4 describes a failure branch "fail fast with `TEMPLATE_MISSING`".
 
 ```yaml
 check: Q1_symbols
 severity: blocker
-plan_location: "{plan}.md:{line of Task 4 branch}"
-reality: "registered set at {plan}.md:{line of Task 2 statement}; TEMPLATE_MISSING absent"
-impact: "Task 4's failure branch cannot be implemented as written; the implementer will improvise a second registration site or reuse a wrong code"
+location: "{plan}.md:{line of Task 4 branch}"
+reality: "registered set at {plan}.md:{line of Task 2}; TEMPLATE_MISSING absent"
+impact: "Task 4's failure branch cannot be implemented as written; the implementer improvises a second registration site"
 fix: "add TEMPLATE_MISSING to the registration task, or reference an existing code"
 ```
 
-### Example B — File drift on both sides (Q1)
+### Example B — False premise (Q2, Plan mode)
 
-**Plan shape**: Task 2 `Changes` includes "step 3: register five error codes in `src/lib/errors.ts`". Task 3 includes "step 2: register `SYNC_APPLY_FAILED` in `src/lib/errors.ts`". The `Affected Files` table has rows for ten components; `src/lib/errors.ts` is not among them.
+Technical Context asserts "the legacy schema path is gone, so initialization always fails". Task 4 removes the reader for that path; AC#7 asserts a repo-wide search returns zero hits.
 
-```yaml
-check: Q1_files
-severity: warning
-plan_location: "{plan}.md:{line of Task 2 step 3}"
-reality: "Affected Files table at {plan}.md:{line range} lists no row for src/lib/errors.ts"
-impact: "the file is edited by two tasks but sits outside the Plan's declared file scope"
-fix: "add an Affected Files row naming the file and the tasks that touch it"
-```
-
-### Example C — False premise (Q2)
-
-**Plan shape**: Technical Context asserts "the legacy schema path is gone from the ontology, so initialization necessarily fails". Task 4 removes the reader for that path, and AC#7 asserts a repo-wide search returns zero hits for the old identifiers.
-
-**Check**: at the stated revision, search the repo for the old path and for callers of the reader.
+At the stated revision, the reader still has one live call site the Plan never names.
 
 ```yaml
 check: Q2_facts
 severity: blocker
-plan_location: "{plan}.md:{line of the premise}"
-reality: "{file}:{line} still imports and calls the old reader; the Plan's search list does not include that call site"
+location: "{plan}.md:{line of the premise}"
+reality: "{file}:{line} still imports and calls the old reader; the search list omits that call site"
 revision: "{commit}"
-impact: "the premise 'no other callers exist' is false; the repo-wide AC cannot pass because an unnamed call site remains"
+impact: "the premise is false; the repo-wide AC cannot pass — discovered at verify time, after the budget is spent"
 fix: "name the remaining call site in a task's scope, or add it to the removal task"
 ```
 
-Note how the AC itself reveals the defect once the premise is checked: the Plan's own acceptance criterion would fail at verify time, after the whole execution budget was spent. That is exactly what Q2 exists to prevent.
+### Example C — Re-invented infrastructure (Q4, Plan mode)
 
-### Example D — Correctly NOT reporting a finding
-
-**Plan shape**: six tasks, 11 `Affected Files` rows, four waves; a `D-10` states "single-Plan delivery, not split by task count; tasks are mutually dependent; context budget is managed per task".
-
-**Correct handling**: no finding on size, task count, or file count. `D-10` is the author's explicit, justified decision. Report under Positive Findings if useful ("single-plan decision is explicit and its rationale is stated"). If the review form tempts you to flag "6 tasks exceeds the recommended 2–3", that form is gone — it does not exist here.
-
-### Example E — Unowned acceptance criterion (Q1)
-
-**Plan shape**: 13 Agent Verification ACs. Six tasks declare `Verification Intent`; the referenced set covers ACs 1–6, 8, 10, 12, 13. ACs 7, 9, 11 are referenced by no task; only AC#10 carries an explicit "(cross-task)" marker.
+Task 3 creates `src/lib/retry.ts` with a backoff-retry helper. `rg 'retry|backoff' src/` shows `src/lib/http.ts:88` already ships one, used by four call sites.
 
 ```yaml
-check: Q1_acs
+check: Q4_ladder
 severity: warning
-plan_location: "{plan}.md:{line range of ACs 7,9,11}"
-reality: "no Verification Intent references these; only AC#10 is marked cross-task"
-impact: "three acceptance criteria have no owner, so nothing in the execution plan is responsible for proving them"
-fix: "assign each AC to a task's Verification Intent, or mark it cross-task explicitly"
+location: "{plan}.md:{line of Task 3}"
+reality: "src/lib/http.ts:88 already provides backoff retry; 4 existing call sites"
+impact: "two retry implementations diverge on edge cases; the shorter diff reuses the existing helper"
+fix: "reuse the existing helper; delete Task 3, or reduce it to extending the existing one"
 ```
 
-### Example F — AC that cannot fail (Q3)
+### Example D — Undecidable goal (D3, Document mode)
 
-**Plan shape**: Task 3's behavior claim is "invalid state input is rejected cleanly". Its AC reads `test -e src/lib/state.ts` — existence of the file, not the behavior.
+A product DESIGN's Goal reads: "improve the developer experience of the CLI".
 
 ```yaml
-check: Q3_acs
-severity: warning
-plan_location: "{plan}.md:{line of the AC}"
-reality: "the AC asserts file existence; a broken rejection path changes nothing about the file's existence"
-impact: "the claimed behavior is never actually verified; a regression passes silently"
-fix: "replace with a command that exercises the rejection path and asserts the error, e.g. run the script with a bad state and check the exit code"
+check: D3_goal
+severity: blocker
+location: "{doc}.md:{line of Goal}"
+reality: "no observable outcome anywhere in the document; an observer cannot tell whether this was met"
+impact: "every implementation choice can claim success; the goal cannot fail, so it governs nothing"
+fix: "state the outcome the change produces, e.g. 'first-run setup completes in under one minute with zero manual edits'"
 ```
+
+### Example E — Correctly NOT reporting a finding
+
+Six tasks, 11 Affected Files rows, four waves; a `D-10` states "single-Plan delivery, not split by task count; tasks are mutually dependent; context budget is managed per task". The Plan also adds a new dependency, with a paragraph naming the stdlib options it considered and why each falls short.
+
+**Correct handling**: no finding on size (size is not a defect), and no finding on the dependency (rung admission was explicitly satisfied). Report both under Positive Findings if useful.
