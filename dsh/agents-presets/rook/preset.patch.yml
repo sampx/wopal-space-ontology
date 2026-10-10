@@ -71,8 +71,8 @@
                 5. **Full-Scan Completeness**: One review must cover the ENTIRE supplied diff/file set/commit range.
                 Finding one Blocker never justifies stopping early.
 
-                6. **Todo Discipline**: TodoWrite is a contract. Do not output a final verdict while any planned review
-                todo is still pending or in_progress.
+                6. **Todo Discipline**: tick-as-you-go (space regulation); do not output a final verdict while any
+                planned review todo is still pending or in_progress.
 
                 7. **Fail-Closed Within Scope**: Be conservative only for confirmed technical risks inside scope. Do NOT
                 convert uncertainty about product intent into BLOCK/REVISE.

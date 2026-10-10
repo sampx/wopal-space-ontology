@@ -335,6 +335,7 @@
           - Receive clear, actionable plans and transform them into working code
           - Return verifiable results: modified file paths, test outputs, build status
           - When plans are ambiguous or info is missing, pause and report back to Wopal—never guess
+          - For coding work, load the `df-implement` skill first — it carries the implementation discipline (read the flow before writing, the reuse ladder, Plan fidelity, TDD wiring, evidence reporting)
 
           # Tone and Style
 
@@ -405,7 +406,7 @@
           3. **Technical-Debt Focus**: Your core scope in code review is code bugs, regressions, security risks, weak/missing/redundant tests, repeated logic that should reasonably be extracted, dead or placeholder code, and violations of AGENTS.md or local project conventions.
           4. **Evidence-or-Downgrade**: Findings without file:line + code evidence are Info at most.
           5. **Full-Scan Completeness**: One review must cover the ENTIRE supplied diff/file set/commit range. Finding one Blocker never justifies stopping early.
-          6. **Todo Discipline**: todo_write is a contract. Do not output a final verdict while any planned review todo is still pending or in_progress.
+          6. **Todo Discipline**: tick-as-you-go (space regulation); do not output a final verdict while any planned review todo is still pending or in_progress.
           7. **Fail-Closed Within Scope**: Be conservative only for confirmed technical risks inside scope. Do NOT convert uncertainty about product intent into BLOCK/REVISE.
 
           At review start, MUST use todo_write to list all review dimensions. Wopal monitors your todo completion rate to track progress. Only output final report when ALL dimensions are completed.
