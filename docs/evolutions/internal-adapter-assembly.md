@@ -6,8 +6,8 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-10-10
-- **Stage**: draft
-- **Mode**: (none)
+- **Stage**: accepted
+- **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: (none)
 - **Base Commit**: (none)
@@ -15,7 +15,7 @@
 
 ## Scope Assessment
 
-- **Complexity**: Medium
+- **Complexity**: Low
 - **Confidence**: High
 
 ## Goal
@@ -36,13 +36,14 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 
 ### Key Interfaces
 
-新版类型默认装配和生成的 ellamaka.plugin 不含外部 dsh-adapter。内部实现由产品提供，参数键和默认值保持。初始化宿主不替用户改装配文件；已有空间通过正式装配流程更新。
+新版类型默认装配不含外部 dsh-adapter。内部实现由产品提供，参数键和默认值保持。当前开发空间因新版 Ellamaka SDK / CLI 尚未完成接线，手工同步本地装配结果；其他已有空间待新版 CLI 可用后通过正式 CLI 装配操作迁移。
 
 ## In Scope
 
-- 新版默认清单、相关装配示例与生成配置不再引用外部 adapter。
-- 对已有空间重新物化，核对所有配置层的有效外部引用及参数保留；旧源码/依赖保持。
-- 准备 Ellamaka 计划的真实联合验收视图。
+- 新版默认 coding 装配清单不再引用外部 adapter。
+- 当前 wopal-workspace 手工删除本地 `ellamaka.plugin` 中的外部 adapter 引用。
+- 保留 `wopal.pluginConfig.dsh-adapter` 用户参数与旧 `plugins/dsh-adapter` 源码/依赖。
+- 其他已有空间本次不迁移，待新版 CLI 接线后通过正式 CLI 装配操作处理。
 
 ## Out of Scope
 
@@ -66,9 +67,10 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 
 ### Agent Verification
 
-1. [ ] 新空间和已有空间重新物化后的有效插件列表均无外部 dsh-adapter；其他插件、settings 注释和用户已有参数保持。
-2. [ ] 候选新产品仅提供内部 adapter，无外部源码仍能执行文件/沙箱工具；旧配置条目由新产品在安装/import前接管。
-3. [ ] 旧源码/依赖未改；兼容旧产品搭配旧声明的临时 fixture 可运行，不宣称它能消费移除声明后的新版 ontology。
+1. [ ] `assembly/archetypes/coding.yaml` 的 Ellamaka 默认插件列表不再包含 `dsh-adapter`。
+2. [ ] 当前空间 `.wopal/config/settings.local.jsonc` 的 `ellamaka.plugin` 不再包含 `../plugins/dsh-adapter`，其他插件保持。
+3. [ ] `wopal.pluginConfig.dsh-adapter` 参数和旧 `plugins/dsh-adapter` 源码/依赖保持不变；其他已有空间本次不迁移。
+4. [ ] 复用 Ellamaka unified-sdk Task 4 已通过的内部 adapter 回归证据，本提案不重复改造 SDK / CLI / materializer。
 
 ### User Validation
 
@@ -85,61 +87,36 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 
 ## Implementation
 
-### Task 1: 默认装配与已有空间更新
+### Task 1: 停止默认装配外部 adapter，并同步当前空间
 
-**Verification Intent**: AC#1
+**Verification Intent**: AC#1, AC#2, AC#3, AC#4
 
 **Behavior**:
-- 新默认清单不含外部 adapter；已有空间重新物化只移除对应生成引用，其他插件与参数保持。
-- 用户显式配置的残留外部引用需清楚报告并按用户授权处理，不改整个 plugin 数组、不删除 pluginConfig。
+- 从 coding 默认装配删除 `dsh-adapter`。
+- 当前空间仅手工删除 `ellamaka.plugin` 中的 `../plugins/dsh-adapter`；不删除 `wopal.pluginConfig.dsh-adapter`。
+- 不修改旧 adapter 源码，不迁移其他空间，不改 SDK / CLI / materializer。
 
-**Pre-read**: assembly/archetypes/coding.yaml、docs/DESIGN-assembly.md、当前装配物化实现
+**Pre-read**: assembly/archetypes/coding.yaml、当前 `.wopal/config/settings.local.jsonc`、Ellamaka unified-sdk Task 4 交付记录
 
 **Design**:
-复用正式装配流程，不在宿主启动时修写空间。保留旧源码，默认不装配。
+用最小配置变更完成当前阶段迁移。默认装配负责未来新空间；当前开发空间因新版 CLI 尚未接线，手工同步本地结果；其他已有空间留待新版 CLI 正式迁移。
 
-**TDD**: true
+**TDD**: false
 
 **Changes**:
-1. RED：为新建/重装配与配置保留写失败断言，记录实际命令。
-2. GREEN：移除默认外部引用，重新物化验证视图。
-3. REFACTOR：清理相关示例，复验。
+1. 从 `assembly/archetypes/coding.yaml` 删除 `dsh-adapter`。
+2. 从当前空间 `config/settings.local.jsonc` 的 `ellamaka.plugin` 删除 `../plugins/dsh-adapter`。
+3. 核对 `wopal.pluginConfig.dsh-adapter` 与 `plugins/dsh-adapter` 均未变化。
 
-**Verify**: 用真实装配 fixture 核对有效插件与配置保留，RED 阶段回填命令。
+**Verify**: 静态核对默认装配、本地有效插件列表、参数保留和旧源码 Git 摘要；运行 `wopal space evo check internal-adapter-assembly`。
 
 **Done**:
 任务产出与实际触碰文件：实施完成后记录。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤。
-
-### Task 2: 内部独立运行与旧配置回归
-
-**Verification Intent**: AC#2, AC#3
-
-**Behavior**:
-- 新产品无需外部目录或独立 SDK，正常文件/沙箱执行；旧外部项不触发安装、import 或工厂。
-- 旧产品使用兼容旧声明，旧源码和依赖无变化；两种产品使用隔离临时 Home。
-
-**Pre-read**: Ellamaka DESIGN-ellamaka-tools.md、unified-sdk Task 4 的候选交付
-
-**Design**:
-自动验证独立运行和旧组合；已有 e2e Home 只做主计划的正常用户交互。
-
-**TDD**: true
-
-**Changes**:
-1. RED：将行为变成可执行跨项目断言，回填命令。
-2. GREEN：验证正确声明与候选产品。
-3. REFACTOR：复核有效配置，准备联合 UV。
-
-**Verify**: 运行候选产品与真实声明的临时 fixture；核对旧源码 Git 摘要。
-
-**Done**:
-任务产出与实际触碰文件：实施完成后记录。
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤。
+- [ ] 实施 Agent 已完成上述变更和验证。
 
 ## Delegation Strategy
 
-按用户要求人工推进，本轮只规划、不启动实施。Task 1 后执行 Task 2；通过后先联合 UV，再由用户授权整合，不绕过演进机制。
+本提案按用户批准直接推进最小变更；不委派并行实施，不扩展到 SDK / CLI / materializer。完成后进入现有 Ellamaka 联合验证。
 
 ## Delivery
 
