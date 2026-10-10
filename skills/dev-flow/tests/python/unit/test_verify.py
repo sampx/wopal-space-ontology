@@ -11,6 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
+from support.git_fixtures import (
+    init_repo as _shell_init_repo,
+    install_failing_hook as _shell_install_failing_hook,
+    shell_git as _shell_git,
+)
+
 
 # -- Fixtures -----------------------------------------------------------------
 
@@ -281,3 +287,143 @@ class TestCheckFeatureBranchMerged:
         assert result == 1
         from plan import get_plan_status
         assert get_plan_status(str(plan_path)) == "verifying"
+
+
+# ============================================
+# cmd_verify durability gate (Task 4, AC#6)
+# ============================================
+#
+# Real construction: a temp workspace repo holding a verifying Plan and a
+# project repo supplying Final Commit. The Plan rewrite, the git commit and
+# the retry run for real; network side effects (PR lookups / Issue sync /
+# gh close) are mocked so the failure path can assert they are unreached.
+
+VERIFY_PLAN_REL = ".wopal-space/plans/ontology/204-fix-verifying-plan.md"
+
+VERIFY_PLAN_TEMPLATE = """\
+# 204-fix-verifying-plan
+
+## Metadata
+
+- **Issue**: #204
+- **Type**: fix
+- **Target Project**: gesp
+- **Project Type**: standard
+- **Project Path**: projects/gesp
+- **Status**: verifying
+
+## Goal
+
+Verifying plan used by the verify durability-gate tests.
+
+## Acceptance Criteria
+
+### User Validation
+
+#### Scenario 1: gate behavior
+- Goal: confirm verify runs
+- Launch Command: `flow.sh verify 204 --confirm`
+- Pass Criteria: Plan reaches done
+
+- [x] 用户已完成上述功能验证并确认结果符合预期
+"""
+
+
+def _make_verify_workspace(tmp_path):
+    ws = tmp_path / "ws"
+    _shell_init_repo(ws)
+    _shell_init_repo(ws / "projects" / "gesp")
+    plan = ws / VERIFY_PLAN_REL
+    plan.parent.mkdir(parents=True)
+    plan.write_text(VERIFY_PLAN_TEMPLATE)
+    _shell_git("add", VERIFY_PLAN_REL, cwd=ws)
+    _shell_git("commit", "-m", "add plan", cwd=ws)
+    return ws, plan
+
+
+def _run_verify(ws, target="204"):
+    """Run cmd_verify with workspace/repo detection and network mocked."""
+    from argparse import Namespace
+
+    from commands.verify import cmd_verify
+
+    close_run = MagicMock(return_value=MagicMock(returncode=0))
+    sync_label = MagicMock()
+    sync_body = MagicMock()
+    with patch.multiple(
+        "commands.verify",
+        find_workspace_root=MagicMock(return_value=ws),
+        resolve_space_repo=MagicMock(return_value="test/space"),
+        sync_status_label=sync_label,
+        sync_plan_to_issue_body=sync_body,
+        _get_pr_url_from_issue=MagicMock(return_value=""),
+        _search_merged_pr_for_issue=MagicMock(return_value=False),
+        subprocess=MagicMock(run=close_run),
+    ):
+        result = cmd_verify(Namespace(target=target, confirm=True))
+    return result, sync_label, sync_body, close_run
+
+
+class TestVerifyDurabilityGate:
+    """A failed Plan commit must not reach Issue sync/close and must leave
+    the Plan retryable (AC#6)."""
+
+    def test_commit_failure_blocks_sync_and_close_and_restores_plan(
+        self, tmp_path, capsys
+    ):
+        ws, plan = _make_verify_workspace(tmp_path)
+        original = plan.read_text()
+        _shell_install_failing_hook(ws, "injected verify-commit failure")
+
+        result, sync_label, sync_body, close_run = _run_verify(ws)
+
+        assert result == 1
+        assert plan.read_text() == original
+        assert "- **Status**: verifying" in plan.read_text()
+        assert "Final Commit" not in plan.read_text()
+        # No staged Plan residue: a retry sees the same clean state.
+        assert _shell_git(
+            "status", "--porcelain", "--", VERIFY_PLAN_REL, cwd=ws
+        ).stdout == ""
+        sync_label.assert_not_called()
+        sync_body.assert_not_called()
+        close_run.assert_not_called()
+        out, err = capsys.readouterr()
+        assert "injected verify-commit failure" in (out + err)
+
+    def test_retry_after_commit_failure_succeeds(self, tmp_path):
+        ws, plan = _make_verify_workspace(tmp_path)
+        hook = _shell_install_failing_hook(ws, "injected verify-commit failure")
+
+        first, _, _, _ = _run_verify(ws)
+        assert first == 1
+
+        hook.unlink()
+        second, sync_label, sync_body, close_run = _run_verify(ws)
+
+        assert second == 0
+        committed = _shell_git("show", f"HEAD:{VERIFY_PLAN_REL}", cwd=ws).stdout
+        assert "- **Status**: done" in committed
+        assert "Final Commit" in committed
+        assert _shell_git(
+            "log", "-1", "--format=%s", cwd=ws
+        ).stdout.strip() == "docs(plan): verify plan #204"
+        assert _shell_git(
+            "status", "--porcelain", "--", VERIFY_PLAN_REL, cwd=ws
+        ).stdout == ""
+        sync_label.assert_called_once_with(204, "done", "test/space")
+        sync_body.assert_called_once()
+        close_run.assert_called_once()
+        assert "close" in close_run.call_args[0][0]
+
+    def test_success_path_commits_done_and_syncs(self, tmp_path):
+        ws, plan = _make_verify_workspace(tmp_path)
+
+        result, sync_label, sync_body, close_run = _run_verify(ws)
+
+        assert result == 0
+        committed = _shell_git("show", f"HEAD:{VERIFY_PLAN_REL}", cwd=ws).stdout
+        assert "- **Status**: done" in committed
+        sync_label.assert_called_once()
+        sync_body.assert_called_once()
+        close_run.assert_called_once()

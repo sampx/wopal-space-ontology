@@ -411,17 +411,23 @@ def _build_relative_path(archived_file: str, workspace_root: Path) -> str:
         return archived_path.name
 
 
-def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspace_root: str = None):
+def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspace_root: str = None, branch: str | None = None):
     """Update Issue Plan link after archive.
     
     Uses resolve_plan_location() to determine the Plan's actual project repo,
-    so the blob URL points to the correct repo and branch.
+    so the blob URL points to the correct repo and branch. When `branch` is
+    given (the branch that actually carries the archive commit, verified by
+    push), it overrides resolve_plan_location's default branch — a plain
+    checkout may be on a non-default branch, and the link must point at the
+    ref that actually holds the archived content (B-02).
     
     Args:
         issue_number: Issue number to update
         plan_file: Path to the (archived) Plan file
         repo: Space repo (used for gh CLI --repo flag for Issue operations)
         workspace_root: Workspace root path
+        branch: Branch that actually carries the archive commit (B-02);
+            when given, overrides the resolved default branch in the URL
     """
     workspace = Path(workspace_root) if workspace_root else find_workspace_root()
     
@@ -433,7 +439,7 @@ def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspa
 
     # Resolve Plan location to get correct repo + branch + relative path
     loc = resolve_plan_location(Path(plan_file), workspace)
-    blob_url = build_plan_blob_url(loc)
+    blob_url = build_plan_blob_url(loc, branch=branch)
     
     # Get current Issue body
     state_dir = workspace / 'state'

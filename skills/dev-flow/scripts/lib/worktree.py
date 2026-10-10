@@ -13,9 +13,11 @@
 import os
 import re
 import subprocess
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from lib.git import GitMutationFailure
+from lib.logging import log_warn
 from lib.project import resolve_plan_location
 
 
@@ -356,24 +358,34 @@ def create_worktree(project_dir: Path, branch: str, worktree_base: Path) -> Path
     # Ensure worktree_base exists
     worktree_base.mkdir(parents=True, exist_ok=True)
 
+    add_cmd = ["git", "worktree", "add", str(worktree_path), branch]
     result = subprocess.run(
-        ["git", "worktree", "add", str(worktree_path), branch],
+        add_cmd,
         cwd=str(project_dir),
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
+        first_attempt = GitMutationFailure.from_completed(
+            add_cmd, str(project_dir), result,
+        )
         # Try with HEAD if branch doesn't exist yet — create new branch
+        retry_cmd = ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"]
         result = subprocess.run(
-            ["git", "worktree", "add", "-b", branch, str(worktree_path), "HEAD"],
+            retry_cmd,
             cwd=str(project_dir),
             capture_output=True,
             text=True,
         )
         if result.returncode != 0:
+            second_attempt = GitMutationFailure.from_completed(
+                retry_cmd, str(project_dir), result,
+            )
             raise RuntimeError(
-                f"Failed to create worktree at {worktree_path}: {result.stderr.strip()}"
+                f"Failed to create worktree at {worktree_path}:\n"
+                f"  attempt 1: {first_attempt}\n"
+                f"  attempt 2: {second_attempt}"
             )
 
     return worktree_path
@@ -440,7 +452,7 @@ def _find_worktree_path_by_branch(project_dir: Path, branch: str) -> Path | None
     return None
 
 
-def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None:
+def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> list[str]:
     """Remove a git worktree (equivalent to worktree.sh cmd_remove).
 
     Tries git worktree remove, then --force on failure. When --force also
@@ -451,6 +463,10 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
         project_dir: Path to the project's git root directory
         branch: Branch name of the worktree
         worktree_base: Base directory where worktrees are stored
+
+    Returns:
+        List of prune problem descriptions (empty when clean). Removal
+        failures still raise.
 
     Raises:
         RuntimeError: If removal fails and residual files remain
@@ -465,8 +481,9 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
 
     if worktree_path.exists():
         # Try normal remove
+        remove_cmd = ["git", "worktree", "remove", str(worktree_path)]
         result = subprocess.run(
-            ["git", "worktree", "remove", str(worktree_path)],
+            remove_cmd,
             cwd=str(project_dir),
             capture_output=True,
             text=True,
@@ -474,21 +491,29 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
 
         if result.returncode != 0:
             # Force remove on failure
-            result = subprocess.run(
-                ["git", "worktree", "remove", str(worktree_path), "--force"],
+            force_cmd = ["git", "worktree", "remove", str(worktree_path), "--force"]
+            force_result = subprocess.run(
+                force_cmd,
                 cwd=str(project_dir),
                 capture_output=True,
                 text=True,
             )
-            if result.returncode != 0:
+            if force_result.returncode != 0:
                 # The worktree registration is typically already gone;
                 # only a residual empty directory skeleton may remain
                 # (e.g. a process held the directory as cwd). Clean the
                 # skeleton so .worktrees/ does not accumulate orphans.
                 if not _remove_empty_dirs(worktree_path):
-                    stderr_text = result.stderr.strip()
+                    first_attempt = GitMutationFailure.from_completed(
+                        remove_cmd, str(project_dir), result,
+                    )
+                    second_attempt = GitMutationFailure.from_completed(
+                        force_cmd, str(project_dir), force_result,
+                    )
                     raise RuntimeError(
-                        f"Failed to remove worktree {worktree_path}: {stderr_text}\n"
+                        f"Failed to remove worktree {worktree_path}:\n"
+                        f"  attempt 1: {first_attempt}\n"
+                        f"  attempt 2: {second_attempt}\n"
                         f"Diagnostic hints:\n"
                         f"  - Common causes: a process is holding the directory open, "
                         f"or large untracked files (node_modules, dist, out) are present\n"
@@ -496,26 +521,71 @@ def remove_worktree(project_dir: Path, branch: str, worktree_base: Path) -> None
                         f"  - Manually remove: trash {worktree_path}"
                     )
 
-    # Always prune (whether remove succeeded or path didn't exist)
-    subprocess.run(
-        ["git", "worktree", "prune"],
+    # Always prune (whether remove succeeded or path didn't exist).
+    # `git worktree prune` can exit 0 while printing a deletion error to
+    # stderr (e.g. Permission denied), so both are inspected; a failure is
+    # reported and returned, never silently ignored (B-04).
+    warnings: list[str] = []
+    prune_cmd = ["git", "worktree", "prune"]
+    prune = subprocess.run(
+        prune_cmd,
         cwd=str(project_dir),
         capture_output=True,
         text=True,
     )
+    if prune.returncode != 0:
+        failure = GitMutationFailure.from_completed(
+            prune_cmd, str(project_dir), prune,
+        )
+        log_warn(f"git worktree prune failed:\n{failure}")
+        warnings.append(f"git worktree prune failed:\n{failure}")
+    elif prune.stderr.strip():
+        log_warn(f"git worktree prune reported errors: {prune.stderr.strip()}")
+        warnings.append(
+            f"git worktree prune reported errors: {prune.stderr.strip()}"
+        )
+    return warnings
 
 
-def delete_branch(git_dir: Path, branch: str) -> bool:
+@dataclass
+class BranchDeleteResult:
+    """Outcome of delete_branch, distinguishing the four real states.
+
+    status:
+        "deleted" — the local ref was deleted (soft or forced)
+        "absent"  — the local ref does not exist (nothing to do)
+        "skipped" — the branch is currently checked out (cannot delete)
+        "failed"  — both `git branch -d` and `-D` failed; attempts carry
+                    the full mutation diagnostics
+    """
+
+    status: str
+    attempts: list[GitMutationFailure] = field(default_factory=list)
+
+    @property
+    def deleted(self) -> bool:
+        return self.status == "deleted"
+
+    @property
+    def incomplete(self) -> bool:
+        """True when a real deletion failure left the ref behind."""
+        return self.status == "failed"
+
+
+def delete_branch(git_dir: Path, branch: str) -> BranchDeleteResult:
     """Delete a local branch (git branch -d, then -D on failure).
 
-    Skips if branch is the current branch.
+    Distinguishes "absent" (nothing to delete) and "skipped" (the branch
+    is currently checked out) from a real "failed" deletion; failures keep
+    the exact git diagnostics instead of collapsing into a bare False.
 
     Args:
         git_dir: Path to git repository root
         branch: Branch name to delete
 
     Returns:
-        True if branch was deleted, False if skipped or failed
+        BranchDeleteResult with status and, on failure, both attempts'
+        diagnostics.
     """
     # Check current branch — skip if it's the branch to delete
     result = subprocess.run(
@@ -526,28 +596,61 @@ def delete_branch(git_dir: Path, branch: str) -> bool:
     )
     current = result.stdout.strip()
     if current == branch:
-        return False
+        return BranchDeleteResult("skipped")
+
+    # No ref → nothing to delete. Distinguish "ref does not exist" (exit 1,
+    # empty stderr under --quiet) from "rev-parse itself failed" (permission,
+    # corruption — non-empty stderr). The latter must not be reported as
+    # absent (W-02): that would let cleanup succeed on an unknown state.
+    exists = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=str(git_dir),
+        capture_output=True,
+        text=True,
+    )
+    if exists.returncode != 0:
+        if exists.stderr.strip():
+            return BranchDeleteResult(
+                "failed",
+                attempts=[GitMutationFailure(
+                    command=["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+                    cwd=str(git_dir),
+                    exit_code=exists.returncode,
+                    stdout=exists.stdout,
+                    stderr=exists.stderr,
+                )],
+            )
+        return BranchDeleteResult("absent")
 
     # Try soft delete (-d)
+    d_cmd = ["git", "branch", "-d", branch]
     result = subprocess.run(
-        ["git", "branch", "-d", branch],
+        d_cmd,
         cwd=str(git_dir),
         capture_output=True,
         text=True,
     )
-
     if result.returncode == 0:
-        return True
+        return BranchDeleteResult("deleted")
 
     # Force delete (-D) on failure
-    result = subprocess.run(
-        ["git", "branch", "-D", branch],
+    D_cmd = ["git", "branch", "-D", branch]
+    force_result = subprocess.run(
+        D_cmd,
         cwd=str(git_dir),
         capture_output=True,
         text=True,
     )
+    if force_result.returncode == 0:
+        return BranchDeleteResult("deleted")
 
-    return result.returncode == 0
+    return BranchDeleteResult(
+        "failed",
+        attempts=[
+            GitMutationFailure.from_completed(d_cmd, str(git_dir), result),
+            GitMutationFailure.from_completed(D_cmd, str(git_dir), force_result),
+        ],
+    )
 
 
 def clean_worktree(project_dir: Path, branch: str, worktree_base: Path) -> dict:
@@ -562,30 +665,42 @@ def clean_worktree(project_dir: Path, branch: str, worktree_base: Path) -> dict:
         worktree_base: Base directory where worktrees are stored
 
     Returns:
-        {"removed": bool, "branch_deleted": bool, "errors": list[str]}
+        {"removed": bool, "branch_deleted": bool, "branch_status": str,
+         "errors": list[str]}
+        branch_status is the BranchDeleteResult status: deleted / absent /
+        skipped / failed.
     """
     errors = []
 
     # 1. Remove worktree
     removed = False
     try:
-        remove_worktree(project_dir, branch, worktree_base)
+        warnings = remove_worktree(project_dir, branch, worktree_base)
         removed = True
+        if warnings:
+            errors.extend(warnings)
     except Exception as e:
         errors.append(f"Failed to remove worktree: {e}")
 
-    # 2. Delete branch
+    # 2. Delete branch — a real failure keeps both attempts' diagnostics
+    #    so callers can report the incomplete cleanup truthfully.
     branch_deleted = False
+    branch_status = "failed"
     try:
-        branch_deleted = delete_branch(project_dir, branch)
-        if not branch_deleted:
-            # Branch might not exist or is current — not an error
-            pass
+        branch_result = delete_branch(project_dir, branch)
+        branch_status = branch_result.status
+        branch_deleted = branch_result.deleted
+        if branch_result.incomplete:
+            detail = "\n".join(str(a) for a in branch_result.attempts)
+            errors.append(
+                f"Failed to delete branch '{branch}':\n{detail}"
+            )
     except Exception as e:
         errors.append(f"Failed to delete branch: {e}")
 
     return {
         "removed": removed,
         "branch_deleted": branch_deleted,
+        "branch_status": branch_status,
         "errors": errors,
     }

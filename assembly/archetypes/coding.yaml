@@ -25,6 +25,7 @@ skills:
   - git-worktrees
   - skill-creator
   - agent-browser
+  - context-manage
 
 # 声明该空间加载的规则
 rules:

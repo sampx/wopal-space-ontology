@@ -336,7 +336,7 @@ Beyond the evolution lifecycle, this skill owns the ontology's maintenance surfa
 | `wopal space sync [--confirm]` | both | Align with `local main`: integrate space-unique evolution upward (isolated worktree, stops on conflict), then fast-forward down |
 | `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | Shared channel: edit the archetype manifest and re-materialize; accepts only a capability the pool already owns (a pool-absent name is refused before the manifest is touched) and creates **no Git commit** — committing the manifest is a separate, explicit step. `--local`: mount or unload the complete asset as this space's local selection (include / exclude / private); when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Content still travels up only through the user's own `space sync` / `ontology contribute` decisions, separate from that state commit |
 | `wopal ontology capability list` | — | Read-only: what the pool owns — the pick-list for `space capability add` |
-| `wopal ontology update [--confirm]` | downstream | `upstream/main` → `local main` |
+| `wopal ontology sync [--confirm]` | triangle | Align `local main` with its source chain `upstream ⇄ origin ⇄ local main` in three steps (fork: ① fast-forward origin to upstream → ② merge origin/main into local main → ③ push local main to origin; clone collapses to ② only). `ontology update` remains as a compatibility alias |
 | `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | upstream | `local main` → upstream PR (fork mode; squash-merge in an isolated worktree; `--resume` / `--abort` for a conflict) |
 
 ## Reading status

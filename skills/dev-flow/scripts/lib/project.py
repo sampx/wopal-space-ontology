@@ -167,10 +167,11 @@ def resolve_plan_location(
     )
 
 
-def build_plan_blob_url(plan_location: PlanLocation) -> str:
+def build_plan_blob_url(plan_location: PlanLocation, branch: str | None = None) -> str:
     if plan_location.github_repo is None:
         return ""
+    ref = branch if branch else plan_location.branch
     return (
         f"https://github.com/{plan_location.github_repo}"
-        f"/blob/{plan_location.branch}/{plan_location.repo_relative_path}"
+        f"/blob/{ref}/{plan_location.repo_relative_path}"
     )

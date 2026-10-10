@@ -11,6 +11,7 @@
 #     on worktree/commit failure, rollback commit, retry, and the approval
 #     commit carrying the real Base Commit with no uncommitted residue
 
+import shlex
 import subprocess
 import sys
 import unittest
@@ -350,6 +351,25 @@ def _error_log_text(log_error):
     return "\n".join(str(call.args[0]) for call in log_error.call_args_list)
 
 
+def _install_message_filtered_hook(repo: Path, needle: str, message: str) -> None:
+    """Install a commit-msg hook that fails only matching commit messages.
+
+    Real failure injection: a commit whose message contains `needle` exits
+    non-zero with `message` on stderr; every other commit passes.
+    """
+    hook = repo / ".git" / "hooks" / "commit-msg"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(
+        "#!/bin/sh\n"
+        f'if grep -q {shlex.quote(needle)} "$1"; then\n'
+        f"  echo {shlex.quote(message)} >&2\n"
+        "  exit 1\n"
+        "fi\n"
+        "exit 0\n"
+    )
+    hook.chmod(0o755)
+
+
 class TestApproveRollback:
     """Failure after state fields are written rolls the Plan back to the
     pre-approval field shape (proposal D-07)."""
@@ -480,6 +500,83 @@ class TestApproveSuccessArtifacts:
         assert "  - branch: ontology-existing-evo" in committed
         assert "- **Status**: executing" in committed
         assert _git("status", "--porcelain", "--", PLAN_REL, cwd=ws).stdout == ""
+
+
+class TestApproveRootCauseLayering:
+    """D-08: the root failure keeps its full evidence; the rollback outcome
+    is layered separately and never replaces the root cause."""
+
+    @pytest.mark.parametrize("rollback_commit_fails", [False, True])
+    def test_worktree_dual_attempt_failure_keeps_full_root_cause(
+        self, tmp_path, rollback_commit_fails
+    ):
+        ws, plan = _make_workspace(tmp_path)
+        original = plan.read_text()
+        if rollback_commit_fails:
+            _install_message_filtered_hook(
+                ws, "rollback", "injected rollback-commit failure"
+            )
+        blocked = ws / ".worktrees" / WORKTREE_BRANCH
+        blocked.parent.mkdir(parents=True)
+        blocked.write_text("")
+
+        with patch("commands.approve.log_warn") as log_warn:
+            result, log_error = _run_approve(ws)
+
+        assert result == 1
+        assert plan.read_text() == original
+        messages = [str(call.args[0]) for call in log_error.call_args_list]
+        text = "\n".join(messages)
+        # Root cause retains both worktree attempts (first failure evidence).
+        assert "attempt 1" in text
+        assert "attempt 2" in text
+        # No evidence-free duplicate of the root failure dilutes the output.
+        root_reports = [m for m in messages if "Worktree creation failed" in m]
+        assert root_reports
+        assert all("attempt 1" in m and "attempt 2" in m for m in root_reports)
+        # The rollback outcome is reported separately, whether it succeeded...
+        if rollback_commit_fails:
+            warn_text = "\n".join(str(c.args[0]) for c in log_warn.call_args_list)
+            assert "回滚提交失败" in warn_text
+        else:
+            assert "已回滚" in text
+
+    def test_rollback_failure_report_keeps_root_cause(self, tmp_path):
+        """A failed rollback must not read as if it were the only failure."""
+        from commands.approve import PlanFieldSnapshot, _abort_after_state_write
+        from lib.worktree import create_worktree
+
+        # Real dual-attempt root cause: a blocking file fails both
+        # worktree-create attempts.
+        project = tmp_path / "project"
+        _init_repo(project)
+        blocked = tmp_path / ".worktrees" / "ontology-some-plan"
+        blocked.parent.mkdir(parents=True)
+        blocked.write_text("")
+        with pytest.raises(RuntimeError) as excinfo:
+            create_worktree(project, "ontology-some-plan", tmp_path / ".worktrees")
+        root_failure = str(excinfo.value)
+
+        # Real rollback failure: the Plan directory is gone, so the snapshot
+        # cannot be restored.
+        plan_dir = tmp_path / "plans"
+        plan_dir.mkdir()
+        plan = plan_dir / "some-plan.md"
+        plan.write_text("original content")
+        snapshot = PlanFieldSnapshot.capture(str(plan))
+        plan.unlink()
+        plan_dir.rmdir()
+
+        with patch("commands.approve.log_error") as log_error:
+            rc = _abort_after_state_write(
+                str(plan), snapshot, "reviewing", tmp_path, 42,
+                rollback_commit=False, root_failure=root_failure,
+            )
+
+        assert rc == 1
+        text = "\n".join(str(c.args[0]) for c in log_error.call_args_list)
+        assert "attempt 1" in text and "attempt 2" in text
+        assert "回滚失败" in text
 
 
 if __name__ == "__main__":
