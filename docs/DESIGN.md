@@ -197,20 +197,20 @@ CLI 边界：
 
 ontology 本身是无状态的声明式能力包，不持有运行时状态：
 
-| State              | Location                                  | Owner                   | Rules                                                          |
-| ------------------ | ----------------------------------------- | ----------------------- | -------------------------------------------------------------- |
-| Agent 灵魂定义     | `agents/*.md`                             | ontology                | 定义者，ellamaka 加载执行                                      |
-| 技能定义           | `skills/*/SKILL.md`                       | ontology                | 定义者，按触发条件注入                                         |
-| 规则定义           | `rules/*.md`                              | ontology + wopal-plugin | ontology 定义，wopal-plugin 执行注入                           |
-| 命令定义           | `commands/*.md`                           | ontology + ellamaka     | ontology 定义，ellamaka 执行                                   |
-| 辅助脚本           | `scripts/**`                              | ontology                | 维护与辅助自动化载体                                           |
-| 装配定义           | `assembly/**`                             | ontology                | 物化源头，共享服务消费后物化                                   |
-| 插件运行时状态     | wopal-plugin 进程内                       | wopal-plugin            | 运行载体，ontology 不持有                                      |
-| 记忆数据           | `$WOPAL_HOME/storage/memory` 下的 LanceDB | memory_manage           | ontology 提供工具，不持有数据                                  |
-| 会话状态           | ellamaka session                          | ellamaka                | ontology 不持有                                                |
-| 空间结构           | `.wopal-space/STRUCTURE.md`               | `/init`                 | ontology 提供模板，不持有实例                                  |
-| 空间身份与装配状态 | `.wopal-space/space-meta.json`            | `wopal space` CLI       | 空间根仓库跟踪身份与能力/通用路径级选择；仅由 CLI 限定路径提交 |
-| 空间守则           | `.wopal-space/REGULATIONS.md`             | 用户 + `/wopal:evolve`  | ontology 提供初始化模板，不持有实例                            |
+| State              | Location                                  | Owner                       | Rules                                                                     |
+| ------------------ | ----------------------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| Agent 灵魂定义     | `agents/*.md`                             | ontology                    | 定义者，ellamaka 加载执行                                                 |
+| 技能定义           | `skills/*/SKILL.md`                       | ontology                    | 定义者，按触发条件注入                                                    |
+| 规则定义           | `rules/*.md`                              | ontology + wopal-plugin     | ontology 定义，wopal-plugin 执行注入                                      |
+| 命令定义           | `commands/*.md`                           | ontology + ellamaka         | ontology 定义，ellamaka 执行                                              |
+| 辅助脚本           | `scripts/**`                              | ontology                    | 维护与辅助自动化载体                                                      |
+| 装配定义           | `assembly/**`                             | ontology                    | 物化源头，共享服务消费后物化                                              |
+| 插件运行时状态     | wopal-plugin 进程内                       | wopal-plugin                | 运行载体，ontology 不持有                                                 |
+| 记忆数据           | `$WOPAL_HOME/storage/memory` 下的 LanceDB | memory_manage               | ontology 提供工具，不持有数据                                             |
+| 会话状态           | ellamaka session                          | ellamaka                    | ontology 不持有                                                           |
+| 空间结构           | `.wopal-space/STRUCTURE.md`               | `/init`                     | ontology 提供模板，不持有实例                                             |
+| 空间身份与装配状态 | `.wopal-space/space-meta.json`            | 共享准备服务与 CLI 演进操作 | 空间根仓库跟踪身份与能力/通用路径级选择；执行入口只提交本次管理的状态文件 |
+| 空间守则           | `.wopal-space/REGULATIONS.md`             | 用户 + `/wopal:evolve`      | ontology 提供初始化模板，不持有实例                                       |
 
 Runtime 维护由 ontology commands 驱动：`/init`（结构校准）、`/wopal:memo`（日记暂存）、`/wopal:evolve`（经验沉淀）、`/wopal:distill`（记忆蒸馏）、`/cupdate-agent-rules`（项目规范更新）。
 
