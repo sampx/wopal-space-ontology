@@ -7,11 +7,11 @@
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 
 /**
- * The `sandbox-policy` settings-section shape: the extra writable roots the
- * user document carries. Schema-optional; the composition entry (and
- * therefore every resolved section) always carries an array. A type alias on
- * purpose: the implicit index signature keeps the section assignable to the
- * schemastery `Dict`-extended schema parameter types.
+ * The extra writable roots this plugin owns. They ride the composition entry's
+ * `config.writableRoots`, so the settings service projects them into the same
+ * form as `mode` and `workspaceRoot`. A type alias on purpose: the implicit
+ * index signature keeps the shape assignable to the schemastery `Dict`-extended
+ * schema parameter types.
  */
 export type SandboxRootsSection = {
   /** Extra writable directory roots as configured (`~` and relative spellings allowed). */
@@ -20,6 +20,6 @@ export type SandboxRootsSection = {
 
 /**
  * The resolved policy extension: the stock execution policy plus the
- * settings-derived extra roots, attached under `workspace-write` only.
+ * config-derived extra roots, attached under `workspace-write` only.
  */
 export type WithExtras = SandboxExecutionPolicy & SandboxRootsSection

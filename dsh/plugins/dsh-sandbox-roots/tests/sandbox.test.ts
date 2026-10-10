@@ -1,8 +1,9 @@
 /**
  * Process-wrap tests: extra roots reach the Seatbelt profile, the no-extras
  * path stays identical to the stock provider (or fails closed identically
- * where the sandbox environment blocks runner selection), and a non-darwin
- * runner platform fails loud instead of silently dropping the roots.
+ * where the sandbox environment blocks runner selection), the cancellation
+ * signal reaches the stock provider, and a non-darwin runner platform fails
+ * loud instead of silently dropping the roots.
  */
 
 import { Context } from '@deepseek-ai/cordis'
@@ -33,19 +34,19 @@ function policy(writableRoots?: string[]): SandboxPolicy {
   }
 }
 
-/** Run one confine call, capturing the throw instead of propagating it. */
-function attempt(provider: { confine: (argv: readonly string[], policy: SandboxPolicy) => unknown }, argv: readonly string[], pol: SandboxPolicy): unknown {
+/** Await one confine call, capturing the rejection instead of propagating it. */
+async function attempt(provider: { confine: (argv: readonly string[], policy: SandboxPolicy) => Promise<unknown> }, argv: readonly string[], pol: SandboxPolicy): Promise<unknown> {
   try {
-    return { ok: provider.confine(argv, pol) }
+    return { ok: await provider.confine(argv, pol) }
   } catch (error) {
     return { threw: error instanceof Error ? error.name : error }
   }
 }
 
 describe('SandboxRootsSandboxProvider', () => {
-  it.skipIf(!isDarwin)('wraps extra roots into the seatbelt profile with the stock seatbelt evidence', () => {
+  it.skipIf(!isDarwin)('wraps extra roots into the seatbelt profile with the stock seatbelt evidence', async () => {
     const { provider } = mount()
-    const result = provider.confine(['sh', '-c', 'echo hi'], policy(['/tmp/extra-root']))
+    const result = await provider.confine(['sh', '-c', 'echo hi'], policy(['/tmp/extra-root']))
     expect(result.argv.slice(0, 2)).toEqual(['sandbox-exec', '-p'])
     expect(result.argv[3]).toBe('--')
     expect(result.argv.slice(4)).toEqual(['sh', '-c', 'echo hi'])
@@ -58,28 +59,48 @@ describe('SandboxRootsSandboxProvider', () => {
     expect(result.runnerFailureRules).toEqual([{ fatalSignatures: ['sandbox-exec: '] }])
   })
 
-  it('stays identical to the stock provider without extra roots, or fails closed identically', () => {
+  it('stays identical to the stock provider without extra roots, or fails closed identically', async () => {
     const { provider, stock } = mount()
     const argv = ['sh', '-c', 'echo hi']
-    expect(attempt(provider, argv, policy())).toEqual(attempt(stock, argv, policy()))
+    expect(await attempt(provider, argv, policy())).toEqual(await attempt(stock, argv, policy()))
   })
 
-  it('fails loud for extra roots on a non-darwin runner platform', () => {
+  it('fails loud for extra roots on a non-darwin runner platform', async () => {
     const { provider } = mount()
     const actual = process.platform
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
     try {
-      expect(() => provider.confine(['sh'], policy(['/tmp/extra-root']))).toThrowError(/writableRoots.*Seatbelt/i)
+      await expect(provider.confine(['sh'], policy(['/tmp/extra-root']))).rejects.toThrowError(/writableRoots.*Seatbelt/i)
     } finally {
       Object.defineProperty(process, 'platform', { value: actual, configurable: true })
     }
   })
 
-  it.skipIf(!isDarwin)('merges the stock roots with deduplicated extras into one profile', () => {
+  it.skipIf(!isDarwin)('merges the stock roots with deduplicated extras into one profile', async () => {
     const { provider } = mount()
     const workspace = '/nonexistent-dsh-roots-ws'
     const passed = { mode: 'workspace-write' as const, workspaceRoot: workspace, writableRoots: [workspace, '/tmp/extra-root', workspace] }
-    const result = provider.confine(['true'], passed)
+    const result = await provider.confine(['true'], passed)
     expect(result.argv[2]).toBe(seatbeltProfile([...stockWritableRoots(passed), '/tmp/extra-root']))
+  })
+
+  it('forwards the caller signal to the stock provider on the no-extras path', async () => {
+    const { provider } = mount()
+    const proto = LocalSandboxProvider.prototype as unknown as {
+      confine: (argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal) => Promise<unknown>
+    }
+    const original = proto.confine
+    const seen: (AbortSignal | undefined)[] = []
+    proto.confine = function (this: unknown, argv: readonly string[], pol: SandboxPolicy, signal?: AbortSignal) {
+      seen.push(signal)
+      return original.call(this, argv, pol, signal)
+    }
+    const controller = new AbortController()
+    try {
+      await provider.confine(['true'], policy(), controller.signal).catch(() => undefined)
+    } finally {
+      proto.confine = original
+    }
+    expect(seen).toEqual([controller.signal])
   })
 })
