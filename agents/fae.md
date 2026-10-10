@@ -3,6 +3,7 @@ description: Execution agent for all implementation work. Receives clearly scope
 mode: all
 temperature: 0.3
 permission:
+  wopal_skill_grant: deny
   wopal_task: deny
   wopal_task_output: deny
   wopal_task_reply: deny
@@ -14,7 +15,6 @@ permission:
   skill:
     "*": deny
     df-implement: allow
-    ontology-evolution: allow
     skill-creator: allow
   doom_loop: deny
   external_directory:

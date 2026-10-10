@@ -3,6 +3,7 @@ description: A universal witch agent dwelling in WopalSpace, serving any problem
 mode: primary
 temperature: 0.1
 permission:
+  wopal_skill_grant: allow
   plan_exit: allow
   skill:
     "*": allow

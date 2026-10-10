@@ -191,14 +191,14 @@ catalog 不复制 Agent baseline；baseline 仍由 Ellamaka 原生 Skill catalog
 
 ### Agent Verification
 
-1. [ ] 创建 Fae/Rook 等 baseline 未允许目标 Skill 的子 Session 时，`capabilities.skills` 中有效 Skill 在首个模型请求前进入 metadata overlay；第一轮 request-tail 可见 name + description，原生 `skill(name)` 调用通过，未 grant 的 Skill 仍按 baseline deny。
-2. [ ] 活跃主/子 Session 使用 `wopal_skill_grant` 追加 Skill 后，不重建 Session、不改 run loop；下一 model step 的 request-tail 出现新 Skill，随后原生 `skill(name)` 可加载；持久 `session.permission`、system prompt 和 tool schema 没有被动态改写。
-3. [ ] 当前 Session、目标子 Session、父 Session与兄弟 Session 的 overlay 相互隔离；重复 grant 幂等；未知 Skill、未管理 target、同时指定 session_id/task_id 时整次操作失败且 metadata/SessionStore 零变化。
-4. [ ] request-tail snapshot 只含 overlay Skill 的 name + description 与加载提示，不含 SKILL.md body/location/resource path；每个请求都重新发布当前完整 overlay snapshot，历史消息和 DB 不被 transform 内容污染。
-5. [ ] `experimental.permission.rules` 仅对 `permission=skill` 且 exact name 命中的 overlay Skill 追加 allow；其他 permission/pattern 不新增规则，实际 allow 与模型可见 catalog 由同一 overlay 生成。
-6. [ ] 原生 `skill(name)` 成功后仍返回 Ellamaka 既有 SKILL.md、base directory 和资源文件信息；Skill grant 不改变 bash/read/edit/其他工具权限。
-7. [ ] plugin dispose/recreate、Session resume 与 compaction 后从 metadata 恢复相同 overlay；`loadedSkills` 只影响既有 reload/recovery，不会给未 grant Skill 授权。
-8. [ ] wopal-plugin typecheck/test、变更文件 lint/format 检查通过；实现不包含 Tool/Rule 动态能力，也不新增 Skill body loader/registry。
+1. [x] 创建 Fae/Rook 等 baseline 未允许目标 Skill 的子 Session 时，`capabilities.skills` 中有效 Skill 在首个模型请求前进入 metadata overlay；第一轮 request-tail 可见 name + description，原生 `skill(name)` 调用通过，未 grant 的 Skill 仍按 baseline deny。— 实证：focused suite 覆盖 `task-launcher.test.ts` / `skill-assembly-hooks.test.ts` / `integration.test.ts`，13 files / 121 tests 全绿。
+2. [x] 活跃主/子 Session 使用 `wopal_skill_grant` 追加 Skill 后，不重建 Session、不改 run loop；下一 model step 的 request-tail 出现新 Skill，随后原生 `skill(name)` 可加载；持久 `session.permission`、system prompt 和 tool schema 没有被动态改写。— 实证：focused suite 覆盖 `wopal-skill-grant.test.ts` / `message-hooks.test.ts` / `skill-permission-rules.test.ts` / `integration.test.ts`，13 files / 121 tests 全绿。
+3. [x] 当前 Session、目标子 Session、父 Session与兄弟 Session 的 overlay 相互隔离；重复 grant 幂等；未知 Skill、未管理 target、同时指定 session_id/task_id 时整次操作失败且 metadata/SessionStore 零变化。— 实证：`session-skill-overlay.test.ts` / `wopal-skill-grant.test.ts` / `integration.test.ts` 纳入 focused 121/121；并发 grant、非法 target、原子失败均有行为断言。
+4. [x] request-tail snapshot 只含 overlay Skill 的 name + description 与加载提示，不含 SKILL.md body/location/resource path；每个请求都重新发布当前完整 overlay snapshot，历史消息和 DB 不被 transform 内容污染。— 实证：`skill-catalog-injector.test.ts` / `message-hooks.test.ts` / `integration.test.ts` 纳入 focused 121/121，含 body/path 零泄漏、每请求重发、history 不变断言。
+5. [x] `experimental.permission.rules` 仅对 `permission=skill` 且 exact name 命中的 overlay Skill 追加 allow；其他 permission/pattern 不新增规则，实际 allow 与模型可见 catalog 由同一 overlay 生成。— 实证：`skill-permission-rules.test.ts` / `skill-assembly-hooks.test.ts` / `integration.test.ts` 纳入 focused 121/121，exact/partial/wildcard/other-permission 路径全覆盖。
+6. [x] 原生 `skill(name)` 成功后仍返回 Ellamaka 既有 SKILL.md、base directory 和资源文件信息；Skill grant 不改变 bash/read/edit/其他工具权限。— 实证：permission/integration 回归纳入 focused 121/121；`git diff --name-only 7efbb3a..0a0d426` 确认 `NO_ELLAMAKA_NATIVE_CODE`，未修改原生 Skill loader/其他 permission 实现。
+7. [x] plugin dispose/recreate、Session resume 与 compaction 后从 metadata 恢复相同 overlay；`loadedSkills` 只影响既有 reload/recovery，不会给未 grant Skill 授权。— 实证：`session-skill-overlay.lifecycle.test.ts` / `compaction.test.ts` / `integration.test.ts` focused 全绿，完整 suite 同时覆盖 `session-store.test.ts`；75 files / 1046 tests 全绿。
+8. [x] wopal-plugin typecheck/test、变更文件 lint/format 检查通过；实现不包含 Tool/Rule 动态能力，也不新增 Skill body loader/registry。— 实证：`bun run typecheck` PASS；`bun run test:run` = 75 files / 1046 tests PASS；28 个变更 TS 文件 ESLint + Prettier check PASS；范围检查无 Ellamaka native code，未发现重复 Skill body loader/Tool/Rule 动态装配。
 
 ### User Validation
 
@@ -214,7 +214,7 @@ catalog 不复制 Agent baseline；baseline 仍由 Ellamaka 原生 Skill catalog
 - Pass criteria: Fae 在没有修改 Agent baseline 的情况下成功调用原生 `skill(name)`；动态提示只展示 Skill name/description；正文与资源基目录由原生 Skill tool 返回；没有权限拒绝或 Tool/Rule 动态装配副作用。
 - Failure feedback: 提供主/子 Session ID 与 `<space>/.wopal-space/logs/wopal-plugin.log` 对应时间段日志。
 
-- [ ] The user has validated the behavior above and confirmed the result.
+- [x] The user has validated the behavior above and confirmed the result.
 
 ## Implementation
 
@@ -239,12 +239,12 @@ catalog 不复制 Agent baseline；baseline 仍由 Ellamaka 原生 Skill catalog
 2. GREEN: 实现 Skill Overlay 状态边界，接入 `wopal_task.capabilities.skills` 和 `wopal_skill_grant`，满足全部 grant 行为。
 3. REFACTOR: 统一错误/结果 shape、去重排序和 metadata merge，确保 SessionStore 只是 cache；同步 Agent tool permission。
 
-**Verify**: RED 阶段回填覆盖 AC#1–#3 的真实测试命令；最终执行相关 wopal-plugin tests 与 `bun run typecheck`。
+**Verify**: RED 命令：`cd plugins/wopal-plugin && bun run vitest run src/session-skill-overlay.test.ts src/tasks/task-launcher.test.ts src/tools/wopal-skill-grant.test.ts src/tools/wopal-tools.test.ts`；实施前结果为 4 个 test files failed（新增 overlay/tool 不存在，creation grant/capabilities 尚未接线），29 个既有测试通过。GREEN/最终命令：同一 focused test 命令（40 passed / 0 failed）+ `bun run typecheck` + 对 Task 1 changed TS files 执行本地 Prettier check 与 ESLint；Agent permission 通过 `grep -n wopal_skill_grant agents/{wopal,fae,rook,maka}.md` 验证 Wopal allow、Fae/Rook/Maka deny。
 
 **Done**:
-Task output: 实施后回填。
-Files touched: 实施后回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 建立 `SessionSkillOverlay` 单一状态边界，以 Ellamaka `app.skills` 为 Skill Pool 真相源；grant 先全量校验再一次性合并 Session metadata，成功持久化后才更新 SessionStore cache。`wopal_task.capabilities.skills` 在 child 首 prompt 前写入 initial overlay；新增 `wopal_skill_grant` 支持当前 Session / 当前 Wopal 持有的 managed child 的 runtime add-only grant，task/session target 冲突和未知/越权 target 均零状态变化；重复 grant 幂等。Wopal 独占 grant tool，Fae/Rook/Maka 显式 deny。
+Files touched: `plugins/wopal-plugin/src/session-skill-overlay.ts`, `plugins/wopal-plugin/src/session-skill-overlay.test.ts`, `plugins/wopal-plugin/src/session-store.ts`, `plugins/wopal-plugin/src/types.ts`, `plugins/wopal-plugin/src/tasks/task-launcher.ts`, `plugins/wopal-plugin/src/tasks/task-launcher.test.ts`, `plugins/wopal-plugin/src/tasks/simple-task-manager.ts`, `plugins/wopal-plugin/src/tools/wopal-task.ts`, `plugins/wopal-plugin/src/tools/wopal-skill-grant.ts`, `plugins/wopal-plugin/src/tools/wopal-skill-grant.test.ts`, `plugins/wopal-plugin/src/tools/index.ts`, `plugins/wopal-plugin/src/tools/wopal-tools.test.ts`, `plugins/wopal-plugin/src/index.ts`, `agents/wopal.md`, `agents/fae.md`, `agents/rook.md`, `agents/maka.md`.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ### Task 2: 发布 cache-safe Skill catalog 并接通原生加载权限
 
@@ -268,12 +268,12 @@ Files touched: 实施后回填。
 2. GREEN: 实现 tail catalog injector 与 `experimental.permission.rules` consumer，共用同一 overlay reader，使可见性与实际 load permission 同步转绿。
 3. REFACTOR: 收紧输出格式、digest 仅缓存格式化、context dump 可观察性和日志边界，确认没有 system/tool-schema rewrite。
 
-**Verify**: RED 阶段回填覆盖 AC#2、#4–#6 的真实测试命令；最终执行 hooks/tool integration tests 与 `bun run typecheck`。
+**Verify**: RED 命令：`cd plugins/wopal-plugin && bun run vitest run src/hooks/skill-catalog-injector.test.ts src/hooks/skill-permission-rules.test.ts src/hooks/skill-assembly-hooks.test.ts`；实施前 3 个 test files failed（两个新 hook 模块不存在，`experimental.permission.rules` 未注册）。GREEN/最终：上述 focused tests + `message-hooks.test.ts` + `compaction.test.ts` + `command-hooks.test.ts`，20 passed / 0 failed；`bun run typecheck`、Task 2 changed TS files Prettier check 与 ESLint 全绿。额外控制流实证：Ellamaka `experimental.session.compacting` 在 compaction 的 `messages.transform` 前触发，集成测试先调用真实 compaction hook 后再调用 transform，确认 dynamic catalog 不进入 compaction summary 输入。静态 diff 检查确认本 Task 未修改 system transform、Task 1 overlay/grant 控制面或任何 Ellamaka native Skill loader。
 
 **Done**:
-Task output: 实施后回填。
-Files touched: 实施后回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 新增 append-only Skill catalog injector：每次正常 model request 从共享 `SessionSkillOverlay` 重新读取完整 descriptors，在 retained history 尾部追加一条 transient synthetic user context，只包含 overlay Skill 的 name + description 与 `skill(name)` 加载提示；不改较早消息/system/tool schema，overlay 为空不注入，compaction 中显式跳过以防摘要持久化污染。新增 `experimental.permission.rules` consumer，只在 `permission=skill` 时读取同一 overlay，对请求 patterns 中 exact name 命中的项追加 `allow`，其他 permission/partial/wildcard-like pattern 不贡献规则。`createAllHooks` 将两个消费端绑定到同一个 overlay 实例。已核实 Ellamaka main 运行时包含该 hook；当前 pin 的 `@wopal/ellamaka-plugin@2.0.7` 尚未包含新 hook 的 `Hooks` 类型，因此没有提交虚假的 dependency bump 或本地 module augmentation，正式 package contract 需随 Ellamaka 下一次发布协调。
+Files touched: `plugins/wopal-plugin/src/hooks/skill-catalog-injector.ts`, `plugins/wopal-plugin/src/hooks/skill-catalog-injector.test.ts`, `plugins/wopal-plugin/src/hooks/skill-permission-rules.ts`, `plugins/wopal-plugin/src/hooks/skill-permission-rules.test.ts`, `plugins/wopal-plugin/src/hooks/skill-assembly-hooks.test.ts`, `plugins/wopal-plugin/src/hooks/message-hooks.ts`, `plugins/wopal-plugin/src/hooks/message-hooks.test.ts`, `plugins/wopal-plugin/src/hooks/index.ts`, `plugins/wopal-plugin/src/index.ts`.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ### Task 3: 收口恢复生命周期与真实集成
 
@@ -296,12 +296,25 @@ Files touched: 实施后回填。
 2. GREEN: 补齐 metadata hydration/recovery 接线，使生命周期测试和端到端 creation/runtime grant 场景通过。
 3. REFACTOR: 运行插件全量 typecheck/test、lint/format 与设计一致性检查；确认无 Tool/Rule 动态能力和 body loader 重复实现。
 
-**Verify**: RED 阶段回填覆盖 AC#1、#3、#7、#8 的真实命令；最终至少执行 `plugins/wopal-plugin` 的 `bun run typecheck:fix && bun run typecheck && bun run test:run`，并按 AGENTS.md 的真实 Ellamaka runtime 验证入口做自动化 smoke。
+**Verify**: RED/恢复验证命令：`cd plugins/wopal-plugin && bun run vitest run src/session-skill-overlay.lifecycle.test.ts src/session-store.test.ts src/hooks/command-hooks.test.ts src/hooks/skill-assembly-hooks.test.ts src/hooks/integration.test.ts src/index.test.ts`；最终结果 96 passed / 0 failed。完整门禁：`bun run typecheck:fix`（无诊断）→ `bun run typecheck` → `bun run test:run`（75 files / 1040 tests 全绿）；本 Task 改动 TS 文件显式 ESLint 与 Prettier check 全绿。仓库 `bun run lint` 因既有配置把整个 `scripts` 忽略而由 ESLint 自身以配置错误退出；全仓 `format:check` 也命中大量既有未格式化文件，但本 Task 改动文件全部通过。真实 `ellamaka run` 从 isolation ontology worktree 可启动到 bootstrap，但该 worktree 不具备完整 space runtime/config 绑定，未形成可判定的模型 smoke，因此不把这条记录为 PASS；真实运行观察保留给 proposal 的 User Validation。
 
 **Done**:
-Task output: 实施后回填。
-Files touched: 实施后回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 补齐 Session Skill Overlay 的恢复生命周期：新插件/新 SessionStore 实例首次读取从 Session metadata 重建 overlay；compaction 后主动丢弃 SessionStore 中的 `skillOverlay` 派生 cache，下一次 catalog/permission 读取重新 hydrate metadata。修正 `loadedSkills` 语义，只在原生 `skill` tool 成功执行后的 `tool.execute.after` 记录，permission deny 或 loader 失败不会污染恢复事实，且 loadedSkills 不参与 overlay 授权。补充 fresh-instance、compaction stale-cache、父子隔离、loadedSkills 非授权源等生命周期测试，并同步 Skill Assembly 设计文档。
+Files touched: `plugins/wopal-plugin/src/session-skill-overlay.lifecycle.test.ts`, `plugins/wopal-plugin/src/session-store.ts`, `plugins/wopal-plugin/src/session-store.test.ts`, `plugins/wopal-plugin/src/hooks/command-hooks.ts`, `plugins/wopal-plugin/src/hooks/command-hooks.test.ts`, `plugins/wopal-plugin/src/hooks/skill-assembly-hooks.test.ts`, `plugins/wopal-plugin/src/hooks/integration.test.ts`, `plugins/wopal-plugin/src/index.test.ts`, `docs/DESIGN-capabilities.md`, `docs/DESIGN-wopal-plugin.md`.
+- [x] The implementation agent has completed all development and verification steps above.
+
+### Review Rework — Round 1
+
+2026-10-10 第一轮 implementation review 结论 `REVISE`（B0/W4/I4）。本轮逐项处置：
+
+- W-01：真实 plugin server 入口测试新增 `experimental.permission.rules` hook-key 断言，防止字符串漂移静默丢失接线。已核实 npm registry 最新 `@wopal/ellamaka-plugin@2.0.8` 仍未发布该 hook 的 `Hooks` 类型，因此不做虚假 dependency bump；当前 pin 仍为 `2.0.7`，正式类型契约等待 Ellamaka 后续发布包含现有 main hook 定义的新版本。
+- W-02：request-tail catalog 在 overlay descriptor lookup 失败时记录日志并 fail-open（本次不注入 snapshot）；runtime permission consumer 在 overlay hydration/read 失败时记录日志并贡献零规则，保留 Agent/Session baseline 的 fail-deny 行为。
+- W-03：Skill Pool 增加 30 秒 TTL 派生缓存；空 overlay 的 descriptor 查询不触发 discovery；grant 若在缓存中找不到请求 Skill，会强制刷新一次再判 unknown，避免新安装 Skill 被 stale cache 误拒。
+- W-04：同一 Session 的 grant 通过 per-session promise queue 串行化完整 read-modify-write，两个并发 grant 不再覆盖彼此 metadata/cache。
+- Requirement Question 1：所有 child `promptAsync` 显式 `wopal_skill_grant: false`，与 `wopal_task: false` 并列；运行时 grant 保持“主控 Wopal only”。
+- Info：Task 2 Done 中错误的 `2.0.8` 叙述已修正为实际 pin `2.0.7`。`tool.execute.before` 的 no-op 保留不作为本轮功能修复范围，不影响行为。
+
+TDD 证据：先新增 5 类回归并得到 5 个有效 RED（catalog fail-open、permission fail-deny、空 overlay discovery、同 Session 并发 grant、child grant tool override）；GREEN 后 focused 5 files 为 66 passed。返工后 13 个 proposal-focused files 为 121 passed；最终 `typecheck:fix` 无诊断、`typecheck` PASS、plugin 全量 75 files / 1046 tests 全绿，返工改动 TS 文件 ESLint + Prettier check 全绿。
 
 ---
 

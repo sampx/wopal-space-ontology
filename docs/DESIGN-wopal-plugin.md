@@ -160,19 +160,19 @@ Agent frontmatter 的 `permission.skill` 是默认能力配置。Wopal 选择的
 - effective overlay = `initial ∪ runtime`，去重并确定性排序；本阶段不提供 exact-set、subtract、deny 或 revoke；
 - overlay 只表达“额外激活的 Skill”，不复制 Agent baseline。Agent baseline 继续由 Ellamaka 原生 system catalog / permission 机制表达。
 
-所有 grant 在状态变更前使用 Ellamaka discovery 的 Skill name 校验；未知或未物化 Skill 必须原子失败。持久事实存入 Session metadata，SessionStore 只做可清空缓存。插件重启、resume 或 compaction 后必须能从 metadata 重建同一 overlay。
+所有 grant 在状态变更前使用 Ellamaka discovery 的 Skill name 校验；未知或未物化 Skill 必须原子失败。同一 Session 的 grant 通过插件内 per-session 队列串行化 read-modify-write，避免并发 tool call 互相覆盖。discovery 的 name/description 可做短 TTL 派生缓存；空 overlay 不触发 discovery，grant 在缓存中找不到 Skill 时必须强制刷新一次后再判 unknown。持久事实存入 Session metadata，SessionStore 只做可清空缓存。插件重启、resume 或 compaction 后必须能从 metadata 重建同一 overlay。
 
 #### Request-Tail Catalog
 
 Session Skill Overlay 不直接注入 SKILL.md body，也不把 Skill 路径暴露给模型。`experimental.chat.messages.transform` 在每个正常 model step 的 retained history 之后追加一份 transient synthetic snapshot，只列 overlay 中 Skill 的 `name + description`，并明确提示模型用原生 `skill(name)` 加载后再执行。
 
-该 snapshot 每个请求都从当前 overlay 重新生成；因为 transform 内容不落 DB，不能以跨请求 digest 相同为由省略发送。digest 只能用于解析/格式化缓存。注入必须 append-only：不改较早 user message、不改 system prompt、不改 tool schema，因此新增 Skill 只影响已有可缓存前缀之后的请求尾部。
+该 snapshot 每个正常模型请求都从当前 overlay 重新生成；因为 transform 内容不落 DB，不能以跨请求 digest 相同为由省略发送。digest 只能用于解析/格式化缓存。注入必须 append-only：不改较早 user message、不改 system prompt、不改 tool schema，因此新增 Skill 只影响已有可缓存前缀之后的请求尾部。Skill descriptor lookup 失败时 catalog injector 记录诊断并 fail-open，不追加本次 snapshot，也不让插件故障中断整个 model step。Ellamaka 在生成 compaction summary 前会先触发 `experimental.session.compacting`，随后也会调用 `messages.transform`；wopal-plugin 在该 compacting 窗口必须跳过动态 Skill catalog，避免 transient task catalog 被摘要模型写回持久 compaction history。
 
 #### Native Skill Loading and Permission Overlay
 
 Skill 正文与资源仍完全归 Ellamaka 原生 `skill(name)`：它负责读取 SKILL.md、返回 base directory 和资源文件清单，并维持既有 progressive disclosure / recovery 行为。Skill grant 只授予“加载这项 Skill”的权限，不隐式授予 Skill 指令中涉及的 bash/read/edit/外部工具权限；这些执行权限属于其他能力设计。
 
-为使受限 Agent（例如 `skill: "*": deny`）可以加载 overlay 中的新 Skill，wopal-plugin 在 `experimental.permission.rules` 中读取同一 Session Skill Overlay：只有当当前 ask 的 `permission === "skill"` 且请求 pattern 命中 overlay 时，才向 `output.rules` 追加精确 `allow`。该 runtime rule 排在 agent/session baseline 之后参与本次求值，因此可覆盖角色默认 deny，但它不写 `session.permission`、不进入 project-wide approved pool，也不改变 Permission Service 持久状态。
+为使受限 Agent（例如 `skill: "*": deny`）可以加载 overlay 中的新 Skill，wopal-plugin 在 `experimental.permission.rules` 中读取同一 Session Skill Overlay：只有当当前 ask 的 `permission === "skill"` 且请求 pattern 命中 overlay 时，才向 `output.rules` 追加精确 `allow`。overlay hydration/读取失败时记录诊断并贡献零规则，让原有 agent/session baseline 继续求值（fail-deny），不能把插件缓存/metadata 故障升级为整个 permission ask 失败。该 runtime rule 排在 agent/session baseline 之后参与本次求值，因此可覆盖角色默认 deny，但它不写 `session.permission`、不进入 project-wide approved pool，也不改变 Permission Service 持久状态。
 
 由此保持单一事实源：
 
@@ -188,11 +188,11 @@ Session Skill Overlay
 
 运行时 Skill grant 在两个 model step 之间发生即可；Ellamaka run loop 不需要刷新或重建 Session 对象。下一次请求的 `messages.transform` 会读取最新 overlay，后续 `skill(name)` 的 permission ask 会再次读取同一 overlay。插件不得通过运行期频繁改写 `session.permission` 来实现 Skill 动态注入。
 
-控制面只负责追加 Skill grants。目标契约为 `wopal_skill_grant`：接收 `skills: string[]`，并可选定位一个已知子 Session；未指定目标时作用于当前 Session。调用前必须用 Ellamaka Skill discovery 验证全部名称，任一名称无效则整次 grant 原子失败。该工具本身属于 Skill 装配控制面，不扩展本阶段到 Tool/Rule 动态能力；Fae/Rook/Maka 等非主控角色默认禁止调用，由 Wopal 主 Agent 持有运行时装配权。
+控制面只负责追加 Skill grants。目标契约为 `wopal_skill_grant`：接收 `skills: string[]`，并可选定位一个已知子 Session；未指定目标时作用于当前 Session。调用前必须用 Ellamaka Skill discovery 验证全部名称，任一名称无效则整次 grant 原子失败。该工具本身属于 Skill 装配控制面，不扩展本阶段到 Tool/Rule 动态能力；Fae/Rook/Maka 等非主控角色默认禁止调用，由 Wopal 主 Agent 持有运行时装配权。对子任务的 `promptAsync` 工具覆盖还必须显式把 `wopal_skill_grant` 设为 false，避免未定义专用 frontmatter 的子 Agent 落入引擎 ask fallback。
 
 #### Recovery and Ownership
 
-Session metadata 是 Skill Overlay 的持久真相源；SessionStore 和格式化 digest 都是派生缓存。现有 `loadedSkills` 仍只记录成功调用原生 Skill loader 的恢复事实，不能反向授予 Skill。动态 catalog 在每次请求重新发布，所以 compaction 后无需把 overlay body 重新注入；若已加载 Skill body 被压缩掉，继续复用现有 Skill reload/recovery 机制。
+Session metadata 是 Skill Overlay 的持久真相源；SessionStore 和格式化 digest 都是派生缓存。插件重启或 Session resume 时，overlay 在首次读取时从 metadata hydration；compaction 完成时必须主动丢弃 SessionStore 中的 overlay cache，使下一次 catalog/permission 读取同样从 metadata 重建。现有 `loadedSkills` 只在原生 `skill(name)` 成功执行后的 `tool.execute.after` 记录，表示“正文确实加载过”的恢复事实；权限被拒或 loader 失败的尝试不得写入，且 `loadedSkills` 不能反向授予 Skill。动态 catalog 在每个正常请求重新发布，所以 compaction 后无需把 overlay body 重新注入；若已加载 Skill body 被压缩掉，继续复用现有 Skill reload/recovery 机制。
 
 ### Monitor Module
 

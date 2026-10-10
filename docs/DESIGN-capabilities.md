@@ -68,14 +68,14 @@ Ellamaka 启动时扫描 `.wopal/agents/`，看到的始终是这四个角色。
 
 P2 先只落 Skill 动态装配。设计目标是让主 Agent 把 Ellamaka 已发现的 Skill Pool 当作可用武器库，在创建会话时和会话运行过程中，把任务真正需要的 Skill 叠加到默认 Agent 能力之上，同时不破坏 system/tool 前缀缓存。
 
-- **Skill Pool**：以 Ellamaka discovery 为唯一发现来源；Wopal 只消费 name/description 等元数据，不重新扫描或复制 Skill Registry。
+- **Skill Pool**：以 Ellamaka discovery 为唯一发现来源；Wopal 只消费 name/description 等元数据，不重新扫描或复制 Skill Registry。插件可对 discovery 结果做短 TTL 的派生缓存以避免每个 model step 重拉完整 Skill body；空 overlay 不触发 discovery，grant 若在缓存中找不到名称必须强制刷新一次后再判 unknown。
 - **Agent baseline**：继续由 `agents/<name>.md` 的 `permission.skill` 表达默认能力；不因动态装配而改写 Agent 配置。
-- **Session Skill Overlay**：只保存额外激活的 Skill。创建子会话时由 `wopal_task.capabilities.skills` 写入 initial grants；运行时由主 Agent 的 skill-only grant 控制面继续追加 runtime grants。两者取并集，只增不减。
+- **Session Skill Overlay**：只保存额外激活的 Skill。创建子会话时由 `wopal_task.capabilities.skills` 写入 initial grants；运行时由主 Agent 的 skill-only grant 控制面继续追加 runtime grants。两者取并集，只增不减；同一 Session 的 grant 必须串行化 read-modify-write，避免并发 tool call 静默覆盖彼此授权。
 - **模型可见性**：wopal-plugin 在既有 `experimental.chat.messages.transform` 中，把 overlay 的 `name + description` 作为 transient synthetic snapshot 追加到 retained history 尾部；不注入 SKILL.md body/path，不修改 system prompt、较早消息或 tool schema。
 - **正文与资源加载**：模型看到 overlay 后仍调用 Ellamaka 原生 `skill(name)`。原生 loader 负责 SKILL.md、base directory、scripts/references/assets 的 progressive disclosure；Skill grant 本身不隐式授予脚本执行所需的其他权限。
-- **加载授权**：新增通用 `experimental.permission.rules` 插件 hook。在 `ctx.ask()` 求值前，把 plugin runtime rules 合并在 agent/session rules 之后。wopal-plugin 只为 `permission=skill` 且 pattern 命中 Session Skill Overlay 的项贡献精确 allow；该 allow 仅参与本次求值，不写 `session.permission`，因此无需修改 Ellamaka run loop 或刷新 Session 对象。
+- **加载授权**：新增通用 `experimental.permission.rules` 插件 hook。在 `ctx.ask()` 求值前，把 plugin runtime rules 合并在 agent/session rules 之后。wopal-plugin 只为 `permission=skill` 且 pattern 命中 Session Skill Overlay 的项贡献精确 allow；该 allow 仅参与本次求值，不写 `session.permission`，因此无需修改 Ellamaka run loop 或刷新 Session 对象。overlay 读取失败时插件贡献零规则，保留 Agent/Session baseline 的安全默认，而不是让整个 permission ask 因插件缓存/metadata 故障失败。
 - **单一事实源**：request-tail catalog 与 runtime skill allow 必须读取同一个 Session Skill Overlay。Session metadata 是持久真相源，插件内 SessionStore/digest 仅是派生缓存。
-- **缓存语义**：动态 Skill snapshot 每个模型请求都从当前 overlay 重新生成并追加在尾部；由于 transform 内容不落 DB，digest 只能缓存格式化结果，不能做跨请求发送抑制。新增 Skill 因而只影响已有 retained prefix 之后的尾部。
+- **缓存与恢复语义**：动态 Skill snapshot 每个正常模型请求都从当前 overlay 重新生成并追加在尾部；由于 transform 内容不落 DB，digest 只能缓存格式化结果，不能做跨请求发送抑制。Skill descriptor discovery 可独立短 TTL 缓存，但不改变 overlay 每请求重读语义；catalog lookup 失败时该次注入 fail-open（不追加 snapshot），不能中断整个 model step。Ellamaka 生成 compaction summary 时同样会触发 `messages.transform`，因此 compacting 期间必须抑制这份 transient catalog，避免其被摘要回持久历史；compaction 完成后丢弃 SessionStore 中的 overlay 派生缓存，下一次 catalog/permission 读取从 Session metadata 重建。新增 Skill 因而只影响已有 retained prefix 之后的尾部。
 
 Tool 与 Rule 的动态能力不属于本切片；现有 Tool/Rule 行为保持不变，后续单独设计。没有 Skill Overlay 时，ellamaka 的现有 config、agent frontmatter、permission、plugin 和 SDK 行为保持不变。
 
