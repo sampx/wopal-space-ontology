@@ -50,6 +50,7 @@ planning → executing → verifying → done
 │   ├── agents-collab/  # Agent 协作
 │   ├── dev-flow/       # 开发流程
 │   ├── df-proposal-review/
+│   ├── df-implement/
 │   ├── df-implement-review/
 │   └── ...
 ├── plugins/            # 插件

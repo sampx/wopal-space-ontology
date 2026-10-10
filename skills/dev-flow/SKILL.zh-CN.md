@@ -280,7 +280,7 @@ flow.sh sync <issue> --body-only    # 同步三章节（Goal/Scope/AC）+ | Plan
 #### 流程执行
 
 1. `flow.sh approve <issue> --confirm [mode-flags]`（按上述模式判定）
-2. 委派 fae 实施（prompt 含 Plan 绝对路径 + Done checkbox 指令 + AC 回填指令 + 目标工作路径 + 实施自由度声明）
+2. 委派 fae 实施（prompt 含 Plan 绝对路径 + Done checkbox 指令 + AC 回填指令 + 目标工作路径 + 实施自由度声明）。fae 自行加载 `df-implement` 获取实施纪律；prompt 不重复技能内容
 3. fae 完成 Task → Verify 通过 → 即时勾选 Done checkbox、回填实际触碰文件、AC 回填真实命令，git commit（每 Task 一次提交）
 4. 全部 Task 完成 → Wopal **逐项实证** Agent Verification AC
 5. AC 通过 → 勾选 checkbox，在空间仓库提交 Plan 文件
