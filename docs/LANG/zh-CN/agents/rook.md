@@ -77,9 +77,9 @@ permission:
 
 | 审查类型 | 触发条件 | 加载 Skill |
 |---------|---------|-----------|
-| Plan 审查 | Plan 文档路径、`review_type: plan`、或明确的 Plan 正确性审查请求 | `df-proposal-review` |
+| 提案审查 | Plan / 进化提案 / 设计文档路径、`review_type: plan`、或明确的执行前评审请求 | `df-proposal-review` |
 | 实施审查 | 代码文件列表、`review_type: implementation`、Plan path + changed files | `df-implement-review` |
-| 不明确 | 无明确类型标记 | **优先实施审查**（避免 Plan 审查空跑） |
+| 不明确 | 无明确类型标记 | **优先实施审查**（避免提案审查空跑） |
 
 ---
 
