@@ -54,7 +54,7 @@ WopalSpace 已经有三层稳定事实：空间物化后的能力池、Agent 的
 
 - D-01: `enhance-session-assembly` 是 umbrella proposal，只定义 Session Assembly 总体目标、共同不变量和子提案关系，记录已确认的 tools 架构作为拆分输入，不直接实施 Skill/Tool/Rule。
 - D-02: Session Assembly 拆成三个独立 Evolution Proposal：Skill、Tool、Rule。每个子提案独立经历 draft → accepted → implementing → validating → archived。
-- D-03: Skill 子提案为 `enhance-session-skill`，当前优先推进。Tool 的已确认设计先在本 umbrella 记录，Tool/Rule 子提案在 DSH 升级完成后独立拆分；本提案不冻结它们的最终 wire contract。
+- D-03: Skill 子提案 `enhance-session-skill` 已独立实施、验证并归档。Tool 的已确认设计继续由本 umbrella 保留，Tool/Rule 子提案在 DSH 升级完成后独立拆分；本提案不冻结它们的最终 wire contract。
 - D-04: 能力发现保持所属引擎的来源边界：动态外部 tools/MCP 的唯一真相源为 DSH ToolRegistry，其他原生能力由 Ellamaka discovery 提供。Wopal 负责选择和装配，不复制 registry 或完整 permission evaluator。
 - D-05: Agent 配置是 baseline，Session Assembly 是 additive overlay。是否支持 revoke/subtract/exact-set 由各子提案单独论证，不能从一个能力域外推到另一个能力域。
 - D-06: 动态装配必须保护稳定 prompt prefix。运行时变化不得无必要地改写 system prompt；是否影响 tool schema、使用 request-tail 或其他 scope，由各子提案根据能力特性决定。
@@ -161,7 +161,7 @@ wopal_task({
 
 | Capability | Proposal                                   | Status      | Responsibility                                                                                                     |
 | ---------- | ------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------ |
-| Skill      | `docs/evolutions/enhance-session-skill.md` | draft       | Skill Pool → Session Skill Overlay → request-tail catalog → native `skill(name)` loading；创建时与运行时增量 grant |
+| Skill      | `docs/evolutions/archived/20261011-enhance-session-skill.md` | archived    | Skill Pool → Session Skill Overlay → request-tail catalog → native `skill(name)` loading；创建时与运行时增量 grant |
 | Tool       | 升级后拆分                                 | not created | 继承本提案 T-01～T-15：DSH 唯一外部工具池、Session scope/envelope、run_code、PTC SDK/system prompt 与执行边界      |
 | Rule       | 升级后拆分                                 | not created | Rule eligibility、runtime matching、tool/path facts 与 request-tail snapshot；另行设计                             |
 
@@ -188,7 +188,7 @@ Skill 子提案的直接引擎前置为 Ellamaka `feature-plugin-runtime-perm-ho
 | Component            | Files                                         | Operation              | Role                                                    |
 | -------------------- | --------------------------------------------- | ---------------------- | ------------------------------------------------------- |
 | Umbrella proposal    | `docs/evolutions/enhance-session-assembly.md` | modify                 | Session Assembly 总设计、tools 决策记录、拆分和交付关系 |
-| Skill child proposal | `docs/evolutions/enhance-session-skill.md`    | create                 | Skill 动态装配独立设计与实施契约                        |
+| Skill child proposal | `docs/evolutions/archived/20261011-enhance-session-skill.md` | archived               | Skill 动态装配独立设计与实施契约                        |
 | Capability design    | `docs/DESIGN-capabilities.md`                 | reference / later sync | 保持总体装配概念一致                                    |
 | Plugin design        | `docs/DESIGN-wopal-plugin.md`                 | reference / later sync | 各子提案实施时保持插件边界一致                          |
 
@@ -216,8 +216,8 @@ Skill 子提案的直接引擎前置为 Ellamaka `feature-plugin-runtime-perm-ho
 
 - Goal: 确认 Session Assembly 总设计与 Skill/Tool/Rule 子演进边界符合产品意图。
 - Environment: 直接阅读 `.wopal/docs/evolutions/` 中 umbrella 与 Skill 子提案。
-- Precondition: umbrella 与 `enhance-session-skill` 均处于 `draft`，未创建 implementation worktree。
-- Launch command: `sed -n '1,420p' .wopal/docs/evolutions/enhance-session-assembly.md && sed -n '1,360p' .wopal/docs/evolutions/enhance-session-skill.md`
+- Precondition: umbrella 仍处于 `draft`；`enhance-session-skill` 已完成独立实施、验证与归档，umbrella 本身未创建 implementation worktree。
+- Launch command: `sed -n '1,420p' .wopal/docs/evolutions/enhance-session-assembly.md && sed -n '1,360p' .wopal/docs/evolutions/archived/20261011-enhance-session-skill.md`
 - User Actions:
   1. 确认 umbrella 解释总目标、共同原则、三块拆分和已确认 tools 决策记录。
   2. 确认 Skill 的具体动态注入设计只存在于 Skill 子提案。
@@ -233,9 +233,9 @@ Skill 子提案的直接引擎前置为 Ellamaka `feature-plugin-runtime-perm-ho
 
 ### Child 1: Session Skill
 
-**Proposal**: `enhance-session-skill`
+**Proposal**: `docs/evolutions/archived/20261011-enhance-session-skill.md`
 
-**Status**: draft — 当前已拆分，等待独立评审/批准。
+**Status**: archived — 已完成独立实施、两轮 implementation review、Agent Verification、真实模型 UAT 与集成归档；Final Commit `a5970b1f375dc8a76ea40d737d195fd9d4a59914`。
 
 ### Child 2: Session Tool
 
