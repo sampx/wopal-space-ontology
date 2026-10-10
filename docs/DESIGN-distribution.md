@@ -26,7 +26,7 @@ ontology 分发模型：
 ontology source repo (upstream/main)
   -> local ontology clone (local main)          # 中央能力池，用户级唯一真相源
   -> space/<name> branch + sparse-checkout      # 空间装配 worktree，按装配单物化
-  -> CLI renders deterministic runtime skeleton from templates
+  -> Ellamaka shared service renders runtime skeleton from templates
   -> ellamaka loads commands/agents/plugins/config at runtime
 ```
 
@@ -60,15 +60,15 @@ P1 目标语义：
 2. fork flow 是显式选择的替代模式
 3. 每个 space 拥有独立的 `space/<name>` 分支与装配 worktree
 4. `.wopal/` 是装配 worktree，不是复制目录，也不持有独立能力演化
-5. 空间根仓库跟踪 `.wopal-space/space-meta.json` 中的身份和本空间装配选择，由 CLI 在变更时限定路径提交；本体 Git refs 提供同步进度
+5. 空间根仓库跟踪 `.wopal-space/space-meta.json` 中的身份和本空间装配选择，由实际准备/演进操作在变更时限定路径提交；本体 Git refs 提供同步进度
 
 ---
 
 ## Template and Runtime Skeleton Contract
 
-ontology 通过 `assembly/schemas/` 下的类型骨架与 `assembly/templates/` 素材，为 CLI 提供确定性初始化输入。装配单的 `schema` 字段选择该类型所用骨架。
+ontology 通过 `assembly/schemas/` 下的类型骨架与 `assembly/templates/` 素材，为共享初始化服务提供声明输入。装配单的 `schema` 字段选择该类型所用骨架。
 
-CLI 消费 ontology templates 时负责：
+共享服务消费 ontology templates 时负责：
 
 1. 创建 `<space>/AGENTS.md`
 2. 创建 `<space>/.gitignore`
@@ -80,30 +80,17 @@ CLI 消费 ontology templates 时负责：
 
 Contract：
 
-1. ontology 声明装配单、骨架与模板，CLI 负责确定性 materialization。
+1. ontology 声明装配单、骨架与模板，共享服务负责确定性 materialization。
 2. rerun 时补齐缺失项，已有文件的用户内容保持不动。
 3. `/init` 在初始化之后承接智能校准，与首次确定性 materialization 分工协作。
 
 ---
 
-## Base Capability Source Contract
+## User and Space Capability Source Contract
 
-`wopal setup` 从 ontology source 物化 user-level base capabilities 到 `$WOPAL_HOME/`，为所有 space 提供共享基础能力层。物化逻辑由 wopal-cli 实现（P1-06），ontology 在此声明 source 侧契约。
+共享 setup 创建用户级能力目录，但不把 ontology 的 agents/skills/rules/commands/plugins 整体 symlink/copy 到用户级目录。Ontology 内容通过对应空间的装配 worktree 分发；用户自己安装的全局能力保持独立。
 
-### Materialization
-
-macOS / Linux 将 ontology source 目录整体 symlink 到 `$WOPAL_HOME/` 对应位置；Windows 使用 managed copy。整个目录链接后内容完整可达，无需按文件筛选。
-
-| Source | Target |
-|--------|--------|
-| `ontologies/wopal-space-ontology/agents/` | `agents/` |
-| `ontologies/wopal-space-ontology/skills/` | `skills/` |
-| `ontologies/wopal-space-ontology/commands/` | `commands/` |
-| `ontologies/wopal-space-ontology/rules/` | `rules/` |
-| `ontologies/wopal-space-ontology/plugins/` | `plugins/` |
-| `ontologies/wopal-space-ontology/dsh/agents-presets/` | `dsh/agents-presets/` |
-
-> **注**：user-level base capabilities 是跨空间共享的**只读入口**，物化为 symlink 合理——它们由 `ontology sync` 统一推进，不经由空间内修改。空间内可写的装配资产位于 `<space>/.wopal/`（sparse-checkout 真实文件），两者职责不同。
+DSH preset 是声明式 bundle，源位于 ontology dsh/agents-presets，按目标产品的标准供应链快照安装到选定 profile；不依赖全局 .agent-presets 链接。DSH profile 运行文件与用户覆盖按下节物化。
 
 ### DSH Profiles Materialization Contract
 
@@ -151,13 +138,13 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 2. release asset metadata
 3. package manager integration
 4. 在分发阶段替代 ellamaka runtime loading
-5. 在分发阶段替代 CLI 的 global setup / engine install
+5. 在本体内容中实现全局业务服务或产品 binary installer
 
 ---
 
 ## Reference Documents
 
-| Document | Purpose |
-|---|---|
+| Document                                  | Purpose                                                       |
+| ----------------------------------------- | ------------------------------------------------------------- |
 | `../../projects/wopal-cli/docs/DESIGN.md` | CLI 的 deterministic init、space sync 与 runtime handoff 设计 |
-| `../../projects/ellamaka/docs/DESIGN.md` | ellamaka 的 wopal-space mode 与 runtime loading 设计 |
+| `../../projects/ellamaka/docs/DESIGN.md`  | ellamaka 的 wopal-space mode 与 runtime loading 设计          |
