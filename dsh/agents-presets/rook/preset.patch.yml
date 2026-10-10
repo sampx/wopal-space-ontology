@@ -106,7 +106,7 @@
                 |------------|------------------|-----------|
 
                 | Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request
-                | `df-plan-review` |
+                | `df-proposal-review` |
 
                 | Code Review | Code file list, `review_type: implementation`, Plan path + changed files |
                 `df-implement-review` |

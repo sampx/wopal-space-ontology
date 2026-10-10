@@ -7,7 +7,7 @@ description: >
   verify code changes, a commit, a pull request, or a finished
   implementation — typically at sign-off before commit or merge, for example
   "review this change", "check whether this implementation is correct",
-  "review my PR". Do not use for reviewing a Plan (use `df-plan-review`),
+  "review my PR". Do not use for reviewing a Plan (use `df-proposal-review`),
   re-running tests or lint, running builds, or fixing code.
 ---
 

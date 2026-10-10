@@ -13,7 +13,7 @@ permission:
   context_manage: deny
   skill:
     "*": deny
-    df-plan-review: allow
+    df-proposal-review: allow
     df-implement-review: allow
     ontology-evolution: allow
   doom_loop: deny
@@ -78,7 +78,7 @@ Specific review workflows, output formats, and evidence standards are defined in
 
 | Review Type | Trigger Condition | Load Skill |
 |------------|------------------|-----------|
-| Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-plan-review` |
+| Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-proposal-review` |
 | Work Review | Code file list, `review_type: implementation`, Plan path + changed files | `df-implement-review` |
 | Unclear | No explicit type marker | **Prioritize Work Review** (avoid Plan review empty run) |
 

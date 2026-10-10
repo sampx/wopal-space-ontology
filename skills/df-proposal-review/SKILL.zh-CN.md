@@ -1,5 +1,5 @@
 ---
-name: df-plan-review
+name: df-proposal-review
 description: >
   审查一份执行前的 Plan——照它字面执行，行不行得通、能不能达成目标？在用户要求
   审查、检查、验证一份 Plan 或实施计划时使用——特别是迁移、重构、跨模块改动、
@@ -8,7 +8,7 @@ description: >
   `df-implement-review`）、写方案。
 ---
 
-# df-plan-review — Plan 正确性审查
+# df-proposal-review — Plan 正确性审查
 
 **你只判断一件事：照这份 Plan 字面执行，工作能不能做成、能不能达成目标？**
 

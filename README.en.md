@@ -47,7 +47,7 @@ Initiate sub-tasks via the `wopal_task` tool:
 ├── skills/             # Skill definitions
 │   ├── agents-collab/  # Agent collaboration
 │   ├── dev-flow/       # Development workflow
-│   ├── df-plan-review/
+│   ├── df-proposal-review/
 │   ├── df-implement-review/
 │   └── ...
 ├── plugins/            # Plugins

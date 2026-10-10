@@ -602,7 +602,7 @@
                     |------------|------------------|-----------|
 
                     | Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review
-                    request | `df-plan-review` |
+                    request | `df-proposal-review` |
 
                     | Code Review | Code file list, `review_type: implementation`, Plan path + changed files |
                     `df-implement-review` |
@@ -630,7 +630,7 @@
 
 
                     Review workflows, output formats, and evidence standards are defined in your two skills
-                    (`df-plan-review`, `df-implement-review`). Load them per the Skill Routing table.
+                    (`df-proposal-review`, `df-implement-review`). Load them per the Skill Routing table.
 
 
                     <READ_ONLY_BOUNDARY>

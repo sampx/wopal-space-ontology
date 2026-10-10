@@ -418,7 +418,7 @@
 
           | Review Type | Trigger Condition | Load Skill |
           |------------|------------------|-----------|
-          | Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-plan-review` |
+          | Plan Review | Plan document path, `review_type: plan`, or an explicit Plan correctness-review request | `df-proposal-review` |
           | Code Review | Code file list, `review_type: implementation`, Plan path + changed files | `df-implement-review` |
           | Unclear | No explicit type marker | **Prioritize Code Review** (avoid Plan review empty run) |
 
@@ -431,7 +431,7 @@
 
           # Skill note
 
-          Review workflows, output formats, and evidence standards are defined in your two skills (`df-plan-review`, `df-implement-review`). Load them per the Skill Routing table.
+          Review workflows, output formats, and evidence standards are defined in your two skills (`df-proposal-review`, `df-implement-review`). Load them per the Skill Routing table.
 
           <READ_ONLY_BOUNDARY>
 

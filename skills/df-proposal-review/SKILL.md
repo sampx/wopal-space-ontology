@@ -1,5 +1,5 @@
 ---
-name: df-plan-review
+name: df-proposal-review
 description: >
   Review a Plan before it is executed — if someone follows it literally,
   will it work, and will it deliver the stated goal? Use when the user asks
@@ -12,7 +12,7 @@ description: >
   writing plans.
 ---
 
-# df-plan-review — Plan Correctness Review
+# df-proposal-review — Plan Correctness Review
 
 **You judge one thing: if someone follows this Plan as written, will the work succeed and deliver the stated goal?**
 

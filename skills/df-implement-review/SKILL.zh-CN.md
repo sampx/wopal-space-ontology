@@ -5,7 +5,7 @@ description: |
 
   使用场景：用户要求审查、检查或验收代码改动、commit、PR 或已完成实现（提交/合并前把关）。例如"帮我审查这段代码"、"看看这个实现有没有问题"、"检查一下这次改动"、"review 一下这个 PR"、"有没有问题"。
 
-  不适用：审查方案/Plan（用 `df-plan-review`）、重跑测试或 lint、构建、修复代码。
+  不适用：审查方案/Plan（用 `df-proposal-review`）、重跑测试或 lint、构建、修复代码。
 ---
 
 # df-implement-review — 实施审查
