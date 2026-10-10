@@ -1,6 +1,7 @@
 import z from "@deepseek-ai/schemastery";
 import { WebError } from "@deepseek-ai/dsh-web";
 import { deadline, timeoutOf } from "@deepseek-ai/dsh-timeout";
+import { proxyRouteFor } from "@deepseek-ai/dsh-http-proxy";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import ipaddr from "ipaddr.js";
@@ -31,21 +32,18 @@ const IPV4ONLY_SENTINELS = new Set(["192.0.0.170", "192.0.0.171"]);
 * @param input - textual IPv4 or IPv6 address.
 * @returns true only for a public unicast destination.
 */
-function isPublicIpAddress(input) {
+function isPublicIpAddress(input, fakeIpRanges = []) {
 	let parsed;
 	try {
 		parsed = ipaddr.parse(stripIpv6Brackets(input));
 	} catch {
 		return false;
 	}
+	// Fork (dsh-web-fetch-http-fakeip): a TUN proxy answers every lookup from a reserved
+	// fake-ip range, which the stock check rejects as non-public and blocks. Addresses inside a
+	// configured range are accepted; every other private/reserved address stays blocked.
 	if (parsed instanceof ipaddr.IPv4) {
-		// Fork (dsh-web-fetch-http-fakeip): Clash TUN fake-ip serves 198.18.0.0/15
-		// for every hostname; the user-space proxy forwards them transparently. The
-		// official SSRF guard treats that reserved range as non-public and blocks
-		// every fetch. We trust this range so the proxy can forward, while every
-		// other private/reserved address stays blocked.
-		const octets = parsed.toByteArray();
-		if (octets[0] === 198 && (octets[1] === 18 || octets[1] === 19)) return true;
+		if (fakeIpRanges.some(([network, bits]) => parsed.kind() === network.kind() && parsed.match(network, bits))) return true;
 		return parsed.range() === "unicast";
 	}
 	if (parsed.isIPv4MappedAddress()) return parsed.toIPv4Address().range() === "unicast";
@@ -60,7 +58,7 @@ function isPublicIpAddress(input) {
 * @param resolver - lookup implementation, overridden only by focused tests.
 * @returns the validated, non-empty address set.
 */
-async function resolvePublicAddresses(hostname, signal, resolver = lookup) {
+async function resolvePublicAddresses(hostname, signal, resolver = lookup, fakeIpRanges = []) {
 	const unbracketed = stripIpv6Brackets(hostname);
 	const literalFamily = isIP(unbracketed);
 	const resolved = literalFamily === 0 ? await raceWithSignal(resolver(unbracketed, {
@@ -75,9 +73,9 @@ async function resolvePublicAddresses(hostname, signal, resolver = lookup) {
 	const addresses = [];
 	for (const entry of resolved) {
 		if (entry.family !== 4 && entry.family !== 6 || isIP(entry.address) !== entry.family) throw new WebError(`hostname "${hostname}" resolved to an invalid IP address`, "WEB_PROVIDER_ERROR");
-		if (!isPublicIpAddress(entry.address)) throw new WebError(`URL hostname "${hostname}" resolves to a non-public IP address`, "WEB_BLOCKED_URL");
+		if (!isPublicIpAddress(entry.address, fakeIpRanges)) throw new WebError(`URL hostname "${hostname}" resolves to a non-public IP address`, "WEB_BLOCKED_URL");
 		const translatedIpv4 = translatedIpv4Address(entry.address, nat64Prefixes);
-		if (translatedIpv4 !== void 0 && !isPublicIpAddress(translatedIpv4)) throw new WebError(`URL hostname "${hostname}" resolves through NAT64 to a non-public IPv4 address`, "WEB_BLOCKED_URL");
+		if (translatedIpv4 !== void 0 && !isPublicIpAddress(translatedIpv4, fakeIpRanges)) throw new WebError(`URL hostname "${hostname}" resolves through NAT64 to a non-public IPv4 address`, "WEB_BLOCKED_URL");
 		addresses.push({
 			address: entry.address,
 			family: entry.family
@@ -130,14 +128,33 @@ function embeddedIpv4Address(bytes, prefixLength) {
 	return [...bytes.slice(prefixBytes, prefixBytes + beforeReservedOctet), ...bytes.slice(9, 13 - beforeReservedOctet)].join(".");
 }
 /**
-* Fetch through an Undici agent whose lookup callback returns only the already
-* validated address set. The URL hostname remains intact for HTTP Host and TLS SNI.
+* Whether a hostname is an IP literal that {@link resolvePublicAddresses} would refuse.
 *
-* @param url - validated HTTP(S) URL.
+* A proxied hop skips those checks because the proxy resolves the origin, but a literal needs no
+* resolution: the address is already stated, and handing it to a proxy running on this machine
+* would reach exactly the loopback or private service the checks exist to keep out of reach.
+*
+* @param hostname - a URL's hostname, bracketed or not.
+* @returns true when the host is a literal address no request may be sent to.
+*/
+function isNonPublicIpLiteral(hostname, fakeIpRanges = []) {
+	const unbracketed = stripIpv6Brackets(hostname);
+	return isIP(unbracketed) !== 0 && !isPublicIpAddress(unbracketed, fakeIpRanges);
+}
+/**
+* Fetch through an agent whose lookup callback returns only the already validated address set. The
+* URL hostname remains intact for HTTP Host and TLS SNI.
+*
+* The agent is this request's own because the address set is: pinning is how this package refuses a
+* DNS answer that changes between validation and connection, and it may not apply process-wide —
+* an operator-configured MCP server or model endpoint on loopback is a supported destination, and
+* only the URLs this tool fetches are the model's to choose.
+*
+* @param url - validated HTTP(S) URL the policy does not route through a proxy.
 * @param addresses - public addresses returned by {@link resolvePublicAddresses}.
 * @param headers - request headers.
 * @param signal - request and body-read cancellation signal.
-* @returns a response plus the dispatcher disposer its consumer must call.
+* @returns a response plus the disposer its consumer must call.
 */
 async function requestPinned(url, addresses, headers, signal) {
 	const { Agent, fetch } = await import("undici");
@@ -154,19 +171,51 @@ async function requestPinned(url, addresses, headers, signal) {
 				signal,
 				dispatcher
 			}),
+			// Fork (dsh-web-fetch-http-fakeip): Bun's undici shim lacks Agent.close/destroy
+			// (verified on Bun 1.3.14); optional-call so the pinned path works on both runtimes.
+			// The per-request Agent is then left to GC on Bun — acceptable for web_fetch's low rate.
 			close: async () => {
-				await dispatcher.close();
+				await dispatcher.close?.();
 			}
 		};
 	} catch (error) {
-		await dispatcher.close();
+		await dispatcher.close?.();
 		throw error;
 	}
+}
+/**
+* Fetch through the dispatcher the proxy policy already installed, letting the proxy resolve the
+* origin.
+*
+* No address set is pinned because none exists to pin: the proxy performs the lookup, and a
+* connection pinned to a locally resolved address would reach the origin directly and defeat the
+* proxy. The dispatcher is the process-wide one, so hops share its connection pool and no caller
+* closes it.
+*
+* @param dispatcher - the route's dispatcher, from `proxyRouteFor`.
+* @param url - validated HTTP(S) URL the policy routes through a proxy.
+* @param headers - request headers.
+* @param signal - request and body-read cancellation signal.
+* @returns a response plus a disposer that releases nothing, so both paths close alike.
+*/
+async function requestVia(dispatcher, url, headers, signal) {
+	const { fetch } = await import("undici");
+	return {
+		response: await fetch(url, {
+			method: "GET",
+			redirect: "manual",
+			headers,
+			signal,
+			dispatcher
+		}),
+		close: () => Promise.resolve()
+	};
 }
 /** Production network operations kept as an object so provider tests can replace resolution only. */
 const publicHttpNetwork = {
 	resolve: resolvePublicAddresses,
-	request: requestPinned
+	request: requestPinned,
+	requestVia
 };
 /**
 * Build the connector lookup that serves a fixed validated answer set.
@@ -389,9 +438,27 @@ var HttpFetchProvider = class {
 	* @param limits - resolved transport and response limits.
 	* @param resolveAddresses - resolver that rejects non-public destinations before returning.
 	*/
-	constructor(limits, resolveAddresses = publicHttpNetwork.resolve) {
+	constructor(limits, resolveAddresses = publicHttpNetwork.resolve, fork = {}) {
 		this.limits = limits;
 		this.resolveAddresses = resolveAddresses;
+		// Fork (dsh-web-fetch-http-fakeip): parsed CIDR ranges and the optional entry-configured proxy.
+		this.fakeIpRanges = fork.fakeIpRanges ?? [];
+		this.proxyUrl = fork.proxyUrl ?? "";
+		this.proxyDispatcher = void 0;
+	}
+	/**
+	* The dispatcher for this deploy's configured proxy, built once, or undefined when no proxy is
+	* configured or the launch environment's own policy applies.
+	* @returns the ProxyAgent, or undefined to fall back to the process proxy policy.
+	*/
+	async forkDispatcher() {
+		if (this.proxyUrl === "") return void 0;
+		// A failed import must not be cached, or every later fetch would replay the same rejection.
+		if (this.proxyDispatcher === void 0) {
+			const { ProxyAgent } = await import("undici");
+			this.proxyDispatcher = new ProxyAgent({ uri: this.proxyUrl });
+		}
+		return this.proxyDispatcher;
 	}
 	/** No credentials to check — an anonymous public fetcher is always usable. */
 	available() {
@@ -453,12 +520,22 @@ var HttpFetchProvider = class {
 		}
 	}
 	async requestOnce(url, signal) {
+		const headers = {
+			"user-agent": this.limits.userAgent,
+			"accept": "text/html,application/xhtml+xml,text/*;q=0.9,application/json;q=0.8"
+		};
 		try {
-			const addresses = await this.resolveAddresses(url.hostname, signal);
-			return await publicHttpNetwork.request(url, addresses, {
-				"user-agent": this.limits.userAgent,
-				"accept": "text/html,application/xhtml+xml,text/*;q=0.9,application/json;q=0.8"
-			}, signal);
+			// Fork (dsh-web-fetch-http-fakeip): an entry-configured proxy outranks the process policy, so a
+			// deployment configures its proxy in the profile patch instead of the launch environment.
+			const forkDispatcher = await this.forkDispatcher();
+			if (forkDispatcher !== void 0) {
+				if (!isNonPublicIpLiteral(url.hostname, this.fakeIpRanges)) return await publicHttpNetwork.requestVia(forkDispatcher, url, headers, signal);
+			} else {
+				const route = proxyRouteFor(url);
+				if (route.proxied && !isNonPublicIpLiteral(url.hostname, this.fakeIpRanges)) return await publicHttpNetwork.requestVia(route.dispatcher, url, headers, signal);
+			}
+			const addresses = await this.resolveAddresses(url.hostname, signal, void 0, this.fakeIpRanges);
+			return await publicHttpNetwork.request(url, addresses, headers, signal);
 		} catch (error) {
 			if (error instanceof WebError) throw error;
 			throw translateAbortOrNetwork(error, signal);
@@ -603,7 +680,15 @@ const Config = z.object({
 	maxBodyChars: z.number().default(1e5),
 	timeoutMs: z.number().default(3e4),
 	maxRedirects: z.number().default(5),
-	userAgent: z.string().default(DEFAULT_USER_AGENT)
+	userAgent: z.string().default(DEFAULT_USER_AGENT),
+	// Fork (dsh-web-fetch-http-fakeip): CIDR ranges this deployment treats as public, for a TUN
+	// proxy that answers every lookup from a reserved fake-ip range. Every address outside these
+	// ranges keeps the stock SSRF check. Empty means the stock closed set.
+	fakeIpRanges: z.array(z.string()).default([]),
+	// Fork (dsh-web-fetch-http-fakeip): the outbound proxy this deployment routes through,
+	// configured on this plugin's own entry instead of in the launch environment. Empty means
+	// "follow the launch environment's proxy policy", so a profile that sets HTTPS_PROXY keeps working.
+	proxyUrl: z.string().default("")
 });
 /** A resource limit (byte/char/length/timeout cap) must be a positive finite number. */
 function assertPositiveFinite(name, value) {
@@ -619,6 +704,22 @@ function assertNonNegativeInteger(name, value) {
 	if (!Number.isInteger(value) || value < 0) throw new Error(`web-fetch-http: ${name} must be a non-negative integer`);
 }
 /** Register the local HTTP(S) fetch provider with `ctx.web`. */
+/**
+* Parse one configured CIDR range into an ipaddr.js CIDR.
+* Fork (dsh-web-fetch-http-fakeip): a malformed range fails loud at load rather than silently
+* leaving the guard's closed set in place, which would block every fetch behind a TUN proxy.
+*
+* @param value - the range as configured, e.g. `198.18.0.0/15` or `fc00::/7`.
+* @returns the parsed CIDR.
+*/
+function parseFakeIpRange(value) {
+	try {
+		return ipaddr.parseCIDR(value);
+	} catch (error) {
+		throw new Error(`web-fetch-http: fakeIpRanges entry ${JSON.stringify(value)} is not a CIDR: ${String(error)}`);
+	}
+}
+/** Register the local HTTP(S) fetch provider with `ctx.web`. */
 function apply(ctx, config) {
 	const resolved = config;
 	assertPositiveFinite("maxResponseBytes", resolved.maxResponseBytes);
@@ -632,7 +733,12 @@ function apply(ctx, config) {
 		maxRedirects: resolved.maxRedirects,
 		userAgent: resolved.userAgent
 	};
-	ctx.web.registerFetchProvider(new HttpFetchProvider(limits));
+	// Fork (dsh-web-fetch-http-fakeip): the ranges and proxy this entry configures.
+	const fork = {
+		fakeIpRanges: (resolved.fakeIpRanges ?? []).map(parseFakeIpRange),
+		proxyUrl: resolved.proxyUrl ?? ""
+	};
+	ctx.web.registerFetchProvider(new HttpFetchProvider(limits, void 0, fork));
 }
 //#endregion
 export { Config, DEFAULT_USER_AGENT, HttpFetchProvider, LOCAL_FETCH_PROVIDER_ID, apply, inject, name };

@@ -282,7 +282,7 @@ When the user approves a Plan, the agent must pick the correct mode from their i
 #### Execution flow
 
 1. `flow.sh approve <issue> --confirm [mode-flags]` (per the mode table)
-2. Delegate to fae (prompt: Plan absolute path + Done checkbox instruction + AC write-back instruction + target work path + implementation-freedom statement)
+2. Delegate to fae (prompt: Plan absolute path + Done checkbox instruction + AC write-back instruction + target work path + implementation-freedom statement). fae loads `df-implement` itself for the implementation discipline; state nothing twice
 3. fae completes Task → Verify passes → immediately tick Done, backfill touched files, write back real AC commands, git commit (one per Task)
 4. All Tasks done → Wopal **empirically verifies** every AC
 5. ACs pass → tick checkboxes, commit the Plan file in the space repo

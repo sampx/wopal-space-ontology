@@ -29,7 +29,6 @@ const PEER_PACKAGES = [
   "@deepseek-ai/dsh-sandbox-local",
   "@deepseek-ai/dsh-sandbox-policy",
   "@deepseek-ai/dsh-session",
-  "@deepseek-ai/dsh-settings",
   "@deepseek-ai/schemastery"
 ]
 

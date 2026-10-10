@@ -30,12 +30,19 @@ export class SandboxRootsSandboxProvider extends LocalSandboxProvider {
    * wrap) receives them without any per-session state here.
    * @param argv - the exact argv the caller is about to spawn.
    * @param policy - the file-effect policy this execution runs under.
+   * @param signal - cancellation forwarded to the stock provider's runner resolution.
    * @returns the wrapped argv plus the selected backend's evidence, or the
    *   stock provider's verdict when no extra root is configured.
    */
-  override confine(argv: readonly string[], policy: SandboxPolicy): ConfinedArgv {
+  override async confine(
+    argv: readonly string[],
+    policy: SandboxPolicy,
+    signal?: AbortSignal,
+  ): Promise<ConfinedArgv> {
     const extras = (policy as WithExtras).writableRoots ?? []
-    if (policy.mode !== 'workspace-write' || extras.length === 0) return super.confine(argv, policy)
+    if (policy.mode !== 'workspace-write' || extras.length === 0) {
+      return super.confine(argv, policy, signal)
+    }
     if (process.platform !== 'darwin') {
       throw new Error(`dsh-sandbox-roots: writableRoots (${extras.length} root(s)) requires the macOS Seatbelt runner; unsupported runner platform ${process.platform}`)
     }
