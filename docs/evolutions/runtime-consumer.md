@@ -35,7 +35,9 @@
 
 ### Key Interfaces
 
-硬契约为已交付精确产品/SDK版本的生成 OpenAPI 3.1；当前待实施接口由 `.wopal-space/plans/ellamaka/refactor-sdk-unified-sdk.md` 的 Planned Management Contract 定义，通用规则见 `projects/ellamaka/docs/API-CONTRACT.md`。修改时先修订设计与计划，不能在下游实现中猜测。SDK 包名保持 @wopal/ellamaka-sdk，HTTP 客户端保留 /v2 的 createOpencodeClient；本地入口 /local 提供 createLocalClient({homePath,ellamakaExecutable?})。HTTP 客户端保留原 data/error 包装，本地返回业务 DTO。
+新管理资源统一使用 `/wopalspace`，资源路径以稳定 `spaceId` 寻址，CLI 的 name/id 兼容转换由 wrapper 承担；不得在下游自行改名或新增 `/workspace` 别名。所有新 DTO 与错误状态以 Ellamaka 生产者 Plan 的固定契约为准。
+
+硬契约为已交付精确产品/SDK版本的生成 OpenAPI 3.1；当前待实施接口由 `.wopal-space/plans/ellamaka/refactor-sdk-unified-sdk.md` 的 Key Interfaces / Endpoint Catalog 及 DTO、错误、兼容条款定义，通用规则见 `projects/ellamaka/docs/API-CONTRACT.md`。修改时先修订设计与计划，不能在下游实现中猜测。SDK 包名保持 @wopal/ellamaka-sdk，HTTP 客户端保留 /v2 的 createOpencodeClient；本地入口 /local 提供 createLocalClient({homePath,ellamakaExecutable?})。HTTP 客户端保留原 data/error 包装，本地返回业务 DTO。
 
 - 本地 setup 不启动引擎：inspect、prepareOntology、prepareRuntime、configureGithub、configureProvider 和 wopalspace/已有配置读取按 API 表执行。
 - DSH 的 runtime 必须来自目标 Ellamaka 制品。外部本地 SDK 委托该产品 init；HTTP 宿主与内部调用使用本产品 Bridge。
