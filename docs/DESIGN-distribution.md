@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-10-10
+> **Updated**: 2026-10-12
 > **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -12,7 +12,7 @@
 
 本文件定义 ontology 的分发方式：中央能力池（local main）与空间装配 worktree（sparse-checkout 物化）。
 
-ontology 的分发天然是 Git 仓库模型。wopal-cli 的 `wopal space init` / `wopal setup` 封装了这个过程，将其与 space runtime 初始化串联。分发模型详见 `DESIGN.md` 的 Ontology 协作模型章节。
+ontology 的分发天然是 Git 仓库模型。`@wopal/wopalspace-sdk` 承载 ontology acquisition、Space init/sync 与相关确定性 application workflow；`wopal` 命令和 Ellamaka Onboarding 都是调用方。分发模型详见 `DESIGN.md` 的 Ontology 协作模型章节。
 
 能力边界、模板语义与运行态维护设计见 `DESIGN.md`。
 
@@ -26,7 +26,7 @@ ontology 分发模型：
 ontology source repo (upstream/main)
   -> local ontology clone (local main)          # 中央能力池，用户级唯一真相源
   -> space/<name> branch + sparse-checkout      # 空间装配 worktree，按装配单物化
-  -> Ellamaka shared service renders runtime skeleton from templates
+  -> WopalSpace shared service renders runtime skeleton from templates
   -> ellamaka loads commands/agents/plugins/config at runtime
 ```
 
@@ -127,7 +127,7 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 1. plugin 依赖由 ellamaka 在启动时按 path plugin 语义处理。
 2. `~/.wopal/ellamaka/*` 全局运行目录由 ellamaka 管理。
-3. global setup 由共享SDK服务完成，Wopal CLI负责终端呈现。
+3. global setup、ontology lifecycle 与 Space application workflow 由 `@wopal/wopalspace-sdk` 完成，Wopal CLI 负责终端命令与呈现。
 4. `/init` 的结构维护与差异吸收由 ontology command 在运行时承接。
 
 ---
@@ -146,5 +146,5 @@ ontology 被 materialize 后，ellamaka 在 wopal-space mode 下负责运行时�
 
 | Document                                  | Purpose                                                       |
 | ----------------------------------------- | ------------------------------------------------------------- |
-| `../../projects/wopal-cli/docs/DESIGN.md` | CLI 的 deterministic init、space sync 与 runtime handoff 设计 |
+| `../../projects/wopal-cli/docs/DESIGN.md` | CLI 对 WopalSpace shared application services 的命令投影与 runtime handoff |
 | `../../projects/ellamaka/docs/DESIGN.md`  | ellamaka 的 wopal-space mode 与 runtime loading 设计          |
