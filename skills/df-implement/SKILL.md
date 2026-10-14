@@ -17,6 +17,7 @@ Before editing, understand:
 
 - the current task and acceptance criteria;
 - the Task's `Design Source` when present, confirming every cited DESIGN is `Status: Active`;
+- the Task's `Pre-read`, `Interface`, and `Constraints` when present;
 - the relevant call path and callers;
 - the current and parent `AGENTS.md` rules.
 
@@ -82,15 +83,17 @@ Whether an approved Plan or DESIGN should change is not an implementation-level 
 
 ## TDD
 
-Code behavior normally follows RED → GREEN → REFACTOR:
+Use TDD only when it actually helps define behavior, not mechanically because code changes.
 
-1. **RED**: write the failing test first and confirm it fails because the intended behavior is missing, not because of import/syntax errors.
-2. **GREEN**: write the minimum implementation that passes.
-3. **REFACTOR**: clean up only while tests remain green.
+With `TDD: true`, follow RED → GREEN → REFACTOR: first write a failing test that precisely expresses the new/fixed behavior, then implement the minimum needed to pass, then clean up while tests stay green. Every new test must have lasting regression value; do not create a test only to manufacture one RED cycle.
 
-When `TDD: true`, every Behavior gets its failing test first. With `TDD: false` or genuinely trivial non-logic changes, still leave at least one verification that can actually detect a broken result.
+With `TDD: false`, do not invent a failing test. Choose verification that fits the change: existing regression tests, characterization tests, build/typecheck/static checks, integration tests, or smoke checks.
 
-For a dev-flow Plan, RED/Verify also determines the real command for each relevant AC and returns it in the completion report; the implementer does not write it into the Plan directly.
+- When deleting obsolete behavior/code, remove tests whose only purpose was to assert that deleted behavior. Keep or update tests that still protect surviving contracts. If deletion creates a new external behavior, test that new behavior instead.
+- For pure behavior-preserving refactors, keep existing tests green. If the legacy area lacks a safety net, add characterization/regression tests for current behavior before refactoring; do not manufacture a fake RED.
+- Config/build/CI/metadata/dependency work, move/rename/import cleanup, UI layout/style, exploratory work, and glue/wiring usually do not require TDD, but still need risk-appropriate Verify evidence.
+
+For a dev-flow Plan, determine the real verification commands for relevant ACs during implementation/Verify and return them in the completion report; the implementer does not write them into the Plan directly.
 
 ## Bugs: fix the root cause
 

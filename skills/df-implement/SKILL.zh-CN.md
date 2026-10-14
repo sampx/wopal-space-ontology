@@ -17,6 +17,7 @@ description: >
 
 - 当前任务和验收；
 - Task 的 `Design Source`（如有），并确认所引 DESIGN 为 `Status: Active`；
+- Task 的 `Pre-read`、`Interface`、`Constraints`（如有）；
 - 相关调用链和调用方；
 - 当前目录及上级 `AGENTS.md`。
 
@@ -82,15 +83,17 @@ Awaiting: <主控者/delegator 决定>
 
 ## TDD
 
-代码行为默认按 RED → GREEN → REFACTOR：
+TDD 只在它能真正帮助定义行为时使用，不因“改了代码”就机械启用。
 
-1. **RED**：先把 Behavior 写成失败测试，确认它因预期行为缺失而失败，而不是 import/语法错误。
-2. **GREEN**：写最小实现让测试通过。
-3. **REFACTOR**：保持测试全绿再清理结构。
+`TDD: true` 时按 RED → GREEN → REFACTOR：先写能准确表达新/修复行为的失败测试，再做最小实现，最后在保持全绿的前提下整理结构。新增的测试必须有长期回归价值，不能只为了制造一次 RED。
 
-`TDD: true` 时，每条 Behavior 必须先有失败测试。`TDD: false` 或真正琐碎的非逻辑修改，也至少留下一个能真实检查结果的验证方式。
+`TDD: false` 时不要伪造失败测试；按改动性质选择真实验证，例如已有回归测试、characterization test、build/typecheck/静态检查、集成或 smoke 验证。
 
-在 dev-flow Plan 中，RED/Verify 阶段还要确定对应 AC 的真实命令并在完成报告中交给主控者；实施者不直接回填 Plan。
+- 删除废弃行为/代码时，同时删除只为该已删除行为存在的旧测试；仍保护存续契约的测试要保留或更新。若删除产生新的外部行为，只测试新的外部行为。
+- 纯行为保持重构以“现有测试保持全绿”为准；旧区域缺少安全网时先补 characterization/regression tests，不制造假的 RED。
+- 配置、构建/CI、metadata、依赖、移动/重命名/import 清理、UI 布局样式、探索性或胶水接线通常不强制 TDD，但仍必须有与风险匹配的 Verify。
+
+在 dev-flow Plan 中，实施/Verify 过程中确定相关 AC 的真实验证命令并在完成报告中交给主控者；实施者不直接回填 Plan。
 
 ## Bug：修根因
 

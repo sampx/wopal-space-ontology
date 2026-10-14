@@ -84,7 +84,9 @@ Never force an illegal transition; return to the correct step instead.
 
 Create or locate Plans through `flow.sh plan ...`. Do not hand-create new Plan files or grep/glob around the space to guess where an existing Plan lives. Use `plan status` for a known name and `plan list` for browsing.
 
-A Plan fixes behavior, acceptance, contracts, and boundaries. Internal file layout, private APIs, and test organization remain implementation decisions. Task format, two-beat ACs, metadata, and naming rules live in `references/plan-guide.md`.
+Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. A Plan fixes behavior, acceptance, contracts, and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
+
+`Delegation Strategy` must assign every Task to a specific currently available agent based on capability and Task relationships; do not use role labels or generic assignees.
 
 After substantive Plan content changes, run `flow.sh sync <plan> --body-only` so the Issue's Goal / Scope / Acceptance Criteria and Plan link remain aligned.
 
@@ -114,10 +116,10 @@ Once in `executing`, the controller chooses whether to implement each Task direc
 
 For delegated implementation:
 
-1. The implementer completes code and tests against the Task's `Design Source`, Behavior, boundaries, and Verify without expanding scope.
+1. The implementer works against the Task's `Design Source`, Behavior, Pre-read, Interface, Constraints, and Verify without expanding scope.
 2. The implementer runs Verify and reports what changed, actual touched files, verification commands/results, and the real commands corresponding to the relevant ACs; **the implementer does not commit, edit the Plan, or tick progress checkboxes**.
 3. The controller inspects the actual diff and independently runs Task Verify. If the check fails, make no commit and no Plan progress update; return the findings and evidence to the implementer for repair.
-4. Only after the check passes does the controller write back AC commands, Done output and touched files, tick Task Done, and create the Task's implementation commit.
+4. Only after the check passes does the controller write back AC commands, Done evidence and touched files, tick Task Done, and create the Task's implementation commit.
 
 Direct implementation by the controller follows the same order: implement first, then inspect as controller; record progress and commit only after the check passes. A failed implementation attempt creates neither a commit nor a Plan completion record.
 

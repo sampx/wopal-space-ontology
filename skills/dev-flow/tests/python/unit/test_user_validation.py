@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-# test_user_validation.py - Test check_user_validation function
-#
-# Test Case U3: check_user_validation only accepts explicit user confirmation checkbox
-#
-# Scenarios:
-#   1. Plain text only (no checkbox) -> should fail
-#   2. Checkbox unchecked -> should fail
-#   3. Checkbox checked -> should succeed
-#   4. No User Validation section -> should pass (backward compat)
+# test_user_validation.py - Language-neutral user-validation completion gate
 
-import unittest
-import sys
 import os
+import sys
+import tempfile
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -21,95 +14,62 @@ ensure_scripts_path()
 from validation import check_user_validation, ValidationError
 
 
+def _write_tmp(content: str) -> str:
+    file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    )
+    file.write(content)
+    file.close()
+    return file.name
+
+
 class TestUserValidation(unittest.TestCase):
-    """Test check_user_validation function"""
 
-    def setUp(self):
-        self.fixtures_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            'fixtures', 'plans'
-        )
+    def test_unchecked_checkbox_rejected(self):
+        path = _write_tmp("""# plan
 
-    def test_plain_text_only_should_fail(self):
-        """Plain text only (no checkbox) should fail"""
-        plan_file = os.path.join(self.fixtures_dir, 'fix-bad-user-validation-no-checkbox.md')
-        with self.assertRaises(ValidationError) as context:
-            check_user_validation(plan_file)
-        error_msg = str(context.exception)
-        self.assertTrue(
-            'checkbox' in error_msg.lower() or 'final' in error_msg.lower() or '确认' in error_msg,
-            f"Error should mention missing checkbox: {error_msg}"
-        )
+### User Validation
 
-    def test_checkbox_unchecked_should_fail(self):
-        """Checkbox unchecked should fail"""
-        plan_file = os.path.join(self.fixtures_dir, 'fix-good-user-validation-checked.md')
-        # Create temp file with unchecked checkbox
-        import tempfile
-        import shutil
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            content = open(plan_file).read()
-            # Replace checked with unchecked
-            content = content.replace('- [x] 用户已完成', '- [ ] 用户已完成')
-            f.write(content)
-            temp_file = f.name
+- [ ] 用户确认结果符合预期
+""")
         try:
-            with self.assertRaises(ValidationError) as context:
-                check_user_validation(temp_file)
-            error_msg = str(context.exception)
-            self.assertTrue(
-                'not' in error_msg.lower() or 'unchecked' in error_msg.lower() or '未勾选' in error_msg,
-                f"Error should mention unchecked status: {error_msg}"
-            )
+            with self.assertRaises(ValidationError):
+                check_user_validation(path)
         finally:
-            os.unlink(temp_file)
+            os.unlink(path)
 
-    def test_checkbox_checked_should_succeed(self):
-        """Checkbox checked should succeed"""
-        plan_file = os.path.join(self.fixtures_dir, 'fix-good-user-validation-checked.md')
-        check_user_validation(plan_file)
+    def test_checked_checkbox_passes_in_any_language(self):
+        path = _write_tmp("""# plan
+
+### User Validation
+
+- [x] The user confirmed the result
+""")
+        try:
+            check_user_validation(path)
+        finally:
+            os.unlink(path)
+
+    def test_section_without_checkbox_rejected(self):
+        path = _write_tmp("""# plan
+
+### User Validation
+
+User said it looks good.
+""")
+        try:
+            with self.assertRaises(ValidationError):
+                check_user_validation(path)
+        finally:
+            os.unlink(path)
 
     def test_no_user_validation_section_passes(self):
-        """No User Validation section should pass (backward compat)"""
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write("""# test-backward-compat
-
-## Metadata
-
-- **Status**: done
-
-## Goal
-
-Test backward compatibility
-
-## In Scope
-
-- Testing
-
-## Implementation
-
-### Task 1: Test
-
-**Changes**:
-- [x] Step 1: Test backward compat
-
-## Test Plan
-
-N/A
-
-## Acceptance Criteria
-
-### Agent Verification
-
-- [x] Done
-""")
-            temp_file = f.name
+        path = _write_tmp("# plan\n\n## Goal\n\nNo manual validation required.\n")
         try:
-            check_user_validation(temp_file)
+            check_user_validation(path)
         finally:
-            os.unlink(temp_file)
+            os.unlink(path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-# test_check_doc.py - Test check_doc_plan function
-#
-# Scenarios:
-#   1. New template valid plan → pass
-#   2. Old template plan → fail (no longer exempt)
-#   3. Missing Design → reject
-#   4. Changes with Step checkbox → reject
-#   5. Template comments → pass (check removed)
+# test_check_doc.py - Mechanical submit/approve validation
 
-import unittest
-import sys
 import os
+import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -19,162 +12,85 @@ from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
 from validation import check_doc_plan, ValidationError
-from validation import (
-    check_task_structure,
-    check_agent_verification,
-    check_user_validation_new,
-)
 
-CHECK_DOC_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "check-doc"
+
+BASE = """# test-plan
+
+## Metadata
+
+- **Type**: test
+- **Target Project**:
+- **Product**:
+- **Phase**:
+- **Project Path**:
+- **Status**: planning
+
+## Goal
+
+Any human-readable plan content is allowed here.
+"""
+
+
+def _write_tmp(content: str) -> str:
+    file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    )
+    file.write(content)
+    file.close()
+    return file.name
 
 
 class TestCheckDocPlan(unittest.TestCase):
-    """Test check_doc_plan function"""
 
-    def test_new_template_valid_passes(self):
-        plan_file = str(CHECK_DOC_DIR / "plan-new-valid.md")
-        check_doc_plan(plan_file)
+    def test_valid_minimal_metadata_passes(self):
+        path = _write_tmp(BASE)
+        try:
+            check_doc_plan(path)
+        finally:
+            os.unlink(path)
 
-    def test_old_template_rejected(self):
-        """Old template plans fail new-format checks (no backward compat)."""
-        plan_file = str(CHECK_DOC_DIR / "plan-old-valid.md")
-        with self.assertRaises(ValidationError):
-            check_doc_plan(plan_file)
+    def test_plan_semantics_do_not_block_mechanical_check(self):
+        content = BASE + """
+## Implementation
 
-    def test_missing_design_rejected(self):
-        plan_file = str(CHECK_DOC_DIR / "plan-new-missing-design.md")
-        with self.assertRaises(ValidationError):
-            check_doc_plan(plan_file)
+### Task 1: Example
 
-    def test_changes_step_checkbox_rejected(self):
-        plan_file = str(CHECK_DOC_DIR / "plan-new-changes-step-checkbox.md")
-        with self.assertRaises(ValidationError):
-            check_doc_plan(plan_file)
+Free-form task content without Design Source, Behavior, TDD, or special formatting.
+"""
+        path = _write_tmp(content)
+        try:
+            check_doc_plan(path)
+        finally:
+            os.unlink(path)
 
-    def test_template_comments_pass(self):
-        """Template guidance comments no longer block validation."""
-        plan_file = str(CHECK_DOC_DIR / "plan-new-has-template-comments.md")
-        check_doc_plan(plan_file)
-
-    def test_ac_no_commands_rejected(self):
-        plan_file = str(CHECK_DOC_DIR / "plan-new-ac-no-commands.md")
-        with self.assertRaises(ValidationError):
-            check_doc_plan(plan_file)
-
-    def test_missing_project_path_with_target_rejected(self):
-        """Plan with Target Project but no Project Path must be rejected."""
-        plan_file = str(CHECK_DOC_DIR / "plan-new-missing-project-path.md")
-        with self.assertRaises(ValidationError) as ctx:
-            check_doc_plan(plan_file)
-        self.assertIn("Project Path", str(ctx.exception))
-
-    def test_missing_project_path_without_target_passes(self):
-        """Plan without Target Project does not require Project Path."""
-        plan_file = str(CHECK_DOC_DIR / "plan-new-valid.md")
-        check_doc_plan(plan_file)
-
-
-class TestCheckTaskStructure(unittest.TestCase):
-
-    def _fixture(self, name):
-        return (CHECK_DOC_DIR / name).read_text(encoding='utf-8')
-
-    def test_valid_passes(self):
-        errors = check_task_structure(self._fixture("plan-new-valid.md"))
-        self.assertEqual(errors, [])
-
-    def test_missing_design(self):
-        errors = check_task_structure(self._fixture("plan-new-missing-design.md"))
-        self.assertTrue(any("Design" in e for e in errors), f"Expected Design error: {errors}")
-
-    def test_project_plan_requires_valid_design_source(self):
-        base = self._fixture("plan-new-valid.md").replace(
-            "- **Status**: planning",
-            "- **Target Project**: example\n- **Status**: planning",
-        )
-        cases = {
-            "missing": base,
-            "blank": base.replace("**Behavior**:", "**Design Source**:\n\n**Behavior**:"),
-            "na": base.replace("**Behavior**:", "**Design Source**: N/A\n\n**Behavior**:"),
-        }
-        for name, content in cases.items():
-            with self.subTest(name=name):
-                errors = check_task_structure(content)
-                self.assertTrue(any("Design Source" in e for e in errors), f"{errors}")
-
-    def test_tdd_true_no_behavior(self):
-        errors = check_task_structure(self._fixture("plan-new-tdd-no-behavior.md"))
-        self.assertTrue(any("Behavior" in e and "TDD" in e for e in errors), f"{errors}")
-
-    def test_done_no_checkbox(self):
-        errors = check_task_structure(self._fixture("plan-new-done-no-checkbox.md"))
-        self.assertTrue(any("Done" in e and "checkbox" in e for e in errors), f"{errors}")
-
-    def test_changes_has_step_checkbox(self):
-        errors = check_task_structure(self._fixture("plan-new-changes-step-checkbox.md"))
-        self.assertTrue(any("Changes" in e for e in errors), f"{errors}")
-
-
-class TestCheckAgentVerification(unittest.TestCase):
-
-    def _fixture(self, name):
-        return (CHECK_DOC_DIR / name).read_text(encoding='utf-8')
-
-    def test_ac_no_commands(self):
-        # Two-beat AC, beat 1: criterion-style entries without commands are
-        # valid at submit. The no-command fixture must pass cleanly now.
-        errors = check_agent_verification(self._fixture("plan-new-ac-no-commands.md"))
-        self.assertEqual(errors, [])
-
-    def test_ac_without_checkbox_entries_rejected(self):
-        # Beat 1 still owns this: a section with no checkbox entries at
-        # all has nothing verifiable — submit rejects it.
-        content = "### Agent Verification\n\nplain prose, no checkbox\n"
-        errors = check_agent_verification(content)
-        self.assertTrue(any("checkbox" in e.lower() for e in errors), f"{errors}")
-
-    def test_ac_after_impl(self):
-        errors = check_agent_verification(self._fixture("plan-new-ac-after-impl.md"))
-        self.assertTrue(len(errors) > 0, f"Expected position error: {errors}")
-
-
-class TestCheckUserValidationNew(unittest.TestCase):
-
-    def _fixture(self, name):
-        return (CHECK_DOC_DIR / name).read_text(encoding='utf-8')
-
-    def test_user_val_contains_npm_test(self):
-        errors = check_user_validation_new(self._fixture("plan-new-user-val-has-commands.md"))
-        self.assertTrue(any("automated" in e.lower() for e in errors), f"{errors}")
-
-    def test_user_val_without_scenario_rejected(self):
-        content = self._fixture("plan-new-valid.md").replace("#### Scenario 1:", "Scenario 1:")
-        errors = check_user_validation_new(content)
-        self.assertTrue(any("scenario" in e.lower() for e in errors), f"{errors}")
-
-    def test_user_val_without_final_checkbox_rejected(self):
-        content = self._fixture("plan-new-valid.md").replace(
-            "- [ ] 用户已完成上述功能验证并确认结果符合预期", "用户已完成上述功能验证并确认结果符合预期"
-        )
-        errors = check_user_validation_new(content)
-        self.assertTrue(any("checkbox" in e.lower() for e in errors), f"{errors}")
-
-
-class TestPlanStatusValidation(unittest.TestCase):
+    def test_missing_status_rejected(self):
+        path = _write_tmp(BASE.replace("- **Status**: planning\n", ""))
+        try:
+            with self.assertRaises(ValidationError) as ctx:
+                check_doc_plan(path)
+            self.assertIn("Status", str(ctx.exception))
+        finally:
+            os.unlink(path)
 
     def test_unsupported_status_rejected(self):
-        content = (CHECK_DOC_DIR / "plan-new-valid.md").read_text(encoding="utf-8")
-        content = content.replace("**Status**: planning", "**Status**: authorized")
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as file:
-            file.write(content)
-            plan_file = file.name
+        path = _write_tmp(BASE.replace("planning", "unknown-state"))
         try:
-            with self.assertRaises(ValidationError) as context:
-                check_doc_plan(plan_file)
-            self.assertIn("Status", str(context.exception))
+            with self.assertRaises(ValidationError) as ctx:
+                check_doc_plan(path)
+            self.assertIn("Status", str(ctx.exception))
         finally:
-            os.unlink(plan_file)
+            os.unlink(path)
+
+    def test_target_project_requires_project_path(self):
+        content = BASE.replace("- **Target Project**:\n", "- **Target Project**: example\n")
+        path = _write_tmp(content)
+        try:
+            with self.assertRaises(ValidationError) as ctx:
+                check_doc_plan(path)
+            self.assertIn("Project Path", str(ctx.exception))
+        finally:
+            os.unlink(path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

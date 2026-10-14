@@ -6,7 +6,7 @@
 |------|------|
 | `Invalid transition` | 回到正确状态顺序执行 |
 | `Plan not found` | 用 `flow.sh plan status <name>` 定位或 `plan new` 创建 |
-| `check-doc failed` | 修好 Plan 再 `approve` |
+| `plan check` / `check-doc` failed | 修正报错的生命周期 Metadata（Status、Product/Phase、Project Path）后重试 |
 | `Done completion failed` | 勾选所有 Task Done checkbox |
 | `Agent Verification failed` | 补齐 Agent Verification checkbox |
 | `dirty workspace` | 清理/提交 或使用 worktree 隔离 |

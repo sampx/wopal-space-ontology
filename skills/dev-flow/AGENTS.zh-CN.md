@@ -49,7 +49,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 每个命令有前置状态要求，非法转换报错。新增命令必须声明前置/后置状态。
 
-`plan check` 验证 Plan 中声明的 Status 属于该状态机。User Validation 节存在时，校验器要求至少一个场景和最终确认 checkbox；`verify` 阶段负责确认该 checkbox 已由用户勾选。
+`plan check` 只检查生命周期真正依赖的机械元数据：Status、Product/Phase 配对，以及需要时的 Project Path。Plan 内容质量由编写规则和评审保证；`complete` / `verify` 只检查完成状态 checkbox。
 
 ### Plan Directory Rules
 
@@ -85,7 +85,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 **R4 样板阈值：3 次即抽。** 同类 mock/构造样板出现 3 次必须抽取为共享 helper。测试文件行数超过其覆盖的实现文件 3 倍时，停止新增测试，先瘦身。
 
-**R5 红绿铁律。** 新测试必须先在坏代码上失败过（RED），修复后才转绿。无法构造失败的测试是装饰品，不是测试。修复 bug 时，与新测试覆盖同一判定的旧测试必须删除——禁止叠加。
+**R5 有价值的红绿。** 新增、修复或有意改变行为时，新回归测试应先在旧实现上失败（RED），再由实现转绿。纯行为保持重构、删除废弃行为、characterization test 等场景不要制造假 RED。删除行为时同步删除只服务于该已删除行为的测试；修复 bug 时，与新测试覆盖同一判定的重复旧测试也应清理，避免测试叠加。
 
 **R6 禁止固化实现巧合。** 仅当前实现恰好成立的行为（如"worktree 目录名 == 分支名"）不得写成断言，除非有契约文档依据。此类测试会把 bug 固化成规范。
 

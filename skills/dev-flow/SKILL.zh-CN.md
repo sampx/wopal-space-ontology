@@ -84,7 +84,9 @@ description: >
 
 创建或定位 Plan 必须使用 `flow.sh plan ...`，不要手写新 Plan 文件，也不要用 grep/glob 在空间里盲找已有 Plan。已知名称用 `plan status`，需要浏览时用 `plan list`。
 
-Plan 的正文只固定行为、验收、契约与边界；内部文件组织、私有 API 和测试组织留给实施阶段。Task 格式、AC 两拍制、Metadata、命名规范等见 `references/plan-guide.zh-CN.md`。
+Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/字段名保持不变。正文优先用人能直接看懂的大白话，只有 Interface、Constraints、命令、类型/协议等确需精确时使用技术词。Plan 固定行为、验收、契约与边界；内部实现细节留给实施阶段。Task 格式、TDD 判定、AC、Metadata、命名规范等见 `references/plan-guide.zh-CN.md`。
+
+`Delegation Strategy` 必须根据当前可用 Agent 的能力和 Task 关系，把每个 Task 指定给具体 Agent；不能写角色名或泛化称谓。
 
 Plan 内容改变后运行 `flow.sh sync <plan> --body-only` 同步 Issue 中的 Goal / Scope / Acceptance Criteria 与 Plan 链接。
 
@@ -114,10 +116,10 @@ flow.sh approve <plan> --confirm [mode-flags]
 
 委派实施时：
 
-1. 实施者按 Task 的 `Design Source`、Behavior、边界和 Verify 完成代码与测试，不扩大范围。
+1. 实施者按 Task 的 `Design Source`、Behavior、Pre-read、Interface、Constraints 和 Verify 完成工作，不扩大范围。
 2. 实施者运行 Verify，并把完成内容、实际触碰文件、验证命令与结果、AC 对应的真实命令作为报告交回主控者；**不提交代码，不编辑 Plan，不勾选任何进度 checkbox**。
 3. 主控者检查实际 diff，并独立运行 Task Verify。检查失败时，不提交、不更新 Plan，直接把问题和证据退回实施者修复。
-4. 只有检查通过后，主控者才回填 AC 命令、Done 产出与实际触碰文件，勾选 Task Done，并为该 Task 创建一次实施提交。
+4. 只有检查通过后，主控者才回填 AC 命令、Done 证据与实际触碰文件，勾选 Task Done，并为该 Task 创建一次实施提交。
 
 主控者自行实施时也遵循同一顺序：先实现，再以主控身份检查；检查通过后才记录进度并提交。一次失败的实施尝试不形成提交，也不形成 Plan 完成记录。
 
