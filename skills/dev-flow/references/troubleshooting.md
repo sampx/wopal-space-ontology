@@ -20,8 +20,8 @@
 1. 已有 Plan 再次 `plan` — 不重复创建，继续推进
 2. `complete` 时 Done 未勾选 — 先勾选再 complete
 3. `complete` 时 Agent Verification 未完成 — 先补齐
-4. rook BLOCK 后 complete — 停止，修复后重新审查
-5. rook 连续 3 轮 BLOCK/REVISE — 保留分歧注释，用户裁决
+4. 实施评审未 PASS 时执行 complete — 停止，修复后按 `df-implement-review` 复审
+5. 评审预算耗尽仍未 PASS — 保留未解决 finding，交给用户决定下一步
 6. PR 未 merge 时 `verify --confirm` — 等 merge
 7. 目标项目工作区不干净 — 清理或使用 worktree 隔离
 8. 参数选择：Issue 驱动传 issue number，无 Issue 传 plan-name

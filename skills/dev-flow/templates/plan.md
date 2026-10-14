@@ -43,7 +43,7 @@
 
 ### Key Decisions
 
-<!-- 已确定的技术决策，使用 D-NN 编号格式。 -->
+<!-- Plan 级实施决策，必须服从上位 DESIGN；不得用本节覆盖或改写设计真相。使用 D-NN 编号格式。 -->
 - D-01: <决策内容及理由>
 
 ### Key Interfaces
@@ -96,9 +96,9 @@
   第一拍（Plan 阶段，现在写）：每条 = 行为判据 + 通过标准。写"系统
   表现出什么可观察行为、看到什么算过"，允许判据式（不用猜未来
   的测试文件名）。判据必须可判定——能抓住坏实现，不能怎么写都能过。
-  第二拍（RED 阶段，实施时回填）：实施 Agent 把每条 AC 落成真实
-  命令（如 `python -m pytest tests/xxx/ -v` 全绿），原地更新本节。
-  已勾选的 AC 必须是命令式，否则 complete 会被拦下。
+  第二拍（实施 + 主控验收）：实施者确定每条 AC 对应的真实命令并
+  报告给主控者；主控者验收 Task 通过后原地更新本节。实施者不编辑 Plan。
+  最终 Agent Verification 由主控者重新运行命令，通过后再勾选 AC。
 
   每条必须映射回 Task 的 Verification Intent。
 -->
@@ -134,8 +134,8 @@
 <!--
   Task 拆分维度：行为组，不是文件。一个 Task = 一组高内聚 Behavior +
   完整的 RED→GREEN→REFACTOR + 独立可跑的 Verify。
-  粒度三问：这组 Behavior 共享同一批测试吗？一次委派一个 fae 上下文
-  装得下吗？Verify 能独立执行吗？
+  粒度三问：这组 Behavior 共享同一批测试吗？一次实施上下文装得下吗？
+  Verify 能独立执行吗？
 
   Plan 阶段写清行为规格和设计意图；文件路径、内部 API、测试组织
   由实施 Agent 在最新代码上决定。详细指导见 plan-guide.md。
@@ -144,6 +144,8 @@
 ### Task 1: Task Title
 
 **Verification Intent**: <引用的 Agent Verification 条目编号，如 AC#1, AC#3>
+
+**Design Source**: <项目/阶段 Plan 必填：仅引用 `Status: Active` 的权威 DESIGN，格式 `空间根相对路径#heading` + 决策项/契约；Draft/Proposed 不得引用；仅无项目、无设计的简单 Plan 可写 N/A>
 
 **Behavior**: 
 <!--
@@ -162,27 +164,27 @@
 
 **TDD**: true
 
-<!-- true：代码 Task，Behavior 必填；false：非代码 Task，需说明理由。 -->
+<!-- true：按 TDD 实施，Behavior 必填；false：无需 TDD，需说明理由并保留可运行验证。 -->
 
 **Changes**:
 <!-- 
   编号列表格式，禁止 checkbox。
-  第 1 条固定语义：把本 Task 全部 Behavior 落成失败测试并确认失败（RED）。
-  后续条目描述 GREEN/REFACTOR 的意图，不逐文件铺陈。
+  TDD=true 时第 1 条固定为 RED：把本 Task 全部 Behavior 落成失败测试并确认失败；
+  后续条目描述 GREEN/REFACTOR。TDD=false 时写实际步骤，不伪造 RED。
 -->
 1. RED：将上述 Behavior 全部落成失败测试并确认失败
 2. <GREEN：实现至测试全绿的关键步骤>
 3. <REFACTOR：如需清理>
 
 **Verify**:
-<!-- 可执行命令。Agent 必须运行看到 exit 0 后才能勾选 Done。 -->
+<!-- 可执行命令。实施者先运行并报告结果；主控者必须独立重跑确认 exit 0。 -->
 <验证命令，如 `cd projects/xxx && pnpm test:run` 全部通过>
 
 **Done**:
-<!-- 任务产出说明 + 要求委派的子 agent 实施后勾选, 每完成一个 task  后提交 git。 -->
+<!-- 仅由主控者在验收 Task 通过后回填并勾选；失败尝试不更新进度、不提交。 -->
 任务产出：<一句话描述本 Task 产出>
-实际触碰文件：<实施后回填实际修改的文件列表>
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+实际触碰文件：<主控验收后回填实际修改的文件列表>
+- [ ] 主控者已检查本 Task 的实施结果并确认 Verify 通过.
 
 ---
 
@@ -193,6 +195,6 @@
   用 wave 划分并行批次，高 wave 依赖低 wave。详见 plan-guide.md。
 -->
 
-| Wave | Task | 执行者 | 依赖 | 委派理由 |
+| Wave | Task | 执行者 | 依赖 | 安排理由 |
 |------|------|--------|------|---------|
-| 1 | Task 1 | fae | 无 | <委派理由> |
+| 1 | Task 1 | <主控者/实施者> | 无 | <串行、并行或自行实施的理由> |

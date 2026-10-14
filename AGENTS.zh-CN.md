@@ -92,11 +92,11 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 - `verify --confirm` 在集成分支上提交 Plan-only commit（`done`）
 - `archive` 在集成分支上将已接受 Plan 移至 `done/`，清理 worktree
 
-**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent 负责。
+**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。被委派的实施 agent 不提交；主控者检查实施结果并确认 Task Verify 通过后，才创建该 Task 的实施提交。
 
-**Plan 路径**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径；fae 勾选 Done checkbox 时编辑该文件，禁止修改 Plan Status 元数据。
+**Plan 路径与进度所有权**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径，但实施 agent 只读 Plan，不编辑 Plan、不勾选进度。AC 命令、Done、实际触碰文件等进度证据由主控者验收通过后回填。
 
-权威细节见 `skills/dev-flow/SKILL.md` 的「Plan 分支归属」、「Wopal 编排规则」和「委派用 Plan 路径」章节。
+权威细节见 `skills/dev-flow/SKILL.md` 的「Executing：实施、验收、评审、Agent Verification」与「分支与 worktree 边界」，以及 `references/plan-guide.zh-CN.md` 的「实施交接」。
 
 ### 插件
 

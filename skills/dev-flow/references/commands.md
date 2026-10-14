@@ -52,7 +52,7 @@
 
 ## Git mutation surfaces 与失败语义
 
-部分生命周期命令会写入 Git metadata（index / commit / refs / worktree / checkout）；普通工作区可写不代表这些 surface 可写，受限环境下 Agent 需先用当前 Harness 原生的 escalation/approval 机制取得能力（见 `SKILL.md`「生命周期 Git mutation 的执行能力」）。下表按脚本真实调用链逐入口审计（行号对应当前仓库版本；新增 Git mutation 时必须同步此表）。
+部分生命周期命令会写入 Git metadata（index / commit / refs / worktree / checkout）；普通工作区可写不代表这些 surface 可写，受限环境下 Agent 需先用当前 Harness 原生的 escalation/approval 机制取得能力（见 `SKILL.md`「脚本执行」）。下表按脚本真实调用链逐入口审计（行号对应当前仓库版本；新增 Git mutation 时必须同步此表）。
 
 ### 逐入口审计矩阵
 

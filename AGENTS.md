@@ -92,11 +92,11 @@ The dev-flow skill's worktree Plan lifecycle follows the **Plan branch ownership
 - `verify --confirm` commits a Plan-only commit (`done`) on the integration branch
 - `archive` moves the accepted Plan to `done/` on the integration branch and cleans up the worktree
 
-**Plan-only commit principle**: lifecycle scripts commit Plan status changes only, never implementation code. Implementation commits belong to the implementing agent.
+**Plan-only commit principle**: lifecycle scripts commit Plan status changes only, never implementation code. Delegated implementers do not commit; the controller creates a Task's implementation commit only after inspecting the result and confirming Task Verify passes.
 
-**Plan path**: Plan files live in the space repository under `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. Subagent prompts must reference the Plan by its absolute path in the space repository; when fae ticks a Done checkbox it edits that file and must not mutate Plan Status metadata.
+**Plan path and progress ownership**: Plan files live in the space repository under `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. Subagent prompts must reference the Plan by its absolute path in the space repository, but implementers treat it as read-only and never tick progress. AC commands, Done evidence, and actually touched files are written back by the controller only after Task acceptance.
 
-Authoritative details live in the "Plan branch ownership", "Wopal orchestration rules" and "Delegation Plan path" sections of `skills/dev-flow/SKILL.md`.
+Authoritative details live in `skills/dev-flow/SKILL.md` under "Executing: implementation, acceptance, review, Agent Verification" and "Branch and worktree boundaries", plus "Implementation handoff" in `references/plan-guide.md`.
 
 ### Plugin
 

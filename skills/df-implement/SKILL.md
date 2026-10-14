@@ -1,192 +1,143 @@
 ---
 name: df-implement
 description: >
-  Implementation discipline for coding agents — the lazy senior-dev method
-  fused with Plan fidelity. Use when implementing a dev-flow Plan Task, an
-  approved evolution proposal, or any delegated coding work: before writing
-  code, read the flow you are about to touch; climb the ladder (reuse in
-  repo → stdlib → native → installed dep → one line → minimum code) before
-  inventing structure; keep the change faithful to the Plan while fixing
-  root causes rather than symptoms; follow the space TDD law (failing test
-  first); report evidence, not vibes. Also use whenever you are fae (or any
-  implementer) and a task involves code, however small — and whenever the
-  user says "implement", "land this task", "按计划实施", or complains the
-  work drifted from the Plan. Do not use for reviewing delivered work (use
-  `df-implement-review`), for reviewing a Plan before execution (use
-  `df-proposal-review`), or for deciding what to build (that is the Plan's
-  job).
+  General code implementation skill. Use when the current task requires changing code or tests to implement
+  settled requirements, an approved Plan, existing design, or a bug fix; applies to direct or delegated implementation.
 ---
 
 # df-implement — Implementation Discipline
 
-You are the implementer. The best code is the code never written — but the
-code you do write must deliver what the Plan promised. This skill holds two
-duties that only ever conflict on the surface: **be lazy** (minimum working
-diff) and **be faithful** (the Plan's behavior contract governs). When they
-seem to collide, the contract wins on *what*, laziness wins on *how*.
+You are doing **implementation work**. Deliver the requested change with the smallest reliable, verifiable implementation that stays inside the existing design and task boundaries.
 
-## Read before you write
+For project/phase work: **DESIGN defines the target, the approved Plan defines this delivery scope, implementation realizes it.**
 
-The ladder shortens the solution, never the reading. Before touching
-anything, trace the real flow end to end: every file the change touches,
-who calls it, what the Plan's Design section says about this area. Reading
-is cheap; a confident change in the wrong place is a second bug wearing a
-small diff as a disguise. A change you cannot explain in terms of the
-existing flow is a change you do not understand yet.
+## Read before writing
 
-## The ladder
+Before editing, understand:
 
-Stop at the first rung that holds. Climb it *after* you understand the
-problem, not instead of understanding it:
+- the current task and acceptance criteria;
+- the Task's `Design Source` when present, confirming every cited DESIGN is `Status: Active`;
+- the relevant call path and callers;
+- the current and parent `AGENTS.md` rules.
 
-1. **Does this need to exist at all?** If the Plan does not ask for it and
-   no acceptance criterion needs it, skip it — and say so in one line in
-   your report.
-2. **Already in this repo?** A helper, type, pattern, or utility that
-   already lives here → reuse it (`rg` before you write; re-implementing
-   what sits a few files over is the most common slop).
-3. **Stdlib does it?** Use it.
-4. **Native platform feature covers it?** A form control over a picker
-   library, CSS over JS, a DB constraint over app code.
-5. **An already-installed dependency solves it?** Use it. Never add a new
-   dependency for what a few lines can do — a new dep needs a written
-   reason: which lower rung fails and why.
-6. **Can it be one line?** One line.
-7. **Only then:** the minimum code that works. Fewest files, shortest diff
-   — but shortest *after* understanding, never instead of it.
+If you still cannot explain why the proposed change fits the current code, design, and task, keep investigating instead of guessing.
 
-Two rungs work → take the higher one and move on.
+## Minimum implementation order
 
-## Plan fidelity
+While preserving design, Plan, correctness, and tests, prefer the simplest option in this order:
 
-The Plan (or the task prompt standing in for one) is the behavior contract.
+1. If the task and acceptance do not require it, do not add it.
+2. Reuse an existing repository capability when one already fits.
+3. Prefer the standard library when it fits.
+4. Prefer native platform capability when it fits.
+5. Reuse already-installed dependencies when appropriate.
+6. Prefer simple code over new abstraction or dependencies.
+7. Add new implementation structure only when the earlier options are insufficient.
 
-**Governed by the Plan — never drift:**
+A new dependency needs a clear reason existing options are insufficient. “Minimum” means removing unnecessary code after all requirements are satisfied, not doing less than required.
 
-- Behavior and scope: deliver exactly what the Tasks and acceptance
-  criteria describe. Not a richer version, not an early slice of the next
-  task.
-- Stated constraints: architecture boundaries, module ownership, naming
-  conventions, "must" statements in the Design section.
-- TDD flag, verify commands, and the definition of done.
+## Do not drift from design or task
 
-**Yours to decide — the implementation freedom the Plan grants you:**
+Do not autonomously change:
 
-- Internal structure, file layout, helper decomposition — within the
-  stated architecture boundaries.
-- Which ladder rung satisfies a requirement — provided the behavior and
-  constraints hold.
-- Test implementation details, as long as each behavior has its failing
-  test first.
+- the target or architecture constraints defined by DESIGN / `Design Source`;
+- the behavior, scope, boundaries, contracts, or acceptance of an approved Plan;
+- anything the user explicitly required.
 
-**Never silently:** no edits outside the task's declared files, no
-refactors riding along, no "while I'm here" fixes, no dependency
-additions without a written rung-5 justification, no weakening of an
-acceptance criterion to make it pass.
+You may decide:
 
-**When the Plan is wrong, stop and report.** You discover mid-task that
-the design does not hold — an API lacks what the Design assumed, two
-requirements contradict, the data model cannot carry the feature. Do not
-improvise around it, do not redesign on the fly, do not quietly do "the
-spirit of the Plan" instead. Halt the task, report what you found with
-`file:line` evidence, and let the delegator decide (Plan revision beats a
-clever deviation — the review skill will only bounce it back). Runway
-edge-cases worth a note go in the report; blocking discoveries stop the
-task.
+- file layout, internal APIs, and helper decomposition inside the stated boundaries;
+- concrete implementation technique;
+- test implementation details.
 
-## TDD — the space law
+Do not expand scope, ride along with unrelated refactors, fix unrelated bugs, or weaken acceptance to make tests pass.
 
-Code projects run strict TDD: failing test first (RED) → minimum code to
-pass (GREEN) → refactor with tests adjusted in step. A behavior without a
-test is an unfinished behavior, not a detail.
+A few easy-to-misjudge boundaries:
 
-- The Plan's Changes list names the RED entry first; write it before the
-  implementation, watch it fail for the right reason, then make it pass.
-- Refactoring is not exempt: behavior-preserving rewrites still update the
-  tests that pin the behavior.
-- The floor for anything trivial enough to skip TDD (per the Plan's
-  `TDD: false` or a genuinely trivial change): leave **one runnable check**
-  behind — the smallest thing that fails if the logic breaks. YAGNI
-  applies to test suites too; no frameworks, no fixtures, no per-function
-  ceremony unless asked.
+- A pre-existing bug unrelated to the current task: record it in `Notes/deviations`; do not fix it opportunistically.
+- The root cause belongs to the current problem, but the fix would exceed approved scope: stop and return the scope decision.
+- The Plan did not name a test, but the code reveals a real edge case: add the test and report it.
+- Adding or upgrading a dependency: first explain why existing capability is insufficient, and surface it explicitly in the report.
 
-## Bug fixes: root cause, not symptom
+### Stop on conflict
 
-A bug report names a symptom. Before you edit, `rg` every caller of the
-function you are about to touch. The lazy fix **is** the root-cause fix:
-one guard in the shared function is a smaller diff than a guard in every
-caller — and patching only the path the ticket names leaves every sibling
-caller still broken. Fix it once, where all callers route through. If the
-root-cause fix is bigger than the Plan scoped, that is a deviation → stop
-and report, do not inflate the diff on your own authority.
+If a DESIGN cited by `Design Source` is not `Active`, or the Plan, Active DESIGN, and code reality cannot all hold, do not redesign on the fly and do not edit the Plan/design to make implementation fit.
 
-## Never simplify away
+Stop with the relevant Plan text, design basis, and `file:line` evidence, then return the decision to the **controller/delegator**:
 
-Laziness has a hard floor. These are never cut for brevity, never traded
-for a smaller diff:
+- if there is a delegator, report it and wait;
+- if you are also the controller, switch back to the controlling workflow and decide there.
 
-- Input validation at trust boundaries
-- Error handling that prevents data loss
-- Security measures (auth, secrets, injection surfaces)
-- Anything the Plan or the user explicitly requested
+Use this minimal report format:
 
-User insists on the full version → build it, no re-arguing. Correctness
-first, then leanness — never trade one for the other.
-
-## Deliberate simplifications, marked
-
-When you knowingly cut a corner with a known ceiling (a global lock where
-per-key locks belong, an O(n²) scan, a naive heuristic), leave a comment
-naming the ceiling and the upgrade path:
-
-```
-// simplified: global lock — switch to per-key locks if throughput matters
+```text
+STOP
+Task: <task>
+Found: <conflict + file:line evidence>
+Impact: <why the current task cannot continue>
+Awaiting: <controller/delegator decision>
 ```
 
-Format: `// simplified: <what> — <upgrade path>`. One line, no essays. A
-mark without the upgrade path is a confession, not documentation. (This is
-the honest version of marking debt — grep-able, cheap to find, honest to
-reviewers.)
+Whether an approved Plan or DESIGN should change is not an implementation-level decision under this skill.
+
+## TDD
+
+Code behavior normally follows RED → GREEN → REFACTOR:
+
+1. **RED**: write the failing test first and confirm it fails because the intended behavior is missing, not because of import/syntax errors.
+2. **GREEN**: write the minimum implementation that passes.
+3. **REFACTOR**: clean up only while tests remain green.
+
+When `TDD: true`, every Behavior gets its failing test first. With `TDD: false` or genuinely trivial non-logic changes, still leave at least one verification that can actually detect a broken result.
+
+For a dev-flow Plan, RED/Verify also determines the real command for each relevant AC and returns it in the completion report; the implementer does not write it into the Plan directly.
+
+## Bugs: fix the root cause
+
+A bug report usually names a symptom. Inspect the relevant callers and shared paths, then fix the point that corrects all affected paths once.
+
+Do not scatter local patches over callers to hide a shared root cause. If the root-cause fix exceeds the current task boundary, stop and return the scope decision to the controller.
+
+## Never remove these for brevity
+
+A smaller diff does not justify weakening:
+
+- input validation at trust boundaries;
+- error handling that prevents data loss;
+- security controls;
+- behavior explicitly required by DESIGN, Plan, or the user.
+
+Correct first, simplify second.
+
+## Mark deliberate temporary simplifications
+
+If a deliberately simplified solution has a known ceiling but is reasonable for the current scope, leave one searchable upgrade note:
+
+```text
+// simplified: <current simplification> — <when/how to upgrade>
+```
+
+Use this only for a real known ceiling, not as a label for ordinary implementation.
 
 ## Work in small batches
 
-Long tasks run as batches: implement → verify → report → next. A batch is
-one Task or one coherent behavior group, sized so its verification is
-independently runnable. Between batches, update your todo list — mark the
-finished item done the moment it is done (the progress contract; never
-batch-tick at the end). Batch boundaries are also where you re-check Plan
-fidelity cheaply: is the diff still what the Plan asked for?
+For long tasks, work by Task or cohesive behavior group: **implement → verify → report → next batch**. Each batch should be independently verifiable. Capture real evidence immediately instead of reconstructing it from memory later. When an outer controlling workflow owns commits and progress records, do not write those states yourself.
 
-## Report: evidence, not vibes
+## Reports must be verifiable
 
-The report travels back to the delegator and feeds the review. Keep it
-short and verifiable:
+Return a short report to the controller/requester:
 
-```
-Done: <Task/behavior one-liner>
-Touched: <files — the real list>
-Verified: <command> → <actual outcome>
-Skipped: <ladder rung-1 items>, add when <condition>   ← only when applicable
-Notes/deviations: <plan-fidelity notes>                ← only when applicable
+```text
+Done: <what was completed>
+Touched: <actual files changed>
+Verified: <real command> → <real result>
+AC Commands: <real commands for relevant ACs>     # for dev-flow Plan Tasks
+Skipped: <explicitly skipped work and why>        # only when applicable
+Notes/deviations: <boundary notes or deviations>  # only when applicable
 ```
 
-No feature tours, no design essays. Explanation the delegator explicitly
-asked for is not debt — give it in full. If a Verify command failed, the
-report says so with the output; a green claim without the command is a
-vibe, and vibes fail review.
+Do not replace commands and results with “should be fine” or “tests are green.” Report failures as failures.
 
-## Not your job
+## Decisions outside implementation
 
-Deciding what to build (the Plan), reviewing the result (`df-implement-review`),
-fixing other agents' findings without being asked, and expanding scope
-into "obvious improvements". Ship the task, report the evidence, stop.
-
-## References
-
-Load the playbook when a situation needs the detailed method — boundary
-cases for Plan fidelity, worked ladder examples, TDD-in-Plan wiring,
-deviation report format:
-
-- `references/implement-playbook.md` — fidelity boundary cases with
-  verdicts, worked ladder climbs, deviation protocol examples, the
-  evidence-report pairing the review skill expects
+Do not decide product intent, expand approved scope, rewrite an approved Plan/DESIGN, or issue the final implementation-review verdict while acting under this skill. When delegated by a controlling workflow, also do not commit code or update Plan/progress records; return the implementation and evidence to the controller. Stop and return higher-level decisions to the controlling workflow.

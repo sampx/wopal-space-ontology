@@ -9,7 +9,6 @@
 #   check_step_completion   - Task Done completion gate (complete)
 
 import re
-from pathlib import Path
 
 from lib.workspace import find_workspace_root
 from workflow import PLAN_STATES
@@ -23,6 +22,7 @@ class ValidationError(Exception):
 
 TASK_PATTERN = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
 
+DESIGN_SOURCE_PAT = r'^\*\*Design Source\*\*:[ \t]*([^\n]*)$'
 DESIGN_PAT = r'\*\*Design\*\*:\s*\n(.*?)(?:\*\*TDD\*\*:|^###|^##|\Z)'
 BEHAVIOR_PAT = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Pre-read\*\*:|\n\*\*Design\*\*:|\Z)'
 TDD_PAT = r'\*\*TDD\*\*:\s*(true|false)'
@@ -115,8 +115,20 @@ def check_task_structure(content: str) -> list[str]:
     if not impl:
         return issues
 
+    has_design_context = any(
+        _clean_field(m.group(1))
+        for field in ("Target Project", "Product", "Phase")
+        if (m := re.search(rf'^-\s+\*\*{re.escape(field)}\*\*:[ \t]*(.*)$', content, re.MULTILINE))
+    )
+
     for title, body in re.findall(TASK_PATTERN, impl, re.MULTILINE | re.DOTALL):
         t = title.strip()
+
+        if has_design_context:
+            sm = re.search(DESIGN_SOURCE_PAT, body, re.MULTILINE | re.DOTALL)
+            source = _clean_field(sm.group(1)) if sm else ""
+            if not source or source.upper() == "N/A":
+                issues.append(f"Task '{t}': missing Design Source")
 
         dm = re.search(DESIGN_PAT, body, re.MULTILINE | re.DOTALL)
         if not dm or not _clean_field(dm.group(1)):

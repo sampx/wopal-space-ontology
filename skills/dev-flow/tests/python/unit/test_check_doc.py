@@ -19,7 +19,11 @@ from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
 from validation import check_doc_plan, ValidationError
-from validation import check_task_structure, check_agent_verification, check_user_validation_new
+from validation import (
+    check_task_structure,
+    check_agent_verification,
+    check_user_validation_new,
+)
 
 CHECK_DOC_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "check-doc"
 
@@ -82,6 +86,21 @@ class TestCheckTaskStructure(unittest.TestCase):
     def test_missing_design(self):
         errors = check_task_structure(self._fixture("plan-new-missing-design.md"))
         self.assertTrue(any("Design" in e for e in errors), f"Expected Design error: {errors}")
+
+    def test_project_plan_requires_valid_design_source(self):
+        base = self._fixture("plan-new-valid.md").replace(
+            "- **Status**: planning",
+            "- **Target Project**: example\n- **Status**: planning",
+        )
+        cases = {
+            "missing": base,
+            "blank": base.replace("**Behavior**:", "**Design Source**:\n\n**Behavior**:"),
+            "na": base.replace("**Behavior**:", "**Design Source**: N/A\n\n**Behavior**:"),
+        }
+        for name, content in cases.items():
+            with self.subTest(name=name):
+                errors = check_task_structure(content)
+                self.assertTrue(any("Design Source" in e for e in errors), f"{errors}")
 
     def test_tdd_true_no_behavior(self):
         errors = check_task_structure(self._fixture("plan-new-tdd-no-behavior.md"))
