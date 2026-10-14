@@ -171,7 +171,7 @@ draft → accepted → implementing → validating → archived
 
 ## Distribution Boundary
 
-ontology 的分发走 Git source + worktree 模型。wopal-cli 通过 `wopal space init` / `wopal setup` 封装 clone/fork/worktree 过程，将其与 space runtime 初始化串联。
+ontology 的分发走 Git source + worktree 模型。`wopal space init` 与 Web Onboarding 都消费同一 WopalSpace ontology/space application services，将 clone/fork/worktree 与 space runtime 初始化串联；`wopal setup` 只负责打开该 Onboarding。
 
 稳定边界：
 
