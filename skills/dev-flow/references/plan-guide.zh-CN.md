@@ -222,7 +222,7 @@ Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶�
 
 ## Delegation Strategy
 
-根据当前可用 Agent 的能力、Task 依赖和并行关系分配任务。每个 Task 必须写具体 Agent 名称，不能写角色名或泛化称谓。
+根据当前可用 Agent 的能力、Task 依赖和并行关系分配任务；Agent 列只写具体 Agent 名称。
 
 ## 实施交接
 

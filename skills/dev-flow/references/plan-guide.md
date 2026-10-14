@@ -225,7 +225,7 @@ Plans add no Gap-related metadata fields. The phase–Gap relationship is carrie
 
 ## Delegation Strategy
 
-Assign work from the agents currently available, using capability fit, Task dependencies, and parallelism. Every Task must name a specific agent; role labels and generic assignees are not valid.
+Assign work from the agents currently available using capability fit, Task dependencies, and parallelism; the Agent column contains only the specific agent name.
 
 ## Implementation handoff
 

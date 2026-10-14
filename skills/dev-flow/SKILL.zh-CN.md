@@ -86,7 +86,7 @@ description: >
 
 Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/字段名保持不变。正文优先用人能直接看懂的大白话，只有 Interface、Constraints、命令、类型/协议等确需精确时使用技术词。Plan 固定行为、验收、契约与边界；内部实现细节留给实施阶段。Task 格式、TDD 判定、AC、Metadata、命名规范等见 `references/plan-guide.zh-CN.md`。
 
-`Delegation Strategy` 必须根据当前可用 Agent 的能力和 Task 关系，把每个 Task 指定给具体 Agent；不能写角色名或泛化称谓。
+`Delegation Strategy` 必须根据当前可用 Agent 的能力和 Task 关系分配任务；Agent 列只写具体 Agent 名称。
 
 Plan 内容改变后运行 `flow.sh sync <plan> --body-only` 同步 Issue 中的 Goal / Scope / Acceptance Criteria 与 Plan 链接。
 

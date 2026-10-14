@@ -184,6 +184,6 @@ Actually touched files: <backfilled by the controller after acceptance>
 
 <!-- Required for 2+ Tasks or Complexity = High. Assign every Task to a specific currently available agent. -->
 
-| Wave | Task | Actor | Dependencies | Rationale |
+| Wave | Task | Agent | Dependencies | Rationale |
 |------|------|-------|--------------|-----------|
-| 1 | Task 1 | <specific agent name> | None | <assignment rationale> |
+| 1 | Task 1 | <agent name> | None | <assignment rationale> |

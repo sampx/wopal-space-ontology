@@ -86,7 +86,7 @@ Create or locate Plans through `flow.sh plan ...`. Do not hand-create new Plan f
 
 Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. A Plan fixes behavior, acceptance, contracts, and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
 
-`Delegation Strategy` must assign every Task to a specific currently available agent based on capability and Task relationships; do not use role labels or generic assignees.
+`Delegation Strategy` must assign Tasks from the currently available agents based on capability and Task relationships; the Agent column contains only the specific agent name.
 
 After substantive Plan content changes, run `flow.sh sync <plan> --body-only` so the Issue's Goal / Scope / Acceptance Criteria and Plan link remain aligned.
 
