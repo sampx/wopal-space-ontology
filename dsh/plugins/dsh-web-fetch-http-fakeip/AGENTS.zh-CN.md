@@ -37,8 +37,10 @@ description: 官方 dsh-web-fetch-http 的 @wopal fork 插件——双运行时�
   无关：`link:` 安装同样能解析。不存在也不需要任何逐插件链接步骤。
 - **pnpm** 是宿主前置条件，与官方 `dsh` CLI 一致：双方都不随包分发、也不代
   为安装。缺失时安装入口直接给出明确报错。
-- **源码目录保持纯净**——不含 `node_modules` 与 lockfile；`file:` 安装从源
-  目录拷贝。
+- **源码目录不携带会被 `file:` 拷走的东西**：安装只取 `files` 字段，因此
+  `node_modules/`、`lib/`、`pnpm-lock.yaml` 属于本地开发状态，不进版本控制。
+  不要在此处做任何 peer 实体化（旧 `link-peers` 那类）或 `npm install`，
+  都不需要。
 
 ## fork 修改约束
 

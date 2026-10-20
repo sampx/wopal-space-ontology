@@ -46,8 +46,11 @@ Rules that follow:
 - **pnpm** is a host prerequisite, exactly as for the official `dsh` CLI:
   neither product bundles or installs one. A missing `pnpm` fails the install
   with an explicit message.
-- **The source directory stays clean** — no `node_modules`, no lockfile;
-  `file:` installs copy from the source tree.
+- **The source directory stays clean of what `file:` would copy**: the
+  install takes only the `files` field, so `node_modules/`, `lib/` and
+  `pnpm-lock.yaml` are local development state and stay out of version
+  control. Do not run `pnpm run link-peers`-style peer materialization or
+  `npm install` here; none is needed.
 
 ## Fork modification constraints
 
