@@ -102,6 +102,20 @@ Authoritative details live in `skills/dev-flow/SKILL.md` under "Executing: imple
 
 - Plugin internal architecture, logging, type safety, error handling, development, and testing rules: **follow** `.wopal/plugins/wopal-plugin/AGENTS.md`.
 
+### Code Review
+
+Generic review methods are documented in `df-implement-review` (code changes) and `df-proposal-review` (plans and evolution proposals); this section lists only project-specific checkpoints.
+
+- **Declarative content** (`agents/`, `rules/`, `skills/`, `commands/`, `assembly/templates/`) lacks automated test coverage, so reviews must inspect files directly:
+  - frontmatter fields are complete, and trigger conditions are stated in `description`.
+  - Referenced files, skills, and commands actually exist.
+  - The formal English version and preferred-language review version stay semantically aligned; review paths must never hardcode a specific language tag.
+- **Soul prompts** (`agents/`): workflows, skill routing, tool APIs, or delegation timing inside soul prompts are findings.
+- **Generality**: paths, project names, or customer names specific to this space appearing in skills or soul prompts are findings.
+- **Assembly manifests** (`assembly/archetypes/*.yaml`): every capability listed in a manifest must genuinely exist in this repository's capability pool; listing an entry missing from the pool is a finding.
+- **Plugin code** (`plugins/wopal-plugin/`): review against `.wopal/plugins/wopal-plugin/AGENTS.md`.
+- **Comments not to raise**: items owned by CI (compilation, formatting, lint); personal taste; product intent (business rules belong to the user).
+
 ### dsh-adapter Invariants
 
 - **Event-log folds are LAST-wins**: per-message sandbox overrides append `sandbox/mode` unconditionally, including values equal to the space default — "restore default" requires an explicit event; skipping same-as-default appends leaves a prior override in force. Only a missing `extra.sandboxMode` means "keep current fold" (see poc DESIGN-dsh-poc §4.5).

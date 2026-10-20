@@ -102,6 +102,20 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 
 - 插件内部架构、日志、类型安全、错误处理、开发与测试细则，**遵循** `.wopal/plugins/wopal-plugin/AGENTS.md`。
 
+### 代码审查
+
+通用审查方法见 `df-implement-review`（代码改动）和 `df-proposal-review`（方案、进化提案）；本节只写本项目特有的检查点。
+
+- **声明式内容**（`agents/`、`rules/`、`skills/`、`commands/`、`assembly/templates/`）没有自动测试兜底，审查必须直接读文件：
+  - frontmatter 字段齐全，触发条件写在 `description` 里。
+  - 引用的文件、技能、命令真实存在。
+  - 英文正式版与用户偏好语言审核版意思一致；审核版路径没有写死某个具体语言。
+- **灵魂提示词**（`agents/`）里出现工作流、技能路由、工具 API、委派时机，算问题。
+- **通用性**：技能和灵魂提示词里出现本空间的具体路径、项目名、客户名，算问题。
+- **装配单**（`assembly/archetypes/*.yaml`）里列出的每一项能力，必须真实存在于本仓库的能力池中；列了但池里没有，算问题。
+- **插件代码**（`plugins/wopal-plugin/`）按该目录的 `AGENTS.md` 审。
+- **不该提的意见**：编译、格式、lint 这类 CI 已管的事；个人口味；产品意图（业务规则归用户）。
+
 ### dsh-adapter 不变量
 
 - **事件日志折叠 LAST-wins**：每条消息的 sandbox 覆写必须无条件追加 `sandbox/mode`，包括与空间默认值相等的取值——「恢复默认」需要显式事件；跳过与默认值相同的追加会让先前的覆写继续生效。只有缺失 `extra.sandboxMode` 才表示「保持当前折叠」（见 poc DESIGN-dsh-poc §4.5）。
