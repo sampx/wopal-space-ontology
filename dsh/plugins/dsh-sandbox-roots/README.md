@@ -37,7 +37,7 @@ sandbox-policy:
 ## 安装（ellamaka 部署）
 
 ```sh
-ellamaka dsh plugin --profile web add /path/to/dsh-sandbox-roots   # Bun 安装器，写官方终态
+ellamaka dsh plugin --profile web add /path/to/dsh-sandbox-roots   # 转给官方 dsh 安装器，记为 file:<绝对路径>
 ```
 
 运行中的容器经组合文件监听热挂载；bundle patch 变更在下次重放或重启时生效。
@@ -61,7 +61,7 @@ ellamaka dsh plugin --profile web add /path/to/dsh-sandbox-roots   # Bun 安装�
   服务会导致会话异常；本插件的生效时机交给 boot（重启）最稳。
 - **live-home quarantine**：引擎运行期间，引擎进程外不得写入
   `$WOPAL_HOME/dsh/home/profiles/`（组合重放以 mtime/size 为键，会竞争）；
-  安装一律走 `ellamaka dsh plugin`（plugins.lock 串行化）。
+  安装一律走 `ellamaka dsh plugin`（转发给官方 pnpm 安装器，串行化由它负责）。
 - **裸包名解析**：Bun 宿主无 Node internal loader，Bridge 在组合期把 patch 行
   裸包名改写为实体入口的绝对 `file://` URL；插件运行时对 peer 的 import
   从实体出发 parent-walk，经 `profiles/node_modules` 共享层命中闭包。

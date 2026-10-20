@@ -13,7 +13,9 @@ Agent presets are ordinary `@deepseek-ai/dsh-agent-preset` declarations carried 
 
 官方依赖位于 Ellamaka 管理的 `closures/<fingerprint>/`，只读参考。WopalSpace 的三个 preset 由 `@wopal/dsh-presets` bundle 声明；旧 `preset.yml` 与 `agent.cordis.yml` 是生成源，运行时消费生成的 `preset.patch.yml`。修改源后重新生成并安装 bundle，在新会话确认行为，既有会话保留原 revision。
 
-安装优先使用集成版 `ellamaka dsh plugin --profile web add <bundle目录>` 或集成版的 `plugin_manager`，保持同一闭包和 profile。保留旧源目录和迁移前快照，不依赖 `.agent-presets` 软链自动发现。项目技能经 `<项目>/.dsh/skills` 装配，bundle 自带技能经 `customSkillDirs` 挂载。
+安装使用 `ellamaka dsh plugin --profile web add <bundle 绝对目录>`：它把目录规格转成 `file:<绝对路径>` 交给官方 dsh 安装器（pnpm），由官方完成声明、依赖、lockfile 与 bundle 登记。本集成里 Wopal 没有 `plugin_manager` 工具，因此以 `install_bundle` 为中心的流程不适用；同样不要在 profile 目录手跑 pnpm 或手改 `package.json`。
+
+插件的 `@deepseek-ai/*` 依赖必须写在 `peerDependencies`，由宿主闭包与 `profiles/node_modules` 兜底层提供；写进 `dependencies` 会在 profile 里装出第二份模块实例。保留旧源目录和迁移前快照，不依赖 `.agent-presets` 软链自动发现。项目技能经 `<项目>/.dsh/skills` 装配，bundle 自带技能经 `customSkillDirs` 挂载。
 
 ## Where declarations live
 
@@ -57,7 +59,7 @@ Write a bundle directory in the workspace with exactly two files, then install i
             name: "@deepseek-ai/dsh-tool-bash"
 ```
 
-Install with `plugin_manager`, `action: install_bundle`, `target` set to the absolute bundle directory. It runs package installation and bundle selection itself; do not reproduce those steps with shell commands.
+Install with `ellamaka dsh plugin --profile web add <absolute bundle directory>` in this deployment: it forwards the directory to the official dsh installer as `file:<abs>`, which performs package installation and bundle selection itself. Where `plugin_manager` is available, `action: install_bundle` with the same absolute directory is the equivalent entry; either way do not reproduce those steps with shell commands, and never hand-edit the profile's `package.json`.
 
 ## Change a shipped preset
 

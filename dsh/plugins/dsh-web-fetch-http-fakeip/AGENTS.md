@@ -17,22 +17,23 @@ Authoritative documents:
 - Replacement contract: header comment of `cordis.patch.yml` (never change a
   row's `name`; disable the stock row, then insert a new row with a new id)
 
-## Dual-runtime dependency resolution boundary (highest priority)
+## Plugin dependency resolution (highest priority)
 
-This plugin serves two runtimes whose dependency resolution differs; never
-mix the two flows:
+One installer serves both runtimes: the official plugin manager's pnpm, on
+the profile's own `package.json`. `ellamaka dsh plugin add <dir>` forwards to
+it, so an install is recorded as `file:<abs>` and pnpm copies the package
+(per its `files` field) into `<profile>/node_modules/`, resolving this
+package's registry dependencies there.
 
-- **ellamaka** (`ellamaka dsh plugin add`): copies `lib/` into the profile;
-  dependencies are served by the runtime's flat closure
-  (`$DSH_HOME/profiles/node_modules/@deepseek-ai/*`) at boot. **The source
-  directory must stay clean** — no `node_modules`, no lockfile; never run
-  `pnpm run link-peers` for ellamaka-only development.
-- **Official dsh** (`dsh plugin --profile <name> add <dir>`): records a
-  `link:` to the source directory; Node resolves the plugin's imports by
-  walking up from the source directory. After installing into an official
-  profile, **run `pnpm run link-peers` once**, or boot fails with
-  `Cannot find package`. Registration success proves nothing about
-  runnability.
+- **Registry dependencies** (`dependencies`) install into the profile. Keep
+  them genuinely third-party; a `@deepseek-ai/*` entry here duplicates a
+  module the host already runs (see the peer rule below).
+- **Peers** (`peerDependencies`) resolve through the shared fallback
+  `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` at boot. `link-peers` is
+  only for a standalone official `dsh` install that recorded `link:` instead
+  of `file:` — never for ellamaka.
+- **The source directory stays clean** — no `node_modules`, no lockfile;
+  `file:` installs copy from the source tree.
 
 ## link-peers.mjs maintenance constraints
 
@@ -60,8 +61,9 @@ mix the two flows:
 
 This package has no test chain; verify against the target runtime:
 
-- ellamaka: reinstall with `ellamaka dsh plugin add <dir>`, then the user
-  restarts the engine to verify (restarts are always performed by the user).
+- ellamaka: reinstall with `ellamaka dsh plugin --profile web add <dir>`,
+  then the user restarts the engine to verify (restarts are always performed
+  by the user).
 - Official dsh: boot `dsh web` under an **isolated copy** of `$DSH_HOME` and
   verify a zero-error plugin tree; never run boot experiments against any
   live home.

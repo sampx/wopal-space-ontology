@@ -4,8 +4,9 @@
 // official `dsh` CLI, whose plugin install (`dsh plugin add <dir>`) links the
 // source directory verbatim — Node then resolves the plugin's own imports by
 // walking up from the source directory, so the peers must exist there.
-// The ellamaka runtime copies the plugin into its profile and serves peers
-// from its own flat closure; under ellamaka this script is unnecessary.
+// Under ellamaka this script is unnecessary: `ellamaka dsh plugin add` records
+// `file:<abs>` and pnpm copies the package into the profile, where peers
+// resolve from the shared fallback layer.
 //
 // Usage:  pnpm run link-peers   (or: node scripts/link-peers.mjs)
 // Resolution chain: `which dsh` → realpath → the @deepseek-ai/dsh package →
@@ -22,8 +23,10 @@ const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 /** Packages this plugin imports at runtime and that live in the dsh closure. */
 const PEER_PACKAGES = [
   "@deepseek-ai/cordis",
+  "@deepseek-ai/dsh-http-proxy",
   "@deepseek-ai/dsh-timeout",
   "@deepseek-ai/dsh-web",
+  "@deepseek-ai/schemastery",
 ]
 
 function fail(message) {

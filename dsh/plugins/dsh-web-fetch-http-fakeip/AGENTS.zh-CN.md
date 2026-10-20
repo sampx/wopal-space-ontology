@@ -14,18 +14,21 @@ description: 官方 dsh-web-fetch-http 的 @wopal fork 插件——双运行时�
 - 上游参考源码（与本包同版本）：`labs/ref-repos/deepseek-harness/`（下称 REF）
 - 替换契约：`cordis.patch.yml` 头部注释（禁改 `name`、先 disable 后 insert 新 id）
 
-## 双运行时依赖解析边界（最高优先级）
+## 插件依赖解析边界（最高优先级）
 
-本插件同时服务两个运行时，两者的依赖解析机制不同，禁止混用：
+两个运行时共用同一个安装器：官方 pluginManager 的 pnpm，作用于 profile
+自己的 `package.json`。`ellamaka dsh plugin add <目录>` 直接转发给它，因此安
+装记为 `file:<绝对路径>`，pnpm 按 `files` 字段把包拷进
+`<profile>/node_modules/`，并就地解析本包的 registry 依赖。
 
-- **ellamaka**（`ellamaka dsh plugin add`）：拷贝 `lib/` 进 profile，依赖由
-  运行时 flat closure（`$DSH_HOME/profiles/node_modules/@deepseek-ai/*`）在
-  boot 时自动兜底。**源码目录必须保持纯净**——不含 `node_modules` 与
-  lockfile；ellamaka-only 开发禁止运行 `pnpm run link-peers`。
-- **官方 dsh**（`dsh plugin --profile <name> add <dir>`）：`link:` 软链源码
-  目录，Node 按源码目录物理向上解析 import。装进官方 profile 后必须
-  **运行一次 `pnpm run link-peers`**，否则 boot 报
-  `Cannot find package`。注册成功不代表可运行。
+- **registry 依赖**（`dependencies`）装进 profile。只放真正的第三方包；把
+  `@deepseek-ai/*` 写在这里会让宿主已有的模块多出一份实例（见下方 peer 规则）。
+- **peer**（`peerDependencies`）在 boot 时经共享兜底层
+  `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` 解析。`link-peers` 只适用
+  于独立官方 `dsh` 安装记录成 `link:`（而非 `file:`）的情况，ellamaka 不使
+  用。
+- **源码目录保持纯净**——不含 `node_modules` 与 lockfile；`file:` 安装从源
+  目录拷贝。
 
 ## link-peers.mjs 维护约束
 
@@ -47,8 +50,8 @@ description: 官方 dsh-web-fetch-http 的 @wopal fork 插件——双运行时�
 
 本包无测试链，验证按目标运行时执行：
 
-- ellamaka：`ellamaka dsh plugin add <dir>` 重装后由用户重启引擎验证
-  （重启永远由用户执行）。
+- ellamaka：`ellamaka dsh plugin --profile web add <目录>` 重装后由用户重启
+  引擎验证（重启永远由用户执行）。
 - 官方 dsh：在**隔离副本**的 `$DSH_HOME` 下 `dsh web` 启动验证插件树
   零错误；禁止对着任何 live home 做启动实验。
 - 每次修改后核对：`cordis.patch.yml` 的 disable/insert 对与上游 provider id
