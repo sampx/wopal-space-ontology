@@ -62,7 +62,7 @@ The `## Affected Files` table is the expected footprint, not a contract; the imp
 3. Diff them. Unreferenced ACs have no owner. Cross-task ACs must be marked as such.
 4. Check the bucket: tests, lint, typecheck, scriptable assertions belong in Agent Verification; only human observation belongs in User Validation.
 
-**Two-beat context**: beat-1 entries are criterion-style — legal by design; the real command is written back at the RED stage. Never flag a criterion-style entry itself; flag only criteria that cannot catch a bad implementation.
+**Plain-text AC before coding**: before implementation starts, an AC may state the pass/fail rule in plain text when the exact test command will be filled in during the RED stage. Never flag a plain-text rule just for lacking a shell command yet; flag only rules that cannot catch a broken implementation.
 
 ### 2.4 Order matches dependencies
 
@@ -128,7 +128,7 @@ Split `## Goal` into independently meaningful parts; find the Task(s) delivering
 
 ### 4.3 ACs that can fail
 
-For each AC: if the feature were broken, would this check catch it? An AC asserting existence where behavior is the claim proves nothing; one that restates the change proves less. Weak falsifiability is WARNING — `plan check` owns command presence; you own whether the command proves anything.
+For each AC: if the feature were broken, would this check catch it? An AC asserting file existence where behavior is the claim proves nothing; one that merely repeats the task title proves less. An AC that cannot catch a broken implementation is WARNING — `plan check` checks whether a command is filled in; you check whether the AC actually proves anything.
 
 ### 4.4 Handoff possible
 
@@ -144,7 +144,7 @@ Flag only where the missing information would cause a wrong turn.
 
 ## 5. Plan mode — Q4: Lean
 
-For every new artifact the Plan creates — module, class, interface, config surface, dependency, extension point — climb the ladder. Stop at the first rung that holds; the artifact must land at that rung.
+For every new item the Plan creates — module, class, interface, config surface, dependency, extension point — climb the ladder. Stop at the first rung that holds; the item must land at that rung.
 
 ### The ladder
 
@@ -152,7 +152,8 @@ For every new artifact the Plan creates — module, class, interface, config sur
 2. **Already in this repo?** The Plan builds what a few files over already ships. Probe with `rg <pattern>` before flagging — the finding must name the existing implementation (`file:line`), or it is at most Info.
 3. **Stdlib does it?** The Plan adds a dependency whose job the standard library already does. Name the stdlib function in the finding.
 4. **Native platform covers it?** Code or a dependency doing what the platform ships (CSS over a JS polyfill, a DB constraint over app-side checks, built-in CLI flags over hand-rolled parsing).
-5. **Fewest moving parts?** The same logic a shorter, more direct form delivers. Show the shorter form in the finding.
+5. **Shortest direct form?** The same logic a shorter, more direct form delivers. Show the shorter form in the finding.
+6. **Cleans up what it replaces?** When the Plan replaces an existing module, helper, or dependency, check whether a task deletes the obsolete code, its old tests, and the unused dependency entry. Leaving replaced code behind turns it into dead code immediately.
 
 ### Dependency admission
 
@@ -165,6 +166,7 @@ Any new third-party dependency in the Plan needs a stated reason the ladder cann
 | Speculative abstraction or extension point | WARNING |
 | Re-implementation of existing repo infrastructure (named `file:line`) | WARNING |
 | New dependency while stdlib / installed packages cover it | WARNING |
+| Replacement that leaves the old code, old tests, or old dependency behind | WARNING |
 | Same logic in a shorter form | INFO |
 | Style or naming preference | not a finding |
 

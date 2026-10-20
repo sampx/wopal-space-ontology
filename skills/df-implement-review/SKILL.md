@@ -1,16 +1,20 @@
 ---
 name: df-implement-review
 description: >
-  Review delivered work — decide whether the result really delivers what it
-  claims, breaks anything that already worked, is correct under real inputs,
-  and leaves no bloat behind. Use when the user asks to review, check, or
-  verify code changes, a commit, a pull request, or a finished
-  implementation — typically at sign-off before commit or merge, for example
-  "review this change", "check whether this implementation is correct",
-  "review my PR". Also the gate for landed ontology evolution proposals
-  (skills, rules, agents) before user validation. Do not use for reviewing
-  a Plan or design doc before execution (use `df-proposal-review`), for
-  re-running tests or lint, for running builds, or for fixing code.
+  Review delivered code changes, or audit an existing project for technical debt
+  and bloat — decide whether a change really delivers what it claims, breaks
+  existing callers, works under real inputs, and leaves no dead code or
+  unnecessary complexity behind. Use when the user asks to review, check, or
+  verify code changes, a commit, a pull request, or a finished implementation
+  (e.g. "review this change", "check whether this implementation is correct",
+  "review my PR"), or asks to analyze a project's technical debt, audit a
+  codebase, or find dead code, unused dependencies, over-engineering, and
+  cleanup candidates (e.g. "analyze technical debt in this project", "audit this
+  repo", "find dead code and bloat", "what can we delete or simplify"). Also the
+  gate for landed ontology evolution proposals before user validation. Do not
+  use for reviewing a Plan or design doc before execution (use
+  `df-proposal-review`), for re-running tests or lint, for running builds, or
+  for fixing code.
 ---
 
 # df-implement-review — Implementation Review
@@ -22,20 +26,21 @@ Every failure that slips past tests, lint, typecheck, and CI belongs to one of t
 | | Question | Catches |
 |---|----------|---------|
 | Q1 | Does the change really deliver what it claims? | stubs, empty shells, unwired code, reduced scope |
-| Q2 | Does the change break anything that already worked? | silent behavior changes, broken call sites, drifted contracts |
+| Q2 | Does the change break anything that already worked? | silent behavior changes, broken call sites, changed shared interfaces |
 | Q3 | Are the new code paths correct under real inputs and states? | concurrency bugs, leaks, boundary errors, bad error handling, security holes |
-| Q4 | Does the evidence hold up, and what debt does the change leave? | fake tests, untested branches, bloat, wrong abstractions |
+| Q4 | Do the tests prove it, and what bloat or orphans remain? | fake tests, stale docs, dead code, orphaned files/deps, unnecessary abstractions |
 
 ## Pick the mode
 
 Decide once, at the start, from what the prompt carries:
 
-- **Delivery review** — the prompt includes a Plan path, an evolution proposal, explicit truths, or acceptance criteria. The change is one delivery inside a scheduled scope. Verify the change against those truths, then run Q1–Q4.
+- **Delivery review** — the prompt includes a Plan path, an evolution proposal, or explicit acceptance criteria. The change is one delivery inside a scheduled scope. Verify the change against those criteria, then run Q1–Q4.
 - **Change review** — the prompt only carries a change: working-tree edits, a commit, a range, a file list. No Plan exists. Run Q1–Q4 using the change's own stated intent (commit message, background in the prompt) as the Q1 spec.
+- **Repo audit** — the prompt asks to analyze technical debt or audit a whole project/directory for dead code, unused dependencies, over-engineering, or cleanup candidates without naming a diff or Plan. Skip diff-based Q1–Q3 and run the whole-repo Q4 sweep (using the repo-audit scan in the rubric: unused deps, orphaned files/exports, stdlib/native replacements, single-use abstractions, plus lingering `TODO`/`FIXME` debt markers, fake/skipped tests, and stale docs when doing a full tech-debt audit). Emit the ranked one-line list (`- \`<tag>\` <what to cut>. <replacement>. [path]`) ending with `net: -N lines, -M dependencies possible.` (or `Lean already. Ship.`).
 
-In change review, do **not** invent product requirements. Business logic belongs to the change owner unless the prompt says `business_logic_review: requested`. Gaps that hinge on product intent go under `Requirement Questions`.
+In change review, do **not** invent product requirements. Business logic belongs to the change owner unless the prompt says `business_logic_review: requested`. Gaps that depend on product intent go under `Requirement Questions`.
 
-If the prompt omits context entirely, review the narrowest defensible scope — working-tree changes under the stated project path — and say so in the report.
+If the prompt omits context entirely, review only the working-tree changes under the stated project path and say so in the report.
 
 Input fields the prompt may carry: `review_type: implementation`, `project_path`, `change_scope: working_tree`, `commit: <hash>`, `commit_range: <A>..<B>`, `background`, Plan or proposal path, `design_docs: <path>`, `business_logic_review: requested`.
 
@@ -90,27 +95,29 @@ Report only findings with a concrete failure scenario — "in situation Z this r
 
 Severity: defect with a concrete scenario, exploitable security hole → **BLOCKER**; plausible risk with a scenario, missing validation on a public surface → **WARNING**.
 
-## Q4 — Does the evidence hold up, and what debt does the change leave?
+## Q4 — Do the tests prove it, and what bloat or orphans remain?
 
-Three parts.
+Three parts (in **Repo audit** mode, run only the third part across the whole project, ranked biggest cut first).
 
-**Test integrity.** Map each claimed behavior to its covering tests, then read what they actually assert. Broken patterns: skipped tests, circular proofs, placeholder assertions, existence-only assertions, untested key branches. The bar: **would this test fail if the behavior broke?** Skipped/circular/placeholder for a claimed behavior → **BLOCKER**; untested changed branch → **WARNING**.
+**Test effectiveness.** Map each claimed behavior to its covering tests, then read what they actually assert. Broken patterns: skipped tests, circular proofs, placeholder assertions, existence-only assertions, untested key branches. The bar: **would this test fail if the behavior broke?** Skipped/circular/placeholder for a claimed behavior → **BLOCKER**; untested changed branch → **WARNING**.
 
 **Documentation drift.** For every changed external contract (API, schema, CLI flag, config key), find where docs describe it and check whether the change updated them. Stale docs → **WARNING** (REVISE — the fix is updating docs); violating a stated docs-sync rule → **BLOCKER**. Pure internal refactors trigger nothing.
 
-**Debt — the lean sweep.** Hunt bloat with the five tags. One line per finding: location, what to cut, what replaces it. **A finding without a replacement is a complaint, not a finding.**
+**Debt — the lean & orphan sweep.** Hunt bloat and orphaned code with the five tags. One line per finding: location, what to cut, what replaces it. **A finding without a replacement is a complaint, not a finding.**
 
 | Tag | What it catches | Replacement |
 |---|---|---|
-| `delete:` | dead code, unused flexibility, speculative features, dependencies with zero references | nothing |
-| `stdlib:` | hand-rolled code the standard library already ships | name the function |
-| `native:` | code or deps doing what the platform ships for free | name the feature |
-| `yagni:` | one-implementation interfaces, factories with one product, config nobody sets, layers with one caller | inline until a second need exists |
-| `shrink:` | same logic in fewer, clearer lines | show the shorter form |
+| `delete:` | dead code, files/exports/deps orphaned when a caller switched to a new implementation, unused flexibility, zero-reference dependencies | nothing |
+| `stdlib:` | hand-rolled code the standard library already ships | name the function (verify runtime version supports it) |
+| `native:` | code or deps doing what the platform ships for free | name the feature (verify target OS/platform supports it) |
+| `yagni:` | one-implementation interfaces, factories with one product, config nobody sets, thin wrappers with one caller | inline until a second need exists |
+| `shrink:` | duplicated logic across files, or the same logic in fewer, clearer lines | show the shared helper or shorter form |
+
+**Orphan check on diffs**: whenever a diff removes an `import` or call to an internal function, module, or package, run `rg` across the repo to check whether that target now has **zero production references**. Leaving an orphaned function, file, test, or `package.json` dependency behind after replacing its caller → **WARNING** (REVISE).
 
 Never flag: the smallest check that would fail if the logic broke (a smoke test, one assert) — that is the lean minimum, not bloat. Never simplify away input validation at trust boundaries, error handling that prevents data loss, or security measures. Correctness first, then leanness — never trade one for the other.
 
-Severity: re-implemented existing infrastructure (the repo already ships it, `file:line` named) or a new heavyweight dependency added without need → **WARNING** (REVISE); everything else lean → **INFO**.
+Severity: re-implemented existing infrastructure (the repo already ships it, `file:line` named), a new heavyweight dependency added without need, or an orphaned module/function/dependency left behind by the diff → **WARNING** (REVISE); everything else lean → **INFO**.
 
 End of report: `net: -N lines, -M dependencies possible`. Nothing to cut → `Lean already. Ship.`
 
@@ -198,6 +205,8 @@ BLOCK  — at least one Blocker
 ```
 
 **Quick report:** `Summary` (same fields) + one merged `Findings` list (B/W/I labelled) + `Positive Findings`.
+
+**Repo audit report:** ranked one-line list (`- \`<tag>\` <what to cut>. <replacement>. [path]`), biggest cut first, ending with `net: -<N> lines, -<M> deps possible.` (or `Lean already. Ship.`).
 
 A `PASS` requires the `Positive Findings` section to state what was checked and how — a bare PASS asks the reader to take the verdict on faith.
 

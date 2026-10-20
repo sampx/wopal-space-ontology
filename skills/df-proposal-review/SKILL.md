@@ -69,7 +69,7 @@ Q1–Q3 decide whether the Plan works. Q4 decides whether it works without bloat
 3. **Behavior specs are real.** Each Behavior in a TDD task can be turned into a failing test without guessing. "Works correctly" is unspecified behavior.
 4. **Order matches dependencies.** Every consumer comes after its producer. Overlap between tasks is a conflict only under declared parallel execution.
 
-**Files are expected scope, not a contract.** The `Affected Files` table is the expected footprint; do not audit task-level lists against it. Flag only a stale operation premise ("create" a file that exists) or file overlap under declared parallel execution.
+**Files are expected scope, not a contract.** The `Affected Files` table is the expected file list; do not audit task-level lists against it. Flag only a stale operation premise ("create" a file that already exists) or file overlap under declared parallel execution.
 
 Severity: symbol with no producer, misspelled producer, producer in a later wave, or parallel file overlap → **BLOCKER**. AC owned by nobody, untestable Behavior, automatable check in User Validation, stale file premise → **WARNING**.
 
@@ -91,7 +91,7 @@ The repo is the only authority. Settle each fact claim mechanically; never wave 
 
 Then check agreement with the authorities it cites (design docs, `AGENTS.md`, existing interfaces): find what the authority says and compare. Divergence the artifact acknowledges or justifies is a decision; silent divergence is a broken contract. When two documents conflict, establish which one is authoritative for the model this artifact implements before calling it.
 
-Severity: a false premise the work leans on, a silent divergence from a safety constraint, an AC command that cannot run → **BLOCKER**. Silent doc divergence with no effect on the work → **WARNING**; cosmetic drift → **INFO**.
+Severity: a false premise the work leans on, a silent divergence from a safety constraint, an AC command that cannot run → **BLOCKER**. Silent doc divergence with no effect on the work → **WARNING**; minor wording or line-number drift → **INFO**.
 
 ### Q3 — Will executing it deliver the goal?
 
@@ -106,15 +106,16 @@ Severity: goal part with no task, decision quietly reduced → **BLOCKER**. AC t
 
 ### Q4 — Lean: is this the lean way to deliver it?
 
-Climb the ladder for every new artifact the Plan creates. Stop at the first rung that holds; the artifact must land at that rung:
+Climb the ladder for every new item the Plan creates. Stop at the first rung that holds; the item must land at that rung:
 
-1. **Does it need to exist at all?** An interface with one implementation, a factory with one product, a config for a value that never changes, an extension point with no consumer — speculative need is skipped, in one line.
-2. **Already in this repo?** The plan creates a helper, module, or pattern that already lives a few files over — re-implementation is the most common slop. Check with `rg`, not assumption.
+1. **Does it need to exist at all?** An interface with one implementation, a factory with one product, a config for a value that never changes, an extension point with no consumer — skip speculative needs, in one line.
+2. **Already in this repo?** The Plan creates a helper, module, or pattern that already lives a few files over. Check with `rg`, not assumption.
 3. **Stdlib does it?** A new dependency whose job the standard library already does.
-4. **Native platform covers it?** Code or a dependency doing what the platform ships for free.
-5. **Fewest moving parts?** Same logic that a shorter, more direct form delivers.
+4. **Native platform covers it?** Code or a dependency doing what the platform or runtime already provides.
+5. **Shortest direct form?** Same logic that a shorter, more direct design delivers.
+6. **Cleans up what it replaces?** When the Plan replaces an old module, helper, or dependency, it must also schedule deleting the obsolete code, its old tests, and the unused dependency so no dead code is left behind.
 
-Severity — Q4 never blocks: speculative abstraction, reinvented infrastructure, unneeded new dependency → **WARNING** (the fix is shrinking the Plan, and lean findings are judgement calls, not execution failures). Same logic in a shorter form → **INFO**. Nothing to cut → say `Lean already` and move on.
+Severity — Q4 never blocks: speculative abstraction, reinvented infrastructure, unneeded new dependency, or replacement that leaves the old code behind → **WARNING** (the fix is trimming or completing the Plan). Same logic in a shorter form → **INFO**. Nothing to cut → say `Lean already` and move on.
 
 For ontology evolution proposals, add one gate on top of Q1–Q4: the landed result must satisfy the platform's own capability standards — frontmatter `name` + `description`, triggering conditions in the description, body = workflow + output + notes, long content offloaded to `references/`, no invented structure. A proposal whose deliverable violates them → **WARNING**.
 
@@ -133,13 +134,13 @@ Document mode has no tasks to schedule, so the questions reshape. Q4 keeps its n
 
 Contradictions between sections; terms used before they are defined or used two ways; components or states whose ownership is unstated. Also structure conformance: when the document belongs to the `dev-doc-master` set, its structural rules (header zones, bidirectional index, naming) are governed by `dev-doc-master/references/consistency.md` — and the mechanical part of that is already scanned by its quality gate script (`scripts/verify-docset.py`). Run it when available; spend your review on what the script cannot see.
 
-Severity: internal contradiction on a load-bearing statement → **BLOCKER**; undefined term with real ambiguity, missing ownership for a component the doc introduces → **WARNING**.
+Severity: internal contradiction on a core statement → **BLOCKER**; undefined term with real ambiguity, missing ownership for a component the doc introduces → **WARNING**.
 
 ### D2 — Are its statements about reality true?
 
-Same mechanical probe as Q2: every claim about the code, the system, or another document gets settled against reality. Sibling-document conflicts follow the authority rule from Q2. Documents in the `dev-doc-master` set also obey **target-state writing** — "deprecated", "legacy", "moved from", "migration" narration is a finding, because a reader learns the current structure, not the history.
+Same mechanical probe as Q2: every claim about the code, the system, or another document gets settled against reality. Sibling-document conflicts follow the authority rule from Q2. Documents in the `dev-doc-master` set also describe **current design only, not change history** — "deprecated", "legacy", "moved from", "migration" narration is a finding, because a reader needs to understand how the system works now, not its history.
 
-Severity: claim the code contradicts on a load-bearing path → **BLOCKER**; stale claim with no effect on decisions → **WARNING**; cosmetic drift → **INFO**.
+Severity: claim the code contradicts on a critical path → **BLOCKER**; stale claim with no effect on decisions → **WARNING**; minor wording or line-number drift → **INFO**.
 
 ### D3 — Is the goal sound?
 
