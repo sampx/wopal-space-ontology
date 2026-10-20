@@ -14,28 +14,33 @@ description: 官方 dsh-web-fetch-http 的 @wopal fork 插件——双运行时�
 - 上游参考源码（与本包同版本）：`labs/ref-repos/deepseek-harness/`（下称 REF）
 - 替换契约：`cordis.patch.yml` 头部注释（禁改 `name`、先 disable 后 insert 新 id）
 
-## 双运行时依赖解析边界（最高优先级）
+## 插件依赖解析边界（最高优先级）
 
-本插件同时服务两个运行时，两者的依赖解析机制不同，禁止混用：
+两个运行时共用同一个安装器：官方 pluginManager 的 pnpm，作用于 profile
+自己的 `package.json`。`ellamaka dsh plugin add <目录>` 直接转发给它。本包是
+标准 dsh bundle，不需要任何特殊打包；但 spec 形式决定装进 profile 的东西
+（在 dsh 0.2.0-rc.2 实测）：
 
-- **ellamaka**（`ellamaka dsh plugin add`）：拷贝 `lib/` 进 profile，依赖由
-  运行时 flat closure（`$DSH_HOME/profiles/node_modules/@deepseek-ai/*`）在
-  boot 时自动兜底。**源码目录必须保持纯净**——不含 `node_modules` 与
-  lockfile；ellamaka-only 开发禁止运行 `pnpm run link-peers`。
-- **官方 dsh**（`dsh plugin --profile <name> add <dir>`）：`link:` 软链源码
-  目录，Node 按源码目录物理向上解析 import。装进官方 profile 后必须
-  **运行一次 `pnpm run link-peers`**，否则 boot 报
-  `Cannot find package`。注册成功不代表可运行。
+- **`file:<绝对路径>`**：把包按 `files` 字段拷进 `<profile>/node_modules/`，
+  并在那里安装它的 `dependencies`。`ellamaka dsh plugin add <目录>` 记录的就
+  是这种；有 registry 依赖的包也只能用这种。
+- **裸路径**：记为 `link:<绝对路径>`，即指向源码目录的软链。它的
+  `dependencies` **不会安装**，任何 `import` 都会 `ERR_MODULE_NOT_FOUND`。
+  只适用于运行时 import 全部另有出处的包的边改边测。
 
-## link-peers.mjs 维护约束
+由此得到的规则：
 
-- `scripts/link-peers.mjs` 通过 `which dsh` → realpath 推导官方闭包，**禁止
-  改为读取 `$DSH_HOME` 或任何 home 路径**（本机存在官方 `~/.dsh` 与
-  ellamaka `~/.wopal/dsh/home` 两个 home，环境变量指向后者，混用即错）。
-- `PEER_PACKAGES` 清单必须与 `package.json` 的 `peerDependencies` 保持一致；
-  增删 peer 时两处同步修改。
-- 链接目标是官方闭包的 symlink（非拷贝），版本自动跟随官方 dsh 升级；
-  禁止用 `npm install` 落地 peer 实体（会产生与宿主不同的模块副本）。
+- **registry 依赖**（`dependencies`）只在 `file:` 安装时装进 profile，且只放
+  真正的第三方包；把 `@deepseek-ai/*` 写在这里会让宿主已有的模块多出一份实
+  例，且插件内部解析会命中 profile 那份。
+- **peer**（`peerDependencies`）由 dsh loader 从安装作用域解析，与 spec 形式
+  无关：`link:` 安装同样能解析。不存在也不需要任何逐插件链接步骤。
+- **pnpm** 是宿主前置条件，与官方 `dsh` CLI 一致：双方都不随包分发、也不代
+  为安装。缺失时安装入口直接给出明确报错。
+- **源码目录不携带会被 `file:` 拷走的东西**：安装只取 `files` 字段，因此
+  `node_modules/`、`lib/`、`pnpm-lock.yaml` 属于本地开发状态，不进版本控制。
+  不要在此处做任何 peer 实体化（旧 `link-peers` 那类）或 `npm install`，
+  都不需要。
 
 ## fork 修改约束
 
@@ -47,8 +52,8 @@ description: 官方 dsh-web-fetch-http 的 @wopal fork 插件——双运行时�
 
 本包无测试链，验证按目标运行时执行：
 
-- ellamaka：`ellamaka dsh plugin add <dir>` 重装后由用户重启引擎验证
-  （重启永远由用户执行）。
+- ellamaka：`ellamaka dsh plugin --profile web add <目录>` 重装后由用户重启
+  引擎验证（重启永远由用户执行）。
 - 官方 dsh：在**隔离副本**的 `$DSH_HOME` 下 `dsh web` 启动验证插件树
   零错误；禁止对着任何 live home 做启动实验。
 - 每次修改后核对：`cordis.patch.yml` 的 disable/insert 对与上游 provider id

@@ -1,6 +1,6 @@
 ---
 name: dsh-sandbox-roots
-description: Sandbox writable-roots extension plugin (@wopal/dsh-sandbox-roots) — dual-runtime dependency-resolution boundary, mandatory TDD, and link-peers maintenance constraints
+description: Sandbox writable-roots extension plugin (@wopal/dsh-sandbox-roots) — plugin dependency-resolution boundary and mandatory TDD
 ---
 
 # dsh-sandbox-roots — Agent Rules
@@ -35,36 +35,40 @@ the implementation; refactors adjust tests in step. Upstream-behavior
 replication (e.g. `internal/containment.ts` copied from REF) is likewise
 locked by tests.
 
-## Dual-runtime dependency resolution boundary (highest priority)
+## Plugin dependency resolution (highest priority)
 
-This plugin serves two runtimes whose dependency resolution differs; never
-mix the two flows:
+One installer serves both runtimes: the official plugin manager's pnpm, on
+the profile's own `package.json`. `ellamaka dsh plugin add <dir>` forwards to
+it. This package is a plain dsh bundle and needs no special packaging, but
+the spec form decides what lands in the profile (measured on dsh
+0.2.0-rc.2):
 
-- **ellamaka** (`ellamaka dsh plugin add`): copies `lib/` into the profile;
-  dependencies are served by the runtime's flat closure
-  (`$DSH_HOME/profiles/node_modules/@deepseek-ai/*`) at boot. **The source
-  directory must stay clean** — no `node_modules`, no lockfile; never run
-  `pnpm run link-peers` for ellamaka-only development.
-- **Official dsh** (`dsh plugin --profile <name> add <dir>`): records a
-  `link:` to the source directory; Node resolves the plugin's imports by
-  walking up from the source directory. After installing into an official
-  profile, **run `pnpm run link-peers` once**, or boot fails with
-  `Cannot find package`. Registration success proves nothing about
-  runnability.
+- **`file:<abs>`** copies the package into `<profile>/node_modules/` (per its
+  `files` field) and installs its `dependencies` there. This is what
+  `ellamaka dsh plugin add <dir>` records, and the only option for a package
+  with registry dependencies.
+- **A bare path** is recorded as `link:<abs>` — a symlink to the source tree.
+  Its `dependencies` are **not** installed; any `import` of one fails with
+  `ERR_MODULE_NOT_FOUND`. Only usable for live-edit development of a package
+  whose runtime imports all resolve elsewhere.
 
-## link-peers.mjs maintenance constraints
+Rules that follow:
 
-- `scripts/link-peers.mjs` derives the official closure from `which dsh` →
-  realpath. **Never rewrite it to read `$DSH_HOME` or any home path** (this
-  machine has two homes — official `~/.dsh` and ellamaka
-  `~/.wopal/dsh/home`; the environment variable points at the latter, and
-  mixing them up is a real failure mode).
-- `PEER_PACKAGES` must stay in sync with `peerDependencies` in
-  `package.json`; update both when adding or removing a peer.
-- Links are symlinks into the official closure (not copies), so versions
-  follow official dsh upgrades automatically; never materialize peer copies
-  with `npm install` (that creates module duplicates distinct from the
-  host's).
+- **Registry dependencies** (`dependencies`) install only on a `file:`
+  install; keep them genuinely third-party. A `@deepseek-ai/*` entry here
+  duplicates a module the host already runs, and the profile copy wins
+  resolution from inside the plugin.
+- **Peers** (`peerDependencies`) are resolved by the dsh loader from the
+  installation scope, independently of the spec form: a `link:` install
+  resolves them fine. No per-plugin linking step exists or is needed.
+- **pnpm** is a host prerequisite, exactly as for the official `dsh` CLI:
+  neither product bundles or installs one. A missing `pnpm` fails the install
+  with an explicit message.
+- **The source directory stays clean of what `file:` would copy**: the
+  install takes only the `files` field, so `node_modules/`, `lib/` and
+  `pnpm-lock.yaml` are local development state and stay out of version
+  control. Do not run `pnpm run link-peers`-style peer materialization or
+  `npm install` here; none is needed.
 
 ## Upstream alignment constraints
 
@@ -80,8 +84,9 @@ mix the two flows:
 ## Verification requirements
 
 - Automated: a green `pnpm check` is a precondition for any commit.
-- ellamaka: reinstall with `ellamaka dsh plugin add <dir>`, then the user
-  restarts the engine to verify (restarts are always performed by the user).
+- ellamaka: reinstall with `ellamaka dsh plugin --profile web add <dir>`,
+  then the user restarts the engine to verify (restarts are always performed
+  by the user).
 - Official dsh: boot `dsh web` under an **isolated copy** of `$DSH_HOME` and
   verify a zero-error plugin tree; never run boot experiments against any
   live home.
