@@ -21,36 +21,33 @@ Authoritative documents:
 
 One installer serves both runtimes: the official plugin manager's pnpm, on
 the profile's own `package.json`. `ellamaka dsh plugin add <dir>` forwards to
-it, so an install is recorded as `file:<abs>` and pnpm copies the package
-(per its `files` field) into `<profile>/node_modules/`, resolving this
-package's registry dependencies there.
+it. This package is a plain dsh bundle and needs no special packaging, but
+the spec form decides what lands in the profile (measured on dsh
+0.2.0-rc.2):
 
-- **Registry dependencies** (`dependencies`) install into the profile. Keep
-  them genuinely third-party; a `@deepseek-ai/*` entry here duplicates a
-  module the host already runs (see the peer rule below).
-- **Peers** (`peerDependencies`) resolve through the shared fallback
-  `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` at boot. `link-peers` is
-  only for a standalone official `dsh` install that recorded `link:` instead
-  of `file:` — never for ellamaka.
+- **`file:<abs>`** copies the package into `<profile>/node_modules/` (per its
+  `files` field) and installs its `dependencies` there. This is what
+  `ellamaka dsh plugin add <dir>` records, and the only option for a package
+  with registry dependencies.
+- **A bare path** is recorded as `link:<abs>` — a symlink to the source tree.
+  Its `dependencies` are **not** installed; any `import` of one fails with
+  `ERR_MODULE_NOT_FOUND`. Only usable for live-edit development of a package
+  whose runtime imports all resolve elsewhere.
+
+Rules that follow:
+
+- **Registry dependencies** (`dependencies`) install only on a `file:`
+  install; keep them genuinely third-party. A `@deepseek-ai/*` entry here
+  duplicates a module the host already runs, and the profile copy wins
+  resolution from inside the plugin.
+- **Peers** (`peerDependencies`) are resolved by the dsh loader from the
+  installation scope, independently of the spec form: a `link:` install
+  resolves them fine. No per-plugin linking step exists or is needed.
 - **pnpm** is a host prerequisite, exactly as for the official `dsh` CLI:
   neither product bundles or installs one. A missing `pnpm` fails the install
   with an explicit message.
 - **The source directory stays clean** — no `node_modules`, no lockfile;
   `file:` installs copy from the source tree.
-
-## link-peers.mjs maintenance constraints
-
-- `scripts/link-peers.mjs` derives the official closure from `which dsh` →
-  realpath. **Never rewrite it to read `$DSH_HOME` or any home path** (this
-  machine has two homes — official `~/.dsh` and ellamaka
-  `~/.wopal/dsh/home`; the environment variable points at the latter, and
-  mixing them up is a real failure mode).
-- `PEER_PACKAGES` must stay in sync with `peerDependencies` in
-  `package.json`; update both when adding or removing a peer.
-- Links are symlinks into the official closure (not copies), so versions
-  follow official dsh upgrades automatically; never materialize peer copies
-  with `npm install` (that creates module duplicates distinct from the
-  host's).
 
 ## Fork modification constraints
 

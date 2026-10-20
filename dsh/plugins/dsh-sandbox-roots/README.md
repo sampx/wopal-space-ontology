@@ -41,7 +41,7 @@ ellamaka dsh plugin --profile web add /path/to/dsh-sandbox-roots   # 转给官�
 ```
 
 运行中的容器经组合文件监听热挂载；bundle patch 变更在下次重放或重启时生效。
-包内零 node_modules（peer 依赖由 `profiles/node_modules` 共享 heal 层解析），
+包内零 node_modules（peer 由 dsh loader 从安装作用域解析，与安装方式无关），
 `lib/` 由 `prepare` 脚本（tsdown）预构建。
 
 ## 已知限制

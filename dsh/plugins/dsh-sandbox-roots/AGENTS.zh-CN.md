@@ -1,6 +1,6 @@
 ---
 name: dsh-sandbox-roots
-description: 沙箱可写根扩展插件（@wopal/dsh-sandbox-roots）——插件依赖解析边界、TDD 强制与 link-peers 维护约束
+description: 沙箱可写根扩展插件（@wopal/dsh-sandbox-roots）——插件依赖解析边界与 TDD 强制
 ---
 
 # dsh-sandbox-roots — Agent 规范
@@ -33,30 +33,28 @@ pnpm check       # typecheck + test + build 全链
 ## 插件依赖解析边界（最高优先级）
 
 两个运行时共用同一个安装器：官方 pluginManager 的 pnpm，作用于 profile
-自己的 `package.json`。`ellamaka dsh plugin add <目录>` 直接转发给它，因此安
-装记为 `file:<绝对路径>`，pnpm 按 `files` 字段把包拷进
-`<profile>/node_modules/`，并就地解析本包的 registry 依赖。
+自己的 `package.json`。`ellamaka dsh plugin add <目录>` 直接转发给它。本包是
+标准 dsh bundle，不需要任何特殊打包；但 spec 形式决定装进 profile 的东西
+（在 dsh 0.2.0-rc.2 实测）：
 
-- **registry 依赖**（`dependencies`）装进 profile。只放真正的第三方包；把
-  `@deepseek-ai/*` 写在这里会让宿主已有的模块多出一份实例（见下方 peer 规则）。
-- **peer**（`peerDependencies`）在 boot 时经共享兜底层
-  `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` 解析。`link-peers` 只适用
-  于独立官方 `dsh` 安装记录成 `link:`（而非 `file:`）的情况，ellamaka 不使
-  用。
+- **`file:<绝对路径>`**：把包按 `files` 字段拷进 `<profile>/node_modules/`，
+  并在那里安装它的 `dependencies`。`ellamaka dsh plugin add <目录>` 记录的就
+  是这种；有 registry 依赖的包也只能用这种。
+- **裸路径**：记为 `link:<绝对路径>`，即指向源码目录的软链。它的
+  `dependencies` **不会安装**，任何 `import` 都会 `ERR_MODULE_NOT_FOUND`。
+  只适用于运行时 import 全部另有出处的包的边改边测。
+
+由此得到的规则：
+
+- **registry 依赖**（`dependencies`）只在 `file:` 安装时装进 profile，且只放
+  真正的第三方包；把 `@deepseek-ai/*` 写在这里会让宿主已有的模块多出一份实
+  例，且插件内部解析会命中 profile 那份。
+- **peer**（`peerDependencies`）由 dsh loader 从安装作用域解析，与 spec 形式
+  无关：`link:` 安装同样能解析。不存在也不需要任何逐插件链接步骤。
 - **pnpm** 是宿主前置条件，与官方 `dsh` CLI 一致：双方都不随包分发、也不代
   为安装。缺失时安装入口直接给出明确报错。
 - **源码目录保持纯净**——不含 `node_modules` 与 lockfile；`file:` 安装从源
   目录拷贝。
-
-## link-peers.mjs 维护约束
-
-- `scripts/link-peers.mjs` 通过 `which dsh` → realpath 推导官方闭包，**禁止
-  改为读取 `$DSH_HOME` 或任何 home 路径**（本机存在官方 `~/.dsh` 与
-  ellamaka `~/.wopal/dsh/home` 两个 home，环境变量指向后者，混用即错）。
-- `PEER_PACKAGES` 清单必须与 `package.json` 的 `peerDependencies` 保持一致；
-  增删 peer 时两处同步修改。
-- 链接目标是官方闭包的 symlink（非拷贝），版本自动跟随官方 dsh 升级；
-  禁止用 `npm install` 落地 peer 实体（会产生与宿主不同的模块副本）。
 
 ## 上游对齐约束
 

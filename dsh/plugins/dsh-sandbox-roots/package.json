@@ -30,8 +30,7 @@
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm test && pnpm build",
-    "link-peers": "node scripts/link-peers.mjs"
+    "check": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {},
   "peerDependencies": {
