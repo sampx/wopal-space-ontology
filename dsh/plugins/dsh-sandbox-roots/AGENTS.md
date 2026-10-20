@@ -50,6 +50,9 @@ package's registry dependencies there.
   `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` at boot. `link-peers` is
   only for a standalone official `dsh` install that recorded `link:` instead
   of `file:` — never for ellamaka.
+- **pnpm** is a host prerequisite, exactly as for the official `dsh` CLI:
+  neither product bundles or installs one. A missing `pnpm` fails the install
+  with an explicit message.
 - **The source directory stays clean** — no `node_modules`, no lockfile;
   `file:` installs copy from the source tree.
 

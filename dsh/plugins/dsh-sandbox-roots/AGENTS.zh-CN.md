@@ -43,6 +43,8 @@ pnpm check       # typecheck + test + build 全链
   `$DSH_HOME/profiles/node_modules/@deepseek-ai/*` 解析。`link-peers` 只适用
   于独立官方 `dsh` 安装记录成 `link:`（而非 `file:`）的情况，ellamaka 不使
   用。
+- **pnpm** 是宿主前置条件，与官方 `dsh` CLI 一致：双方都不随包分发、也不代
+  为安装。缺失时安装入口直接给出明确报错。
 - **源码目录保持纯净**——不含 `node_modules` 与 lockfile；`file:` 安装从源
   目录拷贝。
 

@@ -15,7 +15,7 @@ Do not write the profile's `package.json` or `cordis.patch.yml`, create packages
 
 官方依赖位于 Ellamaka 管理的 `closures/<fingerprint>/`，只读参考。WopalSpace 的三个 preset 由 `@wopal/dsh-presets` bundle 声明；旧 `preset.yml` 与 `agent.cordis.yml` 是生成源，运行时消费生成的 `preset.patch.yml`。修改源后重新生成并安装 bundle，在新会话确认行为，既有会话保留原 revision。
 
-安装使用 `ellamaka dsh plugin --profile web add <bundle 绝对目录>`：它把目录规格转成 `file:<绝对路径>` 交给官方 dsh 安装器（pnpm），由官方完成声明、依赖、lockfile 与 bundle 登记。本集成里 Wopal 没有 `plugin_manager` 工具，因此上文以 `install_bundle` 为中心的流程不适用；同样不要在 profile 目录手跑 pnpm 或手改 `package.json`。
+安装使用 `ellamaka dsh plugin --profile web add <bundle 绝对目录>`：它把目录规格转成 `file:<绝对路径>` 交给官方 dsh 安装器（pnpm），由官方完成声明、依赖、lockfile 与 bundle 登记。本集成里 Wopal 没有 `plugin_manager` 工具，因此上文以 `install_bundle` 为中心的流程不适用；同样不要在 profile 目录手跑 pnpm 或手改 `package.json`。pnpm 是宿主前置条件（与官方 dsh 一致，产品不随包分发），缺失时安装会直接报错，需先让 `pnpm` 在 PATH 上。
 
 插件的 `@deepseek-ai/*` 依赖必须写在 `peerDependencies`，由宿主闭包与 `profiles/node_modules` 兜底层提供；写进 `dependencies` 会在 profile 里装出第二份模块实例。保留旧源目录和迁移前快照，不依赖 `.agent-presets` 软链自动发现。项目技能经 `<项目>/.dsh/skills` 装配，bundle 自带技能经 `customSkillDirs` 挂载。
 
