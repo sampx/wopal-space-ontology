@@ -122,7 +122,7 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 
 此标题保持英文原样，Codex 代码审查按它定位本段。
 
-通用审查方法见 `df-implement-review`（代码改动）和 `df-proposal-review`（方案与进化提案）。
+通用审查方法见 `df-implement-review`（代码改动）和 `df-plan-review`（Plan）。
 本节只补本项目特有的检查点，不替代 CI、测试或产品意图。
 
 只有当本次 diff 引入了该缺陷，且能给出具体触发条件、受影响行为、改动代码中的证据时，
@@ -130,10 +130,12 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 
 ### 能力引用必须可解析
 
-- `assembly/archetypes/*.yaml`、agent 的 `permission:` 块、技能中引用的每个
-  技能、agent、规则、命令和模板，都必须在同一版本中存在。
-- 新增或删除一项能力时，必须同时更新所有 archetype 和 README 技能树。
+- 适用的 `assembly/archetypes/*.yaml`、agent 的 `permission:` 块、技能中引用的
+  每个技能、agent、规则、命令和模板，都必须在同一棵树中存在。
+- 新增或删除一项能力时，必须更新消费它的 archetype，以及真正枚举了它的 README 条目。
 - 安全路径：旧条目保留到所有消费者迁移完成，或将改名与全部消费者更新放在同一次改动中。
+  仅属于单个空间或单一类型的能力，可以只改本类型的装配单或登记 `include`
+  （`docs/DESIGN-assembly.md`）。
 - 影响：引用无法解析会让空间装配 fail fast（`docs/DESIGN-assembly.md`），
   一个过期名字就能卡住所有 coding 空间。
 

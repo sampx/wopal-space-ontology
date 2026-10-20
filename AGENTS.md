@@ -123,8 +123,8 @@ Authoritative details live in `skills/dev-flow/SKILL.md` under "Executing: imple
 Keep this heading verbatim — Codex Code Review looks for it.
 
 Generic review method lives in `df-implement-review` (code changes) and
-`df-proposal-review` (plans and evolution proposals). This section adds
-repository-specific checks; it does not replace CI, tests, or product intent.
+`df-plan-review` (Plans). This section adds repository-specific checks; it does
+not replace CI, tests, or product intent.
 
 Report a defect only when this diff introduces it and the finding names a
 concrete trigger, the affected behavior, and evidence in the changed code.
@@ -132,13 +132,15 @@ Omit pre-existing problems, style preferences, and anything CI already enforces.
 
 ### Capability references resolve
 
-- Every skill, agent, rule, command, and template referenced by
+- Every skill, agent, rule, command, and template referenced by an applicable
   `assembly/archetypes/*.yaml`, an agent's `permission:` block, or a skill must
-  exist at the same revision.
-- Adding or removing a capability requires updating every archetype and the
-  README skill tree in the same change.
-- Safe path: keep the old entry until all consumers move, or land the rename and
-  every consumer update together.
+  exist in the same tree.
+- Adding or removing a capability requires updating the archetypes that consume
+  it, plus the README entries that actually enumerate it.
+- Safe path: keep the old entry until every consumer moves, or land the rename
+  and all consumer updates together. A space-local or single-type change may
+  update only its own manifest or register an `include`
+  (`docs/DESIGN-assembly.md`).
 - Why it matters: an unresolved reference makes space assembly fail closed
   (`docs/DESIGN-assembly.md`), so one stale name blocks every coding space.
 
