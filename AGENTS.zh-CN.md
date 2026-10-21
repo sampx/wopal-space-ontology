@@ -5,17 +5,13 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 # Agent 开发规范
 
-## 1. 规范文档引用
+## 规范文档引用
 
 - DESIGN: `.wopal/docs/DESIGN.md`
 - Parent Rules: `.wopal-space/REGULATIONS.md`
 - Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
 
-## 2. 架构与目录
-
-执行链：修改 ontology 源 → 如涉及加载链路，由用户重启 ellamaka → 在 ellamaka 运行时验证。
-
-本地化审核目录使用 `.wopal/docs/LANG/<locale>/...`；`<locale>` 采用 IETF BCP 47 / RFC 5646 语言标记，例如 `zh-CN`、`en-US`，不要写死 `zh-CN`。
+## 架构与目录
 
 | 目录 | 职责 |
 |---|---|
@@ -28,14 +24,14 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 | `scripts/` | ontology 维护、git hooks 与辅助自动化脚本 |
 | `config/` | 空间级 ellamaka 配置层 |
 
-## 3. 开发命令
+## 开发命令
 
 | 场景 | 命令 | 时机 |
 |---|---|---|
 | 插件构建与测试 | 参见 `.wopal/plugins/wopal-plugin/AGENTS.md` | 插件代码变更后 |
 | 内容变更验证 | 提醒用户重启 ellamaka | 涉及加载链路的任何变更 |
 
-## 4. 实现规则
+## 实现规则
 
 ### 多语言
 
@@ -80,49 +76,20 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 - `trigger` 声明匹配方式（如 `model_decision`）；`keywords` 声明触发关键词。
 - 正文只写 Agent 可执行的约束，不写产品意图或实现细节。
 
-### dev-flow Worktree 生命周期
-
-dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约：
-
-- `planning` 和已批准的 `executing` 基线位于集成分支（main 或 space/<name>）
-- `approve --confirm` 先在集成分支提交 `executing` + Worktree 元数据，再创建 worktree
-- `complete` 在 feature 分支上提交 Plan-only commit（`verifying`），脏实施树报错退出
-- 用户验证在 feature 分支上进行
-- `verify-switch --merge` 在用户明确确认后将 feature 分支集成到 main
-- `verify --confirm` 在集成分支上提交 Plan-only commit（`done`）
-- `archive` 在集成分支上将已接受 Plan 移至 `done/`，清理 worktree
-
-**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。被委派的实施 agent 不提交；主控者检查实施结果并确认 Task Verify 通过后，才创建该 Task 的实施提交。
-
-**Plan 路径与进度所有权**：Plan 文件位于空间仓库 `.wopal-space/plans/<项目>/`，worktree 中不存在 Plan 副本。子代理 prompt 必须使用空间仓库的 Plan 绝对路径，但实施 agent 只读 Plan，不编辑 Plan、不勾选进度。AC 命令、Done、实际触碰文件等进度证据由主控者验收通过后回填。
-
-权威细节见 `skills/dev-flow/SKILL.md` 的「Executing：实施、验收、评审、Agent Verification」与「分支与 worktree 边界」，以及 `references/plan-guide.zh-CN.md` 的「实施交接」。
-
 ### 插件
 
 - 插件内部架构、日志、类型安全、错误处理、开发与测试细则，**遵循** `.wopal/plugins/wopal-plugin/AGENTS.md`。
 
-### dsh-adapter 不变量
-
-- **事件日志折叠 LAST-wins**：每条消息的 sandbox 覆写必须无条件追加 `sandbox/mode`，包括与空间默认值相等的取值——「恢复默认」需要显式事件；跳过与默认值相同的追加会让先前的覆写继续生效。只有缺失 `extra.sandboxMode` 才表示「保持当前折叠」（见 poc DESIGN-dsh-poc §4.5）。
-- **权限 frontmatter 不带通配符**：agent 的 `permission:` 块不得声明 `"*": allow` 形式的条目（引擎默认值已提供）。求值是对深合并的多副本 frontmatter 按 LAST-wins 进行，因此通配符可能因键顺序不同而静默覆盖显式的 `ask`（见 poc DESIGN-dsh-poc §6.8）。任何权限改动后，在活实例上通过 `GET /agent` 验证合并后的规则顺序。
-- **投影给模型的工具 schema 必须忠实于容器声明**：JSON Schema→zod 转换必须保留 `oneOf`/`anyOf`（null 分支折为 nullable）、`enum`、`const` 以及每个属性的 `description`，只有真正不支持的节点才降级为 `z.unknown()`。dsh 会用自己的 schema 重新校验每次调用，模型看不见的约束正是模型会猜错、dsh 会随后拒收的约束（`insert_line` 被投影成 `any` → 模型发字符串 → `oneOf branch (matched 0)`）。保真度属于转换器，不属于逐工具补丁——provider 每次请求重读容器活 schema，一次转换器修复即覆盖所有已投影工具与未来所有参数。验证必须对照已安装 dsh 运行时的全部投影工具 schema（schema 检查 + 与 `validateJsonSchemaValue` 的接受/拒绝一致性），绝不对手写样例验证。
-
-## 5. 测试
+## 测试
 
 - 插件代码遵循 TDD：先写失败测试，再实现代码使测试通过。
 - 本项目声明式内容变更后，提醒用户重启 ellamaka 验证加载结果；验证通过前不要频繁提交。
-
-## 6. 用户补充规则
-
-- 禁止把审核版路径写死为 `zh-CN`。
-- 禁止在技能或灵魂提示词中写死与本空间或某些具体的任务高度相关路径或信息,影响通用性.
 
 ## Code Review Rules
 
 此标题保持英文原样，Codex 代码审查按它定位本段。
 
-通用审查方法见 `df-implement-review`（代码改动）和 `df-plan-review`（Plan）。
+通用审查方法见 `df-implement-review`（代码改动）和 `df-proposal-review`（Plan、设计与进化提案）。
 本节只补本项目特有的检查点，不替代 CI、测试或产品意图。
 
 只有当本次 diff 引入了该缺陷，且能给出具体触发条件、受影响行为、改动代码中的证据时，
@@ -172,3 +139,9 @@ dev-flow 技能的 worktree Plan 生命周期遵循 **Plan 分支归属** 契约
 - 编译、格式、lint 等 CI 已负责的内容；
 - 个人口味；
 - 产品意图和业务规则，归用户决定。
+
+## 用户补充规则
+
+- 禁止把审核版路径写死为 `zh-CN`。
+- 禁止在技能或灵魂提示词中写死与本空间或某些具体的任务高度相关路径或信息,影响通用性.
+

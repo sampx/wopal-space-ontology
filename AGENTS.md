@@ -5,17 +5,13 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 # Agent Development Rules
 
-## 1. Canonical References
+## Canonical References
 
 - DESIGN: `.wopal/docs/DESIGN.md`
 - Parent Rules: `.wopal-space/REGULATIONS.md`
 - Plugin Rules: `.wopal/plugins/wopal-plugin/AGENTS.md`
 
-## 2. Architecture and Directories
-
-Execution chain: modify ontology source → if load-path-related, user restarts ellamaka → verify at ellamaka runtime.
-
-Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses IETF BCP 47 / RFC 5647 tags, e.g. `zh-CN`, `en-US`. Never hardcode `zh-CN`.
+## Architecture and Directories
 
 | Directory | Responsibility |
 |---|---|
@@ -28,14 +24,14 @@ Localization review directory: `.wopal/docs/LANG/<locale>/...`. `<locale>` uses 
 | `scripts/` | Ontology maintenance, git hooks, and auxiliary automation scripts |
 | `config/` | Space-level ellamaka configuration layer |
 
-## 3. Development Commands
+## Development Commands
 
 | Scenario | Command | When |
 |---|---|---|
 | Plugin build & test | See `.wopal/plugins/wopal-plugin/AGENTS.md` | After any plugin code change |
 | Content change verification | Remind user to restart ellamaka | Any change involving load paths |
 
-## 4. Implementation Rules
+## Implementation Rules
 
 ### i18n / Multilingual
 
@@ -80,50 +76,21 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 - `trigger` declares the matching mode (e.g. `model_decision`); `keywords` declare triggering keywords.
 - The body only contains agent-executable constraints, not product intent or implementation details.
 
-### Dev-flow Worktree Lifecycle
-
-The dev-flow skill's worktree Plan lifecycle follows the **Plan branch ownership** contract:
-
-- `planning`, and the approved `executing` baseline, live on the integration branch (main or space/<name>)
-- `approve --confirm` first commits `executing` + worktree metadata on the integration branch, then creates the worktree
-- `complete` commits a Plan-only commit (`verifying`) on the feature branch, and exits with an error on a dirty work tree
-- User validation happens on the feature branch
-- `verify-switch --merge` integrates the feature branch into main only after explicit user confirmation
-- `verify --confirm` commits a Plan-only commit (`done`) on the integration branch
-- `archive` moves the accepted Plan to `done/` on the integration branch and cleans up the worktree
-
-**Plan-only commit principle**: lifecycle scripts commit Plan status changes only, never implementation code. Delegated implementers do not commit; the controller creates a Task's implementation commit only after inspecting the result and confirming Task Verify passes.
-
-**Plan path and progress ownership**: Plan files live in the space repository under `.wopal-space/plans/<project>/`; no Plan copy exists in the worktree. Subagent prompts must reference the Plan by its absolute path in the space repository, but implementers treat it as read-only and never tick progress. AC commands, Done evidence, and actually touched files are written back by the controller only after Task acceptance.
-
-Authoritative details live in `skills/dev-flow/SKILL.md` under "Executing: implementation, acceptance, review, Agent Verification" and "Branch and worktree boundaries", plus "Implementation handoff" in `references/plan-guide.md`.
-
 ### Plugin
 
 - Plugin internal architecture, logging, type safety, error handling, development, and testing rules: **follow** `.wopal/plugins/wopal-plugin/AGENTS.md`.
 
-### dsh-adapter Invariants
-
-- **Event-log folds are LAST-wins**: per-message sandbox overrides append `sandbox/mode` unconditionally, including values equal to the space default — "restore default" requires an explicit event; skipping same-as-default appends leaves a prior override in force. Only a missing `extra.sandboxMode` means "keep current fold" (see poc DESIGN-dsh-poc §4.5).
-- **Permission frontmatter carries no wildcards**: agent `permission:` blocks must not declare `"*": allow`-style entries (engine defaults already provide them). Evaluation is LAST-wins over deep-merged multi-copy frontmatter, so a wildcard can silently override an explicit `ask` depending on key order (see poc DESIGN-dsh-poc §6.8). After any permission change, verify merged rule order via `GET /agent` on a live instance.
-- **Projected tool schemas must stay faithful to the container declaration**: the JSON Schema→zod conversion preserves `oneOf`/`anyOf` (null branch → nullable), `enum`, `const`, and every property `description`, degrading to `z.unknown()` only for genuinely unsupported nodes. dsh re-validates every call against its own schema, so a constraint the model cannot see is one it will guess wrong and dsh will then reject (`insert_line` projected as `any` → the model sends strings → `oneOf branch (matched 0)`). Fidelity belongs in the converter, not in per-tool patches — the provider re-reads live container schemas per request, so one converter fix covers every projected tool and every future parameter. Verify against the installed dsh runtime schemas of all projected tools (schema checks plus accept/reject parity with `validateJsonSchemaValue`), never against hand-written samples.
-
-## 5. Testing
+## Testing
 
 - Plugin code follows TDD: write a failing test first, then implement code to make it pass.
 - After any declarative content change, remind the user to restart ellamaka for verification. Do not commit frequently before verification passes.
-
-## 6. User-Supplied Rules
-
-- Never hardcode the review path as `zh-CN`.
-- Never hardcode paths or information highly specific to this space or particular tasks in skills or soul prompts, as it harms generality.
 
 ## Code Review Rules
 
 Keep this heading verbatim — Codex Code Review looks for it.
 
 Generic review method lives in `df-implement-review` (code changes) and
-`df-plan-review` (Plans). This section adds repository-specific checks; it does
+`df-proposal-review` (Plans, designs, and evolution proposals). This section adds repository-specific checks; it does
 not replace CI, tests, or product intent.
 
 Report a defect only when this diff introduces it and the finding names a
@@ -183,3 +150,8 @@ Review `plugins/wopal-plugin/` against its own `AGENTS.md` (runtime path
 - compilation, formatting, and lint that CI already enforces;
 - personal style preferences;
 - product intent and business rules, which belong to the user.
+
+## User-Supplied Rules
+
+- Never hardcode the review path as `zh-CN`.
+- Never hardcode paths or information highly specific to this space or particular tasks in skills or soul prompts, as it harms generality.

@@ -1,7 +1,7 @@
 # Ontology — Distribution
 
 > **Status**: Active
-> **Updated**: 2026-10-13
+> **Updated**: 2026-10-20
 > **Parent**: `./DESIGN.md`
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -90,15 +90,15 @@ Contract：
 
 共享 setup 自动创建用户级 `agents/skills/rules/commands` 目录，但不把 ontology 的 agents/skills/rules/commands/plugins 整体 symlink/copy 到用户级目录。Ontology 内容通过对应空间的装配 worktree 分发；用户自己安装的全局能力保持独立。Runtime 仍可扫描 `$WOPAL_HOME/plugins` 等由其 owning 安装流程创建的全局来源，但 Setup 不因此自动创建或填充这些目录。
 
-DSH preset 是声明式 bundle，源位于 ontology dsh/agents-presets，按目标产品的标准供应链快照安装到选定 profile；不依赖全局 .agent-presets 链接。DSH profile 运行文件与用户覆盖按下节物化。
+DSH preset 是声明式 bundle，源位于 ontology `dsh/agents-presets`，按目标产品的标准供应链快照安装到选定 profile；不依赖全局 `.agent-presets` 链接。
 
-### DSH Profiles Materialization Contract
+### DSH Bundles and Profile Boundary
 
-DSH Profile（`web` 与 `ellamaka-tools`）的基准声明属于本体能力基因，但其执行环境必须位于本地运行态：
+本体仓库的 DSH 资产与宿主运行态 Profile 严格分层：
 
-1. **基准源**：`ontologies/wopal-space-ontology/dsh/profiles/<profile>/` 仅受版本控制维护 `package.json`（bundles 依赖）与 `cordis.patch.yml`（参数与规则补丁）。
-2. **确定性物化**：共享服务将基准源文件物理复制（Copy）到 SDK 返回的当前环境 `home/profiles/<profile>/`，支持增量合并（bundles 去重合并、用户自定义 patch 保护）。
-3. **运行时闭环**：物理文件就位后，由 `ellamaka dsh init` 执行闭包依赖解析、本地 `node_modules` 安装及 fallback 符号链接自愈，并在启动时动态生成 `cordis.yml` 锚点。禁止对 profiles 根目录进行跨文件系统软链接。
+1. **本体能力资产**：`dsh/` 目录仅维护跨版本的声明式预设包（`dsh/agents-presets`，即 `@wopal/dsh-presets`）与扩展插件包（`dsh/plugins/*`）。这些包将 `@deepseek-ai/*` 声明为兼容版本范围的 `peerDependencies`（如 `^0.2.0-rc.2`），不锁定单一预发布版本号，也不在本体仓库中维护 `dsh/profiles/` 基线目录。
+2. **宿主 Profile 初始化**：`$WOPAL_HOME/dsh/home/profiles/<profile>/`（`web` 与 `ellamaka-tools`）的目录结构、初始 `package.json`、`cordis.patch.yml`、`pnpm-workspace.yaml` 与 `cordis.yml` 合成根锚点由 Ellamaka 的 CorePreparation（`@wopal/ellamaka-cordis`）在产品启动准备阶段通过官方 `initProfile` 初始化与管理（详见 `../../projects/ellamaka/docs/DESIGN-dsh-base.md`）。
+3. **标准供应链安装**：当用户或空间启用本体提供的 DSH 预设或插件包时，通过目标产品标准的 DSH 插件供应链（以 `file:` 本地包快照方式）安装到对应 profile 中。禁止对 profiles 根目录或插件包进行跨目录软链接。
 
 ### Space Overlay
 
