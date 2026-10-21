@@ -55,6 +55,13 @@ All document links in `AGENTS.md` must use relative paths (relative to the repos
 
 The Canonical References section in the header carries only mandatory documents (PRD, DESIGN, business rules) that the agent must follow. Reference-only material (research, tutorials, auxiliary specs) is not canonical and must not be listed there. A document is either a canonical link or a reference, never both.
 
+### The Code Review Rules Section
+
+- Code projects (repositories under `projects/` and the ontology repository) must include a `## Code Review Rules` section; documentation-only directories may omit it.
+- New projects generate the section per the template; updates to an existing `AGENTS.md` preserve the section permanently — never delete, rename, or translate the heading.
+- The section content is a direction-level skeleton only: a reference to the review skills the space actually assembles, the defect-report boundary, and project-specific checkpoints each project fills in itself. The template must not carry any single project's concrete rules.
+- The heading stays in English in every language version; only the body translates. This reuses the existing rule that template-defined English section headings are not translated.
+
 ## 3.5 Document-Set Consistency
 
 Updating `AGENTS.md` is never isolated. The rules must match the actual project code and stay consistent with the project DESIGN, PRD, and README:
@@ -80,6 +87,7 @@ Updating `AGENTS.md` is never isolated. The rules must match the actual project 
 - **Safety boundaries**: deletion scope limits, single write path for credentials, protected content rules.
 - **Behavior constraints**: patterns the agent must follow when modifying (thin handlers, output through OutputService, error-code conventions).
 - **Operating constraints even when DESIGN covers the topic**: logging rules, output and routing rules, host / release / DSH operational limits, testing and verification rules, and coding discipline stay here summarized. "DESIGN documents it" is not a delete reason.
+- **Code Review Rules section**: kept verbatim — the heading is never deleted, renamed, or translated; its content is audited like any other rule.
 - **User-Supplied Rules section**: never touched.
 
 ### Fix Criteria
@@ -147,6 +155,7 @@ Before writing, present the full plan and get explicit user confirmation. The pl
 11. Low-information content to delete or avoid: `N/A` placeholders for nonexistent documents, text duplicated from DESIGN / frontmatter / global regulations, and long directory / API / command catalogs
 12. For each structure-related item, whether it is a current fact, a durable target constraint, or a temporary plan
 13. For each deleted rule, the reason it does not constrain agent work — never "DESIGN also covers the topic" alone
+14. For code projects, the presence and content plan of the `Code Review Rules` section (keep / generate / fill in checkpoints); for documentation-only directories, confirmation that omission is intentional
 
 When updating an existing `AGENTS.md`, rules and specifications are immutable after initial creation. Any addition, modification, or deletion must first appear as a proposal in the plan and can only be executed after explicit user confirmation.
 
@@ -189,6 +198,8 @@ For a small update to an existing `AGENTS.md` (no frontmatter change, no target-
 - [ ] `User-Supplied Rules` remained unchanged: no additions, modifications, deletions, or reordering (original specification migrations excepted)
 - [ ] All non-obsolete original rules were preserved: rules fitting the sections above placed there, remaining rules moved verbatim to User-Supplied Rules; any deleted rule has explicit justification in the plan
 - [ ] The full plan was shown and confirmed before writing
+- [ ] Code projects include the `Code Review Rules` section; its heading was never translated, renamed, or deleted
+- [ ] Review skills referenced inside the `Code Review Rules` section actually exist in the space
 - [ ] The formal English version was updated after confirmation when applicable
 
 ## 7. Response After Completion
