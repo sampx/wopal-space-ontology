@@ -31,7 +31,7 @@ writes them.
 - **Type**: fix
 - **Project Path**: .wopal
 - **Created**: 2026-10-21
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-fix-dsh-packages
 - **Branch**: ontology-fix-dsh-packages
