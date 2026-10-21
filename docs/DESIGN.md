@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-10-10
+> **Updated**: 2026-10-20
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -16,9 +16,7 @@
 
 ## Project Role
 
-新版 dsh-adapter 由 Ellamaka 的 ellamaka-cordis 内置；ontology 默认装配不再引用它，参数仍在 settings.jsonc 的 wopal.pluginConfig.dsh-adapter。plugins/dsh-adapter 暂留为旧产品兼容源码，不由新版装配或执行；旧产品需兼容的旧装配声明。实现与权限契约统一见 [工具容器设计](../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter)，ontology 不维护独立 adapter 设计。
-
-ontology 是 WopalSpace 的 Space Ontology 层，也是空间灵魂、规约与能力基因工具包的承载面。Agent 身份、规则、技能、命令、插件、模板与辅助脚本在这里沉淀和分发；ellamaka 负责解释执行和共享的确定性本地业务服务，wopal-cli 负责命令行呈现及调用，space runtime 负责当前空间运行态。
+ontology 是 WopalSpace 的 Space Ontology 层，也是空间灵魂、规约与能力基因工具包的承载面。Agent 身份、规则、技能、命令、插件、DSH 预设与扩展包、模板与辅助脚本在这里沉淀和分发；ellamaka 负责解释执行和共享的确定性本地业务服务，wopal-cli 负责命令行呈现及调用，space runtime 负责当前空间运行态。DSH 内部工具容器适配（`dsh-adapter`）由 Ellamaka 的 `@wopal/ellamaka-cordis` 内置，空间通过 `settings.jsonc` 的 `wopal.pluginConfig.dsh-adapter` 配置行为参数（详见 [工具容器设计](../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter)）。
 
 核心职责：空间灵魂可复用、空间规约可分发、空间能力可编排、空间经验可延续。Fork 一个 ontology = 复制一套可持续演化的空间起点。
 
@@ -115,7 +113,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `memory_manage`     | LanceDB 记忆 CRUD 与语义检索（list/stats/search/add/update/delete/injected） |
 | `context_manage`    | 会话上下文管理（status/dump/compact）+ 蒸馏（distill/confirm/cancel）        |
 
-`wopal_task` 的装配参数只接受能力名称数组。武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载，真相源为 ellamaka 引擎发现层。清单字段、清单契约与派发契约的完整定义see the Capability Assembly Module in `./DESIGN-wopal-plugin.md`.
+`wopal_task` 的装配参数只接受能力名称数组。武器库查询由 wopal-cli 的 `wopal space capability list` 命令承载，真相源为 ellamaka 引擎发现层。清单字段、清单契约与派发契约的完整定义见 `./DESIGN-wopal-plugin.md` 的 Capability Assembly Module 章节。
 
 ### CLI Command Surface
 
@@ -128,7 +126,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal space capability list`              | 查询空间武器库有效能力集（四类武器，全局+空间） |
 | `wopal ontology install/update/contribute` | 本体安装、下行整合与上行贡献                    |
 
-命令语义与边界see the Maintenance and Distribution Command Surface in `./DESIGN-evolution.md`.
+命令语义与边界见 `./DESIGN-evolution.md` 的 Maintenance and Distribution Command Surface 章节。
 
 ### Initialization and Maintenance Targets
 
@@ -189,7 +187,7 @@ CLI 边界：
 
 ### Template Contract
 
-各模板的 schema、字段、生成规则与消费规则see the Template Contract in `./DESIGN-assembly.md`.
+各模板的 schema、字段、生成规则与消费规则见 `./DESIGN-assembly.md` 的 Template Contract 章节。
 
 ---
 
