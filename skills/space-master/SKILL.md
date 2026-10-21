@@ -58,7 +58,8 @@ When creating or updating a project-level or directory-level `AGENTS.md`, work b
    - **Fix**: directory descriptions outdated, conflicts with a newer design mechanism, language versions drifted
 2. **Plan before writing**: present the audit classification (keep / delete / fix with reasons) plus the proposed change list, and wait for user confirmation
 3. **Review version first, formal version second**: update `AGENTS.<locale>.md` first, then the formal English `AGENTS.md` after approval
-4. **Code Review Rules section**: code projects' `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories may omit it). The section carries a direction-level skeleton only: a reference to the space's assembled review skills, the defect-report boundary, and project-specific checkpoints; never any single project's concrete rules
+4. **Code Review Rules section**: code projects' `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories may omit it). The section carries a direction-level skeleton only: a reference to the space's assembled review skills, the defect-report boundary, and project-specific checkpoints. Only the reusable template must not
+   carry any single project's concrete rules
 5. Not updating is the default and legitimate outcome — update only when code, tests, config, and existing docs cannot carry the boundary
 
 **Full specification** (content boundaries, workflow, quality checklist) lives in `references/agents-md-maintenance.md`. The `/cupdate-agent-rules` command is an entry point only and carries no specification.
