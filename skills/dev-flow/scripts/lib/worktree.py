@@ -42,14 +42,6 @@ class WorktreeContext:
     project_type: str = "standard"
 
 
-def _worktree_field_name(field: str) -> str:
-    """Convert python field name to Plan metadata key.
-
-    e.g. 'project_type' -> 'project_type', 'verify_mode' -> 'verify_mode'
-    """
-    return field
-
-
 def parse_worktree_context(plan_path: str) -> WorktreeContext | None:
     """Parse WorktreeContext from Plan metadata.
 

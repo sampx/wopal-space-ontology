@@ -235,22 +235,6 @@ def push(repo_path: str) -> bool:
     return result.returncode == 0
 
 
-def is_git_repo(path: str) -> bool:
-    """Check if path is inside a git repository.
-
-    Args:
-        path: Any path to check
-
-    Returns:
-        True if path is inside a git repo
-    """
-    result = subprocess.run(
-        ["git", "rev-parse", "--is-inside-work-tree"],
-        cwd=path,
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0 and result.stdout.strip() == "true"
 def get_common_git_dir(path: str) -> str:
     """Get the common git directory (shared across worktrees).
 

@@ -34,14 +34,14 @@ def _parse_github_url(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _get_repo_slug(path: Path) -> str | None:
+def get_repo_slug(path: Path) -> str | None:
     url = get_remote_url(str(path))
     if not url:
         return None
     return _parse_github_url(url)
 
 
-def _get_default_branch(project_path: Path) -> str:
+def get_default_branch(project_path: Path) -> str:
     """Resolve the default branch of a repo using LOCAL git refs only.
 
     The default branch name is always derivable locally (origin/HEAD symref,
@@ -150,12 +150,12 @@ def resolve_plan_location(
     repo_relative_path = str(plan_path.relative_to(repo_root))
     is_archived = "/done/" in str(plan_path) and "/plans/" in str(plan_path)
 
-    github_repo = _get_repo_slug(repo_root)
+    github_repo = get_repo_slug(repo_root)
     dot_git = repo_root / ".git"
     if dot_git.is_file():
         branch = get_current_branch(str(repo_root)) or "main"
     else:
-        branch = _get_default_branch(repo_root)
+        branch = get_default_branch(repo_root)
 
     return PlanLocation(
         path=plan_path,

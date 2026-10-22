@@ -69,7 +69,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 - 测试框架：pytest
 - 测试目录：`tests/python/unit/`（单元测试）、`tests/python/integration/`（集成测试）
 - 测试 fixture：`tests/fixtures/`
-- 测试支持工具：`tests/python/support/bootstrap.py`
+- 测试支持工具：`tests/python/support/bootstrap.py`（scripts 路径注入）、`git_fixtures.py`（真实 git 仓库 fixture）、`plan_fixtures.py`（按命名契约生成 Plan 文件）
 - **TDD 要求**：新命令或 `scripts/lib/` 模块功能必须先写失败测试，再实现功能使测试通过
 - 修改子命令逻辑后必须运行对应单元测试确认无回归
 

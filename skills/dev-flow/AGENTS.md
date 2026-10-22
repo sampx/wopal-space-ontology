@@ -69,7 +69,7 @@ Each command requires a prerequisite state; invalid transitions error out. New c
 - Test framework: pytest
 - Test directories: `tests/python/unit/` (unit), `tests/python/integration/` (integration)
 - Test fixtures: `tests/fixtures/`
-- Test support utilities: `tests/python/support/bootstrap.py`
+- Test support utilities: `tests/python/support/bootstrap.py` (scripts path injection), `git_fixtures.py` (real git repo fixtures), `plan_fixtures.py` (Plan files named per the naming contract)
 - **TDD requirement**: new commands or `scripts/lib/` module features must have a failing test written first, then implementation to make it pass
 - After modifying subcommand logic, run the corresponding unit tests to confirm no regression
 

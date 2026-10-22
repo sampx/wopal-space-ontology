@@ -18,21 +18,18 @@ from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root
 from workflow import update_plan_status
 from workflow import guard_status, resolve_space_repo
-from plan import find_plan, find_plan_by_issue
+from plan import find_plan
 from plan import (
     get_plan_issue,
     get_plan_project,
-    get_plan_status,
-    get_plan_type,
     get_plan_worktree,
-    set_plan_worktree,
     set_plan_field,
     get_plan_field,
 )
 from lib.git import is_repo_dirty, commit_paths, get_dirty_lines
 from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
 from plan import resolve_project_path
-from lib.worktree import resolve_active_plan, parse_worktree_context, ResolveActivePlanError, ActivePlanInfo
+from lib.worktree import resolve_active_plan, parse_worktree_context, ResolveActivePlanError
 from validation import (
     ValidationError,
     check_acceptance_criteria,
@@ -45,7 +42,6 @@ from workflow import (
 from issue import (
     sync_status_label,
     sync_plan_to_issue_body,
-    plan_status_to_issue_label,
 )
 
 

@@ -23,11 +23,11 @@ import re
 import subprocess
 from pathlib import Path
 
-from lib.logging import log_info, log_success, log_error, log_warn
+from lib.logging import log_info, log_success, log_error
 from lib.workspace import find_workspace_root
 from workflow import update_plan_status
 from workflow import guard_status, resolve_space_repo
-from plan import find_plan, find_plan_by_issue
+from plan import find_plan
 from plan import (
     get_plan_field,
     get_plan_issue,
@@ -49,7 +49,6 @@ from workflow import (
 from issue import (
     sync_status_label,
     sync_plan_to_issue_body,
-    plan_status_to_issue_label,
 )
 
 
