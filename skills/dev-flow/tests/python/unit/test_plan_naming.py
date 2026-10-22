@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-# test_plan_naming.py - Test validate_plan_name function with mandatory scope
+# test_plan_naming.py - Plan naming contract: <issue>-<type>-<slug> / <type>-<slug>
 #
-# Test Case U5: Plan file naming with mandatory scope validation
-#
-# Scenarios:
-#   1. Issue format with scope -> passes (e.g., 110-feature-dev-flow-slug)
-#   2. No-issue format with scope -> passes (e.g., feature-dev-flow-slug)
-#   3. Old format without scope -> fails (e.g., 110-feature-slug)
-#   4. No-issue old format -> fails (e.g., feature-slug)
-#   5. Invalid type -> fails
-#
-# Note: Tests the new mandatory scope naming requirement from #110
-# Extended: slug length guard (<= 20 chars) and no-issue --slug override
+# A Plan name is <issue?>-<type>-<slug> and nothing else: type and slug are
+# always explicit, never derived from a title. The name must be ASCII kebab-case
+# within the slug length cap because it derives the feature branch and worktree.
 
-import unittest
 import sys
-import os
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
@@ -30,202 +20,96 @@ from plan import validate_plan_name, make_plan_name, ValidationError
 from commands.plan import _cmd_plan_new
 
 
-class TestValidatePlanName(unittest.TestCase):
-    """Test validate_plan_name with mandatory scope"""
-
-    def test_issue_format_with_scope_passes(self):
-        """validate_plan_name: Issue format with scope passes"""
-        issue_plan = "110-feature-dev-flow-improve-plan-naming"
-        validate_plan_name(issue_plan)
-
-    def test_issue_format_with_cli_scope(self):
-        """validate_plan_name: Issue format with cli scope"""
-        cli_plan = "42-feature-cli-add-skills-remove"
-        validate_plan_name(cli_plan)
-
-    def test_no_issue_format_with_scope_passes(self):
-        """validate_plan_name: No-issue format with scope passes"""
-        no_issue_plan = "fix-dev-flow-handle-expired-tokens"
-        validate_plan_name(no_issue_plan)
-
-    def test_no_issue_with_hyphenated_scope(self):
-        """validate_plan_name: No-issue with hyphenated scope"""
-        hyphen_scope_plan = "refactor-wopal-plugin-optimize-modules"
-        validate_plan_name(hyphen_scope_plan)
-
-    def test_old_issue_format_with_multi_segment_slug_matches(self):
-        """validate_plan_name: Old Issue format with multi-segment slug still matches (regex limitation)
-        
-        Note: The regex cannot distinguish old format (no scope) from new format
-        when the old slug happens to have 2+ segments. E.g., "110-feature-improve-plan-naming"
-        matches as: issue=110, type=feature, scope=improve, slug=plan-naming.
-        Scope enforcement happens at plan creation time (via extract_scope from Issue title),
-        not at regex validation time. The regex only checks structural format.
-        """
-        old_issue_plan = "110-feature-improve-plan-naming"
-        # This passes because regex sees: issue=110, type=feature, scope=improve, slug=plan-naming
-        # Scope enforcement is at creation time, not validation time
-        validate_plan_name(old_issue_plan)
-
-    def test_single_segment_after_type_fails(self):
-        """validate_plan_name: Single segment after type fails (no scope no slug)"""
-        single_segment = "feature-someslug"
-        with self.assertRaises(ValidationError) as context:
-            validate_plan_name(single_segment)
-        error_msg = str(context.exception)
-        self.assertTrue(
-            "scope" in error_msg.lower() or "invalid" in error_msg.lower(),
-            f"Error should fail with only one segment after type: {error_msg}"
-        )
-
-    def test_old_no_issue_format_with_multi_segment_slug_matches(self):
-        """validate_plan_name: Old no-issue format with multi-segment slug matches
-        
-        Matches as: type=fix, scope=handle, slug=expired-tokens
-        """
-        old_no_issue_plan = "fix-handle-expired-tokens"
-        # Matches as: type=fix, scope=handle, slug=expired-tokens
-        validate_plan_name(old_no_issue_plan)
-
-    def test_invalid_type_fails(self):
-        """validate_plan_name: Invalid type fails"""
-        invalid_type_plan = "42-invalid-dev-flow-some-slug"
-        with self.assertRaises(ValidationError) as context:
-            validate_plan_name(invalid_type_plan)
-        error_msg = str(context.exception)
-        self.assertTrue(
-            "type" in error_msg.lower() or "invalid" in error_msg.lower(),
-            f"Error should mention invalid type: {error_msg}"
-        )
-
-    def test_valid_fix_type_with_scope(self):
-        """validate_plan_name: Valid fix type with scope"""
-        fix_plan = "15-fix-plugin-handle-error"
-        validate_plan_name(fix_plan)
-
-    def test_valid_refactor_type_with_scope(self):
-        """validate_plan_name: Valid refactor type with scope"""
-        refactor_plan = "refactor-cli-optimize-commands"
-        validate_plan_name(refactor_plan)
-
-    def test_valid_docs_type_with_scope(self):
-        """validate_plan_name: Valid docs type with scope"""
-        docs_plan = "docs-dev-flow-update-readme"
-        validate_plan_name(docs_plan)
-
-    def test_valid_chore_type_with_scope(self):
-        """validate_plan_name: Valid chore type with scope"""
-        chore_plan = "chore-cli-reorganize-scripts"
-        validate_plan_name(chore_plan)
-
-    def test_valid_test_type_with_scope(self):
-        """validate_plan_name: Valid test type with scope"""
-        test_plan = "test-cli-add-unit-tests"
-        validate_plan_name(test_plan)
-
-    def test_valid_enhance_type_with_scope(self):
-        """validate_plan_name: Valid enhance type with scope"""
-        enhance_plan = "21-enhance-plugin-improve-performance"
-        validate_plan_name(enhance_plan)
-
-
-class TestMakePlanName(unittest.TestCase):
-    """Test make_plan_name function"""
-
-    def test_make_plan_name_with_issue(self):
-        """make_plan_name: creates plan name with issue number"""
-        plan_name = make_plan_name(
-            issue_number=110,
-            plan_type="feature",
-            scope="dev-flow",
-            slug="improve-plan-naming"
-        )
-        self.assertEqual(plan_name, "110-feature-dev-flow-improve-plan-naming")
-
-    def test_make_plan_name_without_issue(self):
-        """make_plan_name: creates plan name without issue number"""
-        plan_name = make_plan_name(
-            issue_number=None,
-            plan_type="fix",
-            scope="dev-flow",
-            slug="handle-token-expiry"
-        )
-        self.assertEqual(plan_name, "fix-dev-flow-handle-token-expiry")
-
-    def test_make_plan_name_with_hyphenated_scope(self):
-        """make_plan_name: handles hyphenated scope"""
-        plan_name = make_plan_name(
-            issue_number=42,
-            plan_type="feature",
-            scope="wopal-plugin",
-            slug="add-new-feature"
-        )
-        self.assertEqual(plan_name, "42-feature-wopal-plugin-add-new-feature")
-
-    def test_make_plan_name_normalizes_type(self):
-        """make_plan_name: normalizes plan type"""
-        plan_name = make_plan_name(
-            issue_number=15,
-            plan_type="feat",  # Should normalize to feature
-            scope="cli",
-            slug="add-skills-remove"
-        )
-        self.assertEqual(plan_name, "15-feature-cli-add-skills-remove")
-
-    def test_make_plan_name_enhance_type(self):
-        """make_plan_name: handles enhance type"""
-        plan_name = make_plan_name(
-            issue_number=21,
-            plan_type="enhance",
-            scope="plugin",
-            slug="improve-performance"
-        )
-        self.assertEqual(plan_name, "21-enhance-plugin-improve-performance")
-
-
-class TestMakePlanNameSlugLength:
-    """make_plan_name: slug segment is capped at 20 chars (plan-guide slug rules)
-
-    Input -> expected outcome:
-      len(slug) <= 20 -> name is built with the slug kept verbatim
-      len(slug) > 20  -> ValidationError naming the actual length, the 20-char
-                         limit, and the input to shorten
-                         (--slug in Issue mode, the title in no-issue mode)
-    """
+class TestValidatePlanName:
+    """validate_plan_name: structure is <issue?>-<type>-<slug>, ASCII only."""
 
     @pytest.mark.parametrize(
-        "issue_number,expected_name",
+        "name",
         [
-            # Exactly 20 chars is within the limit — both modes
-            (110, "110-feature-engine-token-expiry-refresh"),
-            (None, "feature-engine-token-expiry-refresh"),
+            "fix-pr-102",
+            "196-feature-cli-plan-scheduler",
+            "docs-readme",
+            "refactor-cli-sdk-integration",
         ],
     )
-    def test_slug_at_20_char_limit_is_accepted(self, issue_number, expected_name):
-        """20-char slug -> accepted verbatim in both modes"""
-        assert make_plan_name(issue_number, "feature", "engine", "token-expiry-refresh") == expected_name
+    def test_valid_names_pass(self, name):
+        validate_plan_name(name)
 
     @pytest.mark.parametrize(
-        "issue_number,slug,slug_from_title,hint",
+        "name",
         [
-            # 21 chars: first length over the limit — Issue mode (explicit --slug)
-            (110, "deliver-plugin-config", False, "--slug"),
-            # 21 chars: no-issue mode with an explicit --slug
-            (None, "deliver-plugin-config", False, "--slug"),
-            # 21 chars: no-issue mode, slug derived from the title
-            (None, "deliver-plugin-config", True, "title"),
-            # 38 chars: the verbose slug that exposed the missing guard
-            (110, "deliver-plugin-config-table-to-plugins", False, "--slug"),
+            # CJK slug — the defect this contract exists to stop
+            "fix-dsh-pr-102-评审修复",
+            "fix-评审",
+            # no type segment
+            "110-improve-plan-naming",
+            # unknown type
+            "42-invalid-some-slug",
+            # underscores and uppercase are not kebab-case
+            "fix-some_slug",
+            "fix-Some-Slug",
         ],
     )
-    def test_slug_over_20_chars_raises_actionable_error(self, issue_number, slug, slug_from_title, hint):
-        """over-20 slug -> ValidationError with length, limit and fix hint"""
+    def test_invalid_names_rejected(self, name):
+        with pytest.raises(ValidationError):
+            validate_plan_name(name)
+
+    def test_error_names_the_accepted_shape_and_ascii_rule(self):
         with pytest.raises(ValidationError) as exc_info:
-            make_plan_name(issue_number, "feature", "engine", slug, slug_from_title=slug_from_title)
+            validate_plan_name("fix-dsh-pr-102-评审修复")
         message = str(exc_info.value)
-        assert str(len(slug)) in message, f"must name actual length {len(slug)}: {message}"
-        assert "20" in message, f"must name the 20-char limit: {message}"
-        assert hint in message.lower(), f"must point at the fix ({hint}): {message}"
+        assert "<type>-<slug>" in message, message
+        assert "--slug" in message, message
+
+    def test_scope_like_segment_is_now_part_of_the_slug(self):
+        """`fix-dsh-pr-102` is legal — `dsh-pr-102` is just the slug.
+
+        The contract no longer has a scope slot, so a name that used to read as
+        `<type>-<scope>-<slug>` simply reads as `<type>-<slug>` now. What this
+        guards is that the rule is about characters and structure, not about
+        banning a word that looks like a scope.
+        """
+        validate_plan_name("fix-dsh-pr-102")
+
+
+class TestSlugLength:
+    """The 20-char cap is a creation-time rule, not a lifecycle gate."""
+
+    def test_slug_at_20_chars_is_accepted(self):
+        make_plan_name(110, "feature", "token-expiry-refresh")
+
+    @pytest.mark.parametrize("slug", ["deliver-plugin-config", "deliver-plugin-config-table-to-plugins"])
+    def test_over_20_chars_raises_with_length_limit_and_fix(self, slug):
+        with pytest.raises(ValidationError) as exc_info:
+            make_plan_name(110, "feature", slug)
+        message = str(exc_info.value)
+        assert str(len(slug)) in message, message
+        assert "20" in message, message
+        assert "--slug" in message, message
+
+    def test_existing_plan_name_skips_the_length_cap(self):
+        """An in-flight Plan keeps its name; the branch is already derived."""
+        validate_plan_name("refactor-runtime-dsh-foundation", enforce_slug_length=False)
+
+
+class TestMakePlanName:
+    """make_plan_name: builds the name and validates it in the same step."""
+
+    @pytest.mark.parametrize(
+        "issue_number,plan_type,slug,expected",
+        [
+            (110, "feature", "token-expiry", "110-feature-token-expiry"),
+            (None, "fix", "token-expiry", "fix-token-expiry"),
+            (15, "feat", "add-skills-remove", "15-feature-add-skills-remove"),
+            (21, "enhance", "improve-performance", "21-enhance-improve-performance"),
+        ],
+    )
+    def test_builds_expected_name(self, issue_number, plan_type, slug, expected):
+        assert make_plan_name(issue_number, plan_type, slug) == expected
+
+    def test_non_ascii_slug_rejected(self):
+        with pytest.raises(ValidationError):
+            make_plan_name(None, "fix", "评审修复")
 
 
 def _write_plan_template(workspace_root: Path) -> None:
@@ -246,73 +130,60 @@ def _run_no_issue_new(args, workspace_root: Path) -> int:
             return _cmd_plan_new(args)
 
 
-class TestNoIssueModeSlug:
-    """_cmd_plan_new (no-issue mode): --slug wins over the title-derived slug
+def _no_issue_args(title, slug, plan_type="feature"):
+    return Namespace(
+        plan_command="new",
+        issue=None,
+        title=title,
+        project="wopal-cli",
+        type=plan_type,
+        slug=slug,
+    )
 
-    Input -> expected artifact:
-      --slug given    -> plan file name uses that slug, verbatim
-      --slug omitted  -> plan file name derives from the title (regression guard)
-      --slug too long -> exit 1, error names length/limit/--slug, no file written
-    """
 
-    @staticmethod
-    def _args(title, slug, plan_type="feature"):
-        return Namespace(
-            plan_command="new",
-            issue=None,
-            title=title,
-            project="wopal-cli",
-            type=plan_type,
-            scope=None,
-            slug=slug,
-        )
+class TestNoIssueModeThroughCli:
+    """_cmd_plan_new (no-issue): the Plan name comes from --type and --slug only."""
 
     @pytest.mark.parametrize(
         "title,slug,plan_type,expected_name",
         [
-            # explicit --slug wins over a long title-derived slug
-            (
-                "feat(engine): deliver plugin config table to plugins",
-                "config-tables", "feature", "feature-engine-config-tables",
-            ),
-            # explicit --slug is kept verbatim — no type-prefix stripping
-            (
-                "fix(cli): handle tokens",
-                "fix-token-flow", "fix", "fix-cli-fix-token-flow",
-            ),
-            # no --slug: falls back to the title-derived slug (regression guard)
-            (
-                "feat(engine): add cache layer",
-                None, "feature", "feature-engine-add-cache-layer",
-            ),
+            # a long, structured title does not leak into the name
+            ("feat(engine): deliver plugin config table to every plugin", "config-tables",
+             "feature", "feature-config-tables"),
+            # a Chinese title is irrelevant — the slug decides the name
+            ("修复 PR 102 的评审问题", "pr-102", "fix", "fix-pr-102"),
         ],
     )
-    def test_plan_file_name_follows_slug_source(self, tmp_path, title, slug, plan_type, expected_name):
-        """slug input -> plan file created under that name"""
+    def test_name_comes_from_type_and_slug_only(self, tmp_path, title, slug, plan_type, expected_name):
         _write_plan_template(tmp_path)
-        result = _run_no_issue_new(self._args(title, slug, plan_type), tmp_path)
-        assert result == 0
+        assert _run_no_issue_new(_no_issue_args(title, slug, plan_type), tmp_path) == 0
         assert (tmp_path / ".wopal-space" / "plans" / "wopal-cli" / f"{expected_name}.md").is_file()
 
-    def test_explicit_slug_over_20_chars_rejected_before_write(self, tmp_path):
-        """38-char explicit --slug -> exit 1, actionable error, no plan file"""
+    def test_missing_slug_rejected_before_write(self, tmp_path):
+        """There is no fallback: without --slug nothing is created."""
         _write_plan_template(tmp_path)
-        args = self._args(
-            "feat(engine): add cache layer",
-            "deliver-plugin-config-table-to-plugins",
-        )
+        with patch("commands.plan.log_error") as mock_log_error:
+            result = _run_no_issue_new(_no_issue_args("feat(engine): add cache layer", None), tmp_path)
+
+        assert result == 1
+        plans_root = tmp_path / ".wopal-space" / "plans"
+        assert list(plans_root.rglob("*.md")) if plans_root.exists() else [] == []
+        message = " ".join(str(call.args[0]) for call in mock_log_error.call_args_list)
+        assert "--slug" in message, message
+
+    def test_slug_over_20_chars_rejected_before_write(self, tmp_path):
+        _write_plan_template(tmp_path)
+        args = _no_issue_args("feat(engine): add cache layer", "deliver-plugin-config-table-to-plugins")
         with patch("commands.plan.log_error") as mock_log_error:
             result = _run_no_issue_new(args, tmp_path)
 
         assert result == 1
         plans_root = tmp_path / ".wopal-space" / "plans"
-        created = list(plans_root.rglob("*.md")) if plans_root.exists() else []
-        assert created == []
+        assert list(plans_root.rglob("*.md")) if plans_root.exists() else [] == []
         message = " ".join(str(call.args[0]) for call in mock_log_error.call_args_list)
-        assert "38" in message, f"must name actual length: {message}"
-        assert "20" in message, f"must name the 20-char limit: {message}"
-        assert "--slug" in message, f"must point at --slug: {message}"
+        assert "20" in message, message
+        assert "--slug" in message, message
 
 
 if __name__ == '__main__':
-    unittest.main()
+    sys.exit(pytest.main([__file__, "-v"]))

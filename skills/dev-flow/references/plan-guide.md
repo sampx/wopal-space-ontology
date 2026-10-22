@@ -285,6 +285,30 @@ The Plan name is the authoritative identifier used to derive feature branches. N
 | `add-skills-remove-command` | `skills-remove` |
 | `support-handling-expired-tokens` | `token-expiry` |
 
+### What is enforced
+
+The name is not a convention you are trusted to follow — it derives the feature branch, so the CLI checks it:
+
+| Where | Checks | Applies to |
+|---|---|---|
+| `plan new` | full contract: ASCII kebab-case, type from the standard set, slug ≤ 20 | every new name |
+| `plan check` | the same, minus the slug cap | any Plan it is pointed at |
+| `submit` / `approve` | via `plan check` | every Plan passing a lifecycle gate |
+
+The slug is always given explicitly with `--slug` — never derived from a title, which is free-form and often long, and often not English at all. That is why `--type` and `--slug` are both required in every mode.
+
+`fix-dsh-pr-102` is a legal name — `dsh-pr-102` is simply the slug. There is no scope slot, so nothing is "extra" in it.
+
+### Existing Plans: no retroactive renaming
+
+Plans created before this contract carry a scope-like segment and slugs over 20 chars. They are **not renamed, and not rejected**:
+
+- `plan check` and the lifecycle commands enforce only the character set on them, not the slug length.
+- Their feature branch is already derived from the current name; renaming mid-flight would orphan the worktree and the branch.
+- Historical Plans in `done/` are history and are not touched at all.
+
+Only creation is strict. This keeps the contract honest — one rule for what gets created — without turning a naming migration into a blocker on work already in progress.
+
 ### Plan directory rules
 
 - New Plans must be created or located via `flow.sh plan ...`; never hand-write files

@@ -177,8 +177,7 @@ class TestCmdPlanNewMetadataWiring(unittest.TestCase):
             "title": "enhance(cli): add thing",
             "project": "wopal-cli",
             "type": "enhance",
-            "scope": None,
-            "slug": None,
+            "slug": "add-thing",
             "product": None,
             "phase": None,
         }

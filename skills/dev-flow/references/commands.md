@@ -112,7 +112,7 @@ flow.sh issue create --title "add skills remove command" --project <name> --type
 flow.sh issue edit <issue> --body-file <path>     # 全量替换 body
 flow.sh issue edit <issue> --append <path>        # 追加到 body 末尾
 flow.sh issue edit <issue> --title "fix(api): ..." # 改标题（自动同步 type/project 标签）
-flow.sh issue edit <issue> --type fix --project wopal-cli  # 改类型/项目标签
+flow.sh issue edit <issue> --type fix --project <name>  # 改类型/项目标签
 ```
 
 **行为**：
@@ -143,9 +143,9 @@ flow.sh issue delete <issue>    # 删除 Issue（gh 会要求确认）
 ```bash
 flow.sh issue list                          # 列出未完成 Issue（默认 50 条）
 flow.sh issue list --limit 100              # 指定数量
-flow.sh issue list --project firecrawl      # 按 project 过滤（可多次，OR）
+flow.sh issue list --project <name>         # 按 project 过滤（可多次，OR）
 flow.sh issue list --status planning        # 按 status 过滤（可多次，OR）
-flow.sh issue list --project firecrawl --project wopal-cli --status planning --status verifying
+flow.sh issue list --project <name> --status planning --status verifying
 ```
 
 **行为**：
@@ -179,8 +179,8 @@ Agent 定位 Issue 的顺序：已知编号 → `issue view`；需要浏览/筛�
 
 ```bash
 # 创建
-flow.sh plan new <issue> --type <type> --scope <scope> --slug <slug>  # 从 Issue 创建
-flow.sh plan new --title "..." --project <name> --type <type>  # 无 Issue 创建
+flow.sh plan new <issue> --type <type> --slug <slug>  # 从 Issue 创建（type/slug 必填，无 scope 段）
+flow.sh plan new --project <name> --type <type> --slug <slug> [--title "..."]  # 无 Issue 创建（--project 选择该模式）
 # 阶段关联：默认继承 Issue body 的 Product/Phase；--product <name> --phase <id> 可覆盖（须成对，缺一报错；无关联时两项均留空）
 
 # 查询

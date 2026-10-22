@@ -2,8 +2,11 @@
 # validation.py - Mechanical Plan lifecycle gates
 
 import re
+from pathlib import Path
 
 from lib.workspace import find_workspace_root
+from plan import ValidationError as PlanNameValidationError
+from plan import validate_plan_name
 from workflow import PLAN_STATES
 
 
@@ -48,6 +51,7 @@ def check_doc_plan(plan_file: str) -> None:
     issues: list[str] = []
     issues.extend(check_plan_status(content))
     issues.extend(check_product_phase(content))
+    issues.extend(check_plan_name(plan_file))
 
     project_path_issue = _check_project_path(content)
     if project_path_issue:
@@ -57,6 +61,21 @@ def check_doc_plan(plan_file: str) -> None:
         raise ValidationError(
             f"{len(issues)} issue(s) in {plan_file}\n" + "\n".join(issues)
         )
+
+
+def check_plan_name(plan_file: str) -> list[str]:
+    """The file name is the Plan's identity: it derives the feature branch.
+
+    Only the character set is enforced for existing Plans. The slug-length cap
+    is a creation-time rule — a Plan already in flight has its branch derived
+    from the current name, so a length complaint here would block a lifecycle
+    step the user never asked to renegotiate.
+    """
+    try:
+        validate_plan_name(Path(plan_file).stem, enforce_slug_length=False)
+    except PlanNameValidationError as exc:
+        return [f"Plan name: {exc}"]
+    return []
 
 
 def check_plan_status(content: str) -> list[str]:

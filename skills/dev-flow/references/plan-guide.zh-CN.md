@@ -282,6 +282,30 @@ Plan name 是权威标识，用于派生 feature 分支。命名必须精简—�
 | `add-skills-remove-command` | `skills-remove` |
 | `support-handling-expired-tokens` | `token-expiry` |
 
+### 哪些是强制的
+
+命名不是「靠自觉遵守」的约定——它要派生 feature 分支，所以由 CLI 校验：
+
+| 位置 | 校验内容 | 作用对象 |
+|---|---|---|
+| `plan new` | 完整契约：ASCII kebab-case、type 属标准集、slug ≤ 20 | 每一个新名字 |
+| `plan check` | 同上，但不查 slug 长度 | 指向的任何 Plan |
+| `submit` / `approve` | 经由 `plan check` | 每个过生命周期的 Plan |
+
+slug 一律由 `--slug` 显式给出，从不从标题派生——标题是自由文本，通常很长，还常常不是英文。这就是 `--type` 和 `--slug` 在两种模式下都必填的原因。
+
+`fix-dsh-pr-102` 是合法名字——`dsh-pr-102` 就是 slug。没有 scope 槽位，所以里面不存在「多余」的段。
+
+### 存量 Plan：不追溯改名
+
+契约生效前创建的 Plan 带有近似 scope 的段、slug 也超过 20 字符。它们**既不改名，也不被拒绝**：
+
+- `plan check` 与生命周期命令对它们只校验字符集，不校验 slug 长度。
+- 它们的 feature 分支已经按当前名字派生出来了；中途改名会让 worktree 和分支变成孤儿。
+- `done/` 里的历史 Plan 属于历史记录，完全不动。
+
+只有创建是严格的。这样契约才诚实——对「将来创建什么」只有一套规则——同时不把一次命名迁移变成正在进行的工作的阻塞项。
+
 ### Plan 目录规则
 
 - 新 Plan 必须先通过 `flow.sh plan ...` 生成或定位，禁止手写创建文件
