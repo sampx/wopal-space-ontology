@@ -28,7 +28,7 @@ description: |
 
 | 场景 | 加载 | 要点 |
 |------|------|------|
-| 开发/修复/重构（Issue/Plan 驱动） | `dev-flow` | 默认开发流程；任务走其状态机（planning → reviewing → executing → verifying → done） |
+| 开发/修复/重构（Issue/Plan 驱动） | `dev-flow` | 默认开发流程；任务走其状态机（planning → reviewing → executing → verifying → done）。本体 Issue 是例外——见下方「Issue 归哪个项目、走哪个流程」 |
 | 本体维护（实例更新、空间对齐、能力装配、贡献） | `ontology-evolution` | 本体仓库操作一律直接加载该技能；本技能只做路由 |
 | 本体能力进化（`.wopal/` 下的 skills、rules、agents、commands、plugins、assembly） | `ontology-evolution` | 对象判据：本体能力资产走本技能；`projects/` 下的代码仓库走 `dev-flow` |
 | 委派任何子 Agent（fae/rook/wsf-* 等所有类型） | `agents-collab` | 委派前必须加载；覆盖委派工具 API、任务生命周期、双向通信、进度监控与恢复 |
@@ -39,6 +39,25 @@ description: |
 - **AGENTS.md 维护**：创建/更新项目级或目录级 AGENTS.md——规则审计、内容边界、工作流
 - **README 维护**：创建/更新项目级 README.md——面向人类的项目入口文档，按空间能力条件性对齐文档集
 - **技能维护**：技能生命周期——安装、扫描、移除
+
+---
+
+## Issue 归哪个项目、走哪个流程
+
+每个 Issue 通过 `--project` / `project/<name>` 标签声明它要改哪个空间组件。这个标签同时决定工作落在哪、以及归哪个流程管，所以必须按**改动对象**选，不能按话题选。
+
+标签怎么填，与 `STRUCTURE.md` 里组件的命名保持一致：
+
+| Issue 要改的东西 | `--project` | 流程 |
+|---|---|---|
+| 本体组件——本体 worktree 本身（`skills/`、`rules/`、`agents/`、`commands/`、`plugins/`、`assembly/`） | 该组件在 `STRUCTURE.md` 里的项目名 | `ontology-evolution` |
+| `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | `dev-flow` |
+
+名字要从 `STRUCTURE.md` 读，不要凭印象猜：本体项目名和仓库清单每个空间都不一样，写一个不匹配的组件名，会让 Plan 或提案落进没有任何地方指向的目录。
+
+项目是本体组件的 Issue 就是本体工作：写成 `docs/evolutions/` 下的提案，走 `wopal space evo` 生命周期，绝不走 dev-flow 那条路——没有 Plan、没有特性分支、没有 worktree。Issue 只是需求的记录，提案才是实施的授权来源。
+
+标签看不准时就按改动路径判断：落在本体 worktree 里就是本体工作，落在 `projects/` 下的仓库就是仓库工作。
 
 ---
 

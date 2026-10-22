@@ -222,6 +222,7 @@ Do not expand a single instruction such as “commit it” into authorization fo
 ## Boundaries that must hold
 
 - Do not bypass dev-flow for design-bearing work.
+- Ontology issues are not dev-flow work. When an Issue's project is the ontology component — its changes land in the ontology worktree (skills, rules, agents, commands, plugins, assembly) rather than in a repository under `projects/` — hand it to `ontology-evolution` instead of planning it here. The Issue stays the demand record; the proposal is the implementation authority. See `references/issue-guide.md` for how `--project` decides this.
 - Do not ask for Plan approval before `reviewing`, and do not implement an unapproved Plan.
 - Do not rewrite approved Plan intent or DESIGN and continue without user confirmation.
 - Do not `complete` before implementation review PASS and Agent Verification are complete.

@@ -28,7 +28,7 @@ Space skills each serve their own purpose. Choose by scenario; do not stack load
 
 | Scenario | Load | Notes |
 |----------|------|-------|
-| Dev / Fix / Refactor (Issue/Plan driven) | `dev-flow` | Default development workflow; tasks run through its state machine (planning → reviewing → executing → verifying → done) |
+| Dev / Fix / Refactor (Issue/Plan driven) | `dev-flow` | Default development workflow; tasks run through its state machine (planning → reviewing → executing → verifying → done). Ontology Issues are the exception — see "Issues: which project, which workflow" below |
 | Ontology maintenance (instance updates, space alignment, capability assembly, contribution) | `ontology-evolution` | Load it directly for any ontology repo operation; this skill only routes |
 | Ontology capability evolution (skills, rules, agents, commands, plugins, assembly under `.wopal/`) | `ontology-evolution` | Object test: ontology capability assets → this skill; code repositories under `projects/` → `dev-flow` |
 | Delegate any sub-agent (fae, rook, wsf-*, etc.) | `agents-collab` | MUST load before delegation; covers delegation tool APIs, task lifecycle, two-way communication, progress monitoring, and recovery |
@@ -39,6 +39,25 @@ This skill directly owns WopalSpace's space governance work — no routing neede
 - **AGENTS.md maintenance**: creating or updating project-level or directory-level AGENTS.md — rule audit, content boundaries, workflow
 - **README maintenance**: creating or updating project-level README.md — human-facing project entry documentation, capability-aware conditional document-set alignment
 - **Skill maintenance**: the skill lifecycle — install, scan, remove
+
+---
+
+## Issues: which project, which workflow
+
+Every Issue names the space component it will change through its `--project` / `project/<name>` label. That label decides both where the work lives and which workflow owns it, so choose it by the object being changed, never by the topic.
+
+Choose the label the same way `STRUCTURE.md` names components:
+
+| The Issue changes | `--project` | Workflow |
+|---|---|---|
+| An ontology component — the ontology worktree itself (`skills/`, `rules/`, `agents/`, `commands/`, `plugins/`, `assembly/`) | That component's project name, read from `STRUCTURE.md` | `ontology-evolution` |
+| A repository under `projects/` | That repository's name, read from `STRUCTURE.md` | `dev-flow` |
+
+Read the name from `STRUCTURE.md` rather than assuming it: the ontology project name and the repository set differ per space, and a name that does not match the component sends the Plan or proposal into a directory nothing else points at.
+
+An Issue whose project is the ontology component is ontology work: it goes to a proposal under `docs/evolutions/` and the `wopal space evo` lifecycle. It never takes the dev-flow path — no Plan, no feature branch, no worktree. The Issue remains the record of the demand; the proposal is the implementation authority.
+
+The component path answers the question when the label is ambiguous: if the change lands in the ontology worktree, it is ontology work; if it lands in a repository under `projects/`, it is repository work.
 
 ---
 

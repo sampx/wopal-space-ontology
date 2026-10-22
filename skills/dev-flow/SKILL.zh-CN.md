@@ -222,6 +222,7 @@ flow.sh archive <plan> [--keep-worktree]
 ## 必须守住的边界
 
 - 带设计面的工作不要绕过 dev-flow 直接实施。
+- 本体 Issue 不是 dev-flow 的工作。Issue 的项目是本体组件——即改动落在本体 worktree 的技能、规则、agent、命令、插件、装配里，而不是 `projects/` 下的仓库——就交给 `ontology-evolution`，不要在这里出 Plan。Issue 仍是需求记录，提案才是实施授权。`--project` 怎么决定这一点见 `references/issue-guide.md`。
 - Plan 未进入 `reviewing` 前，不要请用户审批；Plan 未批准前，不要开始其实施。
 - 已批准 Plan 或 DESIGN 需要改变时，不要自行修改后继续。
 - 实施评审未 PASS、Agent Verification 未完成时，不要 `complete`。
