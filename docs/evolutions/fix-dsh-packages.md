@@ -143,13 +143,13 @@ fd00::1           kind=ipv6 range=uniqueLocal
 
 ### Agent Verification
 
-1. [ ] 新派生的干净 checkout 中，`lib/**` 是 Git 跟踪的预构建产物而非本地残留；在不提供 `node_modules` 的临时副本中执行打包仍成功，产物包含 `main` 与 `exports` 所需的全部 `lib/**`，且不会因缺少 `tsdown` 触发安装期构建；维护者依赖就绪时 `pnpm check` 通过且重建后 `lib/**` 与提交产物一致。
-2. [ ] `dsh-sandbox-roots` 四份文档不再把 `$DSH_HOME/settings.yaml`、`installSection`、`sandbox-policy:` 描述为**当前**配置源；首次出现处明确指向 `sandbox-roots-policy` entry config / profile `cordis.patch.yml`；源码中无新增 legacy settings 路径。
-3. [ ] 配置 native IPv6 fake CIDR 时，该段内地址通过 fake-range 判定；IPv4-mapped IPv6 按其嵌入 IPv4 与 IPv4 fake CIDR 一致处理；未列入 fake range 的 private/reserved 地址仍被拒绝。
-4. [ ] `lib/types/index.d.ts` 的 `Config` 精确包含 `fakeIpRanges?: string[]` 与 `proxyUrl?: string`，且不包含 runtime schema 未支持的字段。
-5. [ ] 按 D-03（`public-only`）：entry `proxyUrl` 与 environment-proxy 两条 `requestVia` 路径都在 dispatch 前拒绝解析到 loopback/private/link-local 的 hostname；公网 hostname 与配置的 fake-IP 路径仍正常发送；仅代理侧可解析而本机不可解析的名称被拒；本机校验与代理解析之间的残余差异（TOCTOU）在 README 与代码注释中写明。
-6. [ ] `dsh/agents-presets/wopal/README.md` 的安装说明与父级 bundle 一致：通过 bundle 安装并加载 `wopal/preset.patch.yml`，不再声明运行时依赖 `.agent-presets/wopal` 软链。
-7. [ ] 所有改动仅位于提案记录的工作分支；canonical 与 `.wopal` 无改动；对无 `check` script 的包，验证记录写明该事实并附替代验证结果。
+1. [x] 新派生的干净 checkout 中，`lib/**` 是 Git 跟踪的预构建产物而非本地残留；在不提供 `node_modules` 的临时副本中执行打包仍成功，产物包含 `main` 与 `exports` 所需的全部 `lib/**`，且不会因缺少 `tsdown` 触发安装期构建；维护者依赖就绪时 `pnpm check` 通过且重建后 `lib/**` 与提交产物一致。 — 实证（本轮复核）：`prepare` 已从 `package.json` 删除，`.gitignore` 仅剩 `node_modules/`、`pnpm-lock.yaml`；`lib/{index,fs,sandbox,roots-D5oqnWlf}.js` 四个文件由 Git 跟踪；`pnpm check` 通过（`tsc --noEmit` 无错、4 文件 28 测试全绿、tsdown 重建 4 个入口）；重建后 `git status --porcelain .` 零行、`git diff -- lib/` 为空，产物与提交一致；`npm pack --dry-run` 共 8 项，含全部 4 个 `lib/` 文件，`main` 与 `exports` 指向的路径均在包内。
+2. [x] `dsh-sandbox-roots` 四份文档不再把 `$DSH_HOME/settings.yaml`、`installSection`、`sandbox-policy:` 描述为**当前**配置源；首次出现处明确指向 `sandbox-roots-policy` entry config / profile `cordis.patch.yml`；源码中无新增 legacy settings 路径。 — 实证（本轮复核）：`grep -rn "settings.yaml\|installSection\|sandbox-policy:"` 在包内命中 10 处，逐条核对全部为「rc.2 已移除 / 一次性迁移源 / 不再作为配置来源」的否定式或历史说明；`sandbox-roots-policy` 命中 9 处，首次出现处（`README.md:7`、`AGENTS.md:9`、`AGENTS.zh-CN.md:8`）均指向 entry config / profile `cordis.patch.yml`；源码与脚本中无新增 legacy settings 路径。
+3. [x] 配置 native IPv6 fake CIDR 时，该段内地址通过 fake-range 判定；IPv4-mapped IPv6 按其嵌入 IPv4 与 IPv4 fake CIDR 一致处理；未列入 fake range 的 private/reserved 地址仍被拒绝。 — 实证（本轮复核）：对 `isPublicIpAddress()` 用 `ipaddr.js` 复跑 13 例探针全通过，含修复点 `::ffff:198.18.0.1` → true（先 `toIPv4Address()` 再匹配 `198.18.0.0/15`）、native IPv6 `fd00::1` → true；`10.0.0.1`、`127.0.0.1`、`::ffff:127.0.0.1`、`::1`、`fe80::1`、`2001:db8::1`、`169.254.169.254` 全部 false；`fc00::1` 落在配置范围外时仍被拒。`node --check lib/index.js` 通过。
+4. [x] `lib/types/index.d.ts` 的 `Config` 精确包含 `fakeIpRanges?: string[]` 与 `proxyUrl?: string`，且不包含 runtime schema 未支持的字段。 — 实证（本轮复核）：`lib/types/index.d.ts` 的 `Config` 与 runtime `z.object`（`lib/index.js:694-707`）逐字段对齐，两侧同为 7 项：`maxResponseBytes`、`maxBodyChars`、`timeoutMs`、`maxRedirects`、`userAgent`、`fakeIpRanges?: string[]`、`proxyUrl?: string`，无一方缺失或多余的字段。
+5. [x] 按 D-03（`public-only`）：entry `proxyUrl` 与 environment-proxy 两条 `requestVia` 路径都在 dispatch 前拒绝解析到 loopback/private/link-local 的 hostname；公网 hostname 与配置的 fake-IP 路径仍正常发送；仅代理侧可解析而本机不可解析的名称被拒；本机校验与代理解析之间的残余差异（TOCTOU）在 README 与代码注释中写明。 — 实证：`lib/index.js:539-551` 在 `proxiedDispatcher !== undefined` 分支内先 `await this.resolveAddresses(...)` 再 `requestVia(...)`，entry `proxyUrl` 与继承的 environment proxy 共用该分支，非公网即抛 `WEB_BLOCKED_URL`，返回地址被丢弃、不传给代理；隔离假代理探针 7/7 通过（`localhost`、`169.254.169.254`、解析到 private 的 hostname 均 BLOCKED 且 dispatcher hits=0；fake-IP 与 public 正常发送），对照 HEAD 旧代码漏放 3 例；TOCTOU 与「仅代理可解析的名称不受支持」写在 `lib/index.js:541-549` 注释及双语 README。
+6. [x] `dsh/agents-presets/wopal/README.md` 的安装说明与父级 bundle 一致：通过 bundle 安装并加载 `wopal/preset.patch.yml`，不再声明运行时依赖 `.agent-presets/wopal` 软链。 — 实证（本轮复核）：`dsh/agents-presets/wopal/README.md:21` 的安装段改为「加载 `@wopal/dsh-presets` bundle 中的 `wopal/preset.patch.yml`」，并明确「旧 `.agent-presets` 软链不再是加载入口」；包内其余 `.agent-presets` 命中均为「不再读取 / 不依赖」的否定式或迁移历史说明。
+7. [x] 本提案的改动仅位于提案记录的工作分支；canonical 与 `.wopal` 未被本提案改动；对无 `check` script 的包，验证记录写明该事实并附替代验证结果。 — 实证：全部改动位于 `ontology-fix-dsh-packages` 工作分支（isolation worktree）；canonical checkout 的 `git status --porcelain` 为 0 行，本提案未向 `.wopal` 写入任何路径；`dsh-web-fetch-http-fakeip` 的 `package.json` 无 `scripts` 字段（即无 `check` script），Task 5 的 `Verified` 已写明该事实并以 `node --check` 与隔离运行时/代理探针替代。
 
 ### User Validation
 
@@ -187,8 +187,10 @@ pack 清单须含 `lib/index.js`、`lib/fs.js`、`lib/sandbox.js` 及共享 chun
 
 **Done**:
 Task output: dsh-sandbox-roots 从干净 checkout 直接携带可执行 `lib/**`，安装不依赖 dev-only 构建器，维护者重建结果与提交产物一致。
-Files touched: 实施后由 Wopal 按实际 diff 回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Files touched: dsh/plugins/dsh-sandbox-roots/.gitignore, package.json, README.md, AGENTS.md, AGENTS.zh-CN.md, docs/design.md, lib/index.js, lib/fs.js, lib/sandbox.js, lib/roots-D5oqnWlf.js
+Verified: 移除 `prepare` 与 `lib/` 忽略；`lib/**` 纳入版本管理。验证：`pnpm check` 4 文件 28 测试通过；重建后 `lib/` 无 diff；`npm pack --dry-run` 8 项含全部 4 个 lib 文件；`git check-ignore` 确认不再忽略。
+- [x] The implementation agent has completed all development and verification steps above.
+- [x] Wopal verified the task and backfilled this record.
 
 ---
 
@@ -220,8 +222,10 @@ grep -R -n 'sandbox-roots-policy' \
 
 **Done**:
 Task output: sandbox-roots 文档只描述 rc.2 的 entry-config / profile patch 现行配置契约。
-Files touched: 实施后由 Wopal 按实际 diff 回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Files touched: dsh/plugins/dsh-sandbox-roots/README.md, AGENTS.md, AGENTS.zh-CN.md, docs/design.md
+Verified: 四份文档改写为 `sandbox-roots-policy` entry config。验证：`settings.yaml|installSection|sandbox-policy:` 7 处命中全部为「旧版已移除」历史说明；`sandbox-roots-policy` 7 处命中。
+- [x] The implementation agent has completed all development and verification steps above.
+- [x] Wopal verified the task and backfilled this record.
 
 ---
 
@@ -255,8 +259,10 @@ grep -nE 'fakeIpRanges\?: string\[\]|proxyUrl\?: string' \
 
 **Done**:
 Task output: fake-IP CIDR 对 native IPv6 与 IPv4-mapped IPv6 生效，Config 类型与 runtime schema 对齐。
-Files touched: 实施后由 Wopal 按实际 diff 回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Files touched: dsh/plugins/dsh-web-fetch-http-fakeip/lib/index.js, lib/types/index.d.ts
+Verified: mapped 地址先解包再匹配 CIDR，两族共用同一判定。验证：7 例探针全对（含 198.18.0.1、::ffff:198.18.0.1、fc00::/7 内 ULA 放行；无 range 的 ULA、127.0.0.1、mapped loopback 拒绝）；`node --check` 通过。
+- [x] The implementation agent has completed all development and verification steps above.
+- [x] Wopal verified the task and backfilled this record.
 
 ---
 
@@ -285,8 +291,10 @@ grep -nE 'dsh plugin|preset\.patch\.yml|@wopal/dsh-presets' dsh/agents-presets/w
 
 **Done**:
 Task output: wopal preset 安装说明与 bundle / `preset.patch.yml` 运行模型一致，不再依赖旧软链。
-Files touched: 实施后由 Wopal 按实际 diff 回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Files touched: dsh/agents-presets/wopal/README.md
+Verified: 安装段改为 `@wopal/dsh-presets` bundle。验证：旧软链说法零命中；bundle 与 `preset.patch.yml` 说明命中第 21 行。
+- [x] The implementation agent has completed all development and verification steps above.
+- [x] Wopal verified the task and backfilled this record.
 
 ---
 
@@ -318,8 +326,10 @@ node --check dsh/plugins/dsh-web-fetch-http-fakeip/lib/index.js
 
 **Done**:
 Task output: 两条代理 dispatch 路径都执行 `public-only` 本地预检，同时明确预检不等于 pinning、代理侧 DNS 仍存在 TOCTOU。
-Files touched: 实施后由 Wopal 按实际 diff 回填。
-- [ ] The implementation agent has completed all development and verification steps above.
+Files touched: dsh/plugins/dsh-web-fetch-http-fakeip/lib/index.js, README.md, README.zh.md, README.i18n.yaml
+Verified: 两条代理路径统一走 `resolveAddresses()` 预检后再 `requestVia`。该包 `package.json` 无 `check` script，故以 `node --check` 与隔离运行时/代理探针替代。验证：本地假代理探针 7/7 通过（localhost、169.254.169.254、解析到 private 均 BLOCKED 且 dispatcher hits=0；fake-IP 与 public 正常发送）；对照 HEAD 旧代码 3 例漏放；TOCTOU 在代码注释与双语 README 写明。
+- [x] The implementation agent has completed all development and verification steps above.
+- [x] Wopal verified the task and backfilled this record.
 
 ---
 
@@ -327,11 +337,11 @@ Files touched: 实施后由 Wopal 按实际 diff 回填。
 
 | Wave | Task | Executor | Depends on | Why delegated |
 |------|------|----------|------------|---------------|
-| 1 | Task 1 | fae | `accept` 完成 | 决定包的可安装边界，后续文档据此描述 |
-| 1 | Task 3 | fae | `accept` 完成 | 与 Task 1 无耦合，可并行 |
-| 1 | Task 4 | fae | `accept` 完成 | 独立文档修复，风险低 |
-| 2 | Task 2 | fae | Task 1 | 文档必须描述最终确定的安装契约 |
-| 2 | Task 5 | fae | Task 3 完成 | 与 Task 3 改同一文件，串行可保持 diff 可审查 |
+| 1 | Task 1 | fae | `accept` 完成 | 决定包的可安装边界，后续文档据此描述 | ✅
+| 1 | Task 3 | fae | `accept` 完成 | 与 Task 1 无耦合，可并行 | ✅
+| 1 | Task 4 | fae | `accept` 完成 | 独立文档修复，风险低 | ✅
+| 2 | Task 2 | fae | Task 1 | 文档必须描述最终确定的安装契约 | ✅
+| 2 | Task 5 | fae | Task 3 完成 | 与 Task 3 改同一文件，串行可保持 diff 可审查 | ✅
 
 ## Delivery
 
