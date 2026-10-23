@@ -239,6 +239,39 @@ def build_structured_issue_body(**kwargs) -> str:
 # Status label group (4-state model)
 STATUS_LABELS = ["status/planning", "status/in-progress", "status/verifying", "status/done"]
 
+# Presentation for the labels the lifecycle must be able to set. A repo can be
+# missing them (fresh repo, renamed label); sync_status_label creates them on
+# demand instead of failing the whole edit silently.
+STATUS_LABEL_META = {
+    "status/planning": ("规划中，方案待定", "FBCA04"),
+    "status/in-progress": ("开发中", "0E8A16"),
+    "status/verifying": ("Awaiting user verification", "5319e7"),
+    "status/done": ("已完成关闭", "1D76DB"),
+}
+
+
+def ensure_status_label(repo: str, label: str) -> bool:
+    """Create or refresh one status label so the edit cannot fail on it.
+
+    Returns True when the repository has the label afterwards.
+    """
+    description, color = STATUS_LABEL_META.get(label, (label, "EDEDED"))
+    try:
+        result = subprocess.run(
+            [
+                'gh', 'label', 'create', label,
+                '--repo', repo,
+                '--color', color,
+                '--description', description,
+                '--force',
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
 
 def plan_status_to_issue_label(status: str) -> str:
     """Map plan status to Issue label (4-state model)."""
@@ -285,8 +318,25 @@ def sync_status_label(issue_number: int, status: str, repo: str) -> None:
         args.extend(['--remove-label', label])
     for label in labels_to_add:
         args.extend(['--add-label', label])
-    
-    subprocess.run(args, capture_output=True)
+
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode == 0:
+        return
+
+    # `gh issue edit` fails as a whole when any referenced label is missing in
+    # the repository, which used to leave the Issue on its previous status with
+    # no signal at all. Create the label, retry once, then report the failure.
+    if ensure_status_label(repo, target_label):
+        retry = subprocess.run(args, capture_output=True, text=True)
+        if retry.returncode == 0:
+            return
+        result = retry
+
+    detail = (result.stderr or result.stdout or "").strip().splitlines()
+    log_warn(
+        f"Issue #{issue_number} status label not updated to {target_label}"
+        + (f": {detail[0]}" if detail else "")
+    )
 
 
 # ============================================

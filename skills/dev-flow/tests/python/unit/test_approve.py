@@ -451,6 +451,37 @@ class TestApproveRollback:
 
 
 class TestApproveSuccessArtifacts:
+    def test_approve_moves_linked_issue_to_in_progress(self, tmp_path):
+        """approve must move a linked Issue planning -> in-progress.
+
+        Regression guard: approval used to stop updating the Issue, which left
+        it on status/planning while the Plan was already executing.
+        """
+        from commands.approve import cmd_approve
+
+        ws, _plan = _make_workspace(tmp_path)
+        status_sync = MagicMock()
+        with patch.multiple(
+            "commands.approve",
+            find_workspace_root=MagicMock(return_value=ws),
+            detect_space_repo=MagicMock(return_value="test/space"),
+            check_doc_plan=MagicMock(return_value=None),
+            sync_status_label=status_sync,
+            sync_plan_to_issue_body=MagicMock(),
+            ensure_issue_labels=MagicMock(),
+        ):
+            result = cmd_approve(
+                Namespace(
+                    target="106",
+                    confirm=True,
+                    no_worktree=False,
+                    existing_worktree=None,
+                )
+            )
+
+        assert result == 0
+        status_sync.assert_called_once_with(106, "executing", "test/space")
+
     """Successful approve: the state-transition commit carries the real Base
     Commit and no uncommitted residue remains (proposal D-08)."""
 

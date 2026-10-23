@@ -185,12 +185,34 @@ def check_step_completion(plan_file: str) -> None:
         raise ValidationError("Task Done not completed:\n" + "\n".join(issues))
 
 
+# A Plan may legitimately have nothing for the user to inspect: the whole
+# behaviour is covered by automated assertions and fixtures. Those Plans say
+# so explicitly with N/A instead of inventing a checkbox nobody can judge.
+NOT_APPLICABLE_PAT = re.compile(
+    r'^[*_`\s]*(?:n\s*/\s*a|not\s+applicable)\b', re.IGNORECASE
+)
+
+
+def _declares_not_applicable(section: str) -> bool:
+    """Whether the section opens with an explicit N/A declaration.
+
+    Only an explicit declaration counts — free-form prose still fails the
+    gate, so "the user probably won't check this" cannot silently skip UAT.
+    """
+    for line in section.splitlines():
+        text = line.strip().lstrip('-*>').strip()
+        if not text:
+            continue
+        return bool(NOT_APPLICABLE_PAT.match(text))
+    return False
+
+
 def check_user_validation(plan_file: str) -> None:
     with open(plan_file, 'r', encoding='utf-8') as file:
         content = file.read()
 
     if "### User Validation" in content:
-        _require_all_checked(
-            _section(content, "### User Validation"),
-            "User Validation",
-        )
+        section = _section(content, "### User Validation")
+        if not _checkboxes(section) and _declares_not_applicable(section):
+            return
+        _require_all_checked(section, "User Validation")

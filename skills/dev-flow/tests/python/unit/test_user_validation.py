@@ -50,6 +50,29 @@ class TestUserValidation(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_explicit_not_applicable_passes(self):
+        # A Plan whose behaviour is fully covered by automated assertions has
+        # nothing for the user to inspect; N/A is the way to say that.
+        for text in ("N/A — 全部由自动化断言验证。", "**N/A**", "n/a"):
+            path = _write_tmp(f"# plan\n\n### User Validation\n\n{text}\n")
+            try:
+                check_user_validation(path)
+            finally:
+                os.unlink(path)
+
+    def test_freeform_prose_without_na_still_rejected(self):
+        path = _write_tmp("""# plan
+
+### User Validation
+
+用户可能不会看这里。
+""")
+        try:
+            with self.assertRaises(ValidationError):
+                check_user_validation(path)
+        finally:
+            os.unlink(path)
+
     def test_section_without_checkbox_rejected(self):
         path = _write_tmp("""# plan
 
