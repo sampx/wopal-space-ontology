@@ -9,6 +9,7 @@
 import unittest
 import sys
 import os
+import subprocess
 import tempfile
 import shutil
 from pathlib import Path
@@ -69,6 +70,28 @@ class TestNoIssueComplete(unittest.TestCase):
         self.tmp_dir = tempfile.mkdtemp()
         self.plan_path = _create_no_issue_plan(self.tmp_dir, "executing")
         self.plan_name = "test-no-issue-plan"
+        # Real repo: complete's Plan commit must be able to land. The
+        # commit-failure durability gate now fails the command instead of
+        # warn-and-continue, so a non-repo fixture would abort the command.
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main", self.tmp_dir], check=True
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=self.tmp_dir, check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=self.tmp_dir, check=True,
+        )
+        subprocess.run(
+            ["git", "add", "plans/test-no-issue-plan.md"],
+            cwd=self.tmp_dir, check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "add plan"],
+            cwd=self.tmp_dir, check=True,
+        )
 
     def tearDown(self):
         shutil.rmtree(self.tmp_dir)

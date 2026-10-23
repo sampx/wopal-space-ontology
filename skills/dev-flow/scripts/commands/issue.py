@@ -31,7 +31,7 @@ from labels import (
     normalize_plan_type,
     plan_type_to_issue_label,
 )
-from lib.logging import log_info, log_warn, log_success, log_error
+from lib.logging import log_warn, log_success, log_error
 from lib.workspace import find_workspace_root, detect_space_repo
 from lib.github import list_issues, STATUS_LABEL_MAP
 

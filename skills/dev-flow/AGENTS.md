@@ -49,7 +49,7 @@ Runtime dependencies: bash 3.x+, `gh` CLI, `jq`, Python 3.10+
 
 Each command requires a prerequisite state; invalid transitions error out. New commands must declare their prerequisite and resulting states.
 
-`plan check` validates that a Plan's declared Status belongs to this state machine. When a User Validation section is present, the checker requires at least one scenario and a final confirmation checkbox; `verify` confirms that the user has checked it.
+`plan check` checks only mechanical metadata the lifecycle truly depends on: Status, Product/Phase pairing, and Project Path when needed. Plan content quality belongs to authoring/review; `complete` / `verify` only gate completion-state checkboxes.
 
 ### Plan Directory Rules
 
@@ -69,7 +69,7 @@ Each command requires a prerequisite state; invalid transitions error out. New c
 - Test framework: pytest
 - Test directories: `tests/python/unit/` (unit), `tests/python/integration/` (integration)
 - Test fixtures: `tests/fixtures/`
-- Test support utilities: `tests/python/support/bootstrap.py`
+- Test support utilities: `tests/python/support/bootstrap.py` (scripts path injection), `git_fixtures.py` (real git repo fixtures), `plan_fixtures.py` (Plan files named per the naming contract)
 - **TDD requirement**: new commands or `scripts/lib/` module features must have a failing test written first, then implementation to make it pass
 - After modifying subcommand logic, run the corresponding unit tests to confirm no regression
 
@@ -85,7 +85,7 @@ These rules prevent test bloat and decoration tests (tests that pass while the l
 
 **R4 Boilerplate threshold: 3 strikes.** The same mock/construction boilerplate appearing 3 times must be extracted into a shared helper. When a test file exceeds 3× the line count of the implementation file it covers, stop adding tests and slim down first.
 
-**R5 Red-green law.** A new test must first fail against the broken code (RED) before the fix turns it green. A test that cannot be made to fail is decoration, not a test. When fixing a bug, old tests that cover the same decision as the new test must be deleted — stacking is forbidden.
+**R5 Meaningful red-green.** For new, fixed, or intentionally changed behavior, a new regression test should fail against the old implementation (RED) before the implementation turns it green. Do not manufacture fake RED cycles for behavior-preserving refactors, deletion of obsolete behavior, characterization tests, or similar work. When behavior is deleted, remove tests whose only purpose was to assert that deleted behavior; when fixing a bug, also remove redundant old tests that cover the same decision instead of stacking them.
 
 **R6 Never freeze implementation coincidence.** Behaviors that merely happen to hold in the current implementation (e.g. "worktree dir name == branch name") must not be asserted unless a contract document supports them. Such tests harden bugs into specifications.
 

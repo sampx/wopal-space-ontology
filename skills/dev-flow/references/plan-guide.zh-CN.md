@@ -6,6 +6,20 @@ Plan 有两类读者：**评审的人**（要能看懂你要什么）和**实施
 
 一句话：**把契约面钉死，把实现面放开。**
 
+## 写作风格
+
+Plan 内容使用用户偏好语言，模板的结构性 heading 和字段名保持不变。正文优先用清楚、直接的大白话，让不了解实现细节的人也能评审；能用普通话说明的，不堆技术黑话、缩写和抽象术语。
+
+只有需要精确表达时才使用技术词，尤其是 `Design Source`、`Interface`、`Constraints`、命令、标识符、类型和协议名。不可避免的陌生术语第一次出现时顺手说明它实际意味着什么。同一件事不要在多个字段重复写。
+
+## Plan 必须来自正式设计
+
+项目/阶段 Plan 只以 `Status: Active` 的 DESIGN/子 DESIGN 为设计事实，再拆 Task。每个 Task 用 **Design Source** 指向它实现的具体章节、决策或契约；跨多个设计面就列多个 source。只有没有项目、也没有设计依据的简单 Plan 才可写 `N/A`。
+
+`Draft` / `Proposed` 设计只能放在 Research Findings / References 中作为前瞻参考，并明确其未定案；不能写入 Design Source，也不能据此确定 Behavior、Key Interfaces、AC 或实施目标。
+
+Plan 批准前，发现 Plan 与 Active DESIGN 不一致就修正 Plan；找不到 Active 设计依据，Plan 还不能提交。如果 Active DESIGN 本身与用户目标冲突，不要自行改设计，先让用户决定设计目标。Plan 批准后，实质修改 Plan 或设计都需要用户确认。
+
 ## 契约怎么定：Key Interfaces
 
 `Technical Context > Key Interfaces` 是对外契约章。**入册即红线**。
@@ -16,7 +30,9 @@ Plan 有两类读者：**评审的人**（要能看懂你要什么）和**实施
 
 **一条判据**：下游的人只凭这一节，能写出消费方代码和兼容测试，就算定准了。写不出来，就是还没定完。
 
-**约束力**：实施 agent 要改这里的签名或错误码，必须先回报、修订 Plan，禁止静默改。没有对外契约时写 N/A。
+**约束力**：实施发现签名、错误码或关键语义必须改变时，先停下交回主控流程。能在现有 DESIGN + 已批准 Plan 内解决就继续；需要改 Plan 或设计时，由主控者先向用户确认。没有共享/跨 Task 契约时写 N/A。
+
+顶层 `Key Interfaces` 只放多个 Task 共用或跨模块/跨项目的重要契约。只属于某个 Task 的局部契约写在该 Task 的 `Interface`；Task 使用顶层接口时只引用，不复制一遍。
 
 **示例**：
 
@@ -37,11 +53,11 @@ Plan 阶段写不出未来的测试命令（测试文件还不存在），这不
 
 **第一拍（写 Plan 时）**：每条 AC = 行为判据 + 通过标准。写「系统表现出什么可观察行为、看到什么算过」，允许判据式写法，不用猜未来的文件名。
 
-写好第一拍的标准只有一条：**这条 AC 能不能抓住坏实现？** 问自己：如果 agent 偷工减料或者做错了，这条判据会不会失败？怎么写都能过的 AC（「功能正常」「代码构建通过」）是装饰品，通不过 submit 之外还有 df-proposal-review 盯着。
+写好第一拍的标准只有一条：**这条 AC 能不能抓住坏实现？** 问自己：如果 agent 偷工减料或者做错了，这条判据会不会失败？怎么写都能过的 AC（「功能正常」「代码构建通过」）是装饰品，编写和评审阶段必须拒绝。
 
-**第二拍（实施 RED 阶段）**：实施 agent 把每条 AC 落成真实命令，**原地回填** Plan（变成 `python -m pytest tests/runner/ -v` 全绿 这种样子）。
+**第二拍（实施与主控验收阶段）**：实施者在实际实施/Verify 过程中确定每条 AC 对应的真实验证命令，并把命令与结果报告给主控者；主控者验收该 Task 通过后再**原地回填** Plan。实施者不直接编辑 Plan。
 
-**complete 硬门**：脚本强制——已勾选的 AC 必须带真实命令，判据式 AC 勾了也过不了 complete。定义权在 Plan（行为清单可评审），执行权在测试（全绿才算数），中间没有缝隙。
+`complete` 脚本只检查 Agent Verification 的 checkbox 是否真的完成；命令和证据是否有意义，由主控者真实执行和评审负责，不让正则替人做语义判断。Plan 定义要验证什么，主控者负责真正跑验证并确认结果。
 
 **示例演进**：
 
@@ -50,121 +66,90 @@ Plan 阶段写不出未来的测试命令（测试文件还不存在），这不
 1. [ ] Runner 一致性测试全绿，后台无交互死等
 2. [ ] 同一执行 ID 重复 begin 返回相同结果，不重复执行
 
-第二拍（RED 阶段回填后）：
-1. [x] `python -m pytest tests/runner/consistency/ -v` 全绿（后台无交互死等由 test_no_stdin_hang 覆盖）
-2. [x] `python -m pytest tests/runner/test_idempotent_begin.py -v` 全绿
+第二拍（主控验收 Task 后回填）：
+1. [ ] `python -m pytest tests/runner/consistency/ -v` 全绿（后台无交互死等由 test_no_stdin_hang 覆盖）
+2. [ ] `python -m pytest tests/runner/test_idempotent_begin.py -v` 全绿
+
+最终 Agent Verification 时，主控者重新运行这些命令并确认通过后再勾选。
 ```
 
-## Task 怎么拆：行为组，不是文件
+## Task 怎么拆
 
-**一个 Task = 一组高内聚 Behavior + 完整的 RED→GREEN→REFACTOR + 独立可跑的 Verify。**
+一个 Task 应该是一组高内聚的结果/行为，并且有可以独立运行的 `Verify`。不要把所有 Task 强行套进 TDD；是否 TDD 由改动性质决定。
 
-拆分粒度三问：
+拆分时看三件事：
 
-1. 这组 Behavior 共享同一批测试吗？（共享 → 同一个 Task）
-2. 一次委派，一个 fae 的上下文装得下吗？（装不下 → 拆）
-3. Verify 能独立执行吗？（不能 → 边界画错了，重新分）
+1. 这是一个完整结果，而不是文件清单吗？
+2. 一次实施上下文装得下吗？
+3. 结果能独立验证吗？
 
-行为组是**需求侧**概念，Plan 阶段想得清楚；文件是**实施侧**概念，Plan 阶段想不清楚。这正是旧格式死板的根源——用拆分维度换掉它，死板自然消失。
+`Pre-read` 用来传递 Plan 作者已经做过的调查：告诉实施者先读哪些关键文件/文档。它不是预计修改文件表。Plan 顶层 `Affected Files` 只给粗粒度影响范围；真正改了什么由主控验收后回填 `Done`。
 
-Task 不再设 Files 字段。从哪下手 → Pre-read（指向真实存在的文件）；步骤节奏 → Changes；实际触碰 → Done 回填（唯一事实源）；粗粒度范围 → Plan 级 Affected Files 表。改动面可枚举的小任务（bug 修复、单点调整）也无需提前铺文件清单——Affected Files 表写实际路径即可。
+### Task 级 Interface 与 Constraints
 
-## TDD 怎么写
+- `Interface` 可选。只有当前 Task 新增、修改、删除或必须保持某个契约时才写，例如 API/CLI、事件/schema、导出类型或重要模块边界。多个 Task 共用的契约放顶层 `Key Interfaces`，Task 只引用，不重复定义。
+- `Constraints` 可选。只写 `Design Source`、`Behavior`、`Interface` 没有覆盖，但实施必须遵守的硬限制。
+- 不再设置一个泛化的 `Design` 字段去重复上位设计或 Behavior。
 
-### Behavior 是规格，不是描述
+## TDD 判定原则
 
-Behavior（TDD=true 时必填）是可测试的行为规格，写法自由：输入→输出映射、Given/When/Then 都行。判据：**实施 agent 能不猜地把每条 Behavior 直接写成一个失败测试。** 写不出测试的 Behavior = 没写清楚，改 Behavior，不是放宽标准。
+TDD 是用测试先定义行为的工具，不是“只要改代码就必须交一次 RED 税”。只有同时满足下面三点才写 `TDD: true`：
 
-```markdown
-**Behavior**:
-- valid_email("user@example.com") → true
-- valid_email("") → false
-- valid_email("no-at-sign") → false
-```
+1. Task 新增、修复或有意改变了可观察行为；
+2. 这个行为能在实现前写成自动化断言；
+3. 这个测试完成后仍有长期回归价值。
 
-### Changes 第一条固定是 RED
+典型 `TDD: true`：业务规则、校验/解析/数据转换、状态机、API/CLI 行为、可稳定复现的 bug 修复。
 
-编号列表格式不变（禁止 checkbox），但第 1 条有了固定语义——把全部 Behavior 落成失败测试：
+以下通常写 `TDD: false`：纯行为保持重构、删除废弃内部代码/模块、移动/重命名/import 清理、配置/构建/CI/metadata/依赖调整、UI 布局样式、探索性工作，以及更适合用集成/smoke 验证的胶水接线。
 
-```markdown
-**Changes**:
-1. RED：将上述 Behavior 全部落成失败测试并确认失败
-2. GREEN：实现 email 验证函数至测试全绿
-3. REFACTOR：提取正则常量（如需）
-```
+`TDD: false` 绝不等于“不测试”。按风险选择真实验证：已有回归测试、characterization test、build/typecheck/静态检查、集成测试、smoke test 或必要的用户验证。
 
-### TDD Task 完整示例
+**删除规则**：删除废弃行为/代码时，同时删除那些只为了证明已删除行为存在的旧测试；仍然保护存续契约的测试要保留或更新。如果删除产生了新的外部行为（例如旧命令现在必须被拒绝），可以只针对这个新行为做 TDD，而不是测试“源码被删了”。
+
+**重构规则**：纯重构应保持现有行为和测试全绿。如果旧代码缺少安全网，先补 characterization/regression tests 锁住当前行为，再重构；不要为了形式制造一个假的 RED。
+
+不要为了覆盖率或流程形式制造琐碎、绑定实现细节、没有长期保护价值的测试；这种测试本身就是维护债务。
+
+### Task 示例
 
 ```markdown
 **Verification Intent**: AC#1, AC#2
 
+**Design Source**: `projects/example/docs/DESIGN.md#validation-contract`
+
 **Behavior**:
-- valid_email("user@example.com") → true
-- valid_email("") → false
-- valid_email("no-at-sign") → false
+- 合法邮箱可以通过校验。
+- 空值或格式错误返回 false，不抛异常。
 
 **Pre-read**: `src/validators/pattern.py`
 
-**Design**:
-新增 email 验证器，复用 pattern.py 的正则风格。
-错误返回 false 而非抛异常（调用方做展示，不适合异常流）。
+**Interface**: `valid_email(value: str) -> bool`
+
+**Constraints**: 复用现有校验风格，不改变调用方的错误处理方式。
 
 **TDD**: true
 
-**Changes**:
-1. RED：将上述 Behavior 全部落成失败测试并确认失败
-2. GREEN：实现 valid_email() 至测试全绿
-3. REFACTOR：提取 EMAIL_REGEX 常量（如需）
-
-**Verify**: `python -m pytest tests/ -v` 全部通过
+**Verify**: `python -m pytest tests/ -v`
 
 **Done**:
-任务产出：email 验证函数 + 3 个测试用例
-实际触碰文件：（实施后回填）
-- [ ] 实施 Agent 已完成上述功能开发和验证的所有步骤.
+实际触碰文件：（主控验收后回填）
+- [ ] 主控者运行 Verify 并验收通过
 ```
-
-### 何时用 TDD
-
-**核心启发式**：能在编写 `fn` 之前用 `expect(fn(input)).toBe(output)` 描述行为吗？能 → TDD；不能 → 标准 Task，事后按需加测试。
-
-- **适合**：有明确输入/输出的业务逻辑、API 端点、数据转换、验证规则、算法、状态机
-- **不适合**：UI 布局/样式、配置更改、胶水代码、探索性原型、无业务逻辑的简单 CRUD
-
-### TDD 阶段纪律
-
-| 阶段 | 问题 | 处理 |
-|------|------|------|
-| RED | 测试没有失败 | 功能可能已存在或测试有误，调查后再继续 |
-| GREEN | 测试没有通过 | 调试实现，迭代到通过，不要跳到重构 |
-| REFACTOR | 测试失败 | 撤销重构，用更小的步骤重试 |
-
-**RED 不失败是最常见的陷阱**：说明测试没真正覆盖预期行为，必须修好再继续。
-
-### TDD 提交建议
-
-按阶段提交（每阶段一个提交，代码在 feature 分支）：
-
-```
-test(scope): add failing test for email validation
-feat(scope): implement email validation
-refactor(scope): extract regex to constant
-```
-
-每完成一个 Task 勾选 Plan 中对应 Done checkbox（Plan 文件在空间仓库，独立提交）。
 
 ## Task 字段速查
 
 | 字段 | 要求 | 说明 |
 |------|------|------|
-| **Verification Intent** | 必填 | AC#N；这组行为为哪几条验收负责 |
-| **Behavior** | TDD=true 必填 | 可测试规格，能直接落成失败测试 |
-| **Pre-read** | 必填 | 实施前该读的文件；无必要写 N/A |
-| **Design** | 必填 | 技术方案、关键思路、约束——设计意图写清，不规定到每文件 |
-| **TDD** | 必填 | true/false；false 需说明理由 |
-| **Changes** | 必填 | 编号列表；第 1 条固定为 RED |
-| **Verify** | 必填 | 可执行命令，exit 0 才能勾 Done |
-| **Done** | 必填 | 产出说明 + 实际触碰文件 + checkbox |
+| **Verification Intent** | 必填 | 本 Task 负责哪些 Agent Verification 条目 |
+| **Design Source** | 项目/阶段 Plan | 权威 Active DESIGN 的 `path#heading`；简单无设计任务可 N/A |
+| **Behavior** | 必填 | 用大白话写可观察结果；确需精确时再用技术词 |
+| **Pre-read** | 必填 | Plan 作者已经确认值得实施者先读的文件/文档；无则 N/A |
+| **Interface** | 可选 | 当前 Task 自己新增/修改/删除/保持的局部契约 |
+| **Constraints** | 可选 | 其他字段未覆盖的硬实施限制 |
+| **TDD** | 必填 | 只有符合上面的 TDD 原则才 true；false 写一句简短理由 |
+| **Verify** | 必填 | 可以真实验证本 Task 的命令 |
+| **Done** | 必填 | 主控验收 checkbox + 实际触碰文件 |
 
 ## Agent Verification 与 User Validation 的边界
 
@@ -235,74 +220,41 @@ Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶�
 - **未关联阶段的 Plan** 归档时不做任何阶段文档处理（直接跳过，不警告不报错）。普通功能/修复/重构 Plan 不需要也不应该补写 `Product`/`Phase`，更不允许在阶段表凭空建行。
 - **Gap**：唯一真相源是项目 `GAPS.md`。Plan 在 Goal 或 Context 中引用要关闭的 Gap 标识（如 `CLI-G3`），不复制描述。Plan 达到 `done` 且 Exit 判据满足时，从 `GAPS.md` 删除对应条目（编号退役，不复用）。
 
-## 委派 prompt 格式
+## Delegation Strategy
 
-**Plan 驱动任务**（推荐）：
+根据当前可用 Agent 的能力、Task 依赖和并行关系分配任务；Agent 列只写具体 Agent 名称。
+
+## 实施交接
+
+主控者可以自行实施，也可以委派。无论谁实施，都应加载 `df-implement`；不要在交接 prompt 里复制一遍实施技能。
+
+委派 Plan Task 时只传完成任务所需的上下文：
 
     ## Plan
-    读取 Plan 文件，按 Task <N> 执行：
+    读取 Plan 文件，执行 Task <N>：
     <Plan 文档绝对路径>
 
-    ## 上下文
-    - 实施工作路径: 项目目录绝对路径 (worktree 绝对路径)
-    - 实施基线: Plan Metadata 中 Base Commit（集成分支 HEAD，approve 时记录）
-    - 实施自由度: Behavior、Key Interfaces 契约和边界是硬约束；文件组织、内部 API、测试组织由你在最新代码上决定
-    - AC 回填: RED 阶段把每条 AC 落成真实命令后，原地更新 Plan 的 Agent Verification
-    - 每完成一个 task 的实施和验证, commit git
-    - 遵循项目和模块开发规范 (AGENTS.md)
-    - <仅在 Plan 之外需要额外强调的事项，无则省略>
+    ## Context
+    - Working path: <项目/worktree 绝对路径>
+    - Baseline: <Plan Metadata 的 Base Commit>
+    - Follow project/module AGENTS.md
 
-    ## 完成标准
-    - <简要列出关键验证点>
+    ## Report
+    完成时返回：Goal / Accomplished / Files / Verified / AC Commands / Status
 
-    ## Task Report
-    完成时输出：Goal/Accomplished/Files/Status
+Task 本身已经承载 `Design Source`、Behavior、Pre-read、需要时的 Interface/Constraints 和 Verify。被委派的实施者只提交实施结果报告：实际触碰文件、Verify 命令与结果、以及相关 AC 对应的真实命令；**不要提交代码，不要编辑 Plan，不要勾选 Done/AC**。主控者收到报告后检查实际 diff 并独立运行 Task Verify；失败就直接退回修复，成功后才由主控者更新 Plan 证据并创建该 Task 的实施提交。
 
-**无 Plan 的临时任务**：
-
-    ## 目标
-    <一句话>
-
-    ## 上下文
-    - 项目路径: /path/to/file
-
-    ## 步骤
-    1. 读取相关文件
-    2. 修改文件
-    3. 运行验证
-
-    ## 完成标准
-    - 功能验证通过
-
-    ## Task Report
-    完成时输出：Goal/Accomplished/Files/Status
-
-**原则**：有 Plan 时 Plan 是单一信息源，prompt 不重复 Plan 内容。
-
-### 委派 prompt 必含项
-
-每次委派 fae 执行 Plan Task 时，prompt 末尾必须附加：
-
-    完成后在 Plan 文件中编辑对应 Task 的 Done checkbox（- [ ] → - [x]），并在 Done 内回填「实际触碰文件」清单，Plan 文件路径：<空间仓库绝对路径>
-    禁止修改 Plan Status 元数据（Status/Worktree/Base Commit 等由 flow.sh 脚本管理）
-
-缺少此指令 = fae 不会主动更新 Plan，导致 Done 全部遗漏。
-
-## 常见错误 TOP 5
-
-| Error | 原因 | Fix |
-|-------|------|-----|
-| `missing Design` | 跳过了 Design 字段 | 补 `**Design**:` + 实施设计 |
-| `TDD=true requires Behavior` | 有 TDD 标记但没写 Behavior | 补可测试的行为规格 |
-| `Changes must not use checkbox` | Changes 用了 `- [ ] Step N:` | 改为编号列表 `1. 2. 3.`，第 1 条固定 RED |
-| `AC checked but carries no executable command` | 判据式 AC 勾选后直接 complete | RED 阶段把真实命令回填进 AC 条目再勾选 |
-| `placeholder: 'TBD'` | 残留占位符 | 替换为实际内容或删除该行 |
+如果实施者同时就是主控者，仍按“实施 → 主控检查 → 更新 Plan/提交”的顺序；遇到冲突则切回 dev-flow 的冲突处理。被委派实施时，冲突交回 delegator。实施技能负责 STOP/报告格式，dev-flow 负责验收与是否需要升级用户。
 
 ## 验证与推进
 
-- `submit` / `approve` 自动运行 `plan check` 校验，无需手动执行
-- `approve` 不是第一次检查，而是进入「等待用户评审方案」的节点
-- `approve` 被校验拦下 → 修好 Plan 后重新执行 `approve`
+`plan check` 刻意保持机械、最小：只检查流程命令真正依赖的 Metadata——`Status` 合法、Product/Phase 成对、设置 Target Project 时 Project Path 可用。它不判断 Design Source 是否写得好、TDD 是否选对、Behavior 文案、Interface/Constraints 或 User Validation 场景质量；这些属于 Plan 编写和评审。
+
+`complete` / `verify` 只检查完成状态：存在的 Task Done、Agent Verification、User Validation checkbox 必须完成。
+
+- `submit` / `approve` 自动运行 `plan check`，无需手动重复检查。
+- `submit` 把 Plan 推进到 `reviewing`，之后才请用户评审。
+- `approve --confirm` 只在用户明确批准当前 Plan 后执行；若被校验拦下，修好 Plan 后再执行。
 
 ## Plan 命名规范
 
@@ -329,6 +281,30 @@ Plan name 是权威标识，用于派生 feature 分支。命名必须精简—�
 | `implement-multi-space-chat-projector-sync` | `chat-projector-sync` |
 | `add-skills-remove-command` | `skills-remove` |
 | `support-handling-expired-tokens` | `token-expiry` |
+
+### 哪些是强制的
+
+命名不是「靠自觉遵守」的约定——它要派生 feature 分支，所以由 CLI 校验：
+
+| 位置 | 校验内容 | 作用对象 |
+|---|---|---|
+| `plan new` | 完整契约：ASCII kebab-case、type 属标准集、slug ≤ 20 | 每一个新名字 |
+| `plan check` | 同上，但不查 slug 长度 | 指向的任何 Plan |
+| `submit` / `approve` | 经由 `plan check` | 每个过生命周期的 Plan |
+
+slug 一律由 `--slug` 显式给出，从不从标题派生——标题是自由文本，通常很长，还常常不是英文。这就是 `--type` 和 `--slug` 在两种模式下都必填的原因。
+
+`fix-dsh-pr-102` 是合法名字——`dsh-pr-102` 就是 slug。没有 scope 槽位，所以里面不存在「多余」的段。
+
+### 存量 Plan：不追溯改名
+
+契约生效前创建的 Plan 带有近似 scope 的段、slug 也超过 20 字符。它们**既不改名，也不被拒绝**：
+
+- `plan check` 与生命周期命令对它们只校验字符集，不校验 slug 长度。
+- 它们的 feature 分支已经按当前名字派生出来了；中途改名会让 worktree 和分支变成孤儿。
+- `done/` 里的历史 Plan 属于历史记录，完全不动。
+
+只有创建是严格的。这样契约才诚实——对「将来创建什么」只有一套规则——同时不把一次命名迁移变成正在进行的工作的阻塞项。
 
 ### Plan 目录规则
 
@@ -364,4 +340,4 @@ Worktree 目录 = branch。分支名承载「唯一且可映射回 Plan」的职
 | `verify --confirm` | 集成分支 | `done` | Plan-only 提交到集成分支 |
 | `archive` | 集成分支 | 归档 | 移至 done/，清理 worktree |
 
-**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。代码提交由实施 agent（fae）负责。脚本遇到脏实施树时报错退出，而非代为提交代码。
+**Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。Task 的实施提交由主控者在验收通过后创建；被委派的实施者不提交。脚本遇到脏实施树时报错退出，而非代为提交代码。

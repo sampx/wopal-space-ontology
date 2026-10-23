@@ -31,8 +31,8 @@ def _slug_by_path(path):
 # -- plan.py: find_plan delegation ----------------------------------------------
 
 class TestPlanFindPlanDelegation:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_returns_str_path_by_name(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "feat-x.md"
         plan_file.write_text("# Plan")
@@ -40,8 +40,8 @@ class TestPlanFindPlanDelegation:
         assert isinstance(result, str)
         assert Path(result) == plan_file.resolve()
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_returns_str_path_by_issue(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feat-x.md"
         plan_file.write_text("# Plan")
@@ -49,8 +49,8 @@ class TestPlanFindPlanDelegation:
         assert isinstance(result, str)
         assert Path(result) == plan_file.resolve()
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_ontology_path(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "space-ontology" / "refactor-skills.md"
         plan_file.write_text("# Plan")
@@ -64,8 +64,8 @@ class TestPlanFindPlanDelegation:
 
 
 class TestPlanFindPlanByNameDelegation:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_standard_project(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "feat-x.md"
         plan_file.write_text("# Plan")
@@ -79,8 +79,8 @@ class TestPlanFindPlanByNameDelegation:
 
 
 class TestPlanFindPlanByIssueDelegation:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_standard_project(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feat-x.md"
         plan_file.write_text("# Plan")
@@ -88,8 +88,8 @@ class TestPlanFindPlanByIssueDelegation:
         assert isinstance(result, str)
         assert Path(result) == plan_file.resolve()
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_ontology_project(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "space-ontology" / "99-fix-bug.md"
         plan_file.write_text("# Plan")
@@ -168,8 +168,8 @@ class TestScanLocalPlansDelegation:
 # -- commands/sync.py: find_plan delegation -------------------------------------
 
 class TestSyncFindPlanDelegation:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_by_issue_number(self, mock_slug, mock_branch, workspace):
         from commands.sync import find_plan
 
@@ -181,8 +181,8 @@ class TestSyncFindPlanDelegation:
         assert isinstance(result, str)
         assert Path(result) == plan_file.resolve()
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_by_name(self, mock_slug, mock_branch, workspace):
         from commands.sync import find_plan
 

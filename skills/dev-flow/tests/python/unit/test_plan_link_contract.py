@@ -55,8 +55,8 @@ def _write_plan(path, status="executing", project="gesp"):
 # =============================================================================
 
 class TestBuildPlanLinkActive:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_url_uses_space_repo(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feature-gesp-resolver.md"
         _write_plan(plan_file, status="executing", project="gesp")
@@ -69,8 +69,8 @@ class TestBuildPlanLinkActive:
         assert "sampx/wopal-space" in result
         assert "blob/main/.wopal-space/plans/gesp/42-feature-gesp-resolver.md" in result
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_returns_table_row_format(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feature-gesp-resolver.md"
         _write_plan(plan_file, status="executing", project="gesp")
@@ -90,8 +90,8 @@ class TestBuildPlanLinkActive:
 # =============================================================================
 
 class TestBuildPlanLinkArchived:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_archived_url_uses_space_repo(self, mock_slug, mock_branch, workspace):
         done_dir = workspace / ".wopal-space" / "plans" / "gesp" / "done"
         done_dir.mkdir(parents=True)
@@ -112,8 +112,8 @@ class TestBuildPlanLinkArchived:
 # =============================================================================
 
 class TestBuildPlanLinkOntology:
-    @patch("lib.project._get_default_branch", return_value="space/main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="space/main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_ontology_uses_space_repo(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "space-ontology" / "feature-dev-flow-resolver.md"
         _write_plan(plan_file, status="executing", project="space-ontology")
@@ -132,8 +132,8 @@ class TestBuildPlanLinkOntology:
 # =============================================================================
 
 class TestBuildPlanLinkNoRepo:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", return_value=None)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", return_value=None)
     def test_no_repo_returns_placeholder(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feature-gesp-resolver.md"
         _write_plan(plan_file, status="executing", project="gesp")
@@ -179,8 +179,8 @@ class TestBuildPlanLinkDraftStatus:
 # =============================================================================
 
 class TestUpdateIssuePlanLink:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     @patch("subprocess.run")
     def test_archive_link_uses_space_repo(self, mock_run, mock_slug, mock_branch, workspace):
         done_dir = workspace / ".wopal-space" / "plans" / "gesp" / "done"

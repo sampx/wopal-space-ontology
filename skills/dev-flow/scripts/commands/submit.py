@@ -21,6 +21,7 @@ from pathlib import Path
 
 from lib.logging import log_info, log_success, log_error, log_step, log_warn
 from lib.workspace import find_workspace_root
+from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
 from workflow import update_plan_status, parse_plan_status, STATUS_PLANNING
 from plan import find_plan, get_plan_issue, get_plan_status
 from validation import check_doc_plan, ValidationError
@@ -88,7 +89,12 @@ def cmd_submit(args: argparse.Namespace) -> int:
     # 4. Extract Issue number (if plan has Issue link)
     issue_number = get_plan_issue(plan_path)
 
-    # 5. Update Plan status to reviewing
+    # 5. Update Plan status to reviewing.
+    #    Snapshot first: if the Plan commit fails, the status write must be
+    #    rolled back — a half-written "reviewing" Plan blocks a re-run with
+    #    "already submitted" even though nothing was committed.
+    snapshot = PlanFieldSnapshot.capture(plan_path)
+
     log_step("Transitioning state: planning -> reviewing")
 
     if not update_plan_status(plan_path, "reviewing"):
@@ -105,7 +111,20 @@ def cmd_submit(args: argparse.Namespace) -> int:
         log_warn("Submit committed locally but push failed; the commit "
                  "will sync to origin on a later push.")
     elif result != RESULT_OK:
+        recovery = recover_plan_after_failed_commit(
+            plan_path, snapshot, workspace_root
+        )
         log_error("Failed to commit Plan")
+        if not recovery.file_restored:
+            log_error("Plan 状态恢复失败，请手动恢复后重试")
+        elif not recovery.index_reset_ok:
+            log_error(
+                "Plan 文件已恢复为提交前状态，但 index 残留未清理"
+                "（重试前需手工清理）："
+            )
+            log_error(recovery.index_failure)
+        else:
+            log_error("Plan 已恢复为提交前状态（planning），可直接重试")
         return 1
 
     # Output confirmation

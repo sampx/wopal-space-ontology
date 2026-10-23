@@ -12,6 +12,28 @@ flow.sh issue create --title "add skills remove command" --project <name> --type
 
 **创建错误的 Issue 必须彻底删除**（`flow.sh issue delete`），不能只是 close。用户不喜欢仓库里留垃圾记录。
 
+### `--project` 怎么填
+
+`--project` 决定 Issue 的 `project/<name>` 标签，也决定后续 Plan 落在 `.wopal-space/plans/<name>/`。它填的是**工作对象所在的空间组件**，不是流程名，也不是话题名：
+
+| Issue 要改的东西 | `--project` | 后续流程 |
+|---|---|---|
+| 本体组件（本体 worktree 下的 skills、rules、agents、commands、plugins、assembly） | 该组件在 `STRUCTURE.md` 里的项目名 | `ontology-evolution` |
+| `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | `dev-flow` |
+
+名字从 `STRUCTURE.md` 读，不要凭印象猜。它同时是 Plan 目录名和 Issue 标签名，写错会让 Plan 落到错误目录。
+
+### 本体相关的 Issue 不走 dev-flow
+
+改动落在本体组件里的 Issue 就是**本体变更**：写提案、走 `wopal space evo` 生命周期，即 `ontology-evolution` 技能。dev-flow 的 Plan、分支、worktree 都不参与。
+
+先判断工作对象，再决定流程：
+
+- 改的是本体 worktree 下的技能、规则、agent、命令、插件、装配 → 本体提案（`ontology-evolution`）
+- 改的是 `projects/` 下的代码 → dev-flow Plan
+
+拿不准时看改动路径落在哪个组件。详见 `space-master` 的场景路由表。
+
 ## Issue 查询
 
 **查询未完成 Issue 必须使用 `flow.sh issue list`**，禁止手动 `gh issue list`。脚本通过 `detect_space_repo` 自动定位空间仓库并显示 repo URL，避免 Agent 因不知道仓库归属而查错仓库（如误查已禁用 issues 的 ontology 仓库）。
@@ -39,8 +61,8 @@ Issue 标题是**自由文本**，不再强制 `type(scope): description` 格式
 - 宽松 type 前缀（若存在）必须合法（见下表）
 - `scope` 不再必填
 - `description` 使用英文祈使句
-- `description` ≤ 55 chars
-- 整体标题 ≤ 72 chars
+- `description` ≤ 70 chars（量的是 type 前缀之后的文本）
+- 整体标题 ≤ 100 chars
 
 ### 合法 type
 
@@ -112,6 +134,6 @@ flow.sh sync <issue> --body-only
 | 模式 | 触发词 | 流程 |
 |------|--------|------|
 | Issue 驱动 | Issue 号、"处理 issue"、"开发" | 先创建 Issue → 再出 Plan |
-| 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan new --title ... --project ... --type ...` |
+| 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan new --project ... --type ... --slug ...` |
 
 两者都是 dev-flow 流程，区别在于是否有 Issue 载体。

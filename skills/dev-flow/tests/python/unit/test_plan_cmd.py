@@ -356,8 +356,7 @@ class TestCmdPlanDispatch(unittest.TestCase):
         args = Namespace(
             plan_command="new",
             issue="42",
-            title=None, project=None, type=None,
-            scope=None,
+            title=None, project=None, type=None, slug=None,
         )
         with patch('commands.plan.find_workspace_root', return_value=ws):
             # Will fail trying to detect_space_repo, but proves dispatch works
@@ -378,8 +377,7 @@ class TestCmdPlanDispatch(unittest.TestCase):
         args = Namespace(
             plan_command="new",
             issue=None,
-            title=None, project=None, type=None,
-            scope=None,
+            title=None, project=None, type=None, slug=None,
         )
         with patch('commands.plan.find_workspace_root', return_value=ws):
             result = cmd_plan(args)
@@ -454,11 +452,11 @@ class TestCmdPlanCheck(unittest.TestCase):
 
 
 class TestCmdPlanNewIssueMode(unittest.TestCase):
-    """Test _cmd_plan_new Issue mode requires explicit --type/--scope/--slug.
+    """Test _cmd_plan_new Issue mode requires explicit --type and --slug.
 
-    Issue title is free-form; type/scope/slug must be explicitly specified
-    by Wopal via --type, --scope, --slug. They are no longer derived from
-    the Issue title.
+    Issue title is free-form; type and slug must be explicitly specified by
+    Wopal via --type and --slug. They are no longer derived from the Issue
+    title, and there is no scope segment in the Plan name.
     """
 
     def setUp(self):
@@ -477,7 +475,6 @@ class TestCmdPlanNewIssueMode(unittest.TestCase):
             "title": None,
             "project": "wopal-cli",
             "type": "feature",
-            "scope": "cli",
             "slug": "add-skills-remove-command",
         }
         base.update(overrides)
@@ -495,20 +492,6 @@ class TestCmdPlanNewIssueMode(unittest.TestCase):
                 self.assertTrue(
                     any('slug' in c.lower() for c in error_calls),
                     f"Error should mention slug: {error_calls}",
-                )
-
-    def test_issue_mode_requires_scope(self):
-        """Issue mode: missing --scope errors."""
-        ws = Path(self.tmp_dir)
-        args = self._make_args(scope=None)
-        with patch('commands.plan.find_workspace_root', return_value=ws):
-            with patch('commands.plan.log_error') as mock_log_error:
-                result = _cmd_plan_new(args)
-                self.assertEqual(result, 1)
-                error_calls = [str(c) for c in mock_log_error.call_args_list]
-                self.assertTrue(
-                    any('scope' in c.lower() for c in error_calls),
-                    f"Error should mention scope: {error_calls}",
                 )
 
     def test_issue_mode_requires_type(self):
@@ -541,12 +524,12 @@ class TestCmdPlanNewIssueMode(unittest.TestCase):
                 with patch('commands.plan._get_issue_info', return_value=issue_info):
                     with patch('commands.plan._resolve_plan_dir', return_value=Path(self.tmp_dir) / "plans"):
                         with patch('commands.plan.create_plan_from_template') as mock_create:
-                            mock_create.return_value = Path(self.tmp_dir) / "plans" / "42-feature-cli-explicit-slug.md"
+                            mock_create.return_value = Path(self.tmp_dir) / "plans" / "42-feature-explicit-slug.md"
                             result = _cmd_plan_new(args)
                             self.assertEqual(result, 0)
-                            # Plan name must use the explicit slug
+                            # Plan name carries issue, type and the explicit slug
                             call_kwargs = mock_create.call_args
-                            self.assertEqual(call_kwargs[0][0], "42-feature-cli-explicit-slug")
+                            self.assertEqual(call_kwargs[0][0], "42-feature-explicit-slug")
 
 
 class TestDeriveProjectPath(unittest.TestCase):
