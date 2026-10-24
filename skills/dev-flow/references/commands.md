@@ -52,20 +52,20 @@
 
 ## Git mutation surfaces 与失败语义
 
-部分生命周期命令会写入 Git metadata（index / commit / refs / worktree / checkout）；普通工作区可写不代表这些 surface 可写，受限环境下 Agent 需先用当前 Harness 原生的 escalation/approval 机制取得能力（见 `SKILL.md`「脚本执行」）。下表按脚本真实调用链逐入口审计（行号对应当前仓库版本；新增 Git mutation 时必须同步此表）。
+部分生命周期命令会写入 Git metadata（index / commit / refs / worktree / checkout）；普通工作区可写不代表这些 surface 可写，受限环境下 Agent 需先用当前 Harness 原生的 escalation/approval 机制取得能力（见 `SKILL.md`「脚本执行」）。下表按脚本真实调用链逐入口审计（定位采用 file + 函数/调用点锚点；精确行号随代码演进漂移，不写入本表。新增 Git mutation 时必须同步此表）。
 
 ### 逐入口审计矩阵
 
-列义：**mutation 调用位置** = 实际执行 Git 写入的调用链（file:line）；**失败结果** = 关键 mutation 非零时命令的可观察结果；**后继门** = 外部可见（Issue sync/close/link/labels）或破坏性（worktree/branch/归档）动作必须等待的持久化门；**结论** = 符合契约 / 已修复（本轮变更）/ 记录性结论（理由见下一节）。
+列义：**mutation 调用位置** = 实际执行 Git 写入的调用链（file + 函数/调用点）；**失败结果** = 关键 mutation 非零时命令的可观察结果；**后继门** = 外部可见（Issue sync/close/link/labels）或破坏性（worktree/branch/归档）动作必须等待的持久化门；**结论** = 符合契约 / 已修复（本轮变更）/ 记录性结论（理由见下一节）。
 
-| 命令 | 实际 mutation 调用位置（file:line） | 失败结果 | 外部/破坏性后继门 | 结论 |
+| 命令 | 实际 mutation 调用位置（file + 函数） | 失败结果 | 外部/破坏性后继门 | 结论 |
 |------|--------------------------------------|----------|-------------------|------|
-| `submit` | `scripts/lib/plan_commit.py:73`（commit_paths → `scripts/lib/git.py:370`）；`plan_commit.py:81`（is_commit_in_remote → `git.py:284`）；`plan_commit.py:83`（push_repo → `git.py:452`） | commit 失败：结构化诊断（command/cwd/exit/stdout/stderr）+ 分层恢复（`scripts/lib/plan_state.py:117`）+ 非零退出；push 失败：`RESULT_PUSH_FAILED`，本地提交保留、warn 继续（既有策略） | 无后续外部 side effect；状态以 commit 为准 | 符合契约 |
-| `approve --confirm` | `scripts/commands/approve.py:487`（approve commit）；`:148`（rollback commit）；`:515`（worktree 创建）→ `scripts/lib/worktree.py:339`（双 attempt 证据 `:370`、`:382`） | commit/worktree 失败：root failure 完整保留、rollback outcome 分层（`approve.py:108`）；文件/index 分层恢复（`plan_state.py:117`）；非零退出。push 失败：warn 继续（既有 #215 策略：本地提交已持久化，后续 push 同步） | Issue sync 仅在 commit 成功后；worktree 创建在 approve commit 之后 | 符合契约 |
-| `complete` | `scripts/commands/complete.py:153`（commit_paths；入口 `:130`）；Plan 字段写入 `:255`（Verification Commit）/`:449`（PR） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 Issue sync；已创建的 PR 身份保留（`:167`） | `:469/:470`、`:505/:506` 的 Issue sync 仅在 commit 成功后 | 符合契约（B-06 修复） |
-| `verify --confirm` | `scripts/commands/verify.py:249`（commit_paths；入口 `:232`） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 sync/close | sync/close（`:454-475`）仅在 commit 成功后；close 吞错见记录性结论 #1 | 符合契约 |
-| `verify-switch` | `scripts/commands/verify_switch.py:269`（fetch → `:20`）；`:281`（worktree remove → `:105`，prune `:137` → `:71`）；`:286`（checkout → `:45`）；`:213`（Plan 元数据 commit） | 全部保留 command/cwd/exit/stderr；元数据 commit 失败：非零 + 手册指引；prune 属 janitor（rc+stderr 双查，报告后继续） | worktree removal 先于 checkout；元数据 commit 失败阻断成功返回 | 符合契约（B-04 修复） |
-| `archive` | `scripts/commands/archive.py:412`（stage）；`:561`（commit_paths）→ `:586`（push_repo）→ `:593`（is_commit_pushed）；`:790`（phase-doc commit_paths）；`:281`（cleanup → `scripts/lib/worktree.py:642` clean_worktree → `:575` delete_branch） | stage/commit/push 失败：结构化诊断 + 非零退出；commit fallback 保留双 attempt 证据；push 绑定当前分支并在 origin 验证包含（`:593`）；cleanup 失败：partial + 非零 | durability（commit + push 验证）成功后才执行 Issue sync/link/labels（`:824-846`）、cleanup、close（`:876`）；phase-doc 失败不宣称已持久化 | 已修复（B-01/B-02/B-03/B-04/W-02） |
+| `submit` | `scripts/lib/plan_commit.py` `commit_and_push_plan`（commit_paths → `scripts/lib/git.py` `commit_paths`；is_commit_in_remote → `git.py` `is_commit_in_remote`；push_repo → `git.py` `push_repo`） | commit 失败：结构化诊断（command/cwd/exit/stdout/stderr）+ 分层恢复（`scripts/lib/plan_state.py` `recover_plan_after_failed_commit`）+ 非零退出；push 失败：`RESULT_PUSH_FAILED`，本地提交保留、warn 继续（既有策略） | 无后续外部 side effect；状态以 commit 为准 | 符合契约 |
+| `approve --confirm` | `scripts/commands/approve.py` `cmd_approve`（approve commit 与 rollback commit 均经 `scripts/lib/plan_commit.py` `commit_and_push_plan`）；worktree 创建经同文件 `_create_worktree` → `scripts/lib/worktree.py` `create_worktree`（双 attempt 证据在 `create_worktree` 的失败分支） | commit/worktree 失败：root failure 完整保留、rollback outcome 分层（`approve.py` `_abort_after_state_write`）；文件/index 分层恢复（`plan_state.py` `recover_plan_after_failed_commit`）；非零退出。push 失败：warn 继续（既有 #215 策略：本地提交已持久化，后续 push 同步） | Issue sync 仅在 commit 成功后；worktree 创建在 approve commit 之后 | 符合契约 |
+| `complete` | `scripts/commands/complete.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`）；Plan 字段写入：`_record_verification_commit`（Verification Commit）/ `cmd_complete`（PR 字段） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 Issue sync；已创建的 PR 身份保留（`_commit_plan_status_or_rollback` 的 preserve_pr 分支） | `cmd_complete` 的 Issue sync 块仅在 commit 成功后 | 符合契约（B-06 修复） |
+| `verify --confirm` | `scripts/commands/verify.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 sync/close | `cmd_verify` 的 sync/close 块仅在 commit 成功后；close 吞错见记录性结论 #1 | 符合契约 |
+| `verify-switch` | `scripts/commands/verify_switch.py` `_git_fetch`（fetch）；`_remove_worktree`（worktree remove → `_prune_worktrees` prune）；`_git_checkout`（checkout）；Plan 元数据 commit 经 `_update_plan_after_switch`（commit_paths） | 全部保留 command/cwd/exit/stderr；元数据 commit 失败：非零 + 手册指引；prune 属 janitor（rc+stderr 双查，报告后继续） | worktree removal 先于 checkout；元数据 commit 失败阻断成功返回 | 符合契约（B-04 修复） |
+| `archive` | `scripts/commands/archive.py` `archive_plan_file`（`git mv` stage）；`commit_archived_plan`（commit_paths → push_repo → is_commit_pushed，`scripts/lib/git.py`）；`cmd_archive` phase-doc commit_paths；`_cleanup_worktree` → `scripts/lib/worktree.py` `clean_worktree`（→ `delete_branch`） | stage/commit/push 失败：结构化诊断 + 非零退出；commit fallback 保留双 attempt 证据；push 绑定当前分支并在 origin 验证包含（`is_commit_pushed`）；cleanup 失败：partial + 非零 | durability（commit + push 验证）成功后才执行 Issue sync/link/labels（`cmd_archive` sync 块）、cleanup、close（`cmd_archive` close 块）；phase-doc 失败不宣称已持久化 | 已修复（B-01/B-02/B-03/B-04/W-02） |
 | `reset` / `plan new` / `sync` / `issue *` | 无本地 Git mutation（仅 Plan 文件 / GitHub API）；首次提交在 `submit` | — | — | 符合契约 |
 
 注：`--no-worktree` / `--existing-worktree` / `--keep-worktree` 会跳过或改变对应的 refs / worktree / checkout mutation；实际执行以所选模式的实际路径为准。
@@ -81,12 +81,12 @@
 
 审计中确认、但按约定不改动的项，连同确切位置与保留理由：
 
-1. **`verify` 的 Issue close 吞错**：`scripts/commands/verify.py:467-475` 对 `gh issue close` 不检查退出码、异常直接 `pass`；`archive` 路径的 `close_issue`（`scripts/commands/archive.py:440`）失败仅 warn（`:876-881`）。保留理由：close 是终态 best-effort，没有依赖它的后继步骤，失败不改变 Plan/记录的持久性；若未来 close 成为门控项需重新审计。
-2. **worktree prune**：`scripts/lib/worktree.py:525-546`、`scripts/commands/verify_switch.py:71-101`。已修复：`git worktree prune` 可能在 rc=0 时把删除错误写到 stderr，现同时检查退出码与 stderr 并报告；prune 是 janitor 操作，报告后不中断主流程（非关键继续，但不再静默）。
-3. **phase-doc 非关键步骤**：`scripts/commands/archive.py:790-806`。已修复：stage/commit 失败保留完整诊断、不宣称「已更新」；archive 整体继续（非关键步骤策略保留）。
-4. **branch delete 幂等语义**：`scripts/lib/worktree.py:551`（`BranchDeleteResult`）、`:575`、`:642`。已修复：区分 deleted / absent / skipped（当前分支）/ failed；真失败保留 `-d`/`-D` 双 attempt 诊断并触发 partial cleanup + 非零退出。
-5. **`write_worktree_context` 末尾 `return False`**：`scripts/lib/worktree.py:208`。记录性结论：仅当 Plan 存在但既无 Worktree 块又无 Status 行时可达；所有 Plan 经 `check_doc`（Status 必需）后才进入 approve，实际不可达。无证据清理不做。
-6. **`lib/git.py` 死代码**：`scripts/lib/git.py:214`（`push()`）、`:339`（`delete_branch()`）无调用方。保留理由：删除超出本提案范围（避免无证据清理）；如需移除应走独立演化并确认无外部引用。
+1. **`verify` 的 Issue close 吞错**：`scripts/commands/verify.py` `cmd_verify` 的 Issue close 块对 `gh issue close` 不检查退出码、异常直接 `pass`；`scripts/commands/archive.py` `close_issue` 失败仅 warn（`cmd_archive` 的 close 块）。保留理由：close 是终态 best-effort，没有依赖它的后继步骤，失败不改变 Plan/记录的持久性；若未来 close 成为门控项需重新审计。
+2. **worktree prune**：`scripts/lib/worktree.py` `remove_worktree` 的 prune 段、`scripts/commands/verify_switch.py` `_prune_worktrees`。已修复：`git worktree prune` 可能在 rc=0 时把删除错误写到 stderr，现同时检查退出码与 stderr 并报告；prune 是 janitor 操作，报告后不中断主流程（非关键继续，但不再静默）。
+3. **phase-doc 非关键步骤**：`scripts/commands/archive.py` `cmd_archive` 的 phase-doc 步骤。已修复：stage/commit 失败保留完整诊断、不宣称「已更新」；archive 整体继续（非关键步骤策略保留）。
+4. **branch delete 幂等语义**：`scripts/lib/worktree.py` `BranchDeleteResult` / `delete_branch` / `clean_worktree`。已修复：区分 deleted / absent / skipped（当前分支）/ failed；真失败保留 `-d`/`-D` 双 attempt 诊断并触发 partial cleanup + 非零退出。
+5. **`write_worktree_context` 末尾 `return False`**：`scripts/lib/worktree.py` `write_worktree_context`。记录性结论：仅当 Plan 存在但既无 Worktree 块又无 Status 行时可达；所有 Plan 经 `check_doc`（Status 必需）后才进入 approve，实际不可达。无证据清理不做。
+6. **`lib/git.py` 死代码**：`scripts/lib/git.py` `push`、`delete_branch` 无调用方。保留理由：删除超出本提案范围（避免无证据清理）；如需移除应走独立演化并确认无外部引用。
 
 ---
 
