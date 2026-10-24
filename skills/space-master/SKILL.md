@@ -65,7 +65,7 @@ The component path answers the question when the label is ambiguous: if the chan
 
 Ontology maintenance and capability evolution are executed by the **`ontology-evolution` skill** — load it directly for any ontology repo operation: instance updates, space alignment, capability assembly, and upstream contribution all follow its Maintenance Protocols. Loading this skill as well is not required.
 
-It is the single specification point — command surface, status reading, channels and the upload gate, execution stance, and contribution scope. This skill carries no maintenance protocol of its own.
+It is the single specification point — command surface, status reading, channels and the upload gate, execution stance, contribution scope, and **Updating and Returning the Same PR**. For fixes to a published contribution or PR tracking, follow that section to update the original PR; retain its contribution branch until the merged change has returned successfully.
 
 ## AGENTS.md Maintenance
 

@@ -336,12 +336,15 @@ Beyond the evolution lifecycle, this skill owns the ontology's maintenance surfa
 | `wopal space sync [--confirm]` | both | Align with `local main`: integrate space-unique evolution upward (isolated worktree, stops on conflict), then fast-forward down |
 | `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | Shared channel: edit the archetype manifest and re-materialize; accepts only a capability the pool already owns (a pool-absent name is refused before the manifest is touched) and creates **no Git commit** — committing the manifest is a separate, explicit step. `--local`: mount or unload the complete asset as this space's local selection (include / exclude / private); when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Content still travels up only through the user's own `space sync` / `ontology contribute` decisions, separate from that state commit |
 | `wopal ontology capability list` | — | Read-only: what the pool owns — the pick-list for `space capability add` |
-| `wopal ontology sync [--confirm]` | triangle | Align `local main` with its source chain `upstream ⇄ origin ⇄ local main` in three steps (fork: ① fast-forward origin to upstream → ② merge origin/main into local main → ③ push local main to origin; clone collapses to ② only). `ontology update` remains as a compatibility alias |
+| `wopal ontology sync [--confirm]` | triangle | Align `local main` with its source chain `upstream ⇄ origin ⇄ local main` in three steps (fork: ① merge origin/main into local main → ② merge upstream/main into that same local-main result → ③ push local main back to origin; clone collapses to ① only). `ontology update` remains as a compatibility alias |
 | `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | upstream | `local main` → upstream PR (fork mode; squash-merge in an isolated worktree; `--resume` / `--abort` for a conflict) |
+| `wopal ontology contribute --pr <number-or-url> [--message <msg>] [--confirm]` | upstream | Reuse the saved scope, append source fixes to the original contribution branch, and update the same PR |
 
 ## Reading status
 
 `wopal ontology status` reports both flows: **Downstream** (`upstream → origin → local main`) and **Upstream** (`local main → origin → upstream`), the latter as the pending file set.
+
+It also shows tracked PR state, published head, pending source fixes, and external commits on the remote contribution branch. On refresh failure, distinguish locally known information from current remote facts; cached state cannot establish a merge or authorize branch cleanup.
 
 `wopal space status` reports the space link: **to contribute** vs **behind local main**, the assembly state, and the **local selections** — `include` (an extra mount: shared content only this space mounts) / `exclude` (a locally deactivated type default) / `private` (privately held untracked content) — plus unregistered untracked files. Private content is protected: the upload gate below refuses any sync carrying a commit that touches a private-registered capability root.
 
@@ -365,6 +368,19 @@ Scope is determined with the user, from evidence:
 4. Space-only assets never appear in any contribution.
 
 One PR per topic: `--include` / `--exclude` carve a coherent contribution out of the pending set, and `--message` states what the change delivers (result state), not the mechanical action. Split unrelated work; never bundle it.
+
+## Updating and Returning the Same PR
+
+A contribution branch serves one PR. After creation, retain the branch and the CLI-managed contribution record; a clean temporary worktree may be released. The CLI owns the record; do not edit it by hand.
+
+1. **Create**: integrate verified Space content into local main, then run `ontology contribute --message <msg> --confirm` with the user-selected topic and scope. Retain the returned PR identity.
+2. **Track**: run `ontology status` on demand for PR and source changes; no background polling. Use GitHub's existing interface for PR title, body, approval, and merge.
+3. **Fix**: edit, verify, and commit on the source Space branch, then run `space sync --confirm`. The contribution branch is the publishing path; put fixes into the locally used content first so the PR and Space do not evolve separately.
+4. **Update**: once the user authorizes this publication, run `ontology contribute --pr <number-or-url> --confirm`. The CLI reuses the saved scope and appends a fix commit to the original branch; a normal push updates the same PR automatically. Optional `--message` describes this fix. A tracked update interruption is recovered by rerunning the same `--pr <number-or-url> --confirm`; do not switch to message-based `--resume`, and `--pr --abort` is invalid. Message-based `--resume` / `--abort` remain only for an interrupted initial create (with abort limited to unpublished candidates).
+5. **Return**: after the user merges the PR, run `ontology sync --confirm`, then `space sync --confirm`. Upstream merge, squash, and rebase all use this path; ordinary merge incorporates the actual upstream landing history while preserving local history.
+6. **Clean up**: let the CLI confirm that the PR is merged, its landing commit is in local main, and fork main was pushed successfully before cleanup. Retain open, closed-unmerged, or unknown PRs, branches with extra commits, and worktrees with uncommitted content. Content equivalence or ancestry alone never authorizes manual deletion.
+
+Inspect the update preview to confirm that the delta still belongs to the original topic. Saved include/exclude scope is fixed; use another contribution for a broader topic. Unsynced source fixes, external remote commits, unavailable network facts, and real conflicts stop publication with a CLI diagnosis; first bring needed external fixes back into Space. Real divergence can still conflict; do not force push or automatically choose ours/theirs. Abort preserves published content.
 
 ---
 
