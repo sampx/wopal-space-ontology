@@ -5,7 +5,7 @@
 #   Metadata: get_plan_field, get_plan_project, get_plan_project_path,
 #             get_plan_type, get_plan_issue, get_plan_status,
 #             set_plan_field, get_plan_worktree, set_plan_worktree
-#   Project:  resolve_project_repo, resolve_project_path, ProjectType
+#   Project:  resolve_project_repo, resolve_project_path
 #   Naming:   validate_plan_name, make_plan_name
 #   Body:     build_plan_link_for_issue
 #   Find:     find_plan, find_plan_by_name, find_plan_by_issue
@@ -16,13 +16,12 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from enum import Enum
 from pathlib import Path
 
 from lib.workspace import find_workspace_root
 from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.git import get_current_branch
-from lib.project import resolve_plan_location, build_plan_blob_url
+from lib.project import build_plan_blob_url, get_default_branch, get_repo_slug, resolve_plan_location
 from lib import project as _project_resolver
 from labels import normalize_plan_type
 from issue import replace_plan_row_in_body
@@ -135,69 +134,22 @@ def set_plan_worktree(plan_path: str, branch: str, path: str) -> bool:
 # Project (from project.py)
 # ============================================
 
-class ProjectType(Enum):
-    """Project type enumeration."""
-    STANDARD = "standard"
-
-
-def _parse_github_repo_url(url: str) -> str | None:
-    """Parse GitHub remote URL to owner/repo format."""
-    match = re.search(r'github\.com[/:]([^/]+/[^/]+?)(?:\.git)?$', url)
-    if match:
-        return match.group(1)
-    return None
-
-
-def _get_default_branch(project_path: Path) -> str:
-    """Detect the remote default branch for a git repository."""
-    # 1. Query remote HEAD
-    try:
-        result = subprocess.run(
-            ["git", "ls-remote", "--symref", "origin", "HEAD"],
-            cwd=project_path,
-            capture_output=True, text=True, check=True,
-        )
-        first_line = result.stdout.strip().split("\n")[0]
-        if first_line.startswith("ref: refs/heads/"):
-            return first_line.split("/")[-1].split("\t")[0]
-    except subprocess.CalledProcessError:
-        pass
-
-    # 2. Fall back to local cache
-    try:
-        result = subprocess.run(
-            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
-            cwd=project_path,
-            capture_output=True, text=True, check=True,
-        )
-        return result.stdout.strip().split("/")[-1]
-    except subprocess.CalledProcessError:
-        pass
-
-    return "main"
-
-
 def resolve_project_repo(project_path: Path) -> tuple[str | None, str]:
-    """Dynamically resolve GitHub repo and base branch from project path."""
+    """Resolve the GitHub repo slug and base branch for a project path.
+
+    Branch resolution is local-only, delegating to lib.project: a network
+    round-trip here used to hang under a sandbox.
+    """
     if not project_path.exists():
         return None, "main"
 
-    repo = None
-    try:
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            cwd=project_path,
-            capture_output=True, text=True, check=True,
-        )
-        repo = _parse_github_repo_url(result.stdout.strip())
-    except subprocess.CalledProcessError:
-        pass
+    repo = get_repo_slug(project_path)
 
     dot_git = project_path / ".git"
     if dot_git.exists() and dot_git.is_file():
         base_branch = get_current_branch(project_path) or "main"
     else:
-        base_branch = _get_default_branch(project_path)
+        base_branch = get_default_branch(project_path)
 
     return repo, base_branch
 
@@ -253,11 +205,6 @@ def _find_git_root(path: Path) -> Path | None:
     return None
 
 
-def _is_git_repo(project_path: Path) -> bool:
-    """Check if path is inside a git repository."""
-    return _find_git_root(project_path) is not None
-
-
 # ============================================
 # Naming (from naming.py)
 # ============================================
@@ -269,61 +216,72 @@ class ValidationError(Exception):
 
 _SLUG_MAX_LENGTH = 20
 
+# Type segment, spelled out — the same vocabulary labels.normalize_plan_type owns.
+# Non-capturing: the only groups this pattern exposes are (issue) and (slug).
+_TYPE_PATTERN = r'(?:feature|enhance|fix|perf|refactor|docs|chore|test)'
+# ASCII kebab-case only. `\w` would also match CJK, so name the character class
+# explicitly instead of relying on regex word semantics.
+_SLUG_PATTERN = r'[a-z0-9]+(?:-[a-z0-9]+)*'
 
-def validate_plan_name(name: str) -> None:
-    """Validate Plan naming convention.
-    
-    Naming: <issue_number>-<type>-<scope>-<slug>.md OR <type>-<scope>-<slug>.md (no Issue)
+_PLAN_NAME_PATTERN = re.compile(rf'^(?:([0-9]+)-)?{_TYPE_PATTERN}-({_SLUG_PATTERN})$')
+
+
+def validate_plan_name(name: str, *, enforce_slug_length: bool = True) -> None:
+    """Validate a Plan name.
+
+    Naming: `<issue>-<type>-<slug>` (Issue-driven) or `<type>-<slug>` (no Issue).
+    There is no scope segment: `--project` already names the area, and the slug
+    carries the subject.
+
+    The name is checked because it is used verbatim to derive the feature
+    branch: a non-ASCII or over-long name would produce a branch name that some
+    tooling cannot handle. `enforce_slug_length=False` is for Plans that already
+    exist — their branch is already derived, so renaming would break the working
+    copy; the length cap only governs new names.
     """
-    pattern = r'^([0-9]+)?-?(feature|enhance|fix|perf|refactor|docs|chore|test)-([a-z0-9]+)-([a-z0-9-]+)$'
-    
-    if not re.match(pattern, name):
+    match = _PLAN_NAME_PATTERN.match(name)
+    if not match:
         raise ValidationError(
             f"Invalid plan name: {name}\n"
             "\n"
-            "Plan naming convention (scope is mandatory):\n"
-            "  <issue_number>-<type>-<scope>-<slug>.md  (with Issue)\n"
-            "  <type>-<scope>-<slug>.md                 (no Issue)\n"
+            "Plan naming convention:\n"
+            "  <issue>-<type>-<slug>   (with Issue)\n"
+            "  <type>-<slug>           (no Issue)\n"
             "\n"
             "Types: feature, enhance, fix, perf, refactor, docs, chore, test\n"
-            "Scope: short lowercase identifier (e.g., cli, dev-flow, plugin)\n"
-            "Slug: short lowercase with hyphens\n"
+            "Slug: English kebab-case (a-z, 0-9, '-')\n"
+            "No scope segment: the project already names the area.\n"
+            "Give the slug with --slug, e.g. --slug pr-102 -> fix-pr-102\n"
+        )
+
+    slug = match.group(2)
+    if enforce_slug_length and len(slug) > _SLUG_MAX_LENGTH:
+        raise ValidationError(
+            f"Slug too long: {len(slug)} chars (max {_SLUG_MAX_LENGTH}): '{slug}'. "
+            "Pass a shorter --slug: keep 1-2 core nouns, drop verb phrases "
+            "(see references/plan-guide.md 'Slug rules')."
         )
 
 
 def make_plan_name(
     issue_number: int | None,
     plan_type: str,
-    scope: str,
     slug: str,
-    slug_from_title: bool = False
 ) -> str:
-    """Generate plan name from components.
+    """Generate a Plan name from its components.
 
-    Type is normalized via labels.normalize_plan_type (single source of truth).
-    The slug segment is capped at 20 chars (references/plan-guide.md slug rules);
-    an over-long slug is rejected, never silently truncated.
-
-    slug_from_title marks a slug auto-derived from the title so the error can
-    point at the right input (the title vs an explicit --slug).
+    Naming: `<issue>-<type>-<slug>` (Issue-driven) or `<type>-<slug>` (no Issue).
+    Type is normalized via labels.normalize_plan_type (single source of truth);
+    the finished name goes through validate_plan_name, so a non-kebab-case or
+    over-long slug is rejected with the fix named — never silently truncated.
     """
-    if len(slug) > _SLUG_MAX_LENGTH:
-        if slug_from_title:
-            fix = "Shorten the title (the slug derives from its description)"
-        else:
-            fix = "Pass a shorter --slug"
-        raise ValidationError(
-            f"Slug too long: {len(slug)} chars (max {_SLUG_MAX_LENGTH}): '{slug}'. "
-            f"{fix}: keep 1-2 core nouns, drop verb phrases "
-            "(see references/plan-guide.md 'Slug rules')."
-        )
-
     normalized_type = normalize_plan_type(plan_type)
-
-    if issue_number:
-        return f"{issue_number}-{normalized_type}-{scope}-{slug}"
-    else:
-        return f"{normalized_type}-{scope}-{slug}"
+    name = (
+        f"{issue_number}-{normalized_type}-{slug}" if issue_number
+        else f"{normalized_type}-{slug}"
+    )
+    validate_plan_name(name)
+    return name
 
 
 # ============================================
@@ -399,29 +357,23 @@ def find_plan_by_issue(issue_number: int, workspace_root: str | Path = None) -> 
 # Link (from link.py)
 # ============================================
 
-def _build_relative_path(archived_file: str, workspace_root: Path) -> str:
-    """Build relative path from docs/."""
-    archived_path = Path(archived_file)
-    docs_root = workspace_root / 'docs'
-    
-    try:
-        relative = archived_path.relative_to(docs_root)
-        return str(relative)
-    except ValueError:
-        return archived_path.name
-
-
-def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspace_root: str = None):
+def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspace_root: str = None, branch: str | None = None):
     """Update Issue Plan link after archive.
     
     Uses resolve_plan_location() to determine the Plan's actual project repo,
-    so the blob URL points to the correct repo and branch.
+    so the blob URL points to the correct repo and branch. When `branch` is
+    given (the branch that actually carries the archive commit, verified by
+    push), it overrides resolve_plan_location's default branch — a plain
+    checkout may be on a non-default branch, and the link must point at the
+    ref that actually holds the archived content (B-02).
     
     Args:
         issue_number: Issue number to update
         plan_file: Path to the (archived) Plan file
         repo: Space repo (used for gh CLI --repo flag for Issue operations)
         workspace_root: Workspace root path
+        branch: Branch that actually carries the archive commit (B-02);
+            when given, overrides the resolved default branch in the URL
     """
     workspace = Path(workspace_root) if workspace_root else find_workspace_root()
     
@@ -433,7 +385,7 @@ def update_issue_plan_link(issue_number: int, plan_file: str, repo: str, workspa
 
     # Resolve Plan location to get correct repo + branch + relative path
     loc = resolve_plan_location(Path(plan_file), workspace)
-    blob_url = build_plan_blob_url(loc)
+    blob_url = build_plan_blob_url(loc, branch=branch)
     
     # Get current Issue body
     state_dir = workspace / 'state'

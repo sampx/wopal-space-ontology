@@ -166,28 +166,30 @@ class TestValidateIssueTitle(unittest.TestCase):
         )
 
     def test_description_too_long_fails(self):
-        """validate_issue_title: description too long fails"""
-        long_title = "feat(cli): this is a very long description that exceeds fifty characters limit"
+        """validate_issue_title: description over 70 chars fails.
+
+        The measured string is what follows the type prefix, so 71 chars of
+        description fails even though the full title is longer for an unrelated
+        reason (the prefix).
+        """
+        long_title = "feat(cli): " + "a" * 71
         with self.assertRaises(ValidationError) as context:
             validate_issue_title(long_title)
         error_msg = str(context.exception)
-        self.assertTrue(
-            "50" in error_msg or "long" in error_msg.lower() or "description" in error_msg.lower(),
-            f"Error should mention description length: {error_msg}"
-        )
+        self.assertIn("70", error_msg)
+        self.assertIn("after the type prefix", error_msg)
+
+    def test_description_at_70_chars_passes(self):
+        """validate_issue_title: 70-char description is accepted."""
+        validate_issue_title("feat(cli): " + "a" * 70)
 
     def test_title_too_long_fails(self):
-        """validate_issue_title: total title too long (>72 chars) fails"""
-        # Create a title that is >72 chars but description <=50 chars
-        # feat(cli-long-scope-name): description here (with some padding to make it over 72 chars)
-        long_title = "feat(very-long-scope-name-here): description with padding to exceed limit"
+        """validate_issue_title: total title over 100 chars fails."""
+        long_title = "feat(" + "x" * 40 + "): " + "a" * 70
         with self.assertRaises(ValidationError) as context:
             validate_issue_title(long_title)
         error_msg = str(context.exception)
-        self.assertTrue(
-            "72" in error_msg or "title" in error_msg.lower() or "long" in error_msg.lower(),
-            f"Error should mention title length: {error_msg}"
-        )
+        self.assertIn("100", error_msg)
 
     def test_empty_description_fails(self):
         """validate_issue_title: empty description fails"""

@@ -6,6 +6,20 @@ So a Plan's job is to state three things: **what is wanted (behavior)**, **what 
 
 One line: **pin the contract surface, open up the implementation surface.**
 
+## Writing style
+
+Write Plan content in the user's preferred language while keeping template headings and field names unchanged. Prefer plain, direct language that a human reviewer can understand without engineering context. Avoid jargon, abbreviations, and abstract technical wording when ordinary words are enough.
+
+Use exact technical terms where precision matters — especially `Design Source`, `Interface`, `Constraints`, commands, identifiers, types, and protocol names. When a non-obvious term is unavoidable, explain its practical meaning on first use. Do not repeat the same fact across multiple fields.
+
+## A Plan must come from formal design
+
+For project/phase work, use only DESIGN/sub-DESIGN documents with `Status: Active` as design facts before splitting Tasks. Every Task uses **Design Source** to point to the concrete section, decision, or contract it implements; list multiple sources when needed. `N/A` is only for simple work with no project and no design basis.
+
+`Draft` / `Proposed` designs may appear only in Research Findings / References as explicitly unsettled forward-looking material. They never belong in Design Source and must not define Behavior, Key Interfaces, ACs, or implementation targets.
+
+Before approval, fix the Plan when it disagrees with Active DESIGN; if no Active design basis can be found, the Plan is not ready to submit. If the Active DESIGN itself conflicts with the user's goal, do not edit design on your own — ask the user to decide the design target. After approval, substantive changes to either the Plan or design require user confirmation.
+
 ## How to define contracts: Key Interfaces
 
 `Technical Context > Key Interfaces` is the external-contract section. **Entry is a red line.**
@@ -16,7 +30,9 @@ One line: **pin the contract surface, open up the implementation surface.**
 
 **One criterion**: if a downstream consumer could write their calling code and compatibility tests from this section alone, the contract is defined. If not, it isn't finished.
 
-**Binding force**: an implementing agent that needs to change a signature or error code here must report back and revise the Plan first — silent changes are forbidden. Write N/A when the Plan has no external contract.
+**Binding force**: if implementation reveals that a signature, error code, or key semantic must change, stop and return to the controlling workflow. Continue only if the issue can be resolved inside the existing DESIGN + approved Plan; a Plan or design change requires user confirmation through the controller. Write N/A when the Plan has no shared or cross-Task contract.
+
+Keep this top-level section for contracts shared across Tasks or important across module/project boundaries. A contract owned only by one Task belongs in that Task's `Interface`; if a Task uses a top-level Key Interface, reference it instead of copying it.
 
 **Example**:
 
@@ -38,11 +54,11 @@ You cannot write future test commands at Plan time (the test files do not exist 
 
 **Beat 1 (at Plan-writing time)**: each AC = behavioral criterion + pass standard. Write "what observable behavior the system shows, and what you see when it passes". Criterion-style entries are legal — no guessing future file names.
 
-There is exactly one standard for a good beat-1 entry: **can this AC catch a bad implementation?** Ask yourself: if the agent cuts corners or gets it wrong, will this criterion fail? An AC that passes no matter what ("feature works", "build passes") is decoration — beyond submit validation, df-proposal-review watches for these too.
+There is exactly one standard for a good beat-1 entry: **can this AC catch a bad implementation?** Ask yourself: if the agent cuts corners or gets it wrong, will this criterion fail? An AC that passes no matter what ("feature works", "build passes") is decoration and must be rejected during authoring/review.
 
-**Beat 2 (at implementation RED stage)**: the implementing agent turns each AC into a real command and **writes it back into the Plan in place** (becoming things like `python -m pytest tests/runner/ -v` all green).
+**Beat 2 (during implementation and controller acceptance)**: the implementer determines the real verification command while implementing/Verifying and reports the command and result to the controller; after the Task passes controller acceptance, the controller **writes it back into the Plan in place**. The implementer does not edit the Plan.
 
-**complete hard gate**: the script enforces it — a checked AC must carry a real command; a criterion-style AC cannot pass complete checked. Definition lives in the Plan (the behavior list is reviewable); proof lives in the tests (all green is the only pass). No gap in between.
+At `complete`, the script only checks that Agent Verification checkboxes are actually complete. Whether the command/evidence is meaningful is a controller and review responsibility, not something a regex should guess. Definition lives in the Plan; proof comes from the controller actually running the verification.
 
 **Evolution example**:
 
@@ -51,121 +67,90 @@ Beat 1 (at Plan-writing time):
 1. [ ] Runner consistency tests all green, no interactive hang in the background
 2. [ ] Repeated begin with the same execution ID returns the same result, no double execution
 
-Beat 2 (after RED-stage write-back):
-1. [x] `python -m pytest tests/runner/consistency/ -v` all green (interactive hang covered by test_no_stdin_hang)
-2. [x] `python -m pytest tests/runner/test_idempotent_begin.py -v` all green
+Beat 2 (after controller acceptance of the Task):
+1. [ ] `python -m pytest tests/runner/consistency/ -v` all green (interactive hang covered by test_no_stdin_hang)
+2. [ ] `python -m pytest tests/runner/test_idempotent_begin.py -v` all green
+
+During final Agent Verification, the controller re-runs these commands and ticks them only after they pass.
 ```
 
-## How to split Tasks: behavior groups, not files
+## How to split Tasks
 
-**One Task = one cohesive Behavior set + a full RED→GREEN→REFACTOR + an independently runnable Verify.**
+One Task should represent one cohesive outcome or behavior group and have an independently runnable `Verify`. Do not force every Task into TDD; TDD is chosen from the nature of the change.
 
-Three granularity questions:
+Use three checks when splitting:
 
-1. Do these Behaviors share the same test set? (share → same Task)
-2. Does it fit in one fae's context for a single delegation? (no → split)
-3. Can the Verify run independently? (no → the boundary is drawn wrong, re-split)
+1. Does the Task describe one coherent outcome instead of a file list?
+2. Does the work fit one implementation context?
+3. Can its result be verified independently?
 
-Behavior groups are a **requirements-side** concept — clear at Plan time. Files are an **implementation-side** concept — unclear at Plan time. That mismatch was the root of the old format's rigidity; change the splitting dimension and the rigidity disappears.
+`Pre-read` carries forward useful investigation already done by the Plan author: list the files/docs the implementer should read first. It is not a predicted edit list. Plan-level `Affected Files` gives coarse impact; `Done` records what was actually touched after acceptance.
 
-Tasks no longer carry a Files field. Where to start → Pre-read (points at files that actually exist); step rhythm → Changes; actually touched → backfilled in Done (the single source of truth); coarse-grained scope → the Plan-level Affected Files table. Small tasks with enumerable footprints (bug fixes, single-point adjustments) need no premature file list either — write the real paths in the Affected Files table.
+### Task-local Interface and Constraints
 
-## How to write TDD
+- `Interface` is optional. Use it for a contract this Task adds, changes, removes, or must preserve: API/CLI shape, event/schema, exported type, or an important module boundary. Shared/cross-Task contracts belong in top-level `Key Interfaces`; reference them from the Task instead of duplicating them.
+- `Constraints` is optional. Use it only for hard implementation limits not already clear from `Design Source`, `Behavior`, or `Interface`.
+- Do not add a generic `Design` field just to restate upstream design or Behavior.
 
-### Behavior is a spec, not a description
+## TDD decision rule
 
-Behavior (required when TDD=true) is a testable behavior spec; format is free: input→output mappings, Given/When/Then, all fine. The criterion: **the implementing agent can turn each Behavior into a failing test without guessing.** A Behavior you cannot write a test for is not yet specified — fix the Behavior, not the standard.
+TDD is a behavior-design tool, not a tax on every code change. Set `TDD: true` only when all three are true:
 
-```markdown
-**Behavior**:
-- valid_email("user@example.com") → true
-- valid_email("") → false
-- valid_email("no-at-sign") → false
-```
+1. the Task adds, fixes, or intentionally changes observable behavior;
+2. that behavior can be stated as an automated assertion before implementation;
+3. the test remains useful as regression protection after the Task is done.
 
-### Changes entry 1 is always RED
+Typical `TDD: true` work includes business rules, validation/parsing/data transforms, state machines, API/CLI behavior, and reproducible bug fixes.
 
-The numbered-list format is unchanged (no checkboxes), but entry 1 now has a fixed meaning — turn all Behaviors into failing tests:
+Use `TDD: false` when RED→GREEN would add little or no design value, including pure behavior-preserving refactors, removal of obsolete internal code/modules, move/rename/import cleanup, config/build/CI/metadata/dependency work, UI layout/style changes, exploratory work, or glue/wiring better checked by integration/smoke validation.
 
-```markdown
-**Changes**:
-1. RED: turn the Behaviors above into failing tests and confirm they fail
-2. GREEN: implement the email validator until all tests pass
-3. REFACTOR: extract the regex constant (if needed)
-```
+`TDD: false` never means “no testing.” Choose verification that matches the risk: existing regression tests, characterization tests, build/typecheck/static checks, integration tests, smoke tests, or user validation as appropriate.
 
-### Full TDD Task example
+**Deletion rule**: when removing obsolete behavior/code, remove tests whose only purpose was to assert that deleted behavior. Keep or update tests that still protect surviving contracts. If deletion creates a new observable behavior (for example an old command must now be rejected), TDD may apply to that new behavior — never to the fact that source code was deleted.
+
+**Refactor rule**: pure refactoring keeps existing behavior and tests green. If the legacy area lacks a safety net, add characterization/regression tests for current behavior before refactoring; do not manufacture a fake RED test for unchanged behavior.
+
+Avoid trivial or implementation-coupled tests that add maintenance cost without protecting a meaningful contract.
+
+### Task example
 
 ```markdown
 **Verification Intent**: AC#1, AC#2
 
+**Design Source**: `projects/example/docs/DESIGN.md#validation-contract`
+
 **Behavior**:
-- valid_email("user@example.com") → true
-- valid_email("") → false
-- valid_email("no-at-sign") → false
+- Valid email is accepted.
+- Empty or malformed email is rejected without throwing.
 
 **Pre-read**: `src/validators/pattern.py`
 
-**Design**:
-Add an email validator, reusing the regex style of pattern.py.
-Errors return false instead of throwing (callers render; exception flow does not fit).
+**Interface**: `valid_email(value: str) -> bool`
+
+**Constraints**: Reuse the existing validation style; do not change caller error handling.
 
 **TDD**: true
 
-**Changes**:
-1. RED: turn the Behaviors above into failing tests and confirm they fail
-2. GREEN: implement valid_email() until all tests pass
-3. REFACTOR: extract the EMAIL_REGEX constant (if needed)
-
-**Verify**: `python -m pytest tests/ -v` all passing
+**Verify**: `python -m pytest tests/ -v`
 
 **Done**:
-Task output: email validation function + 3 test cases
-Actually touched files: (backfilled after implementation)
-- [ ] The implementing agent has completed all steps of development and verification.
+Actually touched files: (backfilled after controller acceptance)
+- [ ] Controller accepted this Task after Verify passed
 ```
-
-### When to use TDD
-
-**Core heuristic**: can you describe the behavior as `expect(fn(input)).toBe(output)` before writing `fn`? Yes → TDD; no → standard Task, add tests afterwards as needed.
-
-- **Fits**: business logic with clear input/output, API endpoints, data transforms, validation rules, algorithms, state machines
-- **Does not fit**: UI layout/styling, config changes, glue code, exploratory prototypes, simple CRUD with no business logic
-
-### TDD stage discipline
-
-| Stage | Problem | Handling |
-|------|------|------|
-| RED | Test did not fail | Feature may already exist or the test is wrong — investigate before continuing |
-| GREEN | Test did not pass | Debug the implementation, iterate until green; do not jump to refactoring |
-| REFACTOR | Test failed | Undo the refactor, retry with smaller steps |
-
-**A RED that does not fail is the most common trap**: it means the test does not actually cover the intended behavior — fix it before continuing.
-
-### TDD commit advice
-
-Commit per stage (one commit per stage, code on the feature branch):
-
-```
-test(scope): add failing test for email validation
-feat(scope): implement email validation
-refactor(scope): extract regex to constant
-```
-
-Tick the corresponding Done checkbox in the Plan after each Task (the Plan file lives in the space repo and commits separately).
 
 ## Task field quick reference
 
-| Field | Required | Notes |
+| Field | Required | Meaning |
 |------|------|------|
-| **Verification Intent** | yes | AC#N; which acceptance entries this behavior group answers for |
-| **Behavior** | yes when TDD=true | Testable spec, directly translatable into a failing test |
-| **Pre-read** | yes | Files to read before implementing; N/A if unneeded |
-| **Design** | yes | Approach, key ideas, constraints — intent stated clearly, not file-by-file dictates |
-| **TDD** | yes | true/false; false needs a reason |
-| **Changes** | yes | Numbered list; entry 1 is always RED |
-| **Verify** | yes | Executable command; exit 0 required before ticking Done |
-| **Done** | yes | Output summary + actually-touched files + checkbox |
+| **Verification Intent** | yes | Which Agent Verification entries this Task is responsible for |
+| **Design Source** | project/phase Plans | Authoritative Active DESIGN `path#heading`; simple no-design work may use N/A |
+| **Behavior** | yes | Observable outcome in plain language; technical precision only where needed |
+| **Pre-read** | yes | Files/docs the Plan author already found important to read first; N/A if none |
+| **Interface** | optional | Task-local contract added/changed/removed or explicitly preserved |
+| **Constraints** | optional | Hard implementation limits not already stated elsewhere |
+| **TDD** | yes | true only under the TDD rule above; false should state the short reason |
+| **Verify** | yes | Real command(s) that verify this Task |
+| **Done** | yes | Controller-owned completion checkbox + actual touched files |
 
 ## The Agent Verification / User Validation boundary
 
@@ -200,7 +185,7 @@ If a mechanism the validation depends on is not yet documented in the project's 
 ```markdown
 #### Scenario 1: onboarding flow regression-free
 - Goal: Confirm each wizard step behaves as before the change
-- 验证环境: AGENTS.md "validation mechanisms" section (ELLAMAKA_TEST_ONBOARDING sandbox mode)
+- Validation environment: AGENTS.md "validation mechanisms" section (ELLAMAKA_TEST_ONBOARDING sandbox mode)
 - Precondition: sandbox mode (WOPAL_HOME=/tmp/wopal-onboarding-sandbox), no build needed
 - Launch command: `ELLAMAKA_TEST_ONBOARDING=1 ./scripts/dev.sh desktop`
 - User Actions:
@@ -238,74 +223,41 @@ Plans add no Gap-related metadata fields. The phase–Gap relationship is carrie
 - **Unlinked Plans** get no phase-doc handling at archive (skipped silently, no warnings, no errors). Ordinary feature/fix/refactor Plans leave `Product`/`Phase` empty and never invent rows in phase tables.
 - **Gaps**: the single source of truth is the project's `GAPS.md`. Plans reference the Gap identifier they close (e.g. `CLI-G3`) in Goal or Context without copying the description. When a Plan reaches `done` and its Exit criteria hold, the entry is removed from `GAPS.md` (the number retires, never reused).
 
-## Delegation prompt format
+## Delegation Strategy
 
-**Plan-driven task** (recommended):
+Assign work from the agents currently available using capability fit, Task dependencies, and parallelism; the Agent column contains only the specific agent name.
+
+## Implementation handoff
+
+The controller may implement directly or delegate. Whoever implements should load `df-implement`; do not duplicate that skill inside a handoff prompt.
+
+For a delegated Plan Task, pass only the context needed to do the work:
 
     ## Plan
-    Read the Plan file and execute Task <N>:
+    Read the Plan and execute Task <N>:
     <absolute path to the Plan document>
 
     ## Context
-    - Working path: project directory absolute path (worktree absolute path)
-    - Implementation baseline: Base Commit from Plan Metadata (integration branch HEAD, recorded at approve)
-    - Implementation freedom: Behaviors, Key Interfaces contracts, and boundaries are hard constraints; file organization, internal APIs, and test structure are yours to decide on the latest code
-    - AC write-back: at the RED stage, turn each AC into a real command and update the Plan's Agent Verification in place
-    - Commit git after each task's implementation and verification
-    - Follow project and module development specs (AGENTS.md)
-    - <Only extra emphases beyond the Plan; omit if none>
+    - Working path: <project/worktree absolute path>
+    - Baseline: <Base Commit from Plan Metadata>
+    - Follow project/module AGENTS.md
 
-    ## Completion criteria
-    - <key verification points, briefly>
+    ## Report
+    Return: Goal / Accomplished / Files / Verified / AC Commands / Status
 
-    ## Task Report
-    On completion output: Goal/Accomplished/Files/Status
+The Task already carries `Design Source`, Behavior, Pre-read, any task-local Interface/Constraints, and Verify. A delegated implementer returns only implementation evidence: actual touched files, Verify commands/results, and the real commands corresponding to relevant ACs; **do not commit code, edit the Plan, or tick Done/AC**. The controller then inspects the actual diff and independently runs Task Verify; failure goes straight back for repair, while success is the point at which the controller updates Plan evidence and creates the Task's implementation commit.
 
-**Ad-hoc task without a Plan**:
-
-    ## Goal
-    <one line>
-
-    ## Context
-    - Project path: /path/to/file
-
-    ## Steps
-    1. Read the relevant files
-    2. Modify files
-    3. Run verification
-
-    ## Completion criteria
-    - Feature verification passes
-
-    ## Task Report
-    On completion output: Goal/Accomplished/Files/Status
-
-**Principle**: with a Plan, the Plan is the single source of information; the prompt never duplicates Plan content.
-
-### Mandatory delegation prompt addition
-
-Every fae delegation for a Plan Task must append this at the end:
-
-    After completion, edit the corresponding Task's Done checkbox (- [ ] → - [x]) in the Plan file, and backfill the "actually touched files" list inside Done. Plan file path: <space-repo absolute path>
-    Never modify Plan Status metadata (Status/Worktree/Base Commit etc. are managed by flow.sh)
-
-Omitting this = fae never updates the Plan, and every Done is missed.
-
-## Top 5 common errors
-
-| Error | Cause | Fix |
-|-------|------|-----|
-| `missing Design` | Skipped the Design field | Add `**Design**:` + implementation design |
-| `TDD=true requires Behavior` | TDD flag set but no Behavior | Add the testable behavior spec |
-| `Changes must not use checkbox` | Changes used `- [ ] Step N:` | Numbered list `1. 2. 3.`, entry 1 always RED |
-| `AC checked but carries no executable command` | Criterion-style AC checked straight through complete | Write the real command back into the AC entry at the RED stage before checking |
-| `placeholder: 'TBD'` | Leftover placeholder | Replace with real content or delete the line |
+If the implementer is also the controller, keep the same order: implementation → controller check → Plan update/commit. Conflicts return to dev-flow handling. With delegated implementation, conflicts return to the delegator. `df-implement` owns STOP/report format; dev-flow owns acceptance and any escalation to the user.
 
 ## Validation and advancement
 
-- `submit` / `approve` run `plan check` automatically; no manual run needed
-- `approve` is not a first check — it is the node that enters "awaiting user review"
-- If `approve` is blocked by validation → fix the Plan and re-run `approve`
+`plan check` is intentionally mechanical. It checks only lifecycle metadata needed by the workflow: valid `Status`, Product/Phase pairing, and a usable Project Path when Target Project is set. It does **not** judge design quality, TDD choice, Behavior wording, Interface/Constraints, or User Validation prose; those belong to authoring/review.
+
+`complete`/`verify` only gate completion state: Task Done, Agent Verification, and User Validation checkboxes must be completed where those sections exist.
+
+- `submit` / `approve` run `plan check` automatically; do not repeat it manually.
+- `submit` moves the Plan into `reviewing`; only then ask the user to review it.
+- Run `approve --confirm` only after the user explicitly approves the current Plan; if validation blocks it, fix the Plan and retry.
 
 ## Plan naming rules
 
@@ -332,6 +284,30 @@ The Plan name is the authoritative identifier used to derive feature branches. N
 | `implement-multi-space-chat-projector-sync` | `chat-projector-sync` |
 | `add-skills-remove-command` | `skills-remove` |
 | `support-handling-expired-tokens` | `token-expiry` |
+
+### What is enforced
+
+The name is not a convention you are trusted to follow — it derives the feature branch, so the CLI checks it:
+
+| Where | Checks | Applies to |
+|---|---|---|
+| `plan new` | full contract: ASCII kebab-case, type from the standard set, slug ≤ 20 | every new name |
+| `plan check` | the same, minus the slug cap | any Plan it is pointed at |
+| `submit` / `approve` | via `plan check` | every Plan passing a lifecycle gate |
+
+The slug is always given explicitly with `--slug` — never derived from a title, which is free-form and often long, and often not English at all. That is why `--type` and `--slug` are both required in every mode.
+
+`fix-dsh-pr-102` is a legal name — `dsh-pr-102` is simply the slug. There is no scope slot, so nothing is "extra" in it.
+
+### Existing Plans: no retroactive renaming
+
+Plans created before this contract carry a scope-like segment and slugs over 20 chars. They are **not renamed, and not rejected**:
+
+- `plan check` and the lifecycle commands enforce only the character set on them, not the slug length.
+- Their feature branch is already derived from the current name; renaming mid-flight would orphan the worktree and the branch.
+- Historical Plans in `done/` are history and are not touched at all.
+
+Only creation is strict. This keeps the contract honest — one rule for what gets created — without turning a naming migration into a blocker on work already in progress.
 
 ### Plan directory rules
 
@@ -367,4 +343,4 @@ Worktree directory = branch. The branch name carries "unique and mappable back t
 | `verify --confirm` | integration branch | `done` | Plan-only commit to the integration branch |
 | `archive` | integration branch | archived | Moved to done/, worktree cleaned up |
 
-**Plan-only commit principle**: lifecycle scripts commit only Plan status changes, never implementation code. Code commits belong to the implementing agent (fae). Scripts abort on a dirty implementation tree rather than committing code on its behalf.
+**Plan-only commit principle**: lifecycle scripts commit only Plan status changes, never implementation code. The controller creates each Task's implementation commit only after controller acceptance; delegated implementers do not commit. Scripts abort on a dirty implementation tree rather than committing implementation code themselves.

@@ -70,8 +70,9 @@ def commit_and_push_plan(
                 max_name = max_total - len(prefix)
                 commit_msg = prefix + plan_filename[:max_name]
 
-        if not commit_paths(repo_root, [plan_relative], commit_msg):
-            log_error("Commit failed")
+        commit_result = commit_paths(repo_root, [plan_relative], commit_msg)
+        if not commit_result:
+            log_error(f"Commit failed: {commit_result}")
             return RESULT_COMMIT_FAILED
 
         log_success(f"Plan file committed: {commit_msg}")
@@ -79,10 +80,11 @@ def commit_and_push_plan(
     # Push if not already in remote
     if not is_commit_in_remote(repo_root, "origin", current_branch):
         log_step(f"Auto-pushing Plan file to origin/{current_branch}...")
-        if not push_repo(repo_root, current_branch):
+        push_result = push_repo(repo_root, current_branch)
+        if not push_result:
             log_error(
                 f"Push failed (commit is safe locally). "
-                f"Retry: cd {repo_root} && git push"
+                f"Retry: cd {repo_root} && git push\n{push_result}"
             )
             return RESULT_PUSH_FAILED
         log_success("Plan file pushed successfully")

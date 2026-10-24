@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-# validation.py - Plan Quality Gates
-#
-# Provides:
-#   check_doc_plan          - Plan completeness gate (submit/approve)
-#   check_product_phase     - Product/Phase metadata contract (presence + pair)
-#   check_user_validation   - UV checkbox gate (verify)
-#   check_acceptance_criteria - AC completion gate (complete)
-#   check_step_completion   - Task Done completion gate (complete)
+# validation.py - Mechanical Plan lifecycle gates
 
 import re
 from pathlib import Path
 
 from lib.workspace import find_workspace_root
+from plan import ValidationError as PlanNameValidationError
+from plan import validate_plan_name
 from workflow import PLAN_STATES
 
 
@@ -19,44 +14,13 @@ class ValidationError(Exception):
     pass
 
 
-# ── Patterns ──
-
 TASK_PATTERN = r'^### Task \d+: (.+?)\n(.*?)(?=^### Task|^##[^#]|\Z)'
-
-DESIGN_PAT = r'\*\*Design\*\*:\s*\n(.*?)(?:\*\*TDD\*\*:|^###|^##|\Z)'
-BEHAVIOR_PAT = r'\*\*Behavior\*\*:\s*(.*?)(?:\n\*\*Pre-read\*\*:|\n\*\*Design\*\*:|\Z)'
-TDD_PAT = r'\*\*TDD\*\*:\s*(true|false)'
 DONE_PAT = r'\*\*Done\*\*:\s*\n(.*?)(?=^###|^##|\Z)'
-CHANGES_PAT = r'\*\*Changes\*\*:\s*\n(.*?)(?:\*\*Verify\*\*:|^###|^##|\Z)'
+CHECKBOX_PAT = r'^\s*(?:\d+\.\s*|-\s+)\[([ xX])\]\s*(.*)$'
 
-STEP_CHECKBOX_PAT = r'-\s+\[\s*\]\s+Step\s+\d+:'
-
-COMMAND_PATTERNS = [
-    r'rg\s+-', r'python\s+-m', r'pytest', r'npm\s+', r'bun\s+',
-    r'cargo\s+', r'git\s+', r'gh\s+', r'bash\s+',
-]
-
-FORBIDDEN_UV_PATTERNS = [
-    r'npm\s+test', r'npm\s+run', r'npm\s+build',
-    r'pytest', r'python\s+-m\s+pytest', r'bun\s+test',
-    r'cargo\s+test', r'cargo\s+build', r'tsc',
-]
-
-PLACEHOLDER_PATTERNS = [
-    r'待补充|待补|TBD|TBC',
-    r'REQ-xxx|\bXXX\b',
-    r'path/to/|/path/to/',
-]
-
-
-# ── Helpers ──
 
 def _strip_md(value: str) -> str:
     return re.sub(r'[`*]', '', value).strip()
-
-
-def _no_code(content: str) -> str:
-    return re.sub(r'^```.*?^```', '', content, flags=re.MULTILINE | re.DOTALL)
 
 
 def _line_at(content: str, pos: int) -> int:
@@ -66,274 +30,189 @@ def _line_at(content: str, pos: int) -> int:
 def _section(content: str, heading: str) -> str:
     level = heading.count('#')
     stop = rf'(?=^#{{2,{level}}}[^#]|\Z)'
-    m = re.search(rf'^{re.escape(heading)}\s*\n(.*?){stop}', content, re.MULTILINE | re.DOTALL)
-    return m.group(1).strip() if m else ""
+    match = re.search(
+        rf'^{re.escape(heading)}\s*\n(.*?){stop}',
+        content,
+        re.MULTILINE | re.DOTALL,
+    )
+    return match.group(1).strip() if match else ""
 
 
-def _clean_field(text: str) -> str:
-    return re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL).strip()
+def _checkboxes(section: str) -> list[tuple[str, str]]:
+    return re.findall(CHECKBOX_PAT, section, re.MULTILINE)
 
 
-# ── check_doc_plan: Plan quality gate for submit/approve ──
+# submit / approve: only metadata that lifecycle commands rely on
 
 def check_doc_plan(plan_file: str) -> None:
-    with open(plan_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+    with open(plan_file, 'r', encoding='utf-8') as file:
+        content = file.read()
 
     issues: list[str] = []
-    clean = _no_code(content)
-
-    issues.extend(_check_placeholders(clean))
-    issues.extend(check_task_structure(content))
-    issues.extend(check_agent_verification(content))
-    issues.extend(check_user_validation_new(content))
     issues.extend(check_plan_status(content))
     issues.extend(check_product_phase(content))
+    issues.extend(check_plan_name(plan_file))
 
-    p = _check_project_path(content)
-    if p:
-        issues.append(p)
+    project_path_issue = _check_project_path(content)
+    if project_path_issue:
+        issues.append(project_path_issue)
 
     if issues:
         raise ValidationError(
-            f"{len(issues)} issue(s) in {plan_file}\n"
-            + "\n".join(issues)
+            f"{len(issues)} issue(s) in {plan_file}\n" + "\n".join(issues)
         )
 
 
-def _check_placeholders(content: str) -> list[str]:
-    issues = []
-    for pat in PLACEHOLDER_PATTERNS:
-        for m in re.finditer(pat, content):
-            issues.append(f"[L{_line_at(content, m.start())}] placeholder: '{m.group()}'")
-    return issues
+def check_plan_name(plan_file: str) -> list[str]:
+    """The file name is the Plan's identity: it derives the feature branch.
 
-
-def check_task_structure(content: str) -> list[str]:
-    issues = []
-    impl = _section(content, "## Implementation")
-    if not impl:
-        return issues
-
-    for title, body in re.findall(TASK_PATTERN, impl, re.MULTILINE | re.DOTALL):
-        t = title.strip()
-
-        dm = re.search(DESIGN_PAT, body, re.MULTILINE | re.DOTALL)
-        if not dm or not _clean_field(dm.group(1)):
-            issues.append(f"Task '{t}': missing Design")
-
-        tm = re.search(TDD_PAT, body, re.IGNORECASE)
-        if tm and tm.group(1).lower() == 'true':
-            bm = re.search(BEHAVIOR_PAT, body, re.MULTILINE | re.DOTALL)
-            if not bm or not _clean_field(bm.group(1)):
-                issues.append(f"Task '{t}': TDD=true requires Behavior")
-
-        dm2 = re.search(DONE_PAT, body, re.MULTILINE | re.DOTALL)
-        if dm2 and not re.search(r'-\s+\[[ x]]', dm2.group(1)):
-            issues.append(f"Task '{t}': Done missing checkbox")
-
-        cm = re.search(CHANGES_PAT, body, re.MULTILINE | re.DOTALL)
-        if cm and re.search(STEP_CHECKBOX_PAT, cm.group(1)):
-            issues.append(f"Task '{t}': Changes must not use checkbox format")
-
-    return issues
-
-
-def check_agent_verification(content: str) -> list[str]:
-    issues = []
-
-    ac_pos = content.find("### Agent Verification")
-    impl_pos = content.find("## Implementation")
-    if ac_pos != -1 and impl_pos != -1 and ac_pos > impl_pos:
-        issues.append("Agent Verification must appear before Implementation")
-
-    section = _section(content, "### Agent Verification")
-    if not section:
-        return issues
-
-    # Two-beat AC, beat 1 (submit): entries are behavioral pass criteria.
-    # Concrete commands are NOT required yet — they are written back at the
-    # RED stage (beat 2, gated by check_acceptance_criteria). What submit
-    # does own: the section must contain at least one checkbox entry, and
-    # no empty placeholder entries.
-    entries = re.findall(r'^\s*(?:\d+\.\s*|-\s+)\[[ x]\]\s*(.+)$', section, re.MULTILINE)
-    if not entries:
-        issues.append(
-            "Agent Verification: no checkbox entries found — each AC must be "
-            "a checkbox with a behavioral pass criterion"
-        )
-        return issues
-
-    for entry in entries:
-        if _strip_md(entry).strip() in ("", "N/A"):
-            issues.append("Agent Verification: empty AC entry")
-
-    return issues
-
-
-def check_user_validation_new(content: str) -> list[str]:
-    section = _section(content, "### User Validation")
-    if not section:
-        return []
-
-    issues = []
-    if not re.findall(r'^####\s+', section, re.MULTILINE):
-        issues.append("User Validation: no scenario found")
-
-    if not re.search(r'^\s*-\s+\[[ x]\]\s+用户已完成', section, re.MULTILINE):
-        issues.append("User Validation: final checkbox missing")
-
-    # Each scenario must carry the required fields and an executable command
-    # (backtick line) — a user has to be able to run it without guessing.
-    scenarios = re.split(r'^####\s+', section, flags=re.MULTILINE)[1:]
-    for i, scn in enumerate(scenarios, start=1):
-        if not re.search(r'启动命令|Launch Command|Command\s*:', scn, re.IGNORECASE):
-            issues.append(f"User Validation: Scenario {i} missing '启动命令' field")
-        elif not re.search(r'`[^`\n]+`', scn):
-            issues.append(f"User Validation: Scenario {i} '启动命令' has no executable command (backtick line)")
-        if not re.search(r'通过判据|Expected Result|Pass Criteria', scn, re.IGNORECASE):
-            issues.append(f"User Validation: Scenario {i} missing pass criteria (通过判据)")
-
-    for p in FORBIDDEN_UV_PATTERNS:
-        m = re.search(p, section, re.IGNORECASE)
-        if m:
-            issues.append(f"User Validation: automated command found ('{m.group()}')")
-    return issues
+    Only the character set is enforced for existing Plans. The slug-length cap
+    is a creation-time rule — a Plan already in flight has its branch derived
+    from the current name, so a length complaint here would block a lifecycle
+    step the user never asked to renegotiate.
+    """
+    try:
+        validate_plan_name(Path(plan_file).stem, enforce_slug_length=False)
+    except PlanNameValidationError as exc:
+        return [f"Plan name: {exc}"]
+    return []
 
 
 def check_plan_status(content: str) -> list[str]:
     match = re.search(r'^- \*\*Status\*\*:\s*(\w+)', content, re.MULTILINE)
-    if match and match.group(1) not in PLAN_STATES:
+    if not match:
+        return ["Metadata: Status is required"]
+    if match.group(1) not in PLAN_STATES:
         return [f"Status: unsupported state '{match.group(1)}'"]
     return []
 
 
 def check_product_phase(content: str) -> list[str]:
-    """Product/Phase metadata contract.
-
-    Both items are always present. The pair is atomic: a phase-linked plan
-    declares both values, an unlinked plan leaves both empty. A missing item
-    breaks the archive-time phase-doc sync; a half-declared pair cannot be
-    rendered or synced at all.
-    """
+    """Product/Phase must both exist and be either both filled or both empty."""
     issues: list[str] = []
     product_m = re.search(r'^- \*\*Product\*\*:[ \t]*(.*)$', content, re.MULTILINE)
     phase_m = re.search(r'^- \*\*Phase\*\*:[ \t]*(.*)$', content, re.MULTILINE)
 
     if not product_m:
-        issues.append(
-            "Metadata: 'Product' item missing — keep the line, leave the "
-            "value empty when the plan is not phase-linked"
-        )
+        issues.append("Metadata: 'Product' item missing")
     if not phase_m:
-        issues.append(
-            "Metadata: 'Phase' item missing — keep the line, leave the "
-            "value empty when the plan is not phase-linked"
-        )
+        issues.append("Metadata: 'Phase' item missing")
 
     if product_m and phase_m:
-        product_value = _strip_md(product_m.group(1)).strip()
-        phase_value = _strip_md(phase_m.group(1)).strip()
-        if bool(product_value) != bool(phase_value):
-            issues.append(
-                "Metadata: Product and Phase must be declared together "
-                "(one is set, the other is empty)"
-            )
+        product = _strip_md(product_m.group(1))
+        phase = _strip_md(phase_m.group(1))
+        if bool(product) != bool(phase):
+            issues.append("Metadata: Product and Phase must be declared together")
 
     return issues
 
 
 def _check_project_path(content: str) -> str | None:
-    m = re.search(r'^-\s+\*\*Project Path\*\*:\s*(.+)$', content, re.MULTILINE)
-    if not m:
-        # Project Path is required when Target Project is declared.
-        # Without it, verify/archive cannot locate the correct git repo.
-        has_target = re.search(
-            r'^-\s+\*\*Target Project\*\*:\s*(.+)$', content, re.MULTILINE
-        )
-        if has_target:
-            return "Project Path is required when Target Project is declared"
+    target_m = re.search(
+        r'^-\s+\*\*Target Project\*\*:[ \t]*(.*)$', content, re.MULTILINE
+    )
+    target = _strip_md(target_m.group(1)) if target_m else ""
+
+    path_m = re.search(
+        r'^-\s+\*\*Project Path\*\*:[ \t]*(.*)$', content, re.MULTILINE
+    )
+    declared = _strip_md(path_m.group(1)) if path_m else ""
+
+    if target and not declared:
+        return "Project Path is required when Target Project is declared"
+    if not declared:
         return None
 
-    declared = _strip_md(m.group(1))
-    ws_root = find_workspace_root()
-    resolved = ws_root / declared
-    line = _line_at(content, m.start())
-
+    resolved = find_workspace_root() / declared
+    line = _line_at(content, path_m.start())
     if not resolved.exists():
         return f"[L{line}] Project Path not found: '{declared}'"
-
-    if not (resolved / ".git").exists():
+    if not (resolved / '.git').exists():
         return f"[L{line}] Project Path not a git repo: '{declared}'"
-
     return None
 
 
-# ── Hard gates for complete/verify ──
+# complete / verify: only completion state, never semantic quality
 
-def check_acceptance_criteria(plan_file: str) -> None:
-    with open(plan_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+def _require_all_checked(section: str, label: str) -> None:
+    entries = _checkboxes(section)
+    if not entries:
+        raise ValidationError(f"{label}: no completion checkbox found")
 
-    section = _section(content, "### Agent Verification")
-    if not section:
-        return
-
-    unchecked = re.findall(r'^\s*(?:\d+\.\s*|-\s+)\[\s*\].*$', section, re.MULTILINE)
+    unchecked = [text for mark, text in entries if mark.lower() != 'x']
     if unchecked:
         raise ValidationError(
-            "Agent Verification not completed:\n"
-            + "\n".join(unchecked)
+            f"{label} not completed:\n" + "\n".join(unchecked)
         )
 
-    # Two-beat AC, beat 2 (complete): a checked entry claims the criterion
-    # is verified — it must have been written back as a real executable
-    # command at the RED stage. A criterion-style entry still checked in
-    # prose means the evidence was never materialized.
-    checked = re.findall(
-        r'^\s*(?:\d+\.\s*|-\s+)\[[ x]\]\s*(.+)$', section, re.MULTILINE
-    )
-    for entry in checked:
-        if not any(re.search(p, entry) for p in COMMAND_PATTERNS) \
-                and not re.search(r'`[^`]+`', entry):
-            raise ValidationError(
-                "Agent Verification entry checked but carries no executable "
-                "command — write the real command back before checking "
-                "(two-beat AC, beat 2):\n"
-                f"  {entry}"
-            )
+
+def check_acceptance_criteria(plan_file: str) -> None:
+    with open(plan_file, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    if "### Agent Verification" in content:
+        _require_all_checked(
+            _section(content, "### Agent Verification"),
+            "Agent Verification",
+        )
 
 
 def check_step_completion(plan_file: str) -> None:
-    with open(plan_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+    with open(plan_file, 'r', encoding='utf-8') as file:
+        content = file.read()
 
-    impl = _section(content, "## Implementation")
-    if not impl:
+    implementation = _section(content, "## Implementation")
+    if not implementation:
         return
 
-    issues = []
-    for title, body in re.findall(TASK_PATTERN, impl, re.MULTILINE | re.DOTALL):
-        dm = re.search(DONE_PAT, body, re.MULTILINE | re.DOTALL)
-        if dm and not re.search(r'-\s+\[x\]', dm.group(1)):
+    issues: list[str] = []
+    for title, body in re.findall(
+        TASK_PATTERN, implementation, re.MULTILINE | re.DOTALL
+    ):
+        done = re.search(DONE_PAT, body, re.MULTILINE | re.DOTALL)
+        if not done:
+            # Legacy Plans may predate the Done field. Do not turn a format
+            # migration into a lifecycle blocker; authoring/review owns format quality.
+            continue
+
+        entries = _checkboxes(done.group(1))
+        if not entries:
+            issues.append(f"Task '{title.strip()}': Done checkbox missing")
+        elif any(mark.lower() != 'x' for mark, _ in entries):
             issues.append(f"Task '{title.strip()}': Done not checked")
 
     if issues:
-        raise ValidationError(
-            "Task Done not completed:\n" + "\n".join(issues)
-        )
+        raise ValidationError("Task Done not completed:\n" + "\n".join(issues))
+
+
+# A Plan may legitimately have nothing for the user to inspect: the whole
+# behaviour is covered by automated assertions and fixtures. Those Plans say
+# so explicitly with N/A instead of inventing a checkbox nobody can judge.
+NOT_APPLICABLE_PAT = re.compile(
+    r'^[*_`\s]*(?:n\s*/\s*a|not\s+applicable)\b', re.IGNORECASE
+)
+
+
+def _declares_not_applicable(section: str) -> bool:
+    """Whether the section opens with an explicit N/A declaration.
+
+    Only an explicit declaration counts — free-form prose still fails the
+    gate, so "the user probably won't check this" cannot silently skip UAT.
+    """
+    for line in section.splitlines():
+        text = line.strip().lstrip('-*>').strip()
+        if not text:
+            continue
+        return bool(NOT_APPLICABLE_PAT.match(text))
+    return False
 
 
 def check_user_validation(plan_file: str) -> None:
-    with open(plan_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+    with open(plan_file, 'r', encoding='utf-8') as file:
+        content = file.read()
 
-    section = _section(content, "### User Validation")
-    if not section:
-        return
-
-    if not re.findall(r'^####\s+', section, re.MULTILINE):
-        raise ValidationError("User Validation: no scenario found")
-
-    if not re.search(r'^\s*-\s+\[x\]\s+用户已完成', section, re.MULTILINE):
-        raise ValidationError("User Validation: final checkbox not checked")
+    if "### User Validation" in content:
+        section = _section(content, "### User Validation")
+        if not _checkboxes(section) and _declares_not_applicable(section):
+            return
+        _require_all_checked(section, "User Validation")

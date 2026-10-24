@@ -18,6 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from support.bootstrap import ensure_scripts_path
 ensure_scripts_path()
 
+from support.git_fixtures import (
+    init_repo as _shell_init_repo,
+    install_failing_hook as _shell_install_failing_hook,
+    shell_git as _shell_git,
+)
+
 from commands.submit import cmd_submit, register_submit_parser
 from lib.plan_commit import RESULT_OK
 
@@ -154,3 +160,87 @@ class TestRegisterSubmitParser(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ============================================
+# submit commit-failure retryability (Task 4, AC#6)
+# ============================================
+#
+# Real construction: a temp workspace repo (+ bare origin) holding a Plan in
+# planning state. check_doc validation is mocked (not the concern here); the
+# status write, git commit/push and the retry run for real.
+
+
+SUBMIT_PLAN_REL = ".wopal-space/plans/ontology/106-fix-dev-flow-valid-issue-plan.md"
+FIXTURE_106 = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures" / "plans" / "106-fix-dev-flow-valid-issue-plan.md"
+)
+
+
+def _make_submit_workspace(tmp_path):
+    ws = tmp_path / "ws"
+    _shell_init_repo(ws)
+    origin = tmp_path / "ws-origin.git"
+    _shell_git("init", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    _shell_git("remote", "add", "origin", str(origin), cwd=ws)
+
+    plan = ws / SUBMIT_PLAN_REL
+    plan.parent.mkdir(parents=True)
+    plan.write_text(FIXTURE_106.read_text())
+    _shell_git("add", SUBMIT_PLAN_REL, cwd=ws)
+    _shell_git("commit", "-m", "add plan", cwd=ws)
+    _shell_git("push", "-u", "origin", "main", cwd=ws)
+    _shell_git("remote", "set-head", "origin", "main", cwd=ws)
+    return ws, plan
+
+
+def _run_submit(ws, target="106"):
+    from commands.submit import cmd_submit
+
+    with patch.multiple(
+        "commands.submit",
+        find_workspace_root=MagicMock(return_value=ws),
+        check_doc_plan=MagicMock(),
+    ):
+        return cmd_submit(Namespace(target=target))
+
+
+class TestSubmitCommitFailureRetryable:
+    """A failed submit commit must leave the Plan retryable (planning), not
+    half-written in reviewing."""
+
+    def test_commit_failure_restores_plan_to_planning(self, tmp_path):
+        ws, plan = _make_submit_workspace(tmp_path)
+        original = plan.read_text()
+        _shell_install_failing_hook(ws, "injected submit-commit failure")
+
+        result = _run_submit(ws)
+
+        assert result == 1
+        assert plan.read_text() == original
+        assert "- **Status**: planning" in plan.read_text()
+        # No staged Plan residue.
+        assert _shell_git(
+            "status", "--porcelain", "--", SUBMIT_PLAN_REL, cwd=ws
+        ).stdout == ""
+
+    def test_retry_after_commit_failure_succeeds(self, tmp_path):
+        ws, plan = _make_submit_workspace(tmp_path)
+        hook = _shell_install_failing_hook(ws, "injected submit-commit failure")
+
+        first = _run_submit(ws)
+        assert first == 1
+
+        hook.unlink()
+        second = _run_submit(ws)
+
+        assert second == 0
+        committed = _shell_git("show", f"HEAD:{SUBMIT_PLAN_REL}", cwd=ws).stdout
+        assert "- **Status**: reviewing" in committed
+        assert _shell_git(
+            "log", "-1", "--format=%s", cwd=ws
+        ).stdout.strip() == "docs(plan): submit plan #106"
+        assert _shell_git(
+            "status", "--porcelain", "--", SUBMIT_PLAN_REL, cwd=ws
+        ).stdout == ""

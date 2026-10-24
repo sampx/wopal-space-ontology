@@ -19,7 +19,7 @@ from lib.project import (
     find_plan,
     resolve_plan_location,
     build_plan_blob_url,
-    _get_default_branch,
+    get_default_branch,
 )
 
 
@@ -54,8 +54,8 @@ class TestResolvePlanDir:
 # -- find_plan ------------------------------------------------------------------
 
 class TestFindPlan:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_by_name(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "feature-dev-flow-resolver.md"
         plan_file.write_text("# Plan")
@@ -64,8 +64,8 @@ class TestFindPlan:
         assert result.path == plan_file.resolve()
         assert result.is_archived is False
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", side_effect=_slug_by_path)
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
     def test_by_issue_number(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "42-feature-dev-flow-resolver.md"
         plan_file.write_text("# Plan 42")
@@ -81,8 +81,8 @@ class TestFindPlan:
 # -- resolve_plan_location ------------------------------------------------------
 
 class TestResolvePlanLocation:
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", return_value="sampx/wopal-space")
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", return_value="sampx/wopal-space")
     def test_active_plan(self, mock_slug, mock_branch, workspace):
         plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "feature-resolver.md"
         plan_file.write_text("# Plan")
@@ -94,8 +94,8 @@ class TestResolvePlanLocation:
         assert result.branch == "main"
         assert result.is_archived is False
 
-    @patch("lib.project._get_default_branch", return_value="main")
-    @patch("lib.project._get_repo_slug", return_value="sampx/wopal-space")
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", return_value="sampx/wopal-space")
     def test_archived_plan(self, mock_slug, mock_branch, workspace):
         done_dir = workspace / ".wopal-space" / "plans" / "gesp" / "done"
         done_dir.mkdir(parents=True)
@@ -131,7 +131,7 @@ class TestBuildPlanBlobUrl:
         assert build_plan_blob_url(loc) == ""
 
 
-# -- _get_default_branch ------------------------------------------------------
+# -- get_default_branch ------------------------------------------------------
 
 class _FakeResult:
     def __init__(self, returncode=0, stdout="", stderr=""):
@@ -158,7 +158,7 @@ class _FakeRun:
 
 
 class TestGetDefaultBranch:
-    """_get_default_branch must resolve the default branch from LOCAL git
+    """get_default_branch must resolve the default branch from LOCAL git
     refs only. It must NEVER invoke `git ls-remote` (a network round-trip that
     hangs in sandboxed environments and caused flow.sh verify/archive timeouts).
     """
@@ -167,7 +167,7 @@ class TestGetDefaultBranch:
         """Prefer local origin/HEAD symbolic-ref over any fallback."""
         fake = _FakeRun([(0, "refs/remotes/origin/main\n")])
         monkeypatch.setattr("lib.project.subprocess.run", fake)
-        assert _get_default_branch(tmp_path) == "main"
+        assert get_default_branch(tmp_path) == "main"
         # Only a single local git call, never the network ls-remote
         assert fake.calls == [["git", "symbolic-ref", "refs/remotes/origin/HEAD"]]
 
@@ -175,7 +175,7 @@ class TestGetDefaultBranch:
         """When symbolic-ref fails, fall back to rev-parse --abbrev-ref."""
         fake = _FakeRun([(1, ""), (0, "origin/main\n")])
         monkeypatch.setattr("lib.project.subprocess.run", fake)
-        assert _get_default_branch(tmp_path) == "main"
+        assert get_default_branch(tmp_path) == "main"
         assert not any("ls-remote" in c for c in fake.calls)
 
     def test_never_calls_ls_remote_when_refs_exist(self, tmp_path, monkeypatch):
@@ -184,5 +184,5 @@ class TestGetDefaultBranch:
         ever issuing a network call."""
         fake = _FakeRun([(1, ""), (1, ""), (1, "")])
         monkeypatch.setattr("lib.project.subprocess.run", fake)
-        assert _get_default_branch(tmp_path) == "main"
+        assert get_default_branch(tmp_path) == "main"
         assert not any("ls-remote" in c for c in fake.calls)

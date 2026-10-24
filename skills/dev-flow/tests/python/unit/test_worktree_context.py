@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # test_worktree_context.py - TDD tests for WorktreeContext model and helpers
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,6 +22,7 @@ from lib.worktree import (
     resolve_active_plan,
     remove_worktree,
     create_worktree,
+    delete_branch,
 )
 
 
@@ -699,3 +702,179 @@ class TestRemoveWorktreeResidualCleanup:
                 remove_worktree(project_dir, "feature/x", worktree_base)
 
         assert residual_file.exists(), "non-empty residual files must not be deleted"
+
+
+# -- Git mutation attempt diagnostics -----------------------------------------
+
+
+def _git(path: Path, *args: str) -> subprocess.CompletedProcess:
+    """Run a git command inside `path`, asserting success."""
+    result = subprocess.run(
+        ["git", *args], cwd=str(path), capture_output=True, text=True,
+    )
+    assert result.returncode == 0, f"git {args} failed: {result.stderr}"
+    return result
+
+
+def _init_repo_with_commit(path: Path) -> None:
+    """Create a git repo with one initial commit."""
+    path.mkdir(parents=True, exist_ok=True)
+    _git(path, "init", "-b", "main")
+    _git(path, "config", "user.email", "test@test.com")
+    _git(path, "config", "user.name", "Test")
+    (path / "README.md").write_text("# test\n")
+    _git(path, "add", "README.md")
+    _git(path, "commit", "-m", "init")
+
+
+class TestCreateWorktreeAttemptDiagnostics:
+    """create_worktree: a failed fallback must not overwrite the first
+    attempt's evidence in the raised error."""
+
+    def test_both_attempt_errors_preserved(self, tmp_path):
+        repo = tmp_path / "project"
+        _init_repo_with_commit(repo)
+
+        branch = "feature/dual-failure"
+        # Occupy the branch in another worktree: attempt 1 fails with
+        # "already used by worktree" ...
+        other = tmp_path / "other-checkout"
+        _git(repo, "branch", branch)
+        _git(repo, "worktree", "add", str(other), branch)
+        # ... and attempt 2 fails because the branch name already exists.
+        worktree_base = tmp_path / ".worktrees"
+
+        with pytest.raises(RuntimeError) as exc_info:
+            create_worktree(repo, branch, worktree_base)
+
+        message = str(exc_info.value)
+        assert "already used by worktree" in message  # attempt 1 evidence
+        assert "already exists" in message            # attempt 2 evidence
+        assert message.count("git worktree add") == 2
+        assert message.count("exit code:") == 2
+        assert str(repo) in message                   # cwd
+        target = worktree_base / "feature-dual-failure"
+        assert str(target) in message                 # attempted path
+
+
+class TestRemoveWorktreeAttemptDiagnostics:
+    """remove_worktree: a failed --force fallback must not overwrite the
+    normal-remove attempt's evidence in the raised error."""
+
+    def test_both_attempt_errors_preserved(self, tmp_path):
+        if os.geteuid() == 0:
+            pytest.skip("chmod-based failure injection has no effect as root")
+
+        repo = tmp_path / "project"
+        _init_repo_with_commit(repo)
+
+        branch = "feature/remove-dual-failure"
+        worktree_path = tmp_path / "checkout"
+        _git(repo, "worktree", "add", "-b", branch, str(worktree_path), "HEAD")
+
+        # Dirty worktree: normal remove refuses ("use --force").
+        (worktree_path / "untracked.txt").write_text("dirty\n")
+        # Read-only directory: --force cannot delete its content either.
+        held_dir = worktree_path / "held-dir"
+        held_dir.mkdir()
+        (held_dir / "held.txt").write_text("held\n")
+        os.chmod(held_dir, 0o555)
+        try:
+            with pytest.raises(RuntimeError) as exc_info:
+                remove_worktree(repo, branch, tmp_path / ".worktrees")
+        finally:
+            os.chmod(held_dir, 0o755)
+
+        message = str(exc_info.value)
+        assert "use --force to delete it" in message  # attempt 1 evidence
+        assert "failed to delete" in message          # attempt 2 evidence
+        assert message.count("git worktree remove") == 2
+        assert message.count("exit code:") == 2
+        assert str(worktree_path.resolve()) in message
+
+
+class TestDeleteBranchOutcomes:
+    """delete_branch must distinguish deleted / absent / skipped-current /
+    failed instead of collapsing every outcome into False (B-02)."""
+
+    def _repo_with_commit(self, tmp_path):
+        repo = tmp_path / "repo"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"], cwd=repo, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+        (repo / "f.txt").write_text("x\n")
+        subprocess.run(["git", "add", "f.txt"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+        return repo
+
+    def test_deleted_branch_reported_deleted(self, tmp_path):
+        repo = self._repo_with_commit(tmp_path)
+        subprocess.run(["git", "branch", "feat"], cwd=repo, check=True)
+
+        result = delete_branch(repo, "feat")
+
+        assert result.status == "deleted"
+        assert result.deleted is True
+        assert subprocess.run(
+            ["git", "rev-parse", "--verify", "refs/heads/feat"],
+            cwd=repo, capture_output=True,
+        ).returncode != 0
+
+    def test_missing_branch_reported_absent(self, tmp_path):
+        repo = self._repo_with_commit(tmp_path)
+
+        result = delete_branch(repo, "does-not-exist")
+
+        assert result.status == "absent"
+        assert result.deleted is False
+        assert result.attempts == []
+
+    def test_current_branch_reported_skipped(self, tmp_path):
+        repo = self._repo_with_commit(tmp_path)
+
+        result = delete_branch(repo, "main")
+
+        assert result.status == "skipped"
+        assert result.deleted is False
+
+    def test_real_failure_preserves_diagnostics(self, tmp_path):
+        repo = self._repo_with_commit(tmp_path)
+        subprocess.run(["git", "branch", "locked"], cwd=repo, check=True)
+        # Real injection: a stale loose-ref lock makes both -d and -D fail.
+        (repo / ".git" / "refs" / "heads" / "locked.lock").write_text("")
+
+        result = delete_branch(repo, "locked")
+
+        assert result.status == "failed"
+        assert result.deleted is False
+        assert len(result.attempts) == 2
+        assert all(a.exit_code != 0 for a in result.attempts)
+        assert any("lock" in (a.stderr or "").lower() for a in result.attempts)
+
+    def test_rev_parse_read_failure_reported_failed(self, tmp_path):
+        """W-02: when rev-parse itself fails (non-empty stderr), the result
+        is 'failed', not silently 'absent' — an unknown state must not be
+        treated as a clean idempotent skip."""
+        from unittest.mock import patch
+        repo = self._repo_with_commit(tmp_path)
+        subprocess.run(["git", "branch", "feat"], cwd=repo, check=True)
+
+        original_run = subprocess.run
+
+        def fake_run(cmd, **kwargs):
+            if "rev-parse" in cmd and "--verify" in cmd:
+                from types import SimpleNamespace
+                return SimpleNamespace(
+                    returncode=128, stdout="", stderr="fatal: permission denied"
+                )
+            return original_run(cmd, **kwargs)
+
+        with patch("lib.worktree.subprocess.run", side_effect=fake_run):
+            result = delete_branch(repo, "feat")
+
+        assert result.status == "failed"
+        assert result.incomplete
+        assert len(result.attempts) >= 1
+        assert "permission denied" in str(result.attempts[0])
