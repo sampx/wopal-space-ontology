@@ -347,20 +347,27 @@ Markdown table schema：
 | `path`        | 相对 space root 的路径                                                                    |
 | `type`        | 组件类型，如 `ontology-worktree`、`space-runtime`、`projects`、`contents`、`labs`、`docs` |
 | `level`       | 结构层级，如 `worktree`、`repo`、`clone`、`module`、`collection`、`dir`                   |
-| `description` | Agent 可读职责说明，不写规则正文                                                          |
+| `description` | 项目定位的一句话说明，只回答「这是什么」                                                  |
 
 Markdown table 维护规则：
 
 - 表格分为 managed block 与 user block；managed block 可由 `/init` 在确认后重写，user block 永不修改。
-- managed block 默认只放 `.wopal` 固定关键模块、frontmatter pinned repos、用户确认的重要 module / collection。
+- managed block 只记录空间的主要项目：顶层 repo、顶层 content module、空间级工具，以及 `.wopal` 固定关键模块。
+- 项目内部结构不进入表格；子模块、子目录、`AGENTS.md` 落在项目内部的细节，由项目自身的 `AGENTS.md` 承载。
 - root `AGENTS.md` 是 ellamaka 启动入口，不进入表格。
 - `wopal space scan` 发现的新 repo 或 `AGENTS.md` 模块不自动进入表格；`/init` 只报告并等待用户确认。
 - 用户从 managed table 删除的非固定资产，不得因再次扫描被静默补回。
 
+描述规则：
+
+- 一条 `description` 只写项目定位，一句话说清它是什么。
+- 不写实现方式、目录结构、技术栈、上游来源、当前开发状态；这些细节属于项目自身的 `DESIGN` 与 `AGENTS.md`，本表不复制。
+- 描述与项目自身的规范冲突时，以项目内的 `DESIGN` / `AGENTS.md` 为准，本表只保留定位。
+
 描述来源规则：
 
-- 受控 repo / module 的首选描述来源是对应 `AGENTS.md` frontmatter `description`。
-- 次选来源是 `AGENTS.md` positioning / 第一段、`README.md` 第一段或 package metadata description。
+- 首选来源是项目 `AGENTS.md` frontmatter `description`，但只取其中的定位部分，压缩成一句话；frontmatter 携带实现细节时不原样搬入。
+- 次选来源是 `README.md` 第一段或 package metadata description。
 - CLI scan 只提取已有描述，不生成描述；需要新描述时由 `/init` 展示方案并等待用户确认。
 
 维护边界：

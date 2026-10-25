@@ -87,9 +87,9 @@ description: 首次引导或校准空间结构
 
 1. **分类 scan 发现的 Module-level agent rules**，对照声明范围表（见下方）：
    - 顶层模块已在 managed table → 检查描述漂移
-   - `projects/<X>/<sub-path>` 有 AGENTS.md → 必须加入 managed table
+   - `projects/<X>/<sub-path>` 有 AGENTS.md → 不加入，由该子模块自己的 AGENTS.md 承载
    - `labs/<*>/<sub-path>` 内部 → 不加入
-   - 按优先级生成描述
+   - 按优先级生成定位描述
 
 2. **Frontmatter / managed-table 差异**，逐项标注：
    - **缺失** — scan 发现但未在 managed table 声明（默认加入）
@@ -109,6 +109,7 @@ description: 首次引导或校准空间结构
    - **陈旧**条目 — 确认是否删除
    - 未声明的新 `labs/ref-repos/<X>` — 确认是否加入
    - 描述无法自动生成 — 请用户提供
+   - 已有描述带实现细节 — 提出只保留定位的改写方案
    - frontmatter `repos` 字段与 managed table 不一致 — 询问以哪个为准
 3. 等待用户明确确认后写入
 
@@ -132,7 +133,7 @@ description: 首次引导或校准空间结构
 |---------|-------------------|------|
 | `.wopal/*` 模块（skills、agents、rules、commands、plugins） | 是 | 本体 worktree — 空间核心 |
 | `projects/<name>/` 仓库根 | 是 | 顶层受管项目 |
-| `projects/<name>/<sub-path>/` 有独立 AGENTS.md | **是** | 子模块有自己的规则，必须索引 |
+| `projects/<name>/<sub-path>/` 有独立 AGENTS.md | **否** | 子模块细节由该模块自己的 AGENTS.md 承载 |
 | `contents/<name>/` | 是 | 顶层内容模块 |
 | `scripts/` | 是 | 空间级工具脚本 |
 | `labs/ref-repos/<name>/` 仓库根 | 问用户 | 由用户决定 |
@@ -140,12 +141,18 @@ description: 首次引导或校准空间结构
 | `labs/research/*`、`labs/fork/*`、`labs/tests/*` | 否 | 实验性/临时代码 |
 | `.wopal-space/backup/`、`.wopal-space/INBOX/` | 否 | 暂存区 |
 
-**新条目描述生成优先级**：
+**新条目描述规则**：
 
-1. `AGENTS.md` frontmatter `description` 字段（首选）
+`description` 只回答「这是什么」，一句话说清项目定位。不写实现细节——不写目录结构、技术栈、上游来源、开发状态；这些在项目自身的 `DESIGN` 与 `AGENTS.md` 里。
+
+生成优先级：
+
+1. `AGENTS.md` frontmatter `description` —— 只取定位部分，压缩成一句话
 2. `package.json` `description`（无 AGENTS.md 的 npm 包）
 3. AGENTS.md body 首个非空段落（无 frontmatter 时）
-4. 目录名 + 最近父级描述作为回退
+4. 目录名作为回退
+
+已有条目若带细节视为漂移：校准时改写为定位描述。
 
 ## 完成后响应
 

@@ -88,9 +88,9 @@ If `STRUCTURE.md` does not exist, report and prompt to run `wopal space init` fi
 
 1. **Classify scan Module-level agent rules** using the Declaration Scope table (see below). For each entry:
    - Top-level module already in managed table → check description drift
-   - `projects/<X>/<sub-path>` with own AGENTS.md → must add to managed table
+   - `projects/<X>/<sub-path>` with own AGENTS.md → not added; the sub-module's own AGENTS.md carries it
    - `labs/<*>/<sub-path>` internal → not added
-   - Generate description per priority order
+   - Generate a positioning description per priority order
 
 2. **Frontmatter / managed-table diffs** against the compact schema. For each asset, classify:
    - **missing** — scan fact not declared in managed table (default: add)
@@ -110,6 +110,7 @@ If `STRUCTURE.md` does not exist, report and prompt to run `wopal space init` fi
    - Asset exists in managed table but no longer in scan (**stale**) — confirm removal
    - New `labs/ref-repos/<X>` not previously declared — confirm whether to declare
    - Description cannot be auto-generated unambiguously — ask for description
+   - An existing description carries implementation detail — propose the positioning-only rewrite
    - Frontmatter `repos` field and managed table disagree — ask which is authoritative
 3. Wait for explicit user approval before proceeding to write.
 
@@ -133,7 +134,7 @@ Execute only the user-approved changes:
 |---|---|---|
 | `.wopal/*` modules (skills, agents, rules, commands, plugins) | Yes | Ontology worktree — space core |
 | `projects/<name>/` repo root | Yes | Top-level managed project |
-| `projects/<name>/<sub-path>/` with own `AGENTS.md` | **Yes** | Sub-module with own rules — must be indexed |
+| `projects/<name>/<sub-path>/` with own `AGENTS.md` | **No** | Sub-module detail belongs in that module's own `AGENTS.md` |
 | `contents/<name>/` | Yes | Top-level content module |
 | `scripts/` | Yes | Space-level utility |
 | `labs/ref-repos/<name>/` repo root | Ask user | User-decided per repo |
@@ -141,12 +142,18 @@ Execute only the user-approved changes:
 | `labs/research/*`, `labs/fork/*`, `labs/tests/*` | No | Experimental / throwaway code |
 | `.wopal-space/backup/`, `.wopal-space/INBOX/` | No | Transient staging |
 
-**Description generation priority for new entries**:
+**Description rules for new entries**:
 
-1. `AGENTS.md` frontmatter `description` field (preferred)
+A `description` answers only "what is this" in one short phrase. It never carries implementation detail — no directory layout, tech stack, upstream provenance, or development status; those live in the project's own `DESIGN` and `AGENTS.md`.
+
+Generation priority:
+
+1. `AGENTS.md` frontmatter `description` — take its positioning only, compress to one phrase
 2. `package.json` `description` (for npm packages without AGENTS.md)
 3. AGENTS.md body first non-empty paragraph (when no frontmatter)
-4. Directory name + nearest parent's description as fallback
+4. Directory name as fallback
+
+Existing entries carrying detail are drift: rewrite them down to positioning when calibrating.
 
 ## Response After Completion
 
