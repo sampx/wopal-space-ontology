@@ -100,7 +100,38 @@ Report PR URL, branch, absolute worktree path, verification results, and next st
 
 ## Review Fixes and Interrupted Work
 
-Verify PR identity/open state, worktree path/branch/cleanliness, and remote head first. Prefer fixing and verifying in the source Space, synchronizing with authorization, then transferring only this revision's topic changes into the original worktree. Fixes made directly in the contribution worktree must also return to the source Space. Preserve the PR's existing conflict resolutions.
+Verify PR identity/open state, worktree path/branch/cleanliness, and remote head first.
+
+### Where to fix
+
+Fix in the **source Space** and let the change travel outward; that direction needs no return step:
+
+    source Space (.wopal) -> space sync -> local main -> contribution worktree -> PR
+
+Fixing directly in the contribution worktree is allowed when the review context lives there, but it creates an obligation: **the PR branch now holds commits that local main does not have.** Until they return, local main and upstream disagree about the same lines, and the next `ontology sync` aborts with a conflict that looks like an upstream change but is actually your own unreturned edit.
+
+> **Mandatory return.** Any commit made in the contribution worktree must reach the source Space before this PR is merged, and always before `ontology sync` runs. Use the return check below instead of relying on memory.
+
+### Return check
+
+Run it after any worktree-side fix, and again immediately before asking the user to merge.
+
+Judge return by content, never by commit identity. A squash merge rewrites the source commit, so `main.."$B"` keeps listing the PR branch forever even after a perfect return — a check built on it reports a permanent false positive.
+
+Compare the files the PR touches against the source of truth instead. Before merge the source of truth is local main: any listed path means the worktree holds a change local main never received. After merge the source of truth is `upstream/main`: any listed path means local main still carries an older copy of merged content.
+
+    # the PR's own file set
+    PR_PATHS=$(git -C "$W" diff --name-only upstream/main..."$B")
+    # before merge: does local main already contain this branch's content?
+    git -C "$R" diff --name-only main "$B" -- $PR_PATHS
+    # after merge: does local main agree with upstream on those files?
+    git -C "$R" diff --name-only upstream/main main -- $PR_PATHS
+
+Both must print nothing when the return is complete. A path that appears is the exact file to reconcile.
+
+To bring work back, use the normal source-Space route: apply this revision's topic changes in `.wopal`, commit them there, run `wopal space sync --confirm`, then run `wopal ontology sync --confirm`. Never hand-edit local main to settle the difference: local main is fed by the space branch, so a direct edit is both out of protocol and the exact cause of the next aborted sync.
+
+Preserve the PR's existing conflict resolutions.
 
 Review may add or remove files; there is no lifetime scope lock. Inspect the final diff before publishing and update affected body/verification information:
 
@@ -113,7 +144,22 @@ Use ordinary push only. If rejected, stop and inspect divergence; never force pu
 
 ## Return and Authorized Cleanup
 
-The user decides merging; review approval alone does not authorize the Agent to merge. On the user's return request, run `wopal ontology sync --confirm`, then `wopal space sync --confirm`. Neither command owns contribution-resource deletion.
+The user decides merging; review approval alone does not authorize the Agent to merge. Neither returned synchronization step owns contribution-resource deletion.
+
+### Return gate
+
+Run these checks before either synchronization, in this order. Each one answers a distinct question; do not skip ahead because an earlier check passed.
+
+1. **No unreturned PR content.** The PR's file set must already agree with local main: `git -C "$R" diff --name-only main "$B" -- $PR_PATHS` prints nothing. Output means worktree-side work never reached the source Space; return it first (see Review Fixes, Return check). Do not start the sync to "see what happens". Never use `main.."$B"` here — a squash merge keeps that non-empty forever.
+2. **PR files agree with upstream.** For every path in `git -C "$W" diff --name-only upstream/main..."$B"`, `git -C "$R" diff --quiet upstream/main main -- <path>` must succeed. A path that differs means local main still carries an older duplicate of the merged content; align it through the source Space, not by editing local main.
+3. **Source Space is clean and synchronized.** `git -C "$S/.wopal" status --short` prints nothing, and `wopal space status` reports no to-contribute commits.
+
+Only then run, in this order:
+
+    wopal ontology sync --confirm     # upstream/origin -> local main
+    wopal space sync --confirm        # local main -> space branch
+
+A sync that reports a conflict after these checks passed is new information, not something to resolve by hand: stop, inspect the named files, and report. The CLI aborts the merge itself, so local main is left intact — verify that before doing anything else.
 
 Obtain explicit deletion authorization for this PR, then check each condition:
 

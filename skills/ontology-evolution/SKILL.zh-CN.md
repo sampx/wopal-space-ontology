@@ -364,6 +364,7 @@ CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直�
 - worktree 固定在 `<space-root>/.worktrees/ontology-contribute-<slug>/`，一个 PR 复用一组现场，从创建保留到评审、回流与授权清理结束；失败或冲突保留，不放临时目录。
 - PR 正文写清原因、变化、能力/文件清单、增删统计、范围依据和实际验证结果；修复后同步更新。
 - 普通 push 更新同一 PR，不强推。删除需用户明确授权，并核对合并回流、干净现场与无额外提交；closed-unmerged 或状态不明都保留。
+- **在贡献 worktree 里做的修复必须回流到来源 Space**，在合并前、且在运行任何 `ontology sync` 之前完成。未回流的 worktree 提交会让 local main 与上游对同样的行各持一说，下一次同步就报出看似上游改动、实为自己未回流的冲突。用 `git -C "$R" log --oneline main.."$B"` 检查；回流走 `.wopal` -> `space sync`，绝不靠手改 local main。
 
 **执行创建、评审修复、重试或收尾前，先读 [原生命令与安全检查](references/contribution.zh-CN.md)。** 该参考是完整操作规范；不要临时发明分支名、工作区位置或清理步骤。
 

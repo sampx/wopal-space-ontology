@@ -100,7 +100,38 @@ gh pr create --repo "$UPSTREAM" --base main --head "$FORK_OWNER:$B" \
 
 ## 评审修复与中断继续
 
-先核对 PR 身份与 open 状态、worktree 路径/分支/干净状态、远端 head。修复优先在来源 Space 落地并验证，经授权同步后，只把本轮主题改动送入原 worktree；直接在贡献 worktree 修复时也要带回来源 Space。不要覆写原 PR 已有的冲突解决。
+先核对 PR 身份与 open 状态、worktree 路径/分支/干净状态、远端 head。
+
+### 在哪里修
+
+改在**来源 Space**，让改动由内向外流；这个方向不需要额外回流：
+
+    来源 Space (.wopal) -> space sync -> local main -> 贡献 worktree -> PR
+
+评审现场在 worktree 时，直接在贡献 worktree 修复是允许的，但它带来一项义务：**PR 分支从此拥有了 local main 没有的提交。** 在它们回流之前，local main 与上游对同样的行各持一说，下一次 `ontology sync` 就会报冲突——那看起来像上游改了什么，实际是你自己没回流的修改。
+
+> **强制回流。** 贡献 worktree 里的任何提交，都必须在本 PR 合并前、且始终在运行 `ontology sync` 之前回到来源 Space。用下面的回流检查，不要依赖记忆。
+
+### 回流检查
+
+在 worktree 侧做过任何修复后跑一次，在请用户合并前再跑一次。
+
+判回流只看内容，不看提交身份。squash 合并会重写源提交，`main.."$B"` 即使回流完美也会永远列出那条 PR 分支——用它做判据会得到一个永久误报。
+
+改为把 PR 触碰的文件与真相源比对。合并前真相源是 local main：列出路径说明 worktree 里有 local main 从未收到的改动。合并后真相源是 `upstream/main`：列出路径说明 local main 还留着已合并内容的旧副本。
+
+    # 本 PR 的文件集
+    PR_PATHS=$(git -C "$W" diff --name-only upstream/main..."$B")
+    # 合并前：local main 是否已包含本分支的内容
+    git -C "$R" diff --name-only main "$B" -- $PR_PATHS
+    # 合并后：local main 与上游在这些文件上是否一致
+    git -C "$R" diff --name-only upstream/main main -- $PR_PATHS
+
+回流完整时两者都必须无输出。出现的路径就是要对齐的那个文件。
+
+回流走正常的来源 Space 路径：把本轮主题改动应用到 `.wopal`、在那里提交、执行 `wopal space sync --confirm`、再执行 `wopal ontology sync --confirm`。**绝不手工改 local main 来抹平差异**：local main 由空间分支喂入，直接改既脱离协议，也正是下一次同步被中止的原因。
+
+不要覆写原 PR 已有的冲突解决。
 
 允许按评审增删文件，不设终身范围锁。推送前核对最终 diff，更新受影响的 PR 正文与验证说明：
 
@@ -113,7 +144,22 @@ gh pr edit <pr-number> --repo "$UPSTREAM" --body-file "$BODY"
 
 ## 合并回流与授权清理
 
-用户决定合并；Agent 不因评审通过自行合并。用户要求回流后执行 `wopal ontology sync --confirm`，再执行 `wopal space sync --confirm`。这两条命令不承担贡献资源清理。
+用户决定合并；Agent 不因评审通过自行合并。两条回流同步命令都不承担贡献资源清理。
+
+### 回流闸
+
+执行任何同步之前，按顺序跑完这些检查。每条回答一个不同的问题；前一条通过不代表可以跳过后面。
+
+1. **没有未回流的 PR 内容。** 本 PR 的文件集必须已与 local main 一致：`git -C "$R" diff --name-only main "$B" -- $PR_PATHS` 无输出。有输出说明 worktree 侧的改动从未进入来源 Space，先回流（见「评审修复与中断继续」的回流检查）。不要先跑同步去「看看会怎样」。这里绝不能用 `main.."$B"`——squash 合并后它永远非空。
+2. **PR 文件与上游一致。** 对 `git -C "$W" diff --name-only upstream/main..."$B"` 里的每个路径，`git -C "$R" diff --quiet upstream/main main -- <路径>` 必须成功。某路径有差异，说明 local main 仍留着已合并内容的旧副本；要经来源 Space 对齐，不要直接改 local main。
+3. **来源 Space 干净且已同步。** `git -C "$S/.wopal" status --short` 无输出，且 `wopal space status` 报告没有待贡献提交。
+
+三条都通过后，才按此顺序执行：
+
+    wopal ontology sync --confirm     # upstream/origin -> local main
+    wopal space sync --confirm        # local main -> 空间分支
+
+检查都过了之后同步仍报冲突，那是新信息，不是手工解冲突的理由：停下来，查看被点名的文件并汇报。CLI 会自行中止合并，local main 保持原样——动手之前先确认这一点。
 
 删除前取得针对该 PR 的明确授权，并逐项检查：
 
