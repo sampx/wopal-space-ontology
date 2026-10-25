@@ -24,6 +24,8 @@ repos: {}
 
 # {space-name} 空间结构
 
+本表只索引空间的主要项目——一个项目一行，只写定位。细节看各项目自己的 `DESIGN` 与 `AGENTS.md`。
+
 <!-- MANAGED:START -->
 | path | type | level | description |
 |------|------|-------|-------------|

@@ -24,6 +24,8 @@ repos: {}
 
 # {space-name} Space Structure
 
+This table indexes the space's main projects only - one row per project, one line of positioning. Details live in each project's own `DESIGN` and `AGENTS.md`.
+
 <!-- MANAGED:START -->
 | path | type | level | description |
 |------|------|-------|-------------|
