@@ -245,6 +245,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 ### 绝对不要标为冗余的内容
 
 - 能护住核心逻辑的最精简测试——一个冒烟测试、一条 `assert` 自检、一个小巧的单元测试文件。那是质量底线，不是赘肉。
+- 带有合规 `simplified:` 标记、且明确写清了上限与升级触发条件的临时简化方案（仅在缺少升级触发条件时才标为无锚点腐烂风险）。
 - 外部输入边界上的安全校验、防止数据丢失的错误处理、权限与安全防护——绝不能为了省行数而删减。
 - 纯个人偏好（"换我写会换一种目录结构"）、变量起名风格、代码格式偏好。
 
@@ -304,8 +305,8 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 4. **排查单实现抽象与冗余大文件**：
    - 运行 `rg -n 'interface |abstract class |Factory|Manager|Adapter' src/`，并按行数排序查看最大的源文件（`wc -l`）。
 5. **排查遗留欠账标记、跳过测试与过期文档（分析技术债时必跑）**：
-   - 运行 `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER' src/` 和 `rg -n 'it\.skip|xdescribe|xit|describe\.skip|@pytest\.mark\.skip|t\.Skip' tests/`，把代码里留下的半成品欠账和失效测试一并揪出来。
-   - 报告按收益从高到低分组输出：**可删减的依赖** → **死文件与死导出（`delete:`）** → **标准库/原生替换（`stdlib:` / `native:`）** → **过度抽象与重复逻辑（`yagni:` / `shrink:`）**（如有遗留 `TODO`/失效测试/过期文档则单列一组**遗留欠账与测试/文档缺口**），末尾汇总 `net: -N lines, -M dependencies possible`。
+   - 运行 `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER|simplified:' src/` 和 `rg -n 'it\.skip|xdescribe|xit|describe\.skip|@pytest\.mark\.skip|t\.Skip' tests/`，把代码里留下的半成品欠账、临时简化记号与失效测试一并揪出来。对 `simplified:` 检查是否注明了升级触发条件（未注明升级条件的标为无触发条件的腐烂风险）。
+   - 报告按收益从高到低分组输出：**可删减的依赖** → **死文件与死导出（`delete:`）** → **标准库/原生替换（`stdlib:` / `native:`）** → **过度抽象与重复逻辑（`yagni:` / `shrink:`）**（如有遗留 `TODO`/`simplified:`/失效测试/过期文档则单列一组**遗留欠账与测试/文档缺口**），末尾汇总 `net: -N lines, -M dependencies possible`。
 
 ## 8. 能力资产规范检查（进化提案）
 

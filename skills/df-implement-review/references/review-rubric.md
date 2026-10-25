@@ -245,6 +245,7 @@ Before recommending a `stdlib:` or `native:` replacement, verify:
 ### Never flag
 
 - the smallest check that would fail if the logic broke — a smoke test, one `assert`-based self-check, one small test file. That is the lean minimum, not bloat.
+- deliberate simplifications with valid `simplified:` comments that explicitly name their ceiling and upgrade path (flag only if missing an upgrade trigger).
 - input validation at trust boundaries, error handling that prevents data loss, security measures — never simplified away, never flagged for deletion.
 - taste ("I would have structured it differently"), naming, style preferences.
 
@@ -304,7 +305,7 @@ When running in **Repo audit** mode (no diff; scanning an existing project or di
 4. **Single-implementation abstractions & wrappers**:
    - Run `rg -n 'interface |abstract class |Factory|Manager|Adapter' src/` and inspect the largest files (`wc -l`).
 5. **Lingering debt markers, skipped tests & stale docs (when analyzing technical debt)**:
-   - Run `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER' src/` and `rg -n 'it\.skip|xdescribe|xit|describe\.skip|@pytest\.mark\.skip|t\.Skip' tests/` to surface half-finished work and disabled tests alongside structural bloat.
+   - Run `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER|simplified:' src/` and `rg -n 'it\.skip|xdescribe|xit|describe\.skip|@pytest\.mark\.skip|t\.Skip' tests/` to surface half-finished work and disabled tests alongside structural bloat. For `simplified:` comments, verify each names an upgrade trigger (flag any without a trigger as an unanchored shortcut risk).
    - Group findings by impact in the report: **Dependencies to cut** → **Dead files & exports (`delete:`)** → **Stdlib / native replacements** → **Abstractions & duplication (`yagni:` / `shrink:`)** (plus **Debt markers & test/doc gaps** if present), ending with `net: -N lines, -M dependencies possible`.
 
 ## 8. Capability standards gate (evolution proposals)
