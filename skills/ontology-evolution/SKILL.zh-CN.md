@@ -339,13 +339,12 @@ wopal space evo archive enhance-example
 | `wopal ontology capability list` | — | 只读：能力池拥有什么——`space capability add` 的选择清单 |
 | `wopal ontology sync [--confirm]` | 三角 | `local main` 与来源链路 `upstream ⇄ origin ⇄ local main` 三步对齐（fork：①把 origin/main merge 进 local main → ②把 upstream/main merge 进同一 local main 结果 → ③把 local main push 回 origin；clone 塌缩为仅①）。`ontology update` 是其兼容别名 |
 | `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | 向上 | `local main` → 上游 PR（fork 模式；在隔离工作树中 squash 合并；冲突时 `--resume` / `--abort`） |
-| `wopal ontology contribute --pr <number-or-url> [--message <msg>] [--confirm]` | 向上 | 沿用已保存范围，向原贡献分支追加来源修复，更新同一个 PR |
 
 ## 读状态
 
 `wopal ontology status` 报告双向流：**向下**（`upstream → origin → local main`）与**向上**（`local main → origin → upstream`），后者以待办文件集呈现。
 
-它同时展示已跟踪 PR 的状态、发布 head、来源是否有待发布修复，以及远端贡献分支是否有外部提交。刷新失败时区分本地已知信息与远端当前状态，不能据缓存宣布已合并或清理分支。
+它同时展示远端 `contribute/*` 分支及其对应 PR 的状态（open / merged / closed）。刷新失败时区分本地已知信息与远端当前状态，不能据缓存宣布已合并或清理分支。
 
 `wopal space status` 报告空间链接：**可贡献** 还是 **落后 local main**、装配状态、以及**本地选择**——`include`（额外挂载：仅本空间挂载的共享内容）/ `exclude`（本地停用的类型默认）/ `private`（私有持有的未跟踪内容）——外加未注册的未跟踪文件。private 内容受保护：下方上行门禁会拒绝任何触碰已登记为 private 的能力根的同步提交。
 
@@ -370,18 +369,42 @@ CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直�
 
 一个主题一个 PR：`--include` / `--exclude` 从待处理集里划出一份连贯的贡献，`--message` 写清这项变更交付了什么（结果态），而不是机械动作。不相关的工作要拆分，绝不捆在一起。
 
-## 同一 PR 的持续修复与回流
+## 评审修复与回流
 
-贡献分支服务于同一个 PR；创建成功后保留分支和 CLI 管理的贡献记录，干净的临时工作树可释放。记录由 CLI 维护，不手工编辑。
+贡献分支是一个普通 Git 分支。分支推到 fork 上、再向 upstream 开 PR 之后，**PR 就是「这条分支相对 base 的差异」**。所以评审要求修改时，不需要任何专用命令：改完这条分支再 push 一次，PR 自动更新。
 
-1. **创建**：先把已验证的 Space 内容汇入 local main，再按用户确定的主题和范围执行 `ontology contribute --message <msg> --confirm`，保存返回的 PR 身份。
-2. **跟踪**：按需运行 `ontology status` 查看 PR 与来源变化，不设后台轮询。PR 标题、正文、批准与合并使用 GitHub 的现有界面。
-3. **修复**：在来源 Space 分支修改、验证并提交，再执行 `space sync --confirm`。贡献分支仅用于发布；修复先回到本地使用的内容，避免 PR 与 Space 各改一份。
-4. **更新**：在用户授权这次发布后执行 `ontology contribute --pr <number-or-url> --confirm`。CLI 沿用原范围并向原分支追加修复提交，普通 push 自动更新同一 PR。`--message` 可描述本轮修复。已跟踪更新若中断，直接重跑同一个 `--pr <number-or-url> --confirm`；不要改走基于 message 的 `--resume`，且 `--pr --abort` 非法。基于 message 的 `--resume` / `--abort` 只用于首次创建中断（其中 abort 仅撤销未发布候选）。
-5. **回流**：用户合并 PR 后，依次执行 `ontology sync --confirm`、`space sync --confirm`。上游采用 merge、squash 或 rebase 都走这条路径；普通 merge 接入上游实际落地历史，保留本地历史。
-6. **清理**：由 CLI 确认 PR 已合并、落地提交已进入 local main 且 fork main 推送成功后清理。Open、closed-unmerged、状态无法确认、有额外提交或有未提交内容的工作树都保留，不凭提交内容相同或祖先关系自行删分支。
+这也意味着修复时可以**自由增删文件**。范围在创建时只是用来圈定这一个 PR 的主题，不是终身锁；评审说「你漏了文档」，直接补进去即可。
 
-更新前看预览确认增量仍属原主题。原 include/exclude 范围固定；扩大主题另开贡献。来源修复未同步、远端出现外部提交、网络查询失败或真实冲突时，按 CLI 诊断停止并处理；需要的外部修复先带回 Space。真实分歧不能承诺无冲突，也不强推或自动取 ours/theirs。abort 保留已发布内容。
+### 修复流程
+
+1. **在 Space 里改**（推荐起点）：在 `.wopal` 的 Space 分支修改、验证、提交，然后 `space sync --confirm` 汇入 local main。Space 始终是你实际运行的那份内容，先改它，PR 与 Space 才不会各改一份。
+2. **取一个工作树**：贡献分支在本地仍然存在，但通常没有工作树——创建时的临时工作树已释放。用普通 git 取一个：
+
+   ```bash
+   git -C "$WOPAL_HOME/ontologies/<repo>" worktree add /tmp/pr-fix \
+     contribute/<分支名>
+   ```
+
+3. **把改动放进去并提交**：从 Space 复制本轮改动的文件，或在工作树里直接编辑；`git add` 点名本次文件、提交。
+4. **普通 push**：
+
+   ```bash
+   git -C /tmp/pr-fix push origin HEAD:contribute/<分支名>
+   ```
+
+   GitHub 随即更新同一个 PR。**不要 force push**；远端出现你没见过的提交时，先弄清来源，不要覆盖。
+5. **拆工作树**：`git worktree remove /tmp/pr-fix`。
+6. **告诉用户 PR 已更新**，由用户在 GitHub 上评审、批准、合并。
+
+只有 fast-forward 的 push 才安全。若 push 被拒（远端有新提交），停下来核对差异，不要强推。
+
+### 回流
+
+用户合并 PR 后，依次执行 `ontology sync --confirm`、`space sync --confirm`。上游采用 merge、squash 或 rebase 都走这条路径；普通 merge 接入上游实际落地历史，保留本地历史。
+
+### 清理
+
+`ontology sync --confirm` 在确认 PR 已合并、且落地提交已进入 local main 之后，清理对应的 `contribute/*` 分支（本地与 fork）。状态为 open、closed-unmerged、无法确认，或分支上有 PR 之外的额外提交时，一律保留并报告——不凭提交内容相同或祖先关系自行删分支。
 
 ---
 
