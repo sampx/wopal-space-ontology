@@ -50,6 +50,23 @@
 
 ---
 
+## 用 Issue 编号定位 Plan
+
+`submit` / `approve` / `complete` / `verify` / `archive` / `sync` / `reset` / `plan status` 等命令的 `plan-id` 位置，可以直接写 Issue 编号。解析按以下顺序，命中即停：
+
+| 顺序 | 依据 | 说明 |
+|------|------|------|
+| 1 | 文件名前缀 | `<issue_number>-*.md` |
+| 2 | Plan 元数据 `- **Issue**:` | 覆盖先建 Plan、后挂 Issue 的情况；多编号字段（`#249, #250`）中任一编号都命中 |
+| 3 | 活跃优先 | 同一编号命中多个 Plan 时，`done/` 下的归档 Plan 让位给活跃 Plan |
+
+同一编号命中多个活跃 Plan 时命令**失败关闭**，打印候选路径并退出，不会随便挑一个。这时改用 Plan 名字执行（`flow.sh plan status <plan-name>`），既不改名也不重建 Plan——改名会孤立 feature 分支与 worktree，重建会让一个 Issue 出现两份进度。
+
+```bash
+flow.sh plan status 249    # 数字前缀或 Issue 元数据
+flow.sh plan status enhance-dev-flow-resolver    # Plan 名字（歧义时）
+```
+
 ## Git mutation surfaces 与失败语义
 
 部分生命周期命令会写入 Git metadata（index / commit / refs / worktree / checkout）；普通工作区可写不代表这些 surface 可写，受限环境下 Agent 需先用当前 Harness 原生的 escalation/approval 机制取得能力（见 `SKILL.md`「脚本执行」）。下表按脚本真实调用链逐入口审计（定位采用 file + 函数/调用点锚点；精确行号随代码演进漂移，不写入本表。新增 Git mutation 时必须同步此表）。

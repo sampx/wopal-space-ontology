@@ -40,6 +40,7 @@ from pathlib import Path
 from datetime import date
 
 from plan import find_plan, find_plan_by_issue, find_plan_by_name
+from lib.project import AmbiguousPlanError
 from plan import make_plan_name
 from plan import ValidationError as NamingValidationError
 from plan import get_plan_status
@@ -402,6 +403,13 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             plan_file = find_plan_by_issue(issue_number, str(workspace_root))
             _print_existing_plan_info(plan_file, str(issue_number))
             return 0
+        except AmbiguousPlanError as e:
+            log_error(str(e))
+            print(
+                "Resolve it with the Plan name instead of creating another Plan:\n"
+                "  flow.sh plan status <plan-name>"
+            )
+            return 1
         except FileNotFoundError:
             # No existing plan, proceed to create
             pass
