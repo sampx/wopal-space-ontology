@@ -21,7 +21,7 @@ description: 本体能力进化 — 撰写进化提案并落地（状态机、�
 | `templates/proposal.md` | 带撰写注释的提案骨架；提案格式的唯一来源 |
 | `references/` | 命令参考与背景说明 |
 
-稀疏状态**只能**通过 `wopal space` 命令族写入。直接执行 `git add -A`、`git checkout` 或 `git sparse-checkout`，范围与索引就会在无人察觉中漂移。
+稀疏状态**只能**通过 `wopal space` 命令族写入。在空间稀疏工作树中直接执行 `git add -A`、`git checkout` 或 `git sparse-checkout` 会破坏范围与索引的一致性。上游贡献在独立、完整检出的贡献 worktree 内使用原生 Git，规范见 `references/contribution.zh-CN.md`。
 
 ## 3. 实现规则
 
@@ -47,7 +47,7 @@ description: 本体能力进化 — 撰写进化提案并落地（状态机、�
 
 ### 不自动交付
 
-`space sync` 与 `ontology contribute` 是用户的最终决定（`docs/DESIGN-evolution.md`，交付终端）。本技能的任何部分都不得调用交付 CLI、添加远端或推送——没有自动上行路径是设计，不是遗漏。
+`space sync` 与原生 Git/GitHub PR 发布由用户逐次决定（`docs/DESIGN-evolution.md`，交付终端）。只有用户授权后才执行对应同步或发布，不擅自添加远端、推送、合并或删除。贡献命名、worktree 保留与安全收尾规范单点维护于 `references/contribution.zh-CN.md`。
 
 ## 4. 用户补充规则
 

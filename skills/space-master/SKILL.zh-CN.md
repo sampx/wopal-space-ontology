@@ -1,19 +1,7 @@
 ---
 name: space-master
-description: |
-  WopalSpace 空间的根技能与总纲。空间的一切能力——如何运行、如何配置、如何编写命令/规则/技能/模板——都定义在本体（ontology）仓库中，经由中央能力池分发给空间，空间进化通过 space sync 回流。
-
-  必须加载的场景：
-  - 空间结构维护：space init/status、.wopal 目录结构、装配模型、空间如何运行与配置
-  - 空间能力编写：命令、规则、技能、模板的编写与修改规范
-  - AGENTS.md 编写：创建或更新项目级/目录级 AGENTS.md
-  - README 编写：创建或更新项目级 README.md
-  - 技能生命周期：安装、扫描、移除
-  - 意图不明确、不确定用哪个流程/技能时，作为总纲路由到正确技能
-
-  本体维护与进化由 `ontology-evolution` 技能执行，不由本技能执行：本体仓库操作（update、sync、capability list、contribute、PR）直接加载 `ontology-evolution`——本技能只做路由，无需同时加载两者。
-
-  [CRITICAL] 涉及 ontology 仓库协作（update/sync/PR）时，即使用户未明确说"上游同步"，也必须加载 `ontology-evolution`。
+description: >
+  WopalSpace 根技能与流程路由入口。意图不清、不能确定应使用哪个技能时必须加载。用于空间初始化、结构/目录布局、运行配置、装配模型，以及项目或目录 AGENTS.md、项目 README.md 的创建与维护；也用于技能安装、扫描、移除和能力编写的规范路由。本体仓库更新、同步、能力发现、贡献 PR 与能力进化直接加载 ontology-evolution，不必同时加载本技能；具体开发、技能编写与委派分别路由至 dev-flow、skill-creator、agents-collab。
 ---
 
 # space-master
@@ -28,7 +16,7 @@ description: |
 
 | 场景 | 加载 | 要点 |
 |------|------|------|
-| 开发/修复/重构（Issue/Plan 驱动） | `dev-flow` | 默认开发流程；任务走其状态机（planning → reviewing → executing → verifying → done） |
+| 开发/修复/重构（Issue/Plan 驱动） | `dev-flow` | 默认开发流程；任务走其状态机（planning → reviewing → executing → verifying → done）。本体 Issue 是例外——见下方「Issue 归哪个项目、走哪个流程」 |
 | 本体维护（实例更新、空间对齐、能力装配、贡献） | `ontology-evolution` | 本体仓库操作一律直接加载该技能；本技能只做路由 |
 | 本体能力进化（`.wopal/` 下的 skills、rules、agents、commands、plugins、assembly） | `ontology-evolution` | 对象判据：本体能力资产走本技能；`projects/` 下的代码仓库走 `dev-flow` |
 | 委派任何子 Agent（fae/rook/wsf-* 等所有类型） | `agents-collab` | 委派前必须加载；覆盖委派工具 API、任务生命周期、双向通信、进度监控与恢复 |
@@ -42,11 +30,30 @@ description: |
 
 ---
 
+## Issue 归哪个项目、走哪个流程
+
+每个 Issue 通过 `--project` / `project/<name>` 标签声明它要改哪个空间组件。这个标签同时决定工作落在哪、以及归哪个流程管，所以必须按**改动对象**选，不能按话题选。
+
+标签怎么填，与 `STRUCTURE.md` 里组件的命名保持一致：
+
+| Issue 要改的东西 | `--project` | 流程 |
+|---|---|---|
+| 本体组件——本体 worktree 本身（`skills/`、`rules/`、`agents/`、`commands/`、`plugins/`、`assembly/`） | 该组件在 `STRUCTURE.md` 里的项目名 | `ontology-evolution` |
+| `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | `dev-flow` |
+
+名字要从 `STRUCTURE.md` 读，不要凭印象猜：本体项目名和仓库清单每个空间都不一样，写一个不匹配的组件名，会让 Plan 或提案落进没有任何地方指向的目录。
+
+项目是本体组件的 Issue 就是本体工作：写成 `docs/evolutions/` 下的提案，走 `wopal space evo` 生命周期，绝不走 dev-flow 那条路——没有 Plan、没有特性分支、没有 worktree。Issue 只是需求的记录，提案才是实施的授权来源。
+
+标签看不准时就按改动路径判断：落在本体 worktree 里就是本体工作，落在 `projects/` 下的仓库就是仓库工作。
+
+---
+
 ## 本体维护
 
 本体维护与能力进化由 **`ontology-evolution` 技能**执行——任何本体仓库操作（实例更新、空间对齐、能力装配、上游贡献）一律直接加载该技能，并按其维护协议（Maintenance Protocols）章节执行。无需同时加载本技能。
 
-该技能是唯一规范单点——命令面、状态解读、双通道与上行闸、执行口径、贡献范围判定。本技能不承载任何维护协议。
+该技能是唯一规范单点——命令面、状态解读、双通道与上行闸、执行口径、贡献范围与原生贡献流程。创建、修复或收尾上游 PR 时，读取该技能的 `references/contribution.zh-CN.md`；其中统一短分支命名、固定 worktree、评审期间保留现场及授权清理，不在本技能重复维护。
 
 ## AGENTS.md 维护
 

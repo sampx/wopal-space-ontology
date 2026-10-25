@@ -1,19 +1,7 @@
 ---
 name: space-master
-description: |
-  Root skill and master specification for WopalSpace. Everything a space can do — how it runs, how it is configured, how to write commands/rules/skills/templates — is defined in the ontology repository and distributed to spaces through the central capability pool, with space evolution flowing back through space sync.
-
-  MUST load when:
-  - Space structure maintenance: space init/status, .wopal directory layout, assembly model, how the space runs and is configured
-  - Space capability authoring: writing and modifying commands, rules, skills, templates
-  - AGENTS.md authoring: creating or updating project/directory AGENTS.md
-  - README authoring: creating or updating project-level README.md
-  - Skill lifecycle: install, scan, remove
-  - Task intent is ambiguous or Wopal is unsure which workflow/skill to use — this is the routing entry point
-
-  Ontology maintenance and evolution are executed by the `ontology-evolution` skill, not this one: for ontology repo operations (update, sync, capability discovery, contribution, PR), load `ontology-evolution` directly — this skill only routes; loading both is not required.
-
-  [CRITICAL] Load `ontology-evolution` whenever ontology repo operations (update/sync/PR) appear, even if the user does not explicitly say "upstream sync".
+description: >
+  Root WopalSpace specification and workflow router. MUST load when intent is ambiguous or the correct workflow/skill is unclear. Use for space init/status, structure and directory layout, runtime configuration, assembly, authoring project/directory AGENTS.md or project README.md, skill installation/scanning/removal, and capability-authoring guidance. For ontology repository updates, sync, capability discovery, contribution PRs, or evolution, load ontology-evolution directly; loading both is unnecessary. Routes development, skill authoring, and delegation to dev-flow, skill-creator, and agents-collab respectively.
 ---
 
 # space-master
@@ -28,7 +16,7 @@ Space skills each serve their own purpose. Choose by scenario; do not stack load
 
 | Scenario | Load | Notes |
 |----------|------|-------|
-| Dev / Fix / Refactor (Issue/Plan driven) | `dev-flow` | Default development workflow; tasks run through its state machine (planning → reviewing → executing → verifying → done) |
+| Dev / Fix / Refactor (Issue/Plan driven) | `dev-flow` | Default development workflow; tasks run through its state machine (planning → reviewing → executing → verifying → done). Ontology Issues are the exception — see "Issues: which project, which workflow" below |
 | Ontology maintenance (instance updates, space alignment, capability assembly, contribution) | `ontology-evolution` | Load it directly for any ontology repo operation; this skill only routes |
 | Ontology capability evolution (skills, rules, agents, commands, plugins, assembly under `.wopal/`) | `ontology-evolution` | Object test: ontology capability assets → this skill; code repositories under `projects/` → `dev-flow` |
 | Delegate any sub-agent (fae, rook, wsf-*, etc.) | `agents-collab` | MUST load before delegation; covers delegation tool APIs, task lifecycle, two-way communication, progress monitoring, and recovery |
@@ -42,11 +30,30 @@ This skill directly owns WopalSpace's space governance work — no routing neede
 
 ---
 
+## Issues: which project, which workflow
+
+Every Issue names the space component it will change through its `--project` / `project/<name>` label. That label decides both where the work lives and which workflow owns it, so choose it by the object being changed, never by the topic.
+
+Choose the label the same way `STRUCTURE.md` names components:
+
+| The Issue changes | `--project` | Workflow |
+|---|---|---|
+| An ontology component — the ontology worktree itself (`skills/`, `rules/`, `agents/`, `commands/`, `plugins/`, `assembly/`) | That component's project name, read from `STRUCTURE.md` | `ontology-evolution` |
+| A repository under `projects/` | That repository's name, read from `STRUCTURE.md` | `dev-flow` |
+
+Read the name from `STRUCTURE.md` rather than assuming it: the ontology project name and the repository set differ per space, and a name that does not match the component sends the Plan or proposal into a directory nothing else points at.
+
+An Issue whose project is the ontology component is ontology work: it goes to a proposal under `docs/evolutions/` and the `wopal space evo` lifecycle. It never takes the dev-flow path — no Plan, no feature branch, no worktree. The Issue remains the record of the demand; the proposal is the implementation authority.
+
+The component path answers the question when the label is ambiguous: if the change lands in the ontology worktree, it is ontology work; if it lands in a repository under `projects/`, it is repository work.
+
+---
+
 ## Ontology Maintenance
 
 Ontology maintenance and capability evolution are executed by the **`ontology-evolution` skill** — load it directly for any ontology repo operation: instance updates, space alignment, capability assembly, and upstream contribution all follow its Maintenance Protocols. Loading this skill as well is not required.
 
-It is the single specification point — command surface, status reading, channels and the upload gate, execution stance, and contribution scope. This skill carries no maintenance protocol of its own.
+It is the single specification point for commands, status, channels/upload gates, execution stance, scope, and native contributions. For upstream PR creation, fixes, or closeout, read that skill's `references/contribution.md`; it owns short branch names, fixed worktree paths, retention through review, and authorized cleanup. Do not duplicate the runbook here.
 
 ## AGENTS.md Maintenance
 
