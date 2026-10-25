@@ -260,4 +260,4 @@ N/A — umbrella 不直接实施；每个子 Evolution Proposal 自己定义实�
 - 每个子提案独立 accept、implement、review、validate、archive。
 - Skill 子提案完成不自动推进 Tool/Rule，也不自动归档 umbrella。
 - 三个子提案全部完成后，由用户决定 umbrella 是归档为设计索引，还是继续承载后续 Session Assembly 扩展。
-- `space sync` 和 `ontology contribute` 仍由用户单独决定，不自动执行。
+- `space sync` 和原生 Git/GitHub PR 仍由用户单独决定，不自动执行。
