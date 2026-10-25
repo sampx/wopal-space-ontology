@@ -273,6 +273,22 @@ The Plan name is the authoritative identifier used to derive feature branches. N
 - `type` uses standard values (feature/fix/enhance/refactor/docs/test/chore/perf), fully spelled
 - No `scope` segment — scope already shows up in `--project` and the slug
 
+### Finding a Plan by Issue
+
+Anywhere a lifecycle command takes a `plan-id`, an Issue number works. Resolution order is fixed:
+
+1. **Filename prefix** — `<issue_number>-*.md`; a hit wins immediately.
+2. **Metadata lookup** — when the filename carries no number (Plan created first, Issue linked later), read the `- **Issue**:` field. A multi-Issue list (`#249, #250`) resolves the same Plan from **any** of its numbers.
+3. **Active first** — when a number matches several Plans, archived Plans under `done/` are ignored; only active Plans are considered.
+
+If two active Plans still match the same number, the command **fails loudly and lists the candidates** rather than guessing. Re-run with the Plan name; do not rename the Plan and do not create another one:
+
+```bash
+flow.sh plan status <plan-name>
+```
+
+> The Plan name derives the feature branch — renaming it later orphans the worktree and branch, and a duplicate Plan leaves one Issue with two progress records.
+
 ### Slug rules
 
 - slug = **1-2 core nouns**, kebab-case, **≤ 20 chars**

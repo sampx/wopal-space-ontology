@@ -114,17 +114,28 @@ def search_plan_dirs(workspace_root: Path) -> list[Path]:
     return dirs
 
 
-_ISSUE_FIELD = re.compile(r"^-\s*\*\*Issue\*\*:\s*#?(\d+)\s*$", re.MULTILINE)
+class AmbiguousPlanError(FileNotFoundError):
+    """Several active Plans match one reference; callers must not guess."""
 
 
-def _plan_issue_number(plan_file: Path) -> int | None:
-    """Read the Issue metadata field from a Plan header, e.g. **Issue**: #249."""
+_ISSUE_FIELD = re.compile(r"^-\s*\*\*Issue\*\*:[ \t]*(.*)$", re.MULTILINE)
+_ISSUE_NUMBER = re.compile(r"#(\d+)")
+
+
+def _plan_issues(plan_file: Path) -> set[int]:
+    """Read every Issue number from a Plan's metadata field.
+
+    Accepts both the single form (``**Issue**: #249``) and the list form
+    (``**Issue**: #249, #250``), so any linked Issue resolves the same Plan.
+    """
     try:
         head = plan_file.read_text(encoding="utf-8", errors="ignore")[:4000]
     except OSError:
-        return None
+        return set()
     match = _ISSUE_FIELD.search(head)
-    return int(match.group(1)) if match else None
+    if not match:
+        return set()
+    return {int(number) for number in _ISSUE_NUMBER.findall(match.group(1))}
 
 
 def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
@@ -147,7 +158,7 @@ def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
             f
             for d in dirs
             for f in sorted(d.glob("*.md"))
-            if f.is_file() and _plan_issue_number(f) == wanted
+            if f.is_file() and wanted in _plan_issues(f)
         ]
         if matches:
             active = [f for f in matches if f.parent.name != "done"]
@@ -159,7 +170,7 @@ def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
                     f"use the Plan name instead:\n  {listed}",
                     file=sys.stderr,
                 )
-                raise FileNotFoundError(f"Ambiguous plan for: {input_ref}")
+                raise AmbiguousPlanError(f"Ambiguous plan for: {input_ref}")
             return resolve_plan_location(chosen[0], workspace_root)
     else:
         target = f"{input_ref}.md"

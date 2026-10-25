@@ -270,6 +270,22 @@ Plan name 是权威标识，用于派生 feature 分支。命名必须精简—�
 - `type` 使用标准值（feature/fix/enhance/refactor/docs/test/chore/perf），保持全拼
 - 不设 `scope` 段——scope 已体现在 `--project` 和 slug 中
 
+### 按 Issue 找回 Plan
+
+生命周期命令收 `plan-id` 的地方都可以直接给 Issue 编号，解析顺序固定：
+
+1. **文件名前缀**——`<issue_number>-*.md` 命中即用。
+2. **元数据回查**——文件名没有编号时（先建 Plan、后挂 Issue），读 `- **Issue**:` 字段；字段里写多个编号（`#249, #250`）时，**任意一个编号都能找回同一个 Plan**。
+3. **活跃优先**——同一编号命中多个 Plan 时，忽略 `done/` 下的归档 Plan，只在活跃 Plan 里选。
+
+仍有两个活跃 Plan 命中同一编号时，命令**直接报错并列出候选路径**，不做猜测。此时用 Plan 名字重新执行，不要改名、也不要再建一个 Plan：
+
+```bash
+flow.sh plan status <plan-name>
+```
+
+> Plan 名字派生了 feature 分支，事后改名会让 worktree 和分支变成孤儿；重复建 Plan 则会让同一个 Issue 对应两份进度。
+
 ### slug 精简规则
 
 - slug = **1-2 个核心名词**，kebab-case，**≤ 20 chars**
