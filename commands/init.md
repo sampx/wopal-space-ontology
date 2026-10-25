@@ -137,7 +137,7 @@ Execute only the user-approved changes:
 | `projects/<name>/<sub-path>/` with own `AGENTS.md` | **No** | Sub-module detail belongs in that module's own `AGENTS.md` |
 | `contents/<name>/` | Yes | Top-level content module |
 | `scripts/` | Yes | Space-level utility |
-| `labs/ref-repos/<name>/` repo root | Ask user | User-decided per repo |
+| `labs/ref-repos/<name>/` repo root | Yes, new ones confirmed with user | Reference project, declared as one project |
 | `labs/ref-repos/<name>/<sub-path>/` internal | **No** | Internal structure of reference code |
 | `labs/research/*`, `labs/fork/*`, `labs/tests/*` | No | Experimental / throwaway code |
 | `.wopal-space/backup/`, `.wopal-space/INBOX/` | No | Transient staging |

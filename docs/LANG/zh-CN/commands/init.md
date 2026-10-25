@@ -136,7 +136,7 @@ description: 首次引导或校准空间结构
 | `projects/<name>/<sub-path>/` 有独立 AGENTS.md | **否** | 子模块细节由该模块自己的 AGENTS.md 承载 |
 | `contents/<name>/` | 是 | 顶层内容模块 |
 | `scripts/` | 是 | 空间级工具脚本 |
-| `labs/ref-repos/<name>/` 仓库根 | 问用户 | 由用户决定 |
+| `labs/ref-repos/<name>/` 仓库根 | 是，新条目需用户确认 | 参考项目，按项目声明一行 |
 | `labs/ref-repos/<name>/<sub-path>/` 内部 | **否** | 参考代码内部结构 |
 | `labs/research/*`、`labs/fork/*`、`labs/tests/*` | 否 | 实验性/临时代码 |
 | `.wopal-space/backup/`、`.wopal-space/INBOX/` | 否 | 暂存区 |

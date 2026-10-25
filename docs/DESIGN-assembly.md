@@ -352,7 +352,8 @@ Markdown table schema：
 Markdown table 维护规则：
 
 - 表格分为 managed block 与 user block；managed block 可由 `/init` 在确认后重写，user block 永不修改。
-- managed block 只记录空间的主要项目：顶层 repo、顶层 content module、空间级工具，以及 `.wopal` 固定关键模块。
+- managed block 只记录空间的主要项目：顶层 repo、顶层 content module、空间级工具，参考项目仓库根，以及 `.wopal` 固定关键模块。
+- `labs/` 下的参考项目按仓库根一行入表，既有条目保持；新发现的参考仓库由 `/init` 报告后经用户确认加入。其内部目录不入表。
 - 项目内部结构不进入表格；子模块、子目录、`AGENTS.md` 落在项目内部的细节，由项目自身的 `AGENTS.md` 承载。
 - root `AGENTS.md` 是 ellamaka 启动入口，不进入表格。
 - `wopal space scan` 发现的新 repo 或 `AGENTS.md` 模块不自动进入表格；`/init` 只报告并等待用户确认。
