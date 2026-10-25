@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -113,6 +114,19 @@ def search_plan_dirs(workspace_root: Path) -> list[Path]:
     return dirs
 
 
+_ISSUE_FIELD = re.compile(r"^-\s*\*\*Issue\*\*:\s*#?(\d+)\s*$", re.MULTILINE)
+
+
+def _plan_issue_number(plan_file: Path) -> int | None:
+    """Read the Issue metadata field from a Plan header, e.g. **Issue**: #249."""
+    try:
+        head = plan_file.read_text(encoding="utf-8", errors="ignore")[:4000]
+    except OSError:
+        return None
+    match = _ISSUE_FIELD.search(head)
+    return int(match.group(1)) if match else None
+
+
 def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
     workspace_root = Path(workspace_root).resolve()
     dirs = search_plan_dirs(workspace_root)
@@ -123,6 +137,30 @@ def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
             for f in sorted(d.iterdir()):
                 if f.is_file() and f.name.startswith(prefix) and f.suffix == ".md":
                     return resolve_plan_location(f, workspace_root)
+
+        # Fallback: a Plan can be created without an Issue and get one linked
+        # later, so its file name never gains the numeric prefix. Match the
+        # Issue metadata field instead. Plans are never renamed to carry the
+        # number: the feature branch is derived from the Plan name.
+        wanted = int(input_ref)
+        matches = [
+            f
+            for d in dirs
+            for f in sorted(d.glob("*.md"))
+            if f.is_file() and _plan_issue_number(f) == wanted
+        ]
+        if matches:
+            active = [f for f in matches if f.parent.name != "done"]
+            chosen = active or matches
+            if len(chosen) > 1:
+                listed = "\n  ".join(str(p) for p in chosen)
+                print(
+                    f"[ERROR] Issue #{input_ref} matches multiple Plans; "
+                    f"use the Plan name instead:\n  {listed}",
+                    file=sys.stderr,
+                )
+                raise FileNotFoundError(f"Ambiguous plan for: {input_ref}")
+            return resolve_plan_location(chosen[0], workspace_root)
     else:
         target = f"{input_ref}.md"
         for d in dirs:
