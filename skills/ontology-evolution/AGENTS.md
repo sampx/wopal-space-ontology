@@ -23,9 +23,11 @@ wopal CLI (`wopal space evo`); the skill keeps no script layer of its own.
 | `templates/proposal.md` | The proposal skeleton with authoring comments; the single source of the proposal format |
 | `references/` | Command reference and background |
 
-Sparse state is written **only** through the `wopal space` command family. A
-direct `git add -A`, `git checkout`, or `git sparse-checkout` call is how the
-range and the index drift apart unnoticed.
+Sparse state is written **only** through the `wopal space` command family. In the
+space sparse worktree, direct `git add -A`, `git checkout`, or
+`git sparse-checkout` can desynchronize the range and index. Upstream
+contributions use native Git in a separate, fully checked-out contribution
+worktree; follow `references/contribution.md`.
 
 ## 3. Implementation Rules
 
@@ -70,10 +72,11 @@ uses the proposal lifecycle.
 
 ### No Automatic Delivery
 
-`space sync` and `ontology contribute` are the user's terminal decision
-(`docs/DESIGN-evolution.md`, Delivery Terminal). No part of this skill may
-invoke a delivery CLI, add a remote, or push — the absence of an automatic
-upstream path is by design, not by omission.
+`space sync` and native Git/GitHub PR publication are the user's separate
+terminal decisions (`docs/DESIGN-evolution.md`, Delivery Terminal). Execute
+only the synchronization/publication the user authorized. Never add remotes,
+push, merge, or delete on your own initiative. Contribution naming, worktree
+retention, and safe closeout are owned by `references/contribution.md`.
 
 ## 4. User-Supplied Rules
 

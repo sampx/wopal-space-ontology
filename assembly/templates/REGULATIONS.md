@@ -22,7 +22,7 @@ These regulations are the fundamental behavioral norms of this workspace. Every 
 
 - Never read user files that may contain tokens or keys, such as `.env`, `.bashrc`, `.zshrc`; reading is as forbidden as writing
 - Code or commits must not contain `.env`, keys, or other sensitive credentials
-- `external/` is a collection of external resource references; creating, modifying, or deleting anything under it without authorization is forbidden
+- `_links/` is a collection of external resource references; creating, modifying, or deleting anything under it without authorization is forbidden
 
 ---
 
@@ -42,6 +42,13 @@ These regulations are the fundamental behavioral norms of this workspace. Every 
 - Temporary files go in `.wopal-space/.tmp/`
 - Other reads/writes follow `.wopal-space/STRUCTURE.md`
 
+### Task List Discipline
+
+Applies to all agents (Wopal, fae, rook, and any future role).
+
+- When using a Todo/task-list tool, tick each item done the moment it finishes; never batch-tick at the end.
+- Rationale: the todo list is a progress contract visible to the user and collaborators — batch-ticking hides real-time progress and breaks the trustworthiness of inter-agent collaboration state.
+
 ### Forced Skill Gates
 
 The following tasks must load the corresponding skill before any operation. Missing a load = serious negligence:
@@ -50,6 +57,7 @@ The following tasks must load the corresponding skill before any operation. Miss
 |------|----------------|
 | Issue/Plan creation and state transitions (submit/approve/complete/verify/archive) | `dev-flow` |
 | Delegating any subagent (fae/rook and all types) | `agents-collab` |
+| Implementing coding work (Plan Task, evolution landing, any delegated code change) | `df-implement` |
 | Creating/modifying a skill | `skill-creator` |
 | Ambiguous intent, unsure which skill/flow, space maintenance, skill management, ontology repo operations (update/sync/contribute/promote) | `space-master` |
 
@@ -95,8 +103,10 @@ Never execute follow-up tasks before compaction completes.
 
 ### Project Spec Updates (AGENTS.md)
 
-- Project specs carry the long-term principles that constrain agent decisions in design, development, testing, and verification — the decision boundaries agents must strictly follow during implementation.
-- Agents are obligated to keep project specs consistent with actual project content, but must not write implementation details, single-bug fix records, or other information without long-term value into project specs.
+- Project specs are the long-lived rules an agent must follow while designing, developing, testing, and verifying; record only constraints that are long-lived and affect development quality (e.g. logging, output, host/release/DSH operations, testing and verification, coding discipline); the maintenance spec lives in the `space-master` skill.
+- "A DESIGN also describes it" is not a reason to omit: summarize the constraint here even when the design doc already covers it; only copying DESIGN detail verbatim counts as duplication.
+- Never record one-off design decisions, single-bug fix records, implementation details, or directory/API/command inventories.
+- After a code refactor or Plan implementation, sync outdated information in the specs, and keep the (multi-)language versions consistent.
 
 #### TDD
 
@@ -105,6 +115,10 @@ Code projects (`projects/`, ontology-worktree) enforce TDD: write a failing test
 #### Project Workflow
 
 Layer-by-layer commits, project first then space; the changed path determines which repo to check (`projects/*/` changes do not check the space root repo); ensure not in detached HEAD before development; complete add → commit → push inside the project.
+
+#### Changed-Files Quality Gate
+
+Before committing, every code file touched by this change must pass the project lint (no new warning) and formatting checks; the repo's pre-existing debt is neither an exemption nor required to be cleared for files unrelated to this change.
 
 #### Issue Titles
 
@@ -118,7 +132,7 @@ Layer-by-layer commits, project first then space; the changed path determines wh
 - Before implementation: `git status` (remind the user to commit uncommitted changes first) + `git log --oneline -5` (report unpushed commits from other sessions first)
 - All code changes may be committed only after user verification and explicit confirmation; automated verification passing ≠ committable
 - Before committing: `git status` + `git diff --staged --name-only` (confirm scope matches intent, no files from other tasks) + `git log --oneline -5`; confirm not in detached HEAD
-- Commit language: Chinese for the space repo, English for project repos
+- Commit language: English for every repo in the space — the space root, `projects/*`, and the `.wopal/` worktree. Commit messages are engineering records for Git history and do not follow the document body language
 
 #### Commit Format
 

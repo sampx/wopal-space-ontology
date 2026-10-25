@@ -31,12 +31,12 @@ When invoked directly, select the workflow from the user's explicit intent. Do n
 5. Verify that the file exists, is readable, and is located under the space root's `.wopal-space/.tmp/` directory.
 6. On success, produce a **restoration prompt the user can paste directly into a new session**. The prompt must be self-contained: the next agent can complete recovery by following the prompt alone, without loading any skill. The handoff file path must be prefixed with `@` (absolute or relative path both work). In the user's preferred language, generate it from this template (replace placeholders with the actual path; wording may be adjusted, but no step may be omitted):
 
-   > Restore context from the handoff file and continue the unfinished work:
+   > Restore context from the handoff file, then report it and wait for confirmation before continuing:
    > 1. Read the handoff file `@.wopal-space/.tmp/.working-context-20261020-143000.md` in full (if this message already carries the file content, use it directly and do not read the file again)
    > 2. Rebuild the working environment from the handoff: fully read the important related files and key references named there; if the handoff conflicts with current files or code, prefer current evidence
-   > 3. Briefly summarize "what is being done / where it stands / what comes next"
-   > 4. After the summary, immediately delete the handoff file; if safe deletion is unavailable, keep it and say so explicitly
-   > 5. Continue directly with the next step recorded in the handoff file instead of stopping at the summary
+   > 3. Report the restored context: what is being done, where it stands, what comes next, and the goal you are about to pursue
+   > 4. Stop there and wait for the user to confirm the restored context is correct. Do not begin any further work before that confirmation, even when the handoff records an obvious next step
+   > 5. Only after the user confirms, delete the handoff file and then continue with the next step recorded in it; if safe deletion is unavailable, keep the file and say so explicitly
 
 7. Output nothing beyond the restoration prompt from step 6 and one brief confirmation. On failure, identify the exact failed step.
 
@@ -50,10 +50,10 @@ When invoked directly, select the workflow from the user's explicit intent. Do n
 3. Restore the current objective, user concerns, progress, key decisions, relevant paths, rules, next steps, and the important materials referenced by the previous session.
 4. To rebuild the same working environment, fully read the important related files and key references named by the handoff. Re-analyze relevant code or run verifiable checks when needed instead of relying only on stale conclusions in the handoff text.
 5. If the handoff conflicts with current files or code, prefer current evidence and call out the difference in the recovery summary.
-6. Briefly summarize the restored state in the user's preferred language: what is being done, where it stands, and what comes next.
+6. Report the restored state in the user's preferred language: what is being done, where it stands, what comes next, and the goal you are about to pursue. Then stop and wait for the user to confirm it is correct; do not continue on your own.
 7. The recovery itself is straightforward reading and summarizing; there is no need to deliberately load a skill or follow a fixed procedure. Simply apply this section's priority rules and deletion rules during recovery.
-8. Delete the handoff file only after recovery succeeds. Follow the current workspace deletion rules and available safe-delete mechanism; if safe deletion is unavailable, keep the file and say so explicitly. Never delete before recovery completes.
-9. After recovery, continue the unfinished next step from the previous session instead of stopping at the summary.
+8. Delete the handoff file only after the user confirms the restored context. Follow the current workspace deletion rules and available safe-delete mechanism; if safe deletion is unavailable, keep the file and say so explicitly. Never delete before that confirmation, because the file is the only record of what has to be re-checked.
+9. After the user confirms, continue with the unfinished next step from the previous session.
 
 ## Recover — restore after compaction
 
@@ -69,5 +69,5 @@ Use this workflow when the current session has just been compacted:
 ## Output
 
 - `handoff`: one brief confirmation plus the restoration prompt (with the handoff file's full path) on success; identify the exact failure on error.
-- `continue` / `recover`: give a short recovery summary, then immediately resume the original work.
+- `continue`: report the restored state and stop for user confirmation; resume only after that confirmation. - `recover`: give a short recovery summary, then resume the current work.
 - Do not print large portions of the handoff file or compaction summary verbatim.

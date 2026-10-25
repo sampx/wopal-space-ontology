@@ -411,6 +411,6 @@ to provide.
 
 ## Delivery is not a command here
 
-`space evo` has no delivery command. `space sync` and `ontology contribute`
+`space evo` has no delivery command. `space sync` and native Git/GitHub PR publication
 are the user's terminal decision (`docs/DESIGN-evolution.md`, Delivery
 Terminal) and are invoked one at a time, at the user's word.
