@@ -350,6 +350,49 @@ class TestCmdPlanDispatch(unittest.TestCase):
                 self.assertEqual(result, 0)
                 mock_list.assert_called_once()
 
+    def test_plan_new_refuses_to_create_when_issue_matches_multiple_plans(self):
+        """Ambiguity must not silently fall through to creating another Plan."""
+        ws = Path(self.tmp_dir)
+        args = Namespace(
+            plan_command="new",
+            issue="249",
+            title=None, project=None, type="enhance", slug="resolver",
+        )
+        from lib.project import AmbiguousPlanError
+        with patch('commands.plan.find_workspace_root', return_value=ws), \
+             patch('commands.plan.detect_space_repo', return_value="owner/repo"), \
+             patch('commands.plan.find_plan_by_issue',
+                   side_effect=AmbiguousPlanError("Ambiguous plan for: 249")) as resolver, \
+             patch('commands.plan._get_issue_info') as fetch_issue:
+            result = cmd_plan(args)
+        assert result == 1
+        resolver.assert_called_once()
+        fetch_issue.assert_not_called()
+
+    def test_plan_new_ambiguous_issue_writes_no_plan_file(self):
+        """End-to-end guard: ambiguity aborts before any file is written."""
+        ws = Path(self.tmp_dir)
+        plans = ws / ".wopal-space" / "plans" / "gesp"
+        plans.mkdir(parents=True)
+        (ws / ".git").mkdir()
+        (plans / "enhance-one.md").write_text("- **Issue**: #249, #250\n")
+        (plans / "fix-two.md").write_text("- **Issue**: #250\n")
+        before = sorted(p.name for p in plans.glob("*.md"))
+
+        args = Namespace(
+            plan_command="new",
+            issue="250",
+            title=None, project=None, type="enhance", slug="duplicate",
+        )
+        with patch('commands.plan.find_workspace_root', return_value=ws), \
+             patch('commands.plan.detect_space_repo', return_value="owner/repo"), \
+             patch('commands.plan._get_issue_info') as fetch_issue:
+            result = cmd_plan(args)
+
+        assert result == 1
+        fetch_issue.assert_not_called()
+        assert sorted(p.name for p in plans.glob("*.md")) == before
+
     def test_plan_new_falls_through_to_creation(self):
         """plan new 42 falls through to creation logic."""
         ws = Path(self.tmp_dir)

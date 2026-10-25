@@ -73,6 +73,81 @@ class TestFindPlan:
         assert isinstance(result, PlanLocation)
         assert result.path == plan_file.resolve()
 
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
+    def test_by_issue_number_from_metadata_without_name_prefix(
+        self, mock_slug, mock_branch, workspace
+    ):
+        # Plan 先用「无 Issue」模式创建、之后才挂 Issue：文件名没有数字前缀。
+        plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "enhance-dev-flow-resolver.md"
+        plan_file.write_text("# Plan\n\n- **Issue**: #249\n- **Type**: enhance\n")
+        result = find_plan("249", workspace)
+        assert result.path == plan_file.resolve()
+
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
+    def test_by_issue_number_prefers_active_over_archived(
+        self, mock_slug, mock_branch, workspace
+    ):
+        done = workspace / ".wopal-space" / "plans" / "gesp" / "done"
+        done.mkdir(parents=True)
+        (done / "20260101-enhance-old.md").write_text("- **Issue**: #249\n")
+        active = workspace / ".wopal-space" / "plans" / "gesp" / "enhance-new.md"
+        active.write_text("- **Issue**: #249\n")
+        result = find_plan("249", workspace)
+        assert result.path == active.resolve()
+        assert result.is_archived is False
+
+    def test_by_issue_number_ambiguous_fails_closed(self, workspace, capsys):
+        plans = workspace / ".wopal-space" / "plans" / "gesp"
+        (plans / "enhance-one.md").write_text("- **Issue**: #77\n")
+        (plans / "fix-two.md").write_text("- **Issue**: #77\n")
+        with pytest.raises(FileNotFoundError, match="Ambiguous"):
+            find_plan("77", workspace)
+        assert "matches multiple Plans" in capsys.readouterr().err
+
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
+    def test_by_issue_number_matches_secondary_issue_in_list(
+        self, mock_slug, mock_branch, workspace
+    ):
+        # Plan 后来关联了多个 Issue：`Issue: #249, #250`。两个编号都必须能找回。
+        plan_file = workspace / ".wopal-space" / "plans" / "gesp" / "enhance-dev-flow-resolver.md"
+        plan_file.write_text("""# Plan
+
+- **Issue**: #249, #250
+- **Type**: enhance
+""")
+        for ref in ("249", "250"):
+            result = find_plan(ref, workspace)
+            assert result.path == plan_file.resolve()
+
+    @patch("lib.project.get_default_branch", return_value="main")
+    @patch("lib.project.get_repo_slug", side_effect=_slug_by_path)
+    def test_by_issue_number_multi_issue_prefers_active(
+        self, mock_slug, mock_branch, workspace
+    ):
+        done = workspace / ".wopal-space" / "plans" / "gesp" / "done"
+        done.mkdir(parents=True)
+        (done / "20260101-enhance-old.md").write_text("""- **Issue**: #249, #250
+""")
+        active = workspace / ".wopal-space" / "plans" / "gesp" / "enhance-new.md"
+        active.write_text("""- **Issue**: #250
+""")
+        result = find_plan("250", workspace)
+        assert result.path == active.resolve()
+        assert result.is_archived is False
+
+    def test_by_issue_number_multi_issue_ambiguity_fails_closed(self, workspace, capsys):
+        plans = workspace / ".wopal-space" / "plans" / "gesp"
+        (plans / "enhance-one.md").write_text("""- **Issue**: #249, #250
+""")
+        (plans / "fix-two.md").write_text("""- **Issue**: #250
+""")
+        with pytest.raises(FileNotFoundError, match="Ambiguous"):
+            find_plan("250", workspace)
+        assert "matches multiple Plans" in capsys.readouterr().err
+
     def test_not_found_raises(self, workspace):
         with pytest.raises(FileNotFoundError, match="No plan found"):
             find_plan("nonexistent-plan", workspace)
