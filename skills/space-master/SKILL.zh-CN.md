@@ -1,19 +1,7 @@
 ---
 name: space-master
-description: |
-  WopalSpace 空间的根技能与总纲。空间的一切能力——如何运行、如何配置、如何编写命令/规则/技能/模板——都定义在本体（ontology）仓库中，经由中央能力池分发给空间，空间进化通过 space sync 回流。
-
-  必须加载的场景：
-  - 空间结构维护：space init/status、.wopal 目录结构、装配模型、空间如何运行与配置
-  - 空间能力编写：命令、规则、技能、模板的编写与修改规范
-  - AGENTS.md 编写：创建或更新项目级/目录级 AGENTS.md
-  - README 编写：创建或更新项目级 README.md
-  - 技能生命周期：安装、扫描、移除
-  - 意图不明确、不确定用哪个流程/技能时，作为总纲路由到正确技能
-
-  本体维护与进化由 `ontology-evolution` 技能执行，不由本技能执行：本体仓库操作（update、sync、capability list、contribute、PR）直接加载 `ontology-evolution`——本技能只做路由，无需同时加载两者。
-
-  [CRITICAL] 涉及 ontology 仓库协作（update/sync/PR）时，即使用户未明确说"上游同步"，也必须加载 `ontology-evolution`。
+description: >
+  WopalSpace 根技能与流程路由入口。意图不清、不能确定应使用哪个技能时必须加载。用于空间初始化、结构/目录布局、运行配置、装配模型，以及项目或目录 AGENTS.md、项目 README.md 的创建与维护；也用于技能安装、扫描、移除和能力编写的规范路由。本体仓库更新、同步、能力发现、贡献 PR 与能力进化直接加载 ontology-evolution，不必同时加载本技能；具体开发、技能编写与委派分别路由至 dev-flow、skill-creator、agents-collab。
 ---
 
 # space-master
@@ -65,7 +53,7 @@ description: |
 
 本体维护与能力进化由 **`ontology-evolution` 技能**执行——任何本体仓库操作（实例更新、空间对齐、能力装配、上游贡献）一律直接加载该技能，并按其维护协议（Maintenance Protocols）章节执行。无需同时加载本技能。
 
-该技能是唯一规范单点——命令面、状态解读、双通道与上行闸、执行口径、贡献范围判定，以及「评审修复与回流」。用户要求修复已提交的贡献时，按该节用普通 git 更新原贡献分支（PR 自动更新），不用专用命令；贡献分支保留到合并回流完成。
+该技能是唯一规范单点——命令面、状态解读、双通道与上行闸、执行口径、贡献范围与原生贡献流程。创建、修复或收尾上游 PR 时，读取该技能的 `references/contribution.zh-CN.md`；其中统一短分支命名、固定 worktree、评审期间保留现场及授权清理，不在本技能重复维护。
 
 ## AGENTS.md 维护
 

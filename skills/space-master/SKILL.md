@@ -1,19 +1,7 @@
 ---
 name: space-master
-description: |
-  Root skill and master specification for WopalSpace. Everything a space can do — how it runs, how it is configured, how to write commands/rules/skills/templates — is defined in the ontology repository and distributed to spaces through the central capability pool, with space evolution flowing back through space sync.
-
-  MUST load when:
-  - Space structure maintenance: space init/status, .wopal directory layout, assembly model, how the space runs and is configured
-  - Space capability authoring: writing and modifying commands, rules, skills, templates
-  - AGENTS.md authoring: creating or updating project/directory AGENTS.md
-  - README authoring: creating or updating project-level README.md
-  - Skill lifecycle: install, scan, remove
-  - Task intent is ambiguous or Wopal is unsure which workflow/skill to use — this is the routing entry point
-
-  Ontology maintenance and evolution are executed by the `ontology-evolution` skill, not this one: for ontology repo operations (update, sync, capability discovery, contribution, PR), load `ontology-evolution` directly — this skill only routes; loading both is not required.
-
-  [CRITICAL] Load `ontology-evolution` whenever ontology repo operations (update/sync/PR) appear, even if the user does not explicitly say "upstream sync".
+description: >
+  Root WopalSpace specification and workflow router. MUST load when intent is ambiguous or the correct workflow/skill is unclear. Use for space init/status, structure and directory layout, runtime configuration, assembly, authoring project/directory AGENTS.md or project README.md, skill installation/scanning/removal, and capability-authoring guidance. For ontology repository updates, sync, capability discovery, contribution PRs, or evolution, load ontology-evolution directly; loading both is unnecessary. Routes development, skill authoring, and delegation to dev-flow, skill-creator, and agents-collab respectively.
 ---
 
 # space-master
@@ -65,7 +53,7 @@ The component path answers the question when the label is ambiguous: if the chan
 
 Ontology maintenance and capability evolution are executed by the **`ontology-evolution` skill** — load it directly for any ontology repo operation: instance updates, space alignment, capability assembly, and upstream contribution all follow its Maintenance Protocols. Loading this skill as well is not required.
 
-It is the single specification point — command surface, status reading, channels and the upload gate, execution stance, contribution scope, and **Review Fixes and Return**. When the user asks to fix a published contribution, follow that section to update the original contribution branch with ordinary git (the PR updates itself); retain the branch until the merged change has returned successfully.
+It is the single specification point for commands, status, channels/upload gates, execution stance, scope, and native contributions. For upstream PR creation, fixes, or closeout, read that skill's `references/contribution.md`; it owns short branch names, fixed worktree paths, retention through review, and authorized cleanup. Do not duplicate the runbook here.
 
 ## AGENTS.md Maintenance
 

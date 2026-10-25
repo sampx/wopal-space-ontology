@@ -1,19 +1,7 @@
 ---
 name: ontology-evolution
-description: |
-  Ontology capability evolution workflow. Covers both halves of the work: writing evolution proposals out of lived experience — session errors, user corrections, lessons and fixes recalled from memory — and landing an approved proposal into the ontology safely (isolated implementation, validation, archive). Proposals are usually drafted by Maka, whose core mission is that analysis; Wopal may write them too, and Wopal orchestrates the landing process. Fae lands the change, Rook audits it; approval, validation, and delivery belong to the user.
-
-  MUST load when:
-  - Distilling a session's lessons, errors, or user corrections into lasting capability
-  - Deciding where a piece of knowledge belongs (space memory vs type assembly vs central pool)
-  - Producing an evolution proposal for user approval
-  - Auditing a candidate capability for project-specific contamination before it enters the pool
-  - Advancing an evolution proposal through its stage machine, or checking an evolution's status
-  - Implementing a change to the ontology's own capabilities (skills, rules, agents, commands, plugins, assembly)
-  - Creating, updating, distributing, or contributing ontology capability assets in a space
-  - Any "evolution proposal / 进化提案 / evolution stage / capability evolution" request
-
-  Object test: ontology capability assets (this space's own skills, rules, agents, commands, plugins, assembly, docs/evolutions) -> this skill. Code repositories under `projects/` -> dev-flow, never this one.
+description: >
+  The single workflow for ontology capability evolution and maintenance. Use to distill session lessons, errors, and user corrections into proposals; audit generality and private contamination; advance proposal stages; and land approved skills, rules, agents, commands, plugins, or assembly changes. Also use for ontology updates, space alignment, capability assembly, and upstream PR creation, review fixes, status, or closeout using native git/gh with short branch names, fixed worktrees, and safe cleanup. MUST load for ontology repository operations or capability assets; code development under projects/ uses dev-flow. Approval, validation, and delivery belong to the user.
 ---
 # ontology-evolution
 
@@ -207,7 +195,7 @@ Seven constraints:
 4. **Assemble before staging.** New capability directories join the space range first (the range widens before anything is staged), and `integrate` refuses any path that would land invisible — a committed file the runtime cannot see (the visibility check; "corpus assertion" in the CLI contract).
 5. **Never clear the skip-worktree bits in bulk.** They are derived state of the assembly range; adjust the visible scope only by widening assembly, and let the preflight verify the range instead of trusting discipline.
 6. **Validation means restarting and observing.** Anything on the load path is judged by what the user sees after restarting ellamaka; a green test is not a substitute.
-7. **Delivery is the user's terminal decision.** `space sync` and `ontology contribute` run one at a time, at the user's word. The skill contains no automatic upstream path — by design, not by omission.
+7. **Delivery is the user's terminal decision.** `space sync` and upstream PR publication run one at a time, at the user's word. The skill contains no automatic upstream path — by design, not by omission.
 
 ### Quick mode
 
@@ -247,7 +235,7 @@ The sequence, in order. The default flow: implementation does not commit → Wop
 12. **User** — confirm that validation passed.
 13. **Wopal** — branch-switch form only (the integrate-first form integrated at step 9): the integration gate is open — `wopal space evo integrate <name> --confirm`.
 14. **Wopal** — `wopal space evo advance <name> --to archived`, then `wopal space evo archive <name>` (dated name + isolation cleanup).
-15. **User** — delivery decisions (`space sync` / `ontology contribute`), one at a time, at the user's word.
+15. **User** — delivery decisions (`space sync` / native Git/GitHub PR publication), one at a time, at the user's word.
 
 ### Quick mode differences
 
@@ -334,28 +322,27 @@ Beyond the evolution lifecycle, this skill owns the ontology's maintenance surfa
 |---------|-----------|----------------|
 | `wopal space status` | — | Read-only: space branch vs `local main` (to contribute / behind), remote delta, assembly state and sparse consistency, local selections (include / exclude / private) plus unregistered untracked files |
 | `wopal space sync [--confirm]` | both | Align with `local main`: integrate space-unique evolution upward (isolated worktree, stops on conflict), then fast-forward down |
-| `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | Shared channel: edit the archetype manifest and re-materialize; accepts only a capability the pool already owns (a pool-absent name is refused before the manifest is touched) and creates **no Git commit** — committing the manifest is a separate, explicit step. `--local`: mount or unload the complete asset as this space's local selection (include / exclude / private); when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Content still travels up only through the user's own `space sync` / `ontology contribute` decisions, separate from that state commit |
+| `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | Shared channel: edit the archetype manifest and re-materialize; accepts only a capability the pool already owns (a pool-absent name is refused before the manifest is touched) and creates **no Git commit** — committing the manifest is a separate, explicit step. `--local`: mount or unload the complete asset as this space's local selection (include / exclude / private); when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Content still travels up only through the user's own `space sync` / native Git/GitHub PR publication decisions, separate from that state commit |
 | `wopal ontology capability list` | — | Read-only: what the pool owns — the pick-list for `space capability add` |
 | `wopal ontology sync [--confirm]` | triangle | Align `local main` with its source chain `upstream ⇄ origin ⇄ local main` in three steps (fork: ① merge origin/main into local main → ② merge upstream/main into that same local-main result → ③ push local main back to origin; clone collapses to ① only). `ontology update` remains as a compatibility alias |
-| `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | upstream | `local main` → upstream PR (fork mode; squash-merge in an isolated worktree; `--resume` / `--abort` for a conflict) |
 
 ## Reading status
 
 `wopal ontology status` reports both flows: **Downstream** (`upstream → origin → local main`) and **Upstream** (`local main → origin → upstream`), the latter as the pending file set.
 
-It also shows the remote `contribute/*` branches and the state of each one's PR (open / merged / closed). On refresh failure, distinguish locally known information from current remote facts; cached state cannot establish a merge or authorize branch cleanup.
+It also combines local and remote `contribute/*` branches with worktree paths and PR numbers, URLs, and states. Distinguish no matching PR, query failure, and ambiguous identity. “Merged, awaiting closeout” is a reminder, not deletion clearance. Queries use no separate contribution ledger or background polling.
 
 `wopal space status` reports the space link: **to contribute** vs **behind local main**, the assembly state, and the **local selections** — `include` (an extra mount: shared content only this space mounts) / `exclude` (a locally deactivated type default) / `private` (privately held untracked content) — plus unregistered untracked files. Private content is protected: the upload gate below refuses any sync carrying a commit that touches a private-registered capability root.
 
 ## Channels and the upload gate
 
-`space capability` has two channels. Without `--local`, the change edits the assembly manifest and re-materializes — but creates no commit by itself, and only accepts a capability the pool already owns, so committing the manifest is a separate step. With `--local`, it writes only the space's local selection (`include` / `exclude` / `private`) and adjusts the sparse range; when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Uploads are decided separately: only the user's own `space sync` / `ontology contribute` steps send anything up. `add --local` on a locally disabled (excluded) capability is also the recovery exit.
+`space capability` has two channels. Without `--local`, the change edits the assembly manifest and re-materializes — but creates no commit by itself, and only accepts a capability the pool already owns, so committing the manifest is a separate step. With `--local`, it writes only the space's local selection (`include` / `exclude` / `private`) and adjusts the sparse range; when the state changes, the CLI commits the space root repository with a path-limited commit — a state record, not content. Uploads are decided separately: only the user's own `space sync` / native Git/GitHub PR publication steps send anything up. `add --local` on a locally disabled (excluded) capability is also the recovery exit.
 
 Before integrating upward, `space sync` checks the **upload gate**: no space-unique commit may touch a private-registered capability root (`include` / `exclude` are mount choices and never block shared content). A hit refuses the sync and names the remedy — withdraw the commit, or drop the registration. The gate backstops a manual `git add`/`commit` of private content: local isolation does not depend on the operator remembering.
 
 ## Execution stance
 
-The CLI defaults to dry-run preview; `--confirm` executes. The settled stance: the agent acts on the user's intent directly and passes `--confirm` — no extra approval gate is layered on top; `--dry-run` is a diagnostic, not a precondition. Safety comes from mechanics: isolated integration, fast-forward only, stop-on-conflict, worktree checks — the worst case is a change not happening, not a broken worktree. `ontology contribute` is the single exception: each contribution is the user's call, one at a time.
+The CLI defaults to dry-run preview; `--confirm` executes. The settled stance: the agent acts on the user's intent directly and passes `--confirm` — no extra approval gate is layered on top; `--dry-run` is a diagnostic, not a precondition. Safety comes from mechanics: isolated integration, fast-forward only, stop-on-conflict, worktree checks — the worst case is a change not happening, not a broken worktree. Each upstream contribution and review-fix publication is the user's decision; sync authorization does not include PR publication or deletion.
 
 ## Contribution scope and themed PRs
 
@@ -366,44 +353,18 @@ Scope is determined with the user, from evidence:
 3. The user circles the scope: which groups travel upstream, which are excluded, which stay space-only.
 4. Space-only assets never appear in any contribution.
 
-One PR per topic: `--include` / `--exclude` carve a coherent contribution out of the pending set, and `--message` states what the change delivers (result state), not the mechanical action. Split unrelated work; never bundle it.
+One PR per topic: select explicit topic commits or inspected change hunks. Glob matching or whole-file copying does not establish topic ownership; exclude unrelated hunks in shared files too. Check additions, deletions, and both sides of renames. Review may add files; scope is not a lifetime lock.
 
-## Review Fixes and Return
+## Native Contributions
 
-A contribution branch is an ordinary Git branch. Once it is pushed to the fork and a PR is opened against upstream, **the PR is just the diff of that branch against its base**. So a review fix needs no dedicated command: change the branch and push again, and the PR updates itself.
+Use native `git` + `gh` for PR creation, review fixes, and cleanup. `ontology status` only inspects and reminds; `ontology sync` only synchronizes main and never deletes contribution resources.
 
-That also means a fix may freely add or remove files. The scope chosen at creation only framed one PR's topic; it is not a lifetime lock. When review says a document is missing, add it.
+- Name branches `contribute/<slug>`: 2–4 English topic words, at most 24 characters. Do not truncate full commit titles or append dates/random suffixes.
+- Keep the worktree at `<space-root>/.worktrees/ontology-contribute-<slug>/`. Reuse one pair per PR from creation through review, return, and authorized cleanup. Preserve failures/conflicts; this is not disposable temp content.
+- PR bodies explain motivation, changes, affected capabilities/files, addition/deletion statistics, scope provenance, and actual verification; revise them with the work.
+- Ordinary push updates the same PR; never force push. Deletion requires explicit user authorization, verified merge return, a clean workspace, and no extra commits. Preserve closed-unmerged or uncertain cases.
 
-### Fix workflow
-
-1. **Fix in Space** (the recommended starting point): edit, verify, and commit on the `.wopal` Space branch, then `space sync --confirm` into local main. Space is the content you actually run; change it first so the PR and Space never evolve separately.
-2. **Take a worktree**: the contribution branch still exists locally but usually has no worktree — the temporary one was released after creation. Use ordinary git:
-
-   ```bash
-   git -C "$WOPAL_HOME/ontologies/<repo>" worktree add /tmp/pr-fix \
-     contribute/<branch>
-   ```
-
-3. **Put the change in and commit**: copy this round's files from Space, or edit directly in the worktree; `git add` the named files and commit.
-4. **Push normally**:
-
-   ```bash
-   git -C /tmp/pr-fix push origin HEAD:contribute/<branch>
-   ```
-
-   GitHub updates the same PR. **Never force push**; if the remote has commits you have not seen, establish where they came from instead of overwriting them.
-5. **Remove the worktree**: `git worktree remove /tmp/pr-fix`.
-6. **Tell the user the PR is updated**; review, approval, and merge stay on GitHub.
-
-Only a fast-forward push is safe. If the push is rejected because the remote moved, stop and compare the differences instead of forcing.
-
-### Return
-
-After the user merges the PR, run `ontology sync --confirm`, then `space sync --confirm`. Upstream merge, squash, and rebase all use this path; an ordinary merge incorporates the actual upstream landing history while preserving local history.
-
-### Cleanup
-
-Once `ontology sync --confirm` confirms the PR is merged and its landing commit is in local main, it cleans the matching `contribute/*` branch locally and on the fork. An open or closed-unmerged PR, an unverifiable state, or extra commits beyond the PR all mean the branch is kept and reported — content equivalence or ancestry alone never authorizes deletion.
+**Before creating, revising, retrying, or closing out a contribution, read [native commands and safety checks](references/contribution.md).** That reference owns the complete runbook; do not improvise branch names, workspace locations, or cleanup steps.
 
 ---
 
@@ -414,8 +375,8 @@ Once `ontology sync --confirm` confirms the PR is merged and its landing commit 
 - **Landing: Wopal orchestrates, Fae lands, Rook gates.** The workflow never ships upstream on its own.
 - **`/wopal:evolve` and `/wopal:distill`** belong to the memory-evolution loop (diaries → long-term memory files / the memory database), not to this workflow. If distilled experience calls for an ontology change, it still goes through this skill's proposal lifecycle.
 - **`wopal/ontology-maintain`** is a thin trigger: it loads this skill with a focus argument and carries no protocol of its own — the Maintenance protocols above are the protocol.
-- **The skill carries the rules; wopal-cli does the work.** The skill ships only documents and the proposal template — no scripts. Every maintenance and landing step runs through wopal-cli commands (command details in the Maintenance and Landing sections above).
-- **Assembly overlay**: assets are assembled per space via the overlay mechanism (`docs/DESIGN-distribution.md`); the skill operates on the assembled worktree (`.wopal`), never on the central pool directly.
+- **The skill carries rules and reuses existing tools.** It ships documents and a proposal template, not scripts. Use wopal-cli for space mechanisms and native `git` + `gh` for upstream PR creation, revision, and cleanup; the complete rules live in `references/contribution.md`.
+- **Assembly overlay**: assets are assembled per space via the overlay mechanism (`docs/DESIGN-distribution.md`); implement capabilities in the assembled worktree (`.wopal`) or derived isolation. Publish upstream only in a separate contribution worktree; never switch or edit the host central repository's main working directory.
 
 ---
 

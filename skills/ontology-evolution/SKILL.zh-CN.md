@@ -1,19 +1,7 @@
 ---
 name: ontology-evolution
-description: |
-  本体能力进化流程。覆盖这项工作的两半：把运行中获得的经验——会话错误、用户纠正、记忆中沉淀的经验教训与解决方案——写成进化提案；以及把已批准的提案安全落地（隔离实施、验证、归档）。提案通常由 Maka 起草，这是它的核心使命；Wopal 也可以撰写，并主控落地过程。Fae 负责落地变更，Rook 负责审查；批准、验证与交付由用户掌握。
-
-  必须加载的场景：
-  - 把会话中的经验教训、错误或用户纠正沉淀为持久能力
-  - 判断一条知识该住在哪里（空间记忆 / 类型装配 / 中央池）
-  - 产出供用户批准的进化提案
-  - 在候选能力进入能力池之前，审查它是否夹带项目私有污染
-  - 推进进化提案的阶段，或查看某项进化的状态
-  - 实施对本体自身能力（skills、rules、agents、commands、plugins、assembly）的变更
-  - 在空间内创建、更新、分发或贡献本体能力资产
-  - 任何「进化提案 / evolution proposal / evolution stage / 能力进化」类请求
-
-  Object test：本体能力资产（本空间自己的 skills、rules、agents、commands、plugins、assembly、docs/evolutions）→ 本技能。`projects/` 下的代码仓库 → dev-flow，不用本技能。
+description: >
+  本体能力进化与维护的唯一操作规范。用于把会话经验、错误和用户纠正写成进化提案，审查泛化与私有污染，推进提案阶段，并实施已批准的 skills、rules、agents、commands、plugins、assembly 变更。也用于本体更新、空间同步、能力装配，以及上游 PR 的创建、评审修复、状态查看和收尾；贡献使用原生 git/gh，并遵守短分支命名、固定 worktree 和安全清理规则。涉及本体仓库或本体能力资产时必须加载；projects/ 下的代码开发走 dev-flow。批准、验证与交付由用户掌握。
 ---
 
 # ontology-evolution — 本体进化
@@ -208,7 +196,7 @@ wopal space evo switch <name>    # back——.wopal 回到空间分支
 4. **先装配再暂存。** 新能力目录先加入空间范围（先扩范围再暂存）；`integrate` 拒绝任何会「落地即隐身」的路径——已提交但运行时看不见的文件（可见性校验；CLI 契约里叫 "corpus assertion"）。
 5. **不要批量清除 skip-worktree 位。** 它们是装配范围的派生态；调整可见范围只能通过扩大装配，让预检去验证范围，而不是靠自觉。
 6. **验证 = 重启并观察。** 任何触及加载路径的变更，都以用户重启 ellamaka 后看到的行为为准；测试全绿不能代替观察。
-7. **交付是用户的最终决定。** `space sync` 与 `ontology contribute` 一次一个、只在用户发话时执行。本技能不含任何自动上行路径——这是设计，不是遗漏。
+7. **交付是用户的最终决定。** `space sync` 与上游 PR 发布一次一个、只在用户发话时执行。本技能不含任何自动上行路径——这是设计，不是遗漏。
 
 ### 快速模式
 
@@ -248,7 +236,7 @@ wopal space evo switch <name>    # back——.wopal 回到空间分支
 12. **用户**——确认验证通过。
 13. **Wopal**——仅分支切换方式（先集成后验证已在第 9 步完成集成）：集成门控放行——`wopal space evo integrate <name> --confirm`。
 14. **Wopal**——`wopal space evo advance <name> --to archived`，然后 `wopal space evo archive <name>`（带日期命名 + 清理隔离）。
-15. **用户**——交付决定（`space sync` / `ontology contribute`），一次一个，只在用户发话时。
+15. **用户**——交付决定（`space sync` / 原生 Git/GitHub PR），一次一个，只在用户发话时。
 
 ### 快速模式差异
 
@@ -335,28 +323,27 @@ wopal space evo archive enhance-example
 |------|------|------|
 | `wopal space status` | — | 只读：空间分支相对 `local main`（可贡献 / 落后）、远端差异、装配状态与稀疏一致性、本地选择（include / exclude / private）以及未注册的未跟踪文件 |
 | `wopal space sync [--confirm]` | 双向 | 与 `local main` 对齐：先把空间独有的进化向上整合（隔离工作树、冲突即停），再快进向下 |
-| `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | 共享通道：编辑原型 manifest 并重新物化；只接受能力池已有的能力（池中不存在的名字在触碰 manifest 之前就被拒绝），且**不产生 Git 提交**——提交 manifest 是单独的显式步骤。`--local`：把完整资产挂载或卸载为本空间的本地选择（include / exclude / private）；状态变化时，CLI 限路径提交空间根仓库——这是状态记录，不是内容。内容上行始终只经用户自己的 `space sync` / `ontology contribute` 决定，与该状态提交分开 |
+| `wopal space capability add/remove <kind>:<name> [--local]` | manifest / local | 共享通道：编辑原型 manifest 并重新物化；只接受能力池已有的能力（池中不存在的名字在触碰 manifest 之前就被拒绝），且**不产生 Git 提交**——提交 manifest 是单独的显式步骤。`--local`：把完整资产挂载或卸载为本空间的本地选择（include / exclude / private）；状态变化时，CLI 限路径提交空间根仓库——这是状态记录，不是内容。内容上行始终只经用户自己的 `space sync` / 原生 Git/GitHub PR 决定，与该状态提交分开 |
 | `wopal ontology capability list` | — | 只读：能力池拥有什么——`space capability add` 的选择清单 |
 | `wopal ontology sync [--confirm]` | 三角 | `local main` 与来源链路 `upstream ⇄ origin ⇄ local main` 三步对齐（fork：①把 origin/main merge 进 local main → ②把 upstream/main merge 进同一 local main 结果 → ③把 local main push 回 origin；clone 塌缩为仅①）。`ontology update` 是其兼容别名 |
-| `wopal ontology contribute --message <msg> [--include/--exclude <glob>] [--confirm]` | 向上 | `local main` → 上游 PR（fork 模式；在隔离工作树中 squash 合并；冲突时 `--resume` / `--abort`） |
 
 ## 读状态
 
 `wopal ontology status` 报告双向流：**向下**（`upstream → origin → local main`）与**向上**（`local main → origin → upstream`），后者以待办文件集呈现。
 
-它同时展示远端 `contribute/*` 分支及其对应 PR 的状态（open / merged / closed）。刷新失败时区分本地已知信息与远端当前状态，不能据缓存宣布已合并或清理分支。
+它同时合并展示本地和远端 `contribute/*` 分支、worktree 路径及对应 PR 的编号、链接和状态。未找到 PR、查询失败与身份歧义分别显示；“已合并，待收尾”仅是提醒，不授权清理。查询不另建贡献记账文件或后台轮询。
 
 `wopal space status` 报告空间链接：**可贡献** 还是 **落后 local main**、装配状态、以及**本地选择**——`include`（额外挂载：仅本空间挂载的共享内容）/ `exclude`（本地停用的类型默认）/ `private`（私有持有的未跟踪内容）——外加未注册的未跟踪文件。private 内容受保护：下方上行门禁会拒绝任何触碰已登记为 private 的能力根的同步提交。
 
 ## 双通道与上行门禁
 
-`space capability` 有两条通道。不带 `--local` 时，改动编辑装配 manifest 并重新物化——但自身不产生提交，且只接受能力池已有的能力，所以提交 manifest 是单独的步骤。带 `--local` 时，只写空间的本地选择（`include` / `exclude` / `private`）并调整稀疏范围；状态变化时，CLI 限路径提交空间根仓库——状态记录，不是内容。上行另作决定：只有用户自己的 `space sync` / `ontology contribute` 步骤才会把东西送上去。对本地停用（`exclude`）的能力执行 `add --local` 也是恢复出口。
+`space capability` 有两条通道。不带 `--local` 时，改动编辑装配 manifest 并重新物化——但自身不产生提交，且只接受能力池已有的能力，所以提交 manifest 是单独的步骤。带 `--local` 时，只写空间的本地选择（`include` / `exclude` / `private`）并调整稀疏范围；状态变化时，CLI 限路径提交空间根仓库——状态记录，不是内容。上行另作决定：只有用户自己的 `space sync` / 原生 Git/GitHub PR 步骤才会把东西送上去。对本地停用（`exclude`）的能力执行 `add --local` 也是恢复出口。
 
 向上整合之前，`space sync` 会检查**上行门禁**：任何空间独有提交都不得触碰已登记为 `private` 的能力根（`include` / `exclude` 是挂载选择，从不阻断共享内容）。命中即拒绝同步并给出补救：撤回该提交，或注销登记。门禁为手动 `git add`/`commit` 私有内容兜底：本地隔离不依赖操作者记得规则。
 
 ## 执行立场
 
-CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直接依用户意图行事并传 `--confirm`——不额外叠加审批门；`--dry-run` 是诊断，不是前置条件。安全来自机制：隔离集成、仅快进、冲突即停、工作树校验——最坏情况是「变更没发生」，而不是「工作树被搞坏」。唯一例外是 `ontology contribute`：每次贡献都是用户的决定，一次一个。
+CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直接依用户意图行事并传 `--confirm`——不额外叠加审批门；`--dry-run` 是诊断，不是前置条件。安全来自机制：隔离集成、仅快进、冲突即停、工作树校验——最坏情况是「变更没发生」，而不是「工作树被搞坏」。上游贡献与每轮评审修复的发布由用户逐次决定；同步授权不包含 PR 发布或删除。
 
 ## 贡献范围与主题 PR
 
@@ -367,44 +354,18 @@ CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直�
 3. 用户圈定范围：哪些组上行、哪些排除、哪些留在空间内。
 4. 空间独有的资产永不出现在任何贡献里。
 
-一个主题一个 PR：`--include` / `--exclude` 从待处理集里划出一份连贯的贡献，`--message` 写清这项变更交付了什么（结果态），而不是机械动作。不相关的工作要拆分，绝不捆在一起。
+一个主题一个 PR：选择明确的主题提交或核对过的改动片段，不把 glob 匹配或整文件复制当作主题判断。同一文件中的无关改动也要排除；新增、删除和重命名两端都要核对。评审可补充文件，不设终身范围锁。
 
-## 评审修复与回流
+## 原生贡献流程
 
-贡献分支是一个普通 Git 分支。分支推到 fork 上、再向 upstream 开 PR 之后，**PR 就是「这条分支相对 base 的差异」**。所以评审要求修改时，不需要任何专用命令：改完这条分支再 push 一次，PR 自动更新。
+创建 PR、评审修复与清理都用原生 `git` + `gh`；`ontology status` 只查看和提醒，`ontology sync` 只同步 main，不删除贡献资源。
 
-这也意味着修复时可以**自由增删文件**。范围在创建时只是用来圈定这一个 PR 的主题，不是终身锁；评审说「你漏了文档」，直接补进去即可。
+- 分支统一为 `contribute/<slug>`，主题用 2–4 个英文词、最多 24 个字符，不从完整提交标题截断、不加日期或随机后缀。
+- worktree 固定在 `<space-root>/.worktrees/ontology-contribute-<slug>/`，一个 PR 复用一组现场，从创建保留到评审、回流与授权清理结束；失败或冲突保留，不放临时目录。
+- PR 正文写清原因、变化、能力/文件清单、增删统计、范围依据和实际验证结果；修复后同步更新。
+- 普通 push 更新同一 PR，不强推。删除需用户明确授权，并核对合并回流、干净现场与无额外提交；closed-unmerged 或状态不明都保留。
 
-### 修复流程
-
-1. **在 Space 里改**（推荐起点）：在 `.wopal` 的 Space 分支修改、验证、提交，然后 `space sync --confirm` 汇入 local main。Space 始终是你实际运行的那份内容，先改它，PR 与 Space 才不会各改一份。
-2. **取一个工作树**：贡献分支在本地仍然存在，但通常没有工作树——创建时的临时工作树已释放。用普通 git 取一个：
-
-   ```bash
-   git -C "$WOPAL_HOME/ontologies/<repo>" worktree add /tmp/pr-fix \
-     contribute/<分支名>
-   ```
-
-3. **把改动放进去并提交**：从 Space 复制本轮改动的文件，或在工作树里直接编辑；`git add` 点名本次文件、提交。
-4. **普通 push**：
-
-   ```bash
-   git -C /tmp/pr-fix push origin HEAD:contribute/<分支名>
-   ```
-
-   GitHub 随即更新同一个 PR。**不要 force push**；远端出现你没见过的提交时，先弄清来源，不要覆盖。
-5. **拆工作树**：`git worktree remove /tmp/pr-fix`。
-6. **告诉用户 PR 已更新**，由用户在 GitHub 上评审、批准、合并。
-
-只有 fast-forward 的 push 才安全。若 push 被拒（远端有新提交），停下来核对差异，不要强推。
-
-### 回流
-
-用户合并 PR 后，依次执行 `ontology sync --confirm`、`space sync --confirm`。上游采用 merge、squash 或 rebase 都走这条路径；普通 merge 接入上游实际落地历史，保留本地历史。
-
-### 清理
-
-`ontology sync --confirm` 在确认 PR 已合并、且落地提交已进入 local main 之后，清理对应的 `contribute/*` 分支（本地与 fork）。状态为 open、closed-unmerged、无法确认，或分支上有 PR 之外的额外提交时，一律保留并报告——不凭提交内容相同或祖先关系自行删分支。
+**执行创建、评审修复、重试或收尾前，先读 [原生命令与安全检查](references/contribution.zh-CN.md)。** 该参考是完整操作规范；不要临时发明分支名、工作区位置或清理步骤。
 
 ---
 
@@ -415,8 +376,8 @@ CLI 默认 dry-run 预览；`--confirm` 落地执行。既定立场：agent 直�
 - **落地：Wopal 主控、Fae 执行、Rook 把关。** 本流程永不自行上行。
 - **`/wopal:evolve` 与 `/wopal:distill`** 属于记忆进化回路（日记 → 长期记忆文件 / 记忆库），不是本流程的入口；从这里沉淀出的本体变更，仍走本技能的提案流程。
 - **`wopal/ontology-maintain`** 是薄触发器：它以 focus 参数加载本技能，自身不携带协议——上面「维护协议」就是协议。
-- **技能只负责规范，执行交给 wopal-cli。** 本技能只有文档和模板，没有脚本；维护与落地的每一步都通过 wopal-cli 命令完成——命令明细见上文「维护协议」与「落地已批准的提案」。
-- **装配叠加**：资产经由叠加机制按空间装配（`docs/DESIGN-distribution.md`）；技能操作的是装配后的工作树（`.wopal`），永远不直接操作中央池。
+- **技能负责规范，复用现有工具。** 本技能只有文档和模板，没有脚本；空间机制操作使用 wopal-cli，上游 PR 创建、修改与清理使用原生 `git` + `gh`，完整规则见 `references/contribution.zh-CN.md`。
+- **装配叠加**：资产经由叠加机制按空间装配（`docs/DESIGN-distribution.md`）；能力实施在装配后的工作树（`.wopal`）或派生隔离工作树中完成；上游贡献只在独立贡献 worktree 中操作，不切换或编辑宿主中央池主工作目录。
 
 ---
 

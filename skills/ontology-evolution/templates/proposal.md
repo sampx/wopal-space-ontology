@@ -212,4 +212,4 @@ Files touched: <fill in after implementation>
 
 ## Delivery
 
-`space sync` and `ontology contribute` are the user's call — the skill never uploads on its own.
+`space sync` and native Git/GitHub PR publication are the user's call — the skill never uploads on its own.

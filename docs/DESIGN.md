@@ -1,7 +1,7 @@
 # Ontology — Space Soul, Regulations and Capability Genome Toolkit
 
 > **Status**: Active
-> **Updated**: 2026-10-20
+> **Updated**: 2026-10-25
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
 > **Sub-DESIGNs**:
@@ -124,7 +124,7 @@ ellamaka 在 wopal-space mode 下从 ontology 加载：
 | `wopal space sync`                         | 与 local main 双向对齐                          |
 | `wopal space capability add/remove`        | 增删空间装配能力                                |
 | `wopal space capability list`              | 查询空间武器库有效能力集（四类武器，全局+空间） |
-| `wopal ontology install/update/contribute` | 本体安装、下行整合与上行贡献                    |
+| `wopal ontology install/status/sync` | 本体安装、状态与来源链对齐                    |
 
 命令语义与边界见 `./DESIGN-evolution.md` 的 Maintenance and Distribution Command Surface 章节。
 
