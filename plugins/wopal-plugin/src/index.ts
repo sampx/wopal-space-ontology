@@ -27,6 +27,7 @@ import { MonitorEngine } from "./monitor/monitor-engine.js";
 import { createMainSessionMonitorStrategy } from "./monitor/main-session-monitor.js";
 import { registerManagerForCleanup } from "./lifecycle/process-cleanup.js";
 import { createWopalTools } from "./tools/index.js";
+import { SessionSkillOverlay } from "./session-skill-overlay.js";
 import {
   createRuntimeContext,
   type RuntimeContext,
@@ -235,16 +236,57 @@ const openCodeRulesPlugin = async (
   // to route requests to the in-process Hono server, bypassing real HTTP).
   // We must pass it to v2 client so question.reply reaches the Question service.
   const client = pluginInput.client as unknown as
-    | { _client?: { getConfig?: () => { fetch?: typeof globalThis.fetch } } }
+    | {
+        _client?: {
+          getConfig?: () => {
+            fetch?: typeof globalThis.fetch;
+            headers?: Headers | Record<string, string>;
+          };
+        };
+      }
     | undefined;
-  const internalFetch =
-    client?._client?.getConfig?.()?.fetch ?? globalThis.fetch;
+  const clientConfig = client?._client?.getConfig?.();
+  const internalFetch = clientConfig?.fetch ?? globalThis.fetch;
+
+  // Derive authorization headers for the v2 client.
+  // 1. Direct host delivery via `pluginInput.serverHeaders` (ellamaka engine with serverHeaders support).
+  // 2. Fallback to v1 client config headers (`Authorization` header passed during engine startup).
+  // Without this, v2 client requests on an authenticated sidecar fail with 401.
+  const rawInput = pluginInput as unknown as Record<string, unknown>;
+  const directServerHeaders =
+    rawInput.serverHeaders && typeof rawInput.serverHeaders === "object"
+      ? (rawInput.serverHeaders as Record<string, string>)
+      : undefined;
+
+  let fallbackAuthHeader: string | undefined;
+  if (!directServerHeaders && clientConfig?.headers) {
+    const rawHeaders = clientConfig.headers;
+    if (rawHeaders instanceof Headers) {
+      fallbackAuthHeader = rawHeaders.get("authorization") ?? undefined;
+    } else if (typeof rawHeaders === "object") {
+      fallbackAuthHeader =
+        (rawHeaders as Record<string, string>)["authorization"] ??
+        (rawHeaders as Record<string, string>)["Authorization"];
+    }
+  }
+
+  const effectiveHeaders: Record<string, string> | undefined =
+    directServerHeaders ??
+    (fallbackAuthHeader ? { Authorization: fallbackAuthHeader } : undefined);
 
   const v2Client = createV2OpencodeClient({
     baseUrl: pluginInput.serverUrl.toString(),
     directory: pluginInput.directory,
     fetch: internalFetch,
+    ...(effectiveHeaders ? { headers: effectiveHeaders } : {}),
   });
+
+  const skillOverlay = new SessionSkillOverlay(
+    v2Client,
+    sessionStore,
+    pluginInput.directory,
+    loggers.task,
+  );
 
   const taskManager = new SimpleTaskManager(
     pluginInput.client as unknown as OpenCodeClient,
@@ -253,6 +295,7 @@ const openCodeRulesPlugin = async (
     pluginInput.serverUrl,
     sessionStore,
     loggers.task,
+    skillOverlay,
   );
 
   // Create MonitorEngine and register strategies
@@ -294,6 +337,7 @@ const openCodeRulesPlugin = async (
     contextLogger: loggers.context,
     taskManager,
     memoryInjector: memory?.injector,
+    skillOverlay,
     systemSnapshots,
     systemMetadataMap,
     systemInjectionsMap,
@@ -323,6 +367,7 @@ const openCodeRulesPlugin = async (
     resources.store,
     resources.embedder,
     sessionStore,
+    skillOverlay,
   );
 
   // memory_manage registration is resource-availability driven (single source
