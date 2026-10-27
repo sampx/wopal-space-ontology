@@ -21,7 +21,7 @@ Examples:
 
 ## How to Work
 
-This command is an entry point only — the authoritative specification lives in the `space-master` skill.
+The authoritative specification lives in the `space-master` skill.
 
 1. Load the `space-master` skill.
 2. Follow the **README Maintenance** reference in `references/readme-maintenance.md` for the full workflow: capability awareness, document paths and naming, purpose, core rules, update mode, confirmation policy, and quality checklist.

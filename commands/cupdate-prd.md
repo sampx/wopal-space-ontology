@@ -16,7 +16,7 @@ Create or update a product PRD document.
 
 ## How to Work
 
-This command is an entry point only — the authoritative specification lives in the `dev-doc-master` skill.
+The authoritative specification lives in the `dev-doc-master` skill.
 
 1. Load the `dev-doc-master` skill.
 2. Follow the **PRD Reference** in `references/prd.md` and the universal rules in `references/consistency.md` for the full workflow: document paths and naming, context collection, writing rules, header, update mode, and quality checklist.
