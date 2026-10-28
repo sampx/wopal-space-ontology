@@ -77,9 +77,11 @@ The runtime skill name remains `codex-with-chatgpt`; consumers continue to use t
 
 ### Agent Verification
 
-1. [ ] The promoted skill's unit tests pass: all 13 session-protocol tests succeed.
-2. [ ] The ontology capability view reports `codex-with-chatgpt` from the shared space skill pool.
-3. [ ] The coding archetype declares `codex-with-chatgpt`, and the assembled runtime entry resolves to the canonical ontology skill directory.
+1. [x] The promoted skill's unit tests pass: all 13 session-protocol tests succeed. Evidence: `python3 -m unittest discover -s .wopal/skills/codex-with-chatgpt/tests -v` → `Ran 13 tests ... OK`.
+2. [x] The ontology capability view reports `codex-with-chatgpt` from the shared space skill pool. Evidence: `wopal space capability list --json` reports the skill with `source: space` and the canonical `skills/codex-with-chatgpt/SKILL.md` location.
+3. [x] The coding archetype declares `codex-with-chatgpt`, and the assembled runtime entry resolves to the canonical ontology skill directory. Evidence: the archetype contains the skill entry and `.codex/skills/codex-with-chatgpt` resolves to `.wopal/skills/codex-with-chatgpt`.
+
+Security evidence: the OpenClaw scanner completed 13 checks with 0 critical findings, 1 warning, and 12 clean checks; the warning is confined to test fixtures and does not represent download-and-execute behavior.
 
 ### User Validation
 
