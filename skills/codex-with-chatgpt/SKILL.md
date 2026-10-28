@@ -62,6 +62,11 @@ design, implementation, debugging, and review requests for the same work goal.
     so Codex should normally implement, test, and verify locally. Delegate code
     implementation to ChatGPT only when it materially helps or Codex is stuck;
     Codex must still run the final tests/verification before accepting the work.
+14. **Codex owns browser automation.** `session.py` manages Session/request
+    checkpoints only. It never generates the browser payload, types into the
+    ChatGPT composer, clicks Send, or decides browser navigation. Keep browser
+    interaction in Codex and make the browser instructions precise enough that
+    Codex can execute them directly.
 
 ## Rule precedence and authority
 
@@ -103,7 +108,7 @@ WopalSpace-Bot exists only inside the ChatGPT side of C2C. Codex uses its own
 local tools plus the in-app browser and `session.py`; it never directly invokes
 WopalSpace-Bot.
 
-For each C2C request ChatGPT starts with `open_space`, then reads root
+For each C2C request ChatGPT starts with `space_status`, then reads root
 `AGENTS.md` and its startup chain. It loads the `REQUIRED_SKILLS` named by Codex
 before doing the job and uses `AVAILABLE_SKILLS` when relevant.
 
@@ -211,15 +216,33 @@ The browser is the visible interaction channel.
 ### Sending and monitoring
 
 1. Open/recover the Session conversation.
-2. Send the complete request in one message.
-3. Confirm the user message actually appeared.
-4. Start/continue the background waiter.
-5. Inspect the browser only when useful:
+2. Build the complete request first, then write it to the composer in one
+   atomic content-setting operation. Embedded newlines are message data; do
+   not use a key-by-key typing primitive that can translate `\n` into Enter
+   key events. Prefer one fill/paste-style DOM write or an equivalent atomic
+   composer-set operation.
+3. Before submitting, verify the composer contains `[C2C]`, the correct
+   `REQUEST_ID`, and the terminal `[C2C END]` marker. Submit by clicking Send
+   exactly once; do not use Enter as the submit action.
+4. After submitting, verify exactly one new user message appeared and that it
+   contains both `[C2C]` and `[C2C END]`. If any fragment was emitted, do not
+   send the remaining fragments. Treat that conversation as transport-corrupted,
+   create a replacement Chat conversation, HANDOFF the same Session/pending
+   request, and resend the complete request atomically.
+5. Start/continue the background waiter.
+6. Inspect the browser only when useful:
    - still generating -> keep waiting;
    - visible answer but no background response -> ask ChatGPT to run `respond`;
    - tool/error UI -> retry the failed step, not the whole request;
    - Retry-only page -> Retry once;
    - conversation 404 -> create a replacement chat and HANDOFF the same Session.
+
+After a Codex restart with a pending request, do not blindly resend. Reopen the
+saved conversation first and inspect the visible user messages. If one message
+already contains the same `REQUEST_ID` plus both `[C2C]` and `[C2C END]`, the
+request was already sent: resume `wait` only. Resend only when that complete
+message is absent; if only a fragment exists, use the transport-corrupted
+recovery above.
 
 Never infer workflow state from browser words such as DONE/PASS/BLOCK.
 

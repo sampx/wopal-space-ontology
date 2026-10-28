@@ -222,7 +222,7 @@ SESSION_DIR:
 
 ChatGPT 收到后：
 
-1. `open_space`；
+1. `space_status`；
 2. 按根 `AGENTS.md` 的启动链加载空间规则；
 3. 读取 `REQUIRED_SKILLS`；
 4. 需要时读取 `AVAILABLE_SKILLS`；
@@ -413,6 +413,9 @@ response 写入后：
 - 后台 response 缺失时恢复；
 - conversation 丢失时 HANDOFF。
 
+边界：浏览器自动化始终由 Codex 直接执行。`session.py` 只维护 Session/request/response
+checkpoint，不生成 browser payload，不输入 composer，不点击 Send，也不负责页面导航。
+
 规则：
 
 1. 一个 Session 正常复用一个 conversation；
@@ -420,9 +423,20 @@ response 写入后：
 3. 使用 Codex in-app browser（iab）；
 4. 新会话用 Chat mode；
 5. `tab.markHandoff()` + `tab.markDeliverable()` 保持交付标签页；
-6. 正常等待以后台 `wait` 为主，浏览器低频观察；
-7. 浏览器已经有答案但后台没有 response 时，让 ChatGPT 补跑同一个 request 的 `respond`；
-8. 不从聊天文字推导业务 workflow state。
+6. Browser transport 必须把一个 C2C request 当成一个原子消息：先构造完整多行文本，再一次性
+   写入 composer；正文换行不得转换成 Enter 提交事件；提交动作与正文输入分离，只点击一次
+   Send；
+7. Request 以 `[C2C]` 开始、以 `[C2C END]` 结束。发送前后都用这两个边界和
+   `REQUEST_ID` 校验完整性；发送后必须只新增一条 user message；
+8. 如果部分 request 已被错误提交，不继续发送剩余片段；该 conversation 已被污染，改用新的
+   Chat conversation HANDOFF 同一个 Session 和 pending request，再完整重发；
+9. 正常等待以后台 `wait` 为主，浏览器低频观察；
+10. 浏览器已经有答案但后台没有 response 时，让 ChatGPT 补跑同一个 request 的 `respond`；
+11. 不从聊天文字推导业务 workflow state。
+
+Codex 重启恢复 pending request 时，先检查保存的 conversation。若已经存在同一个
+`REQUEST_ID` 且同一条 user message 同时包含 `[C2C]` 与 `[C2C END]`，只恢复 `wait`，
+不重发；只有完整消息不存在时才发送，发现残片则按 transport-corrupted 规则换 chat HANDOFF。
 
 ## 13. Generic work examples
 
