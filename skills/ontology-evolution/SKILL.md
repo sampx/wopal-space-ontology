@@ -61,6 +61,8 @@ Ask in order: does it hold in a different space? For a different project of the 
 `wopal space evo new "<title>"` creates `docs/evolutions/<name>.md` from `templates/proposal.md` at `Stage: draft`. The template is the single source of the proposal's shape — fill every section; unreplaced placeholders are refused at `accept`.
 
 - Write the proposal document in the user's preferred language; the template's headings and field labels stay as they are.
+- **A name must preserve the primary target capability's canonical identity.** When the proposal mainly changes an existing named skill / rule / agent / command / assembly capability, the proposal-name slug must contain that canonical capability name (for example `dev-flow` or `ontology-evolution`). Generalization removes space-, project-, customer-, and session-specific detail; it must not abstract away the capability being changed.
+- **Keep it short without making it anonymous.** Prefer a 2–3 segment `<capability>-<topic>` slug. Keep the full proposal name at or below 32 characters when possible, while always obeying any stricter slug limit in the proposal template. Names such as `delivery-integration` or `workflow-cleanup` are invalid when a reader outside the current conversation cannot tell what capability they change.
 - Anchor every claim in evidence: a session fact, an error, a user correction, a code location (`file:line`). Mark unverified statements as unverified.
 - Few and strong beats many and weak. One analysis may yield several candidates — one proposal per coherent change.
 

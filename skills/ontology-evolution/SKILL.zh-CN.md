@@ -62,6 +62,8 @@ description: >
 `wopal space evo new "<title>"` 会从 `templates/proposal.md` 生成 `docs/evolutions/<name>.md`，初始 `Stage: draft`。模板是提案形态的唯一来源——每一节都要填写；残留占位符会在 `accept` 时被拒绝。
 
 - 进化提案文档使用用户偏好语言编写；模板的标题与字段标签保持原样。
+- **名称必须保留主要目标能力的正式身份。** 如果提案主要修改一个已命名的 skill / rule / agent / command / assembly 能力，proposal name 的 slug 必须包含该能力的 canonical name（例如 `dev-flow`、`ontology-evolution`）；“去具体化”只去掉空间、项目、客户和会话细节，不能把能力名也抽象掉。
+- **短，但不能失去可识别性。** 优先采用 `<capability>-<topic>` 的 2–3 段 slug；完整 proposal name 建议不超过 32 个字符，并始终服从模板更严格的 slug 长度限制。像 `delivery-integration`、`workflow-cleanup` 这类脱离当前会话后无法判断“在改什么”的名字不合格。
 - 每条主张都要有证据锚点：会话事实、错误、用户纠正、代码位置（`file:line`）。未验证的话必须标注为未验证。
 - 少而扎实胜过多而单薄。一次分析可能产出多条候选——一条候选一份提案。
 
