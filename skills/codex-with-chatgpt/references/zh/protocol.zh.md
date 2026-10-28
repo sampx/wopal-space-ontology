@@ -64,6 +64,8 @@ LAST_ACTION:
 python3 .codex/skills/codex-with-chatgpt/scripts/session.py respond \
   --session <SESSION_ID> --request <REQUEST_ID> --status COMPLETED \
   --summary '<一句结论>' [--artifact <path>] [--data-json '<json>']
+
+[C2C END]
 ```
 
 新 conversation 第一条 request 带 `ROLE`；后续同一 conversation 可以省略。固定
@@ -220,11 +222,17 @@ Session directory，不删除 Session 引用的外部正式 artifact。
 1. 复用 Session 保存的 `chatUrl`；
 2. 只用一个 in-app browser tab；
 3. `tab.markHandoff()` + `tab.markDeliverable()`；
-4. 一次发送完整 request 并确认已经出现；
-5. 正常等待后台 waiter；
-6. 必要时或 waiter timeout 再看浏览器；
-7. 已有可见答复但无后台 response -> 要求 ChatGPT 对同一 request 跑 `respond`；
-8. conversation 404 -> 新建 conversation，HANDOFF 同一个 Session。
+4. 先完整构造 request，再用一次性的 composer-set 操作写入全文。换行属于消息内容；
+   禁止用会把 `\n` 变成 Enter 键事件的逐字/逐键输入来发送多行 request；
+5. 提交前检查 composer 同时含有 `[C2C]`、正确 `REQUEST_ID`、`[C2C END]`；提交时
+   只点击一次 Send，禁止用 Enter 提交；
+6. 提交后确认页面只新增一条 user message，且该消息同时含 `[C2C]` 和 `[C2C END]`；
+   如果已经出现部分消息，停止发送剩余片段，把该 conversation 视为 transport-corrupted，
+   新建 Chat conversation，对同一个 Session / pending request HANDOFF 后重新发送完整 request；
+7. 正常等待后台 waiter；
+8. 必要时或 waiter timeout 再看浏览器；
+9. 已有可见答复但无后台 response -> 要求 ChatGPT 对同一 request 跑 `respond`；
+10. conversation 404 -> 新建 conversation，HANDOFF 同一个 Session。
 
 等待期间可以给用户进度更新，但不能发送最终回复结束本轮。`READY` 后消费 response，
 并在同一轮继续 owning workflow，除非真的到了需要用户输入/确认的 gate。
@@ -273,6 +281,8 @@ SESSION_DIR:
 
 LAST_ACTION:
 用 session.py respond 为本 SESSION_ID + REQUEST_ID 写回 response。
+
+[C2C END]
 ```
 
 HANDOFF 只恢复协作上下文，不编码业务 workflow state。

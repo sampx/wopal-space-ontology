@@ -183,10 +183,17 @@ GOAL、CONTEXT、skills、AUTHORITY、EXPECTED_RESULT 等动态字段按本次�
 发送与等待：
 
 1. 打开/恢复 Session 的 conversation；
-2. 一次发完整 request；
-3. 确认消息真的出现在页面；
-4. 以后台 waiter 为正常完成通道；
-5. 必要时低频看浏览器：仍生成就继续等；已回答但没有后台 response，就要求 ChatGPT
+2. 先在内存中构造完整 request，再一次性写入 composer。request 内的换行只是文本，
+   不能用会把 `\n` 解释成键盘 Enter 的逐字/逐键输入方式；优先用一次性的 fill、粘贴式
+   DOM 写入或等价原子输入；
+3. 写入完成后先检查 composer：必须同时包含开头 `[C2C]` 与结尾 `[C2C END]`，并且
+   `REQUEST_ID` 正确；然后只点击一次 Send。不要用 Enter 作为提交动作；
+4. 发送后确认页面只新增一条 user message，而且这条消息同时包含 `[C2C]` 与
+   `[C2C END]`。如果任何片段已经被错误发出，不要继续补发剩余片段；把当前 conversation
+   视为 transport-corrupted，新建 Chat conversation，并对同一个 Session / pending request
+   做 HANDOFF 后重新原子发送完整 request；
+5. 以后台 waiter 为正常完成通道；
+6. 必要时低频看浏览器：仍生成就继续等；已回答但没有后台 response，就要求 ChatGPT
    补跑 `respond`；404 时新建 conversation 并 HANDOFF 同一个 Session。
 
 不要从浏览器里的 DONE/PASS/BLOCK 推导 workflow 状态。

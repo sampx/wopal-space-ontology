@@ -211,10 +211,21 @@ The browser is the visible interaction channel.
 ### Sending and monitoring
 
 1. Open/recover the Session conversation.
-2. Send the complete request in one message.
-3. Confirm the user message actually appeared.
-4. Start/continue the background waiter.
-5. Inspect the browser only when useful:
+2. Build the complete request first, then write it to the composer in one
+   atomic content-setting operation. Embedded newlines are message data; do
+   not use a key-by-key typing primitive that can translate `\n` into Enter
+   key events. Prefer one fill/paste-style DOM write or an equivalent atomic
+   composer-set operation.
+3. Before submitting, verify the composer contains `[C2C]`, the correct
+   `REQUEST_ID`, and the terminal `[C2C END]` marker. Submit by clicking Send
+   exactly once; do not use Enter as the submit action.
+4. After submitting, verify exactly one new user message appeared and that it
+   contains both `[C2C]` and `[C2C END]`. If any fragment was emitted, do not
+   send the remaining fragments. Treat that conversation as transport-corrupted,
+   create a replacement Chat conversation, HANDOFF the same Session/pending
+   request, and resend the complete request atomically.
+5. Start/continue the background waiter.
+6. Inspect the browser only when useful:
    - still generating -> keep waiting;
    - visible answer but no background response -> ask ChatGPT to run `respond`;
    - tool/error UI -> retry the failed step, not the whole request;

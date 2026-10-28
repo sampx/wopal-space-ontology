@@ -420,9 +420,16 @@ response 写入后：
 3. 使用 Codex in-app browser（iab）；
 4. 新会话用 Chat mode；
 5. `tab.markHandoff()` + `tab.markDeliverable()` 保持交付标签页；
-6. 正常等待以后台 `wait` 为主，浏览器低频观察；
-7. 浏览器已经有答案但后台没有 response 时，让 ChatGPT 补跑同一个 request 的 `respond`；
-8. 不从聊天文字推导业务 workflow state。
+6. Browser transport 必须把一个 C2C request 当成一个原子消息：先构造完整多行文本，再一次性
+   写入 composer；正文换行不得转换成 Enter 提交事件；提交动作与正文输入分离，只点击一次
+   Send；
+7. Request 以 `[C2C]` 开始、以 `[C2C END]` 结束。发送前后都用这两个边界和
+   `REQUEST_ID` 校验完整性；发送后必须只新增一条 user message；
+8. 如果部分 request 已被错误提交，不继续发送剩余片段；该 conversation 已被污染，改用新的
+   Chat conversation HANDOFF 同一个 Session 和 pending request，再完整重发；
+9. 正常等待以后台 `wait` 为主，浏览器低频观察；
+10. 浏览器已经有答案但后台没有 response 时，让 ChatGPT 补跑同一个 request 的 `respond`；
+11. 不从聊天文字推导业务 workflow state。
 
 ## 13. Generic work examples
 

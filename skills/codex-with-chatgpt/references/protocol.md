@@ -66,6 +66,8 @@ Record this request's response with:
 python3 .codex/skills/codex-with-chatgpt/scripts/session.py respond \
   --session <SESSION_ID> --request <REQUEST_ID> --status COMPLETED \
   --summary '<one-line conclusion>' [--artifact <path>] [--data-json '<json>']
+
+[C2C END]
 ```
 
 The first request in a new ChatGPT conversation includes `ROLE`; later requests
@@ -228,11 +230,22 @@ canonical artifacts referenced by the Session.
 1. reuse the Session's saved `chatUrl`;
 2. use one in-app browser tab;
 3. mark it with `tab.markHandoff()` and `tab.markDeliverable()`;
-4. send one complete request and verify it appeared;
-5. normally wait on the background process;
-6. inspect the browser only when useful or the waiter times out;
-7. visible answer but no response -> ask ChatGPT to run `respond` for the same id;
-8. conversation 404 -> create a replacement conversation and HANDOFF the same Session.
+4. build the complete request before touching the composer, then write the
+   whole multi-line payload with one atomic composer-set operation. Newlines
+   are content; never send a multi-line C2C request through key-by-key typing
+   that can turn `\n` into Enter key events;
+5. before submit, verify the composer contains `[C2C]`, the correct
+   `REQUEST_ID`, and `[C2C END]`; click Send exactly once and never use Enter
+   as the submit action;
+6. after submit, verify exactly one new user message appeared and that the
+   same message contains `[C2C]` and `[C2C END]`; if any partial message was
+   emitted, stop sending fragments, treat the conversation as transport-corrupted,
+   create a replacement Chat conversation, and HANDOFF the same Session and
+   pending request before resending the full request atomically;
+7. normally wait on the background process;
+8. inspect the browser only when useful or the waiter times out;
+9. visible answer but no response -> ask ChatGPT to run `respond` for the same id;
+10. conversation 404 -> create a replacement conversation and HANDOFF the same Session.
 
 Codex may send progress updates while waiting, but must not send the final user
 reply while `pendingRequestId` is set. After `READY`, consume the response and
@@ -285,6 +298,8 @@ SESSION_DIR:
 
 LAST_ACTION:
 Record the response for this SESSION_ID + REQUEST_ID with session.py respond.
+
+[C2C END]
 ```
 
 HANDOFF restores collaboration context only. It does not encode business
