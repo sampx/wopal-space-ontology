@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-10-28
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: (none)
