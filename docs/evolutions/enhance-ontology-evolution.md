@@ -64,6 +64,7 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 |-----------|-------|-----------|------|
 | evolution skill | `skills/ontology-evolution/SKILL.zh-CN.md`, `skills/ontology-evolution/SKILL.md` | modify | 完整协作协议 |
 | routing reference | `skills/ontology-evolution/references/capability-routing.zh-CN.md`, `skills/ontology-evolution/references/capability-routing.md` | create | 能力组件职责与路由 |
+| landing / maintenance references | `skills/ontology-evolution/references/landing*.md`, `skills/ontology-evolution/references/maintenance*.md`, `skills/ontology-evolution/references/commands.md` | create / modify | 将落地、命令与维护细节从主 Skill 下沉，保持 progressive disclosure |
 | design | `docs/DESIGN-evolution.md` | modify | 设计真相源同步 |
 
 ## Assembly Intent
@@ -79,6 +80,7 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 2. [x] SKILL 能将常见问题路由到 Agent / Rule / Skill / Plugin / Assembly / space-private，并要求优先修正已有 owner。— `rg -n "Capability routing|能力路由|existing capability owner|已有能力" skills/ontology-evolution/SKILL*.md`
 3. [x] 详细路由 reference 可独立解释各能力组件职责、边界与何时回查 DESIGN。— `rg -n "Component responsibilities|组件职责|When DESIGN|什么时候必须回查" skills/ontology-evolution/references/capability-routing*.md`
 4. [x] 中英文 SKILL 与 routing reference 语义一致，DESIGN 与 Skill 不冲突。— `git -C .wopal diff --check` + `wopal space evo check enhance-ontology-evolution`
+5. [x] SKILL description 直接、强触发；主正文控制在 250 行以内，落地与维护细节通过 references 按需加载。— `wc -l skills/ontology-evolution/SKILL*.md` + reference link check
 
 ### User Validation
 
@@ -117,8 +119,8 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 **Verify**: 文本一致性检查 + `wopal space evo check enhance-ontology-evolution`
 
 **Done**:
-Task output: ontology-evolution 已扩展为 Observe → Diagnose → Route → Synthesize → Proposal → Landing，并新增能力路由参考；设计真相源已同步。
-Files touched: `docs/DESIGN-evolution.md`; `skills/ontology-evolution/AGENTS.md`; `skills/ontology-evolution/AGENTS.zh-CN.md`; `skills/ontology-evolution/SKILL.md`; `skills/ontology-evolution/SKILL.zh-CN.md`; `skills/ontology-evolution/references/capability-routing.md`; `skills/ontology-evolution/references/capability-routing.zh-CN.md`; `docs/evolutions/enhance-ontology-evolution.md`
+Task output: ontology-evolution 已扩展为 Observe → Diagnose → Route → Synthesize → Proposal → Landing；description 改为强触发；主 Skill 精简为决策与主流程，落地、命令和维护细节按需下沉到 references；中英文保持同步。
+Files touched: `docs/DESIGN-evolution.md`; `skills/ontology-evolution/AGENTS.md`; `skills/ontology-evolution/AGENTS.zh-CN.md`; `skills/ontology-evolution/SKILL.md`; `skills/ontology-evolution/SKILL.zh-CN.md`; `skills/ontology-evolution/references/capability-routing.md`; `skills/ontology-evolution/references/capability-routing.zh-CN.md`; `skills/ontology-evolution/references/landing.md`; `skills/ontology-evolution/references/landing.zh-CN.md`; `skills/ontology-evolution/references/maintenance.md`; `skills/ontology-evolution/references/maintenance.zh-CN.md`; `skills/ontology-evolution/references/commands.md`; `docs/evolutions/enhance-ontology-evolution.md`
 - [x] The implementation agent has completed all development and verification steps above.
 
 ---

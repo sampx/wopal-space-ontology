@@ -39,7 +39,7 @@ description: 本体能力进化 — 持续观察、汇总、提案与落地（�
 
 ### 提交粒度
 
-实施不提交。每完成一个 task 一次提交，落工作分支——该 task 的内容连同提案记录。命令级机制见 `SKILL.md`。
+实施不提交。每完成一个 task 一次提交，落工作分支——该 task 的内容连同提案记录。落地主流程见 `references/landing.zh-CN.md`；具体命令行为见 `references/commands.md`。
 
 ### 缺陷立即修复
 

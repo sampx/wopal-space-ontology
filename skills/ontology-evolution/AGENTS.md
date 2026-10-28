@@ -58,7 +58,8 @@ part of the proposal file.
 
 Implementation does not commit. Each completed task lands as exactly one
 commit on the working branch — that task's content together with its
-proposal record. The command-level mechanics live in `SKILL.md`.
+proposal record. The landing workflow lives in `references/landing.md`; exact
+command behavior lives in `references/commands.md`.
 
 ### Defect Repairs Are Immediate
 
