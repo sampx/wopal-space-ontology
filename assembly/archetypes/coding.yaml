@@ -27,6 +27,7 @@ skills:
   - skill-creator
   - agent-browser
   - context-manage
+  - codex-with-chatgpt
 
 # 声明该空间加载的规则
 rules:
