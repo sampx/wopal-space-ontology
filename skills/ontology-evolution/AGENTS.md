@@ -1,6 +1,6 @@
 ---
 name: ontology-evolution
-description: Ontology capability evolution — writing evolution proposals and landing them (state machine, sparse isolation, user-owned delivery)
+description: Ontology capability evolution — continuous observation, synthesis, proposals, and landing (state machine, sparse isolation, user-owned delivery)
 ---
 
 # Agent Development Rules
@@ -14,14 +14,15 @@ description: Ontology capability evolution — writing evolution proposals and l
 
 ## 2. Architecture and Directories
 
-The skill ships documents and the proposal template only. The mechanism —
-state-machine commands, sparse safety, isolation — is implemented by the
-wopal CLI (`wopal space evo`); the skill keeps no script layer of its own.
+The skill ships collaboration/routing guidance, references, and the proposal
+template only. The mechanism — state-machine commands, sparse safety,
+isolation — is implemented by the wopal CLI (`wopal space evo`); the skill
+keeps no script layer of its own.
 
 | Directory | Responsibility |
 |---|---|
 | `templates/proposal.md` | The proposal skeleton with authoring comments; the single source of the proposal format |
-| `references/` | Command reference and background |
+| `references/` | Command reference, capability-routing guidance, and background |
 
 Sparse state is written **only** through the `wopal space` command family. In the
 space sparse worktree, direct `git add -A`, `git checkout`, or

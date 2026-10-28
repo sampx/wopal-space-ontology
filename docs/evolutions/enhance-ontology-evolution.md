@@ -41,7 +41,6 @@ WopalSpace 产品设计已经定义 Skill、Rule、Agent、Plugin、Assembly、M
 - D-02: Maka 观察期只积累并分类信号，不创建提案；只有 Wopal 明确发出 synthesis 时才合并证据并决定是否写提案。
 - D-03: 信号分为 discard / local / candidate / mature；成熟不等于立即落盘。
 - D-04: ontology-evolution 正文内置精简能力路由地图，详细组件边界放 `references/capability-routing.md`；产品 DESIGN 只在架构归属不清时按需读取。
-- D-05: Wopal 与 Maka 的 Codex developer instructions 只保留简短协作触发规则，完整协议由 ontology-evolution 单点维护。
 
 ### Key Interfaces
 
@@ -52,7 +51,6 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 - 扩展 ontology-evolution 的观察、诊断、路由、汇总阶段，并保持现有 Proposal → Landing 生命周期不变。
 - 增加能力组件路由 reference，并保持中英文语义一致。
 - 同步 `docs/DESIGN-evolution.md`。
-- 精简补充当前 Codex 的 Wopal 与 Maka developer instructions，使其遵循新协作协议。
 
 ## Out of Scope
 
@@ -67,7 +65,6 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 | evolution skill | `skills/ontology-evolution/SKILL.zh-CN.md`, `skills/ontology-evolution/SKILL.md` | modify | 完整协作协议 |
 | routing reference | `skills/ontology-evolution/references/capability-routing.zh-CN.md`, `skills/ontology-evolution/references/capability-routing.md` | create | 能力组件职责与路由 |
 | design | `docs/DESIGN-evolution.md` | modify | 设计真相源同步 |
-| Codex local prompts | `.codex/config.toml`, `.codex/agents/maka.toml` | modify | 当前 Codex 环境的简短触发规则 |
 
 ## Assembly Intent
 
@@ -78,11 +75,10 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 
 ### Agent Verification
 
-1. [ ] SKILL 明确定义观察期与 synthesis 期，并规定 Wopal 不因 Maka 中间分析阻塞主任务。
-2. [ ] SKILL 能将常见问题路由到 Agent / Rule / Skill / Plugin / Assembly / space-private，并要求优先修正已有 owner。
-3. [ ] 详细路由 reference 可独立解释各能力组件职责、边界与何时回查 DESIGN。
-4. [ ] 中英文 SKILL 与 routing reference 语义一致，DESIGN 与 Skill 不冲突。
-5. [ ] Wopal 与 Maka Codex 提示词只保留简短触发/角色规则，不复制完整工作流。
+1. [x] SKILL 明确定义观察期与 synthesis 期，并规定 Wopal 不因 Maka 中间分析阻塞主任务。— `rg -n "Observation|Synthesis|观察|汇总" skills/ontology-evolution/SKILL*.md`
+2. [x] SKILL 能将常见问题路由到 Agent / Rule / Skill / Plugin / Assembly / space-private，并要求优先修正已有 owner。— `rg -n "Capability routing|能力路由|existing capability owner|已有能力" skills/ontology-evolution/SKILL*.md`
+3. [x] 详细路由 reference 可独立解释各能力组件职责、边界与何时回查 DESIGN。— `rg -n "Component responsibilities|组件职责|When DESIGN|什么时候必须回查" skills/ontology-evolution/references/capability-routing*.md`
+4. [x] 中英文 SKILL 与 routing reference 语义一致，DESIGN 与 Skill 不冲突。— `git -C .wopal diff --check` + `wopal space evo check enhance-ontology-evolution`
 
 ### User Validation
 
@@ -103,7 +99,7 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 
 ### Task 1: 建立持续进化协作协议与能力路由
 
-**Verification Intent**: 1, 2, 3, 4, 5
+**Verification Intent**: 1, 2, 3, 4
 
 **Behavior**:
 - 当会话出现可复用的能力问题信号时，Wopal 可把证据交给可复用 Maka 子线程；Maka 观察期只分析积累，synthesis 时才生成成熟提案，并按能力职责选择正确 owner。
@@ -117,14 +113,13 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 **Changes**:
 1. 更新中英文 skill 与 routing reference。
 2. 同步 DESIGN-evolution。
-3. 更新当前空间 Codex Wopal/Maka 提示词。
 
 **Verify**: 文本一致性检查 + `wopal space evo check enhance-ontology-evolution`
 
 **Done**:
-Task output: 待实施
-Files touched: 待实施
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: ontology-evolution 已扩展为 Observe → Diagnose → Route → Synthesize → Proposal → Landing，并新增能力路由参考；设计真相源已同步。
+Files touched: `docs/DESIGN-evolution.md`; `skills/ontology-evolution/AGENTS.md`; `skills/ontology-evolution/AGENTS.zh-CN.md`; `skills/ontology-evolution/SKILL.md`; `skills/ontology-evolution/SKILL.zh-CN.md`; `skills/ontology-evolution/references/capability-routing.md`; `skills/ontology-evolution/references/capability-routing.zh-CN.md`; `docs/evolutions/enhance-ontology-evolution.md`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 

@@ -1,20 +1,20 @@
 ---
 name: ontology-evolution
 description: >
-  The single workflow for ontology capability evolution and maintenance. Use to distill session lessons, errors, and user corrections into proposals; audit generality and private contamination; advance proposal stages; and land approved skills, rules, agents, commands, plugins, or assembly changes. Also use for ontology updates, space alignment, capability assembly, and upstream PR creation, review fixes, status, or closeout using native git/gh with short branch names, fixed worktrees, and safe cleanup. MUST load for ontology repository operations or capability assets; code development under projects/ uses dev-flow. Approval, validation, and delivery belong to the user.
+  The single workflow for continuous ontology capability evolution and maintenance. Use to observe user corrections, recurring friction, tool/environment failures, and effective patterns during sessions; collaborate with Maka to diagnose and route them to the right capability owner; synthesize mature signals into evolution proposals at closeout; and land approved skills, rules, agents, commands, plugins, or assembly changes. Also use for ontology updates, space alignment, capability assembly, and upstream PR creation, review fixes, status, or closeout. MUST load for ontology repository operations, ontology capability assets, or reusable capability problems; code development under projects/ uses dev-flow. Approval, validation, and delivery belong to the user.
 ---
 # ontology-evolution
 
-Turn lived experience into lasting capability — and land that improvement without corrupting the ontology.
+Turn real work friction into reliable signals, mature signals into lasting capability, and land that improvement without corrupting the ontology.
 
-Everything meets at one artifact: **the evolution proposal** — a file under `docs/evolutions/` that states what should change, why, and how it will be verified. Writing proposals and landing them are the two parts of this workflow; landing always waits on explicit user approval.
+The full workflow is **observe → diagnose → route → synthesize → propose → land**. The first half can accumulate quietly while the primary task continues; only mature signals that still hold after synthesis become evolution proposals under `docs/evolutions/`. Landing always waits on explicit user approval.
 
 ## Who does what
 
 | Role | Does | Never does |
 |------|------|------------|
-| **Maka** | Core mission: analyzes session errors, user corrections, and lessons/fixes remembered from memory; writes and refines evolution proposals under `docs/evolutions/` | Touch a capability asset, run the landing workflow |
-| **Wopal (the orchestrator)** | May also write proposals. Orchestrates the landing end to end: accepts a proposal on the user's approval, plans and delegates the work, verifies each task and backfills its record, commits per task, drives the stage transitions and the user gates, through to archive | Implement assets by hand |
+| **Maka** | Observes and analyzes evolution signals during the session, maintaining evidence and candidates; creates mature proposals only when Wopal explicitly requests synthesis | Write proposals during observation; touch capability assets; run the landing workflow |
+| **Wopal (the orchestrator)** | Detects worthwhile evolution signals and keeps feeding them to the same Maka while the primary task continues; requests synthesis at closeout; after user approval, orchestrates landing end to end | Interrupt the primary task for Maka's intermediate analysis; implement assets by hand |
 | **Fae** | Lands the change — edits the capability assets inside the isolation worktree | Commit; edit the proposal; move the proposal's stage |
 | **Rook** | Reviews the deliverable — the implementation review — before the user is invited to validate | Fix anything |
 | **User** | Approves a proposal before landing starts; picks the validation form and validates; holds the integration gate; decides delivery | — |
@@ -23,21 +23,78 @@ A proposal is never its own implementation authorization: every proposal, from w
 
 ---
 
+# Continuous evolution collaboration
+
+## What to observe
+
+Treat an event as an evolution signal only when it may mean that a capability should behave differently next time. Common sources:
+
+| Signal | Typical evidence |
+|--------|------------------|
+| User correction | The user says an Agent's judgment, behavior, workflow, or communication should change |
+| Recurring friction | The same detour, bad assumption, or repeated work appears again |
+| Tool / environment failure | A failure exposes a wrong assumption about a tool, runtime, or capability boundary |
+| Remembered lesson | A useful lesson still has no stable capability owner |
+| Effective pattern | A new approach clearly outperforms the current one and is worth reproducing |
+
+An ordinary project bug, one-off network failure, or task-specific business fact is not automatically an evolution signal just because something went wrong. Ask: **if a similar situation happens again, should a WopalSpace capability behave differently because of this?**
+
+## How Wopal collaborates with Maka
+
+When the current runtime provides sub-agent collaboration:
+
+1. **Start on demand, then reuse.** Prefer one Maka child thread per logical session instead of spawning a new agent for every signal.
+2. **Send only needed evidence.** Pass the problem, user correction, key context, failure result, or effective pattern; do not copy the full parent history by default.
+3. **Keep the primary task moving.** After sending a signal, Wopal continues the current work. Do not wait for Maka, surface Maka's intermediate analysis to the user, or let that analysis redirect the already-set task goal.
+4. **Synthesize at closeout.** When the primary task is complete, the user is winding down the session, or the user explicitly asks for an evolution summary, Wopal asks Maka to `synthesize` the accumulated signals.
+
+If the current runtime has no usable sub-agent collaboration, Wopal may perform one synthesis pass itself at closeout. Do not add persistence machinery merely to imitate a background Maka.
+
+## Maka's two modes
+
+### Observation
+
+For each incoming signal, Maka only diagnoses, classifies, and accumulates evidence. It does not create proposals. Classify every signal as:
+
+| State | Meaning |
+|-------|---------|
+| `discard` | One-off, already covered correctly, or not reusable |
+| `local` | Valuable, but belongs only to the current project or space |
+| `candidate` | May require a capability change, but evidence or ownership is not yet stable |
+| `mature` | Evidence is strong enough to support a capability change during synthesis |
+
+`mature` does not mean “write a proposal now.” Observation exists to reduce noise, merge duplicates, and strengthen evidence rather than maximize proposal count. Keep intermediate replies minimal: Wopal only needs to know the signal was received and classified.
+
+### Synthesis
+
+Only when Wopal explicitly requests `synthesize`, Maka:
+
+1. Merges duplicate or same-root signals and drops weak evidence or issues already covered by existing capability.
+2. Generalizes the remaining mature signals and audits private contamination.
+3. Determines the correct capability owner before deciding whether to repair an existing asset or create a new one.
+4. Writes proposals only for coherent changes that still hold after synthesis; **zero proposals is a valid result**.
+
+## Capability routing
+
+Find the existing capability owner first and prefer repairing it. Create a new capability only when no existing component naturally owns the behavior.
+
+| Problem essence | Preferred owner |
+|-----------------|-----------------|
+| An Agent's role, responsibilities, decision principles, or long-lived default behavior is wrong | Agent prompt |
+| A behavior constraint applies only in a matching scenario | Rule |
+| The problem is how a task is performed: workflow, steps, verification, or tool-use guidance | Skill |
+| A fixed human-to-Agent work entry or instruction contract needs to change | Command |
+| A real tool, runtime state, automation, or system integration is missing | Plugin / runtime owner |
+| The capability itself is fine, but a space type should or should not receive it | Assembly / archetype |
+| The knowledge is specific to the current project or space | Project `AGENTS.md` / space memory |
+
+When ownership overlaps, the boundary is unclear, or a formal proposal is about to be written, read [`references/capability-routing.md`](references/capability-routing.md) as needed. Read product/design documents only when the issue challenges the capability model itself, its loading lifecycle, or architectural ownership; do not reread the product design for every observed signal.
+
+---
+
 # Writing a proposal
 
 The point is not to archive what happened; it is to change the capability so the same situation goes better next time.
-
-## Sources worth watching
-
-| Signal | Looks like | Usually means |
-|--------|------------|---------------|
-| Session error | A failure exposes a wrong assumption | A guardrail is missing |
-| Repeated correction | The user corrects the same behavior more than once | A rule is missing or unclear |
-| Remembered lesson | Memory holds a lesson, workaround, or fix that no capability carries yet | It deserves to live in an asset |
-| Wasted effort | The same helper or approach gets rebuilt | A capability should be extracted |
-| Effective pattern | Something worked notably well | Worth preserving so it recurs |
-
-Routine completion is not a lesson. Look for the moment where the behavior should have been different.
 
 ## Strip the specifics first
 
