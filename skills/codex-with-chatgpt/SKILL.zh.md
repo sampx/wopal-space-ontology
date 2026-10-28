@@ -50,6 +50,9 @@ Session 不是 Plan，也不是 review round。同一个 Session 可以连续包
     宿主 workspace 的运行环境不一致；因此代码实施默认由 Codex 完成，只有 Codex 确实
     遇到困难或委派明显更合适时才交给 ChatGPT。ChatGPT 改过代码后，最终测试与验证仍由
     Codex 在本地环境执行后再接受结果。
+14. **浏览器自动化由 Codex 自己负责。** `session.py` 只管理 Session/request checkpoint，
+    不生成浏览器 payload、不往 ChatGPT composer 输入文字、不点击 Send、也不决定页面导航。
+    浏览器交互继续由 Codex 直接执行，Skill 负责把操作规则写清楚。
 
 ## 规则优先级与权限
 
@@ -89,7 +92,7 @@ C2C 不增加评审轮次；每次 C2C review request 都占用 owning review sk
 WopalSpace-Bot 只存在于 ChatGPT 侧。Codex 只使用自己的本地工具、in-app browser 和
 `session.py`，绝不直接调用 WopalSpace-Bot。
 
-ChatGPT 每次 C2C 请求先 `open_space`，再按根 `AGENTS.md` 的启动链加载规则。开始任务前
+ChatGPT 每次 C2C 请求先 `space_status`，再按根 `AGENTS.md` 的启动链加载规则。开始任务前
 必须读取 Codex 指定的 `REQUIRED_SKILLS`，必要时读取 `AVAILABLE_SKILLS`。
 
 连接不可用时停止并说明，不伪造空间证据或 response。
@@ -195,6 +198,11 @@ GOAL、CONTEXT、skills、AUTHORITY、EXPECTED_RESULT 等动态字段按本次�
 5. 以后台 waiter 为正常完成通道；
 6. 必要时低频看浏览器：仍生成就继续等；已回答但没有后台 response，就要求 ChatGPT
    补跑 `respond`；404 时新建 conversation 并 HANDOFF 同一个 Session。
+
+Codex 重启后如果存在 pending request，不要直接重发。先打开 Session 保存的 conversation，
+检查可见 user message：如果已经有一条消息同时包含同一个 `REQUEST_ID`、`[C2C]` 和
+`[C2C END]`，说明 request 已经发出，只恢复 `wait`；只有完整消息不存在时才重新发送。
+如果只看到残片，走上面的 transport-corrupted 恢复流程。
 
 不要从浏览器里的 DONE/PASS/BLOCK 推导 workflow 状态。
 

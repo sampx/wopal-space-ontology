@@ -54,7 +54,7 @@ SESSION_DIR:
 .wopal-space/c2c/sessions/<SESSION_ID>/
 
 INSTRUCTION:
-先 open_space。读取根 AGENTS.md 与启动链；开始工作前读取 REQUIRED_SKILLS，必要时读取
+先 `space_status`。读取根 AGENTS.md 与启动链；开始工作前读取 REQUIRED_SKILLS，必要时读取
 AVAILABLE_SKILLS。通过 WopalSpace-Bot 自己检查真实空间，不依赖转述。按照 AUTHORITY 与
 owning skill 决定可修改/执行范围。C2C 自己的中间产物写 SESSION_DIR；其他 workflow 的
 正式产物写回其 canonical 路径。
@@ -233,6 +233,11 @@ Session directory，不删除 Session 引用的外部正式 artifact。
 8. 必要时或 waiter timeout 再看浏览器；
 9. 已有可见答复但无后台 response -> 要求 ChatGPT 对同一 request 跑 `respond`；
 10. conversation 404 -> 新建 conversation，HANDOFF 同一个 Session。
+
+浏览器自动化属于 Codex。`session.py` 不负责往 ChatGPT 输入、点击、提交或导航。Codex
+重启后如果 `pendingRequestId` 仍存在，重新发送前先检查保存的 conversation：若可见的一条
+user message 已同时包含同一个 `REQUEST_ID`、`[C2C]`、`[C2C END]`，说明已经发送，只恢复
+`wait`；完整消息不存在才发送；只有残片时走 transport-corrupted 恢复。
 
 等待期间可以给用户进度更新，但不能发送最终回复结束本轮。`READY` 后消费 response，
 并在同一轮继续 owning workflow，除非真的到了需要用户输入/确认的 gate。

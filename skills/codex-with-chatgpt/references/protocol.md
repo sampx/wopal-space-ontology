@@ -54,7 +54,7 @@ SESSION_DIR:
 .wopal-space/c2c/sessions/<SESSION_ID>/
 
 INSTRUCTION:
-open_space first. Read root AGENTS.md and its startup chain. Read REQUIRED_SKILLS
+space_status first. Read root AGENTS.md and its startup chain. Read REQUIRED_SKILLS
 before doing the job; use AVAILABLE_SKILLS when relevant. Inspect the real
 workspace through WopalSpace-Bot instead of trusting summaries. Follow
 AUTHORITY and the owning skills when deciding what may be edited or executed.
@@ -246,6 +246,13 @@ canonical artifacts referenced by the Session.
 8. inspect the browser only when useful or the waiter times out;
 9. visible answer but no response -> ask ChatGPT to run `respond` for the same id;
 10. conversation 404 -> create a replacement conversation and HANDOFF the same Session.
+
+Browser automation belongs to Codex. `session.py` never types, clicks, submits,
+or navigates ChatGPT. After a Codex restart with `pendingRequestId` set, inspect
+the saved conversation before resending: a visible user message containing the
+same `REQUEST_ID` plus both `[C2C]` and `[C2C END]` means the request was already
+sent, so resume `wait` only. If no complete message exists, send it; if only a
+fragment exists, use the transport-corrupted recovery above.
 
 Codex may send progress updates while waiting, but must not send the final user
 reply while `pendingRequestId` is set. After `READY`, consume the response and
