@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-10-29
-- **Stage**: accepted
+- **Stage**: implementing
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: ontology-enhance-testing-practices
