@@ -123,6 +123,8 @@ Task output: ontology-evolution 已扩展为 Observe → Diagnose → Route → 
 Files touched: `docs/DESIGN-evolution.md`; `skills/ontology-evolution/AGENTS.md`; `skills/ontology-evolution/AGENTS.zh-CN.md`; `skills/ontology-evolution/SKILL.md`; `skills/ontology-evolution/SKILL.zh-CN.md`; `skills/ontology-evolution/references/capability-routing.md`; `skills/ontology-evolution/references/capability-routing.zh-CN.md`; `skills/ontology-evolution/references/landing.md`; `skills/ontology-evolution/references/landing.zh-CN.md`; `skills/ontology-evolution/references/maintenance.md`; `skills/ontology-evolution/references/maintenance.zh-CN.md`; `skills/ontology-evolution/references/commands.md`; `docs/evolutions/enhance-ontology-evolution.md`
 - [x] The implementation agent has completed all development and verification steps above.
 
+**Implementation Review**: PASS（Blocker 0 / Warning 0）。按 `df-implement-review` 的 Delivery review 对 `7b8a513..02c0b9e` 检查 Q1–Q4：主 Skill 中英文均 189 行并保持强触发 description；Observation / Synthesis / capability routing 与 `docs/DESIGN-evolution.md` 一致；Agent / Rule / Skill / Plugin / Assembly / space-private 路由齐全；新增 capability-routing / landing / maintenance references 均由主 Skill 引用且文件存在，无 orphan；`references/commands.md` 未改变 CLI 契约，只把 landing 细节改为 reference 路由；stub / broken-link 扫描 clean；`wopal space evo check enhance-ontology-evolution` 为 OK。
+
 ---
 
 ## Delivery
