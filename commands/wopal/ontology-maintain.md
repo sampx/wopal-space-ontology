@@ -14,7 +14,7 @@ Maintain the ontology instance and its collaboration surface: instance updates, 
 
 ## How to Work
 
-This command is an entry point only — the authoritative specification lives in the `ontology-evolution` skill.
+The authoritative specification lives in the `ontology-evolution` skill.
 
 1. Load the `ontology-evolution` skill.
 2. Treat `$ARGUMENTS` as the focus and follow the skill's **Maintenance Protocols** for the full workflow: command surface, status reading, channels and the upload gate, execution stance, and contribution scope.
