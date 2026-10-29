@@ -586,4 +586,3 @@ def test_retry_rejects_work_branch_drift_after_formal_integration(tmp_path):
 
     assert second == 1
     assert shell_git("rev-parse", "main", cwd=project).stdout.strip() == formal_commit
-

@@ -91,4 +91,3 @@ def test_shared_delivery_cleans_worktree_only_when_owner_archives_last(tmp_path)
     assert shell_git(
         "rev-parse", "--verify", "refs/heads/work-delivery", cwd=project, check=False
     ).returncode != 0
-
