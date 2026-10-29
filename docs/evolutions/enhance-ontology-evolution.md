@@ -95,7 +95,7 @@ N/A。此次只调整 Agent 执行协议与文档能力，不改变 `wopal space
 - Pass criteria: Wopal 主流程不中断；Maka 不因单次信号立即产出提案；收尾时才汇总成熟信号，弱信号允许无提案结束。
 - Failure feedback: 提供 Wopal/Maka 的实际行为与偏差。
 
-- [ ] The user has validated the behavior above and confirmed the result.
+- [x] The user has validated/accepted the behavior and explicitly authorized upstream contribution. Current-session evidence: a reusable correction about merged-PR closeout was routed back to the owning ontology-evolution capability, audited as a workflow gap, repaired through the instant defect path, and the primary contribution task continued. This environment had no usable Maka sub-agent, so validation exercised the Skill's documented no-sub-agent fallback rather than pretending a Maka thread ran.
 
 ## Implementation
 
