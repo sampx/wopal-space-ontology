@@ -5,7 +5,7 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-10-29
-- **Stage**: implementing
+- **Stage**: validating
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: ontology-enhance-testing-practices
@@ -105,12 +105,12 @@ empty when nothing new is added; one row reads
 
 ### Agent Verification
 
-1. [ ] coding archetype 默认包含 `testing.md`，且引用解析成功。
-2. [ ] `testing.md` 明确覆盖测试价值、最低成本分层、确定性/隔离、事件同步、资源 owner、并发边界、失败路径、flaky 修复证据与性能成本。
-3. [ ] Rule 明确禁止 retry、单纯增加 timeout、弱化断言、全局串行化作为 flaky 修复手段。
-4. [ ] TypeScript/Python Rule 不再各自维护一套冲突的通用测试理论；语言规则只保留 runner/命名等技术栈特有内容。
-5. [ ] Ellamaka AGENTS 引用通用 Testing Best Practices，同时保留它已有的项目特有 Test Isolation Rules。
-6. [ ] 中英文 rule 与项目 AGENTS 语义一致，`git diff --check` 通过。
+1. [x] coding archetype 默认包含 `testing.md`，且引用解析成功。
+2. [x] `testing.md` 明确覆盖测试价值、最低成本分层、确定性/隔离、事件同步、资源 owner、并发边界、失败路径、flaky 修复证据与性能成本。
+3. [x] Rule 明确禁止 retry、单纯增加 timeout、弱化断言、全局串行化作为 flaky 修复手段。
+4. [x] TypeScript/Python Rule 不再各自维护一套冲突的通用测试理论；语言规则只保留 runner/命名等技术栈特有内容。
+5. [x] Ellamaka AGENTS 引用通用 Testing Best Practices，同时保留它已有的项目特有 Test Isolation Rules。
+6. [x] 中英文 rule 与项目 AGENTS 语义一致，`git diff --check` 通过。
 
 ### User Validation
 
