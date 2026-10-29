@@ -17,6 +17,7 @@
 | `approve <plan> --confirm` | 用户审批通过，默认创建 worktree 隔离 |
 | `approve <plan> --confirm --no-worktree` | 用户审批通过，跳过 worktree |
 | `complete <issue> [--pr]` | 实施完成，进入用户验证 |
+| `integrate <issue-or-plan> --confirm` | 将已验证的开发分支交付正式写入集成分支 |
 | `verify <issue> --confirm` | 用户验证通过 |
 | `archive <issue>` | 归档 Plan，推送 Plan 变更，同步阶段文档 |
 | `verify-switch <issue> [--yes]` | 切换到特性分支验证 |
@@ -79,7 +80,8 @@ flow.sh plan status enhance-dev-flow-resolver    # Plan 名字（歧义时）
 |------|--------------------------------------|----------|-------------------|------|
 | `submit` | `scripts/lib/plan_commit.py` `commit_and_push_plan`（commit_paths → `scripts/lib/git.py` `commit_paths`；is_commit_in_remote → `git.py` `is_commit_in_remote`；push_repo → `git.py` `push_repo`） | commit 失败：结构化诊断（command/cwd/exit/stdout/stderr）+ 分层恢复（`scripts/lib/plan_state.py` `recover_plan_after_failed_commit`）+ 非零退出；push 失败：`RESULT_PUSH_FAILED`，本地提交保留、warn 继续（既有策略） | 无后续外部 side effect；状态以 commit 为准 | 符合契约 |
 | `approve --confirm` | `scripts/commands/approve.py` `cmd_approve`（approve commit 与 rollback commit 均经 `scripts/lib/plan_commit.py` `commit_and_push_plan`）；worktree 创建经同文件 `_create_worktree` → `scripts/lib/worktree.py` `create_worktree`（双 attempt 证据在 `create_worktree` 的失败分支） | commit/worktree 失败：root failure 完整保留、rollback outcome 分层（`approve.py` `_abort_after_state_write`）；文件/index 分层恢复（`plan_state.py` `recover_plan_after_failed_commit`）；非零退出。push 失败：warn 继续（既有 #215 策略：本地提交已持久化，后续 push 同步） | Issue sync 仅在 commit 成功后；worktree 创建在 approve commit 之后 | 符合契约 |
-| `complete` | `scripts/commands/complete.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`）；Plan 字段写入：`_record_verification_commit`（Verification Commit）/ `cmd_complete`（PR 字段） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 Issue sync；已创建的 PR 身份保留（`_commit_plan_status_or_rollback` 的 preserve_pr 分支） | `cmd_complete` 的 Issue sync 块仅在 commit 成功后 | 符合契约（B-06 修复） |
+| `complete` | `scripts/commands/complete.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`）；可选 PR 路径只记录 PR 身份，不提前写 Verification Commit | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 Issue sync；已创建的 PR 身份保留（`_commit_plan_status_or_rollback` 的 preserve_pr 分支） | `cmd_complete` 的 Issue sync 块仅在 commit 成功后 | 符合契约（B-06 修复） |
+| `integrate --confirm` | `scripts/commands/integrate.py`；本地路径执行 squash / preserve-history，PR 路径通过平台合并；随后只提交 Delivery Plan 记录 | 缺确认、共享字段不一致、dirty project、Git/PR 合入失败均非零退出；正式标题只取 Plan `Commit Subject` 原值 | 成功合入后记录各成员 `Verification Commit` 与负责人 `Integration Commit` | 符合交付历史契约 |
 | `verify --confirm` | `scripts/commands/verify.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 sync/close | `cmd_verify` 的 sync/close 块仅在 commit 成功后；close 吞错见记录性结论 #1 | 符合契约 |
 | `verify-switch` | `scripts/commands/verify_switch.py` `_git_fetch`（fetch）；`_remove_worktree`（worktree remove → `_prune_worktrees` prune）；`_git_checkout`（checkout）；Plan 元数据 commit 经 `_update_plan_after_switch`（commit_paths） | 全部保留 command/cwd/exit/stderr；元数据 commit 失败：非零 + 手册指引；prune 属 janitor（rc+stderr 双查，报告后继续） | worktree removal 先于 checkout；元数据 commit 失败阻断成功返回 | 符合契约（B-04 修复） |
 | `archive` | `scripts/commands/archive.py` `archive_plan_file`（`git mv` stage）；`commit_archived_plan`（commit_paths → push_repo → is_commit_pushed，`scripts/lib/git.py`）；`cmd_archive` phase-doc commit_paths；`_cleanup_worktree` → `scripts/lib/worktree.py` `clean_worktree`（→ `delete_branch`） | stage/commit/push 失败：结构化诊断 + 非零退出；commit fallback 保留双 attempt 证据；push 绑定当前分支并在 origin 验证包含（`is_commit_pushed`）；cleanup 失败：partial + 非零 | durability（commit + push 验证）成功后才执行 Issue sync/link/labels（`cmd_archive` sync 块）、cleanup、close（`cmd_archive` close 块）；phase-doc 失败不宣称已持久化 | 已修复（B-01/B-02/B-03/B-04/W-02） |
@@ -244,14 +246,36 @@ flow.sh approve <plan> --confirm --existing-worktree <path> # 独立分支演进
 **模式选择**：
 1. **默认模式**：创建独立 feature 分支与工作树（`.worktrees/<project>-<plan-name>`），记录集成分支 HEAD 为 Base Commit。
 2. **`--no-worktree`**：直接在集成分支（main）实施，不建分支不建工作树。
-3. **`--existing-worktree <path>`**：**独立分支演进模式**。复用已有工作树路径 `<path>`，自动绑定其检出的 feature 分支写入 Plan 元数据，并将 Base Commit 记录为该分支当前最新 HEAD（上一个 Plan 的实施产物终点）。
+3. **`--existing-worktree <path>`**：**独立分支演进模式**。复用已有工作树路径 `<path>`，自动绑定其检出的 work branch。多个 Plan 可以通过同一个 `Delivery` 共用一次正式交付；成员必须复用负责人记录的 `Integration Branch`、`Work Branch`、`Delivery Base Commit`、`Integration Strategy` 和 `Commit Subject`，任一不一致都拒绝批准。
+
+有开发分支的 Plan 使用固定交付字段：`Delivery`、`Commit Subject`、`Integration Strategy`、`Integration Branch`、`Work Branch`、`Delivery Base Commit`、`Verification Commit`、`Integration Commit`。`--no-worktree` 只使用 `Verification Commit`，其余交付分支字段留空。
+
+`Commit Subject` 在 Plan 审批时随 Plan 一起冻结。冻结后只能通过用户确认的 Plan 修订改变。正式交付时，`integrate` 与 PR 合并路径都逐字使用该字段，不生成、不拼接、不改写，也不追加 Issue 编号或其他自动文本。
+
+### integrate --confirm
+
+```bash
+flow.sh integrate <issue-or-plan> --confirm
+```
+
+只用于存在开发分支的交付；`--no-worktree` 不运行此命令。参数可以是 Issue 编号、负责人 Plan 或任一成员 Plan。
+
+执行时：
+1. 找到该 Plan 的 `Delivery` 负责人，并收集所有尚未归档、`Delivery` 相同的成员。
+2. 要求所有成员都处于 `verifying`，开发工作目录无未提交改动，并逐项核对 `Integration Branch`、`Work Branch`、`Delivery Base Commit`、`Integration Strategy` 与 `Commit Subject` 一致。
+3. 将当前 work-branch HEAD 记录为各成员的 `Verification Commit`。
+4. 从共同 `Delivery Base Commit` 到当前 work branch 收集整次 Delivery 的全部改动。默认 `squash` 为正式分支的一条提交；只有 `Integration Strategy: preserve-history` 且用户明确选择时才保留开发提交。
+5. 正式提交标题直接使用 Plan 的 `Commit Subject`。PR 路径使用平台的 squash 合并时也必须使用同一标题。
+6. 把正式分支实际生成的提交记录为负责人 Plan 的 `Integration Commit`；成员随后执行 `verify --confirm` 时都校验这同一提交。
 
 ### verify --confirm [--keep-worktree]
 
 ```bash
-flow.sh verify <plan> --confirm                # 标准模式（要求已合并到集成分支）
-flow.sh verify <plan> --confirm --keep-worktree # 演进模式（跳过 merge 检查，记录 feature HEAD）
+flow.sh verify <plan> --confirm                 # 有开发分支时校验负责人记录的 Integration Commit
+flow.sh verify <plan> --confirm --keep-worktree # 归档时仍需保留共用 worktree 的成员路径
 ```
+
+`--no-worktree` 不使用 `Integration Commit`；`verify --confirm` 校验并记录用户实际查看到的 integration-branch commit 作为 `Verification Commit`。
 
 ### archive [--keep-worktree]
 
@@ -259,6 +283,8 @@ flow.sh verify <plan> --confirm --keep-worktree # 演进模式（跳过 merge �
 flow.sh archive <plan>                # 标准模式（清理 worktree 与分支）
 flow.sh archive <plan> --keep-worktree # 演进模式（保留 worktree 与分支）
 ```
+
+共享 Delivery 先归档非负责人 Plan，并对这些成员使用 `--keep-worktree`；最后归档负责人 Plan，不带 `--keep-worktree`，由正常清理一次性删除共用 work branch 和 worktree。
 
 ### complete --pr
 
@@ -285,17 +311,7 @@ flow.sh complete <issue> --pr    # PR 路径（默认不走 PR）
 flow.sh verify-switch <issue>
 ```
 
-验证通过后，合并特性分支到集成分支。**默认优先 squash 合并**（保持 main 历史干净）：
-
-```bash
-cd <repo_root>
-git checkout main
-git merge --squash <feature_branch>   # 压成单个提交
-git commit -m "feat(scope): <description> (#<issue>)"
-# 或保留历史: git merge --no-ff <feature_branch>
-```
-
-squash 合入后 verify 的 tree 相等判据原生识别已合并，无需手动干预。
+验证通过后回到正式分支，并运行 `flow.sh integrate <issue-or-plan> --confirm`。`verify-switch` 只负责切换验证位置，不再输出或要求手工 `git merge`。
 
 ### reset（破坏性）
 

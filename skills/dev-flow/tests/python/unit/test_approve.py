@@ -142,9 +142,23 @@ class TestApproveBranchDerivation(unittest.TestCase):
         """Branch handles hyphenated scope (no split ambiguity)."""
         from commands.approve import _derive_branch
         self.assertEqual(
-            _derive_branch("wopal-space-ontology", "42-feature-dev-flow-decouple-naming"),
-            "wopal-space-ontology-42-feature-dev-flow-decouple-naming",
+            _derive_branch("ontology", "42-feature-dev-flow-decouple-naming"),
+            "ontology-42-feature-dev-flow-decouple-naming",
         )
+
+    def test_long_branch_truncates_only_plan_tail_with_stable_checksum(self):
+        """Generated work branches stay <=55 chars without shortening project."""
+        from commands.approve import _derive_branch
+
+        project = "long-project-name-for-delivery"
+        plan = "123-refactor-very-long-existing-plan-name-that-needs-bounding"
+        first = _derive_branch(project, plan)
+        second = _derive_branch(project, plan)
+
+        self.assertLessEqual(len(first), 55)
+        self.assertTrue(first.startswith(project + "-"))
+        self.assertRegex(first, r"-[0-9a-f]{4}$")
+        self.assertEqual(first, second)
 
 
 class TestRegisterApproveParser(unittest.TestCase):
@@ -256,11 +270,14 @@ FIXTURE_PLAN = (
     / "fixtures" / "plans" / "106-fix-dev-flow-valid-issue-plan.md"
 )
 
-# templates/plan.md metadata line; fixture 106 predates it, so the derived
-# input inserts it verbatim after Status (documented derivation — the rest of
-# the recorded sample stays untouched).
+# Fixture 106 predates the formal Delivery contract, so the derived input adds
+# the human-authored subject/strategy needed before approve.
 BASE_COMMIT_PLACEHOLDER = (
     "- **Base Commit**: (approve 时自动记录实施基线,集成分支 HEAD)"
+)
+DELIVERY_AUTHORING_FIELDS = (
+    "- **Commit Subject**: fix(ontology): validate approve delivery\n"
+    "- **Integration Strategy**: squash"
 )
 
 PLAN_NAME = "106-fix-dev-flow-valid-issue-plan"
@@ -306,7 +323,7 @@ def _make_workspace(tmp_path, status="reviewing", create_project=True):
 
     plan_text = FIXTURE_PLAN.read_text().replace(
         "- **Status**: planning",
-        f"- **Status**: {status}\n{BASE_COMMIT_PLACEHOLDER}",
+        f"- **Status**: {status}\n{BASE_COMMIT_PLACEHOLDER}\n{DELIVERY_AUTHORING_FIELDS}",
     )
     plan = ws / PLAN_REL
     plan.parent.mkdir(parents=True)
@@ -374,19 +391,15 @@ class TestApproveRollback:
     """Failure after state fields are written rolls the Plan back to the
     pre-approval field shape (proposal D-07)."""
 
-    @pytest.mark.parametrize("failure", ["blocking-file", "missing-project"])
-    def test_worktree_failure_rolls_back_plan_fields(self, tmp_path, failure):
-        ws, plan = _make_workspace(
-            tmp_path, create_project=(failure != "missing-project")
-        )
+    def test_worktree_failure_rolls_back_plan_fields(self, tmp_path):
+        ws, plan = _make_workspace(tmp_path)
         original = plan.read_text()
 
-        if failure == "blocking-file":
-            # A file on the worktree path makes `git worktree add` fail (the
-            # approve-probe failure shape).
-            blocked = ws / ".worktrees" / WORKTREE_BRANCH
-            blocked.parent.mkdir(parents=True)
-            blocked.write_text("")
+        # A file on the worktree path makes `git worktree add` fail (the
+        # approve-probe failure shape).
+        blocked = ws / ".worktrees" / WORKTREE_BRANCH
+        blocked.parent.mkdir(parents=True)
+        blocked.write_text("")
 
         result, log_error = _run_approve(ws)
 
@@ -405,6 +418,17 @@ class TestApproveRollback:
         assert "已回滚" in text
         assert "未进入 executing" in text
         assert "reviewing" in text
+
+    def test_missing_project_rejects_before_state_write(self, tmp_path):
+        ws, plan = _make_workspace(tmp_path, create_project=False)
+        original = plan.read_text()
+        head_before = _git("rev-parse", "HEAD", cwd=ws).stdout.strip()
+
+        result, _ = _run_approve(ws)
+
+        assert result == 1
+        assert plan.read_text() == original
+        assert _git("rev-parse", "HEAD", cwd=ws).stdout.strip() == head_before
 
     def test_retry_after_worktree_failure_succeeds(self, tmp_path):
         """A failed approve leaves the Plan retryable (exit 1 + rollback)."""
@@ -482,34 +506,38 @@ class TestApproveSuccessArtifacts:
         assert result == 0
         status_sync.assert_called_once_with(106, "executing", "test/space")
 
-    """Successful approve: the state-transition commit carries the real Base
-    Commit and no uncommitted residue remains (proposal D-08)."""
+    """Successful approve records the new Delivery identity without residue."""
 
     @pytest.mark.parametrize(
         "status,no_worktree",
         [("planning", True), ("reviewing", True), ("reviewing", False)],
     )
-    def test_commit_contains_real_base_commit(self, tmp_path, status, no_worktree):
+    def test_commit_contains_delivery_metadata(self, tmp_path, status, no_worktree):
         ws, plan = _make_workspace(tmp_path, status=status)
 
         result, _ = _run_approve(ws, no_worktree=no_worktree)
 
         assert result == 0
-        main_head = _git(
-            "rev-parse", "main", cwd=ws / "projects" / "ontology"
-        ).stdout.strip()
         committed = _git("show", f"HEAD:{PLAN_REL}", cwd=ws).stdout
-        assert f"- **Base Commit**: {main_head}" in committed
         assert "- **Status**: executing" in committed
         assert _git("status", "--porcelain", "--", PLAN_REL, cwd=ws).stdout == ""
         if no_worktree:
             assert "- **Worktree**" not in committed
+            assert "- **Work Branch**: (none)" in committed
+            assert "- **Delivery Base Commit**: (none)" in committed
+            assert "- **Integration Commit**: (none)" in committed
+            assert _git("branch", "--format=%(refname:short)", cwd=ws / "projects" / "ontology").stdout.splitlines() == ["main"]
         else:
+            main_head = _git(
+                "rev-parse", "main", cwd=ws / "projects" / "ontology"
+            ).stdout.strip()
+            assert f"- **Delivery Base Commit**: {main_head}" in committed
+            assert f"- **Work Branch**: {WORKTREE_BRANCH}" in committed
             assert f"  - branch: {WORKTREE_BRANCH}" in committed
             assert (ws / ".worktrees" / WORKTREE_BRANCH).is_dir()
 
-    def test_existing_worktree_commit_contains_worktree_branch_head(self, tmp_path):
-        """--existing-worktree: Base Commit = that worktree's branch HEAD."""
+    def test_existing_worktree_records_common_delivery_base(self, tmp_path):
+        """Existing worktree owner records the branch fork point, not work tip."""
         ws, plan = _make_workspace(tmp_path)
         project = ws / "projects" / "ontology"
 
@@ -520,6 +548,7 @@ class TestApproveSuccessArtifacts:
         _git("add", "work.txt", cwd=wt)
         _git("commit", "-m", "existing evolution work", cwd=wt)
         wt_head = _git("rev-parse", "HEAD", cwd=wt).stdout.strip()
+        main_head = _git("rev-parse", "main", cwd=project).stdout.strip()
 
         result, _ = _run_approve(
             ws, existing_worktree=".worktrees/ontology-existing-evo"
@@ -527,10 +556,158 @@ class TestApproveSuccessArtifacts:
 
         assert result == 0
         committed = _git("show", f"HEAD:{PLAN_REL}", cwd=ws).stdout
-        assert f"- **Base Commit**: {wt_head}" in committed
+        assert wt_head != main_head
+        assert f"- **Delivery Base Commit**: {main_head}" in committed
+        assert "- **Work Branch**: ontology-existing-evo" in committed
         assert "  - branch: ontology-existing-evo" in committed
         assert "- **Status**: executing" in committed
         assert _git("status", "--porcelain", "--", PLAN_REL, cwd=ws).stdout == ""
+
+    @pytest.mark.parametrize(
+        "field,bad_value",
+        [
+            ("Commit Subject", "feat(ontology): different member subject"),
+            ("Integration Strategy", "preserve-history"),
+            ("Integration Branch", "release"),
+            ("Work Branch", "other-work-branch"),
+            ("Delivery Base Commit", "deadbeef"),
+        ],
+    )
+    def test_existing_worktree_shared_delivery_rejects_field_mismatch(
+        self, tmp_path, field, bad_value
+    ):
+        """Each frozen Shared Delivery field is an independent approve gate."""
+        ws, plan = _make_workspace(tmp_path)
+        project = ws / "projects" / "ontology"
+        wt = ws / ".worktrees" / "ontology-existing-evo"
+        wt.parent.mkdir(parents=True)
+        _git("worktree", "add", "-b", "ontology-existing-evo", str(wt), cwd=project)
+        main_head = _git("rev-parse", "main", cwd=project).stdout.strip()
+
+        owner_name = "feature-owner"
+        owner = plan.parent / f"{owner_name}.md"
+        owner.write_text(
+            f"# {owner_name}\n\n## Metadata\n\n"
+            "- **Status**: executing\n"
+            "- **Target Project**: ontology\n"
+            "- **Project Path**: projects/ontology\n"
+            f"- **Delivery**: {owner_name}\n"
+            "- **Commit Subject**: feat(ontology): shared owner subject\n"
+            "- **Integration Strategy**: squash\n"
+            "- **Integration Branch**: main\n"
+            "- **Work Branch**: ontology-existing-evo\n"
+            f"- **Delivery Base Commit**: {main_head}\n"
+        )
+        _git("add", str(owner.relative_to(ws)), cwd=ws)
+        _git("commit", "-m", "add owner plan", cwd=ws)
+
+        from plan import set_plan_field
+        assert set_plan_field(str(plan), "Delivery", owner_name)
+        expected = {
+            "Commit Subject": "feat(ontology): shared owner subject",
+            "Integration Strategy": "squash",
+            "Integration Branch": "main",
+            "Work Branch": "ontology-existing-evo",
+            "Delivery Base Commit": main_head,
+        }
+        for name, value in expected.items():
+            assert set_plan_field(str(plan), name, bad_value if name == field else value)
+        _git("add", PLAN_REL, cwd=ws)
+        _git("commit", "-m", "prepare shared member", cwd=ws)
+        head_before = _git("rev-parse", "HEAD", cwd=ws).stdout.strip()
+
+        result, _ = _run_approve(
+            ws, existing_worktree=".worktrees/ontology-existing-evo"
+        )
+
+        assert result == 1
+        assert "- **Status**: reviewing" in plan.read_text()
+        assert _git("rev-parse", "HEAD", cwd=ws).stdout.strip() == head_before
+
+    def test_existing_worktree_shared_delivery_rejects_actual_branch_mismatch(self, tmp_path):
+        """The existing worktree itself must be on the shared Work Branch."""
+        ws, plan = _make_workspace(tmp_path)
+        project = ws / "projects" / "ontology"
+        owner_wt = ws / ".worktrees" / "ontology-owner-evo"
+        other_wt = ws / ".worktrees" / "ontology-other-evo"
+        owner_wt.parent.mkdir(parents=True)
+        _git("worktree", "add", "-b", "ontology-owner-evo", str(owner_wt), cwd=project)
+        _git("worktree", "add", "-b", "ontology-other-evo", str(other_wt), cwd=project)
+        main_head = _git("rev-parse", "main", cwd=project).stdout.strip()
+        owner_name = "feature-owner"
+        owner = plan.parent / f"{owner_name}.md"
+        owner.write_text(
+            f"# {owner_name}\n\n## Metadata\n\n"
+            "- **Status**: executing\n"
+            "- **Target Project**: ontology\n"
+            "- **Project Path**: projects/ontology\n"
+            f"- **Delivery**: {owner_name}\n"
+            "- **Commit Subject**: feat(ontology): shared owner subject\n"
+            "- **Integration Strategy**: squash\n"
+            "- **Integration Branch**: main\n"
+            "- **Work Branch**: ontology-owner-evo\n"
+            f"- **Delivery Base Commit**: {main_head}\n"
+        )
+        _git("add", str(owner.relative_to(ws)), cwd=ws)
+        _git("commit", "-m", "add owner plan", cwd=ws)
+
+        from plan import set_plan_field
+        assert set_plan_field(str(plan), "Delivery", owner_name)
+        assert set_plan_field(str(plan), "Commit Subject", "feat(ontology): shared owner subject")
+        assert set_plan_field(str(plan), "Integration Strategy", "squash")
+        _git("add", PLAN_REL, cwd=ws)
+        _git("commit", "-m", "prepare shared member", cwd=ws)
+        head_before = _git("rev-parse", "HEAD", cwd=ws).stdout.strip()
+
+        result, _ = _run_approve(
+            ws, existing_worktree=".worktrees/ontology-other-evo"
+        )
+
+        assert result == 1
+        assert "- **Status**: reviewing" in plan.read_text()
+        assert _git("rev-parse", "HEAD", cwd=ws).stdout.strip() == head_before
+
+    def test_existing_worktree_cannot_join_delivery_after_formal_integration(self, tmp_path):
+        """An Integration Commit closes Shared Delivery membership."""
+        ws, plan = _make_workspace(tmp_path)
+        project = ws / "projects" / "ontology"
+        wt = ws / ".worktrees" / "ontology-existing-evo"
+        wt.parent.mkdir(parents=True)
+        _git("worktree", "add", "-b", "ontology-existing-evo", str(wt), cwd=project)
+        main_head = _git("rev-parse", "main", cwd=project).stdout.strip()
+        owner_name = "feature-owner"
+        owner = plan.parent / f"{owner_name}.md"
+        owner.write_text(
+            f"# {owner_name}\n\n## Metadata\n\n"
+            "- **Status**: verifying\n"
+            "- **Target Project**: ontology\n"
+            "- **Project Path**: projects/ontology\n"
+            f"- **Delivery**: {owner_name}\n"
+            "- **Commit Subject**: feat(ontology): shared owner subject\n"
+            "- **Integration Strategy**: squash\n"
+            "- **Integration Branch**: main\n"
+            "- **Work Branch**: ontology-existing-evo\n"
+            f"- **Delivery Base Commit**: {main_head}\n"
+            f"- **Integration Commit**: {main_head}\n"
+        )
+        _git("add", str(owner.relative_to(ws)), cwd=ws)
+        _git("commit", "-m", "add integrated owner plan", cwd=ws)
+
+        from plan import set_plan_field
+        assert set_plan_field(str(plan), "Delivery", owner_name)
+        assert set_plan_field(str(plan), "Commit Subject", "feat(ontology): shared owner subject")
+        assert set_plan_field(str(plan), "Integration Strategy", "squash")
+        _git("add", PLAN_REL, cwd=ws)
+        _git("commit", "-m", "prepare late shared member", cwd=ws)
+        head_before = _git("rev-parse", "HEAD", cwd=ws).stdout.strip()
+
+        result, _ = _run_approve(
+            ws, existing_worktree=".worktrees/ontology-existing-evo"
+        )
+
+        assert result == 1
+        assert "- **Status**: reviewing" in plan.read_text()
+        assert _git("rev-parse", "HEAD", cwd=ws).stdout.strip() == head_before
 
 
 class TestApproveRootCauseLayering:

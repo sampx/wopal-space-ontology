@@ -335,6 +335,40 @@ def _cleanup_worktree(
     return removed and branch_status != "failed"
 
 
+def _delivery_id(plan_path: str) -> str:
+    value = get_plan_field(plan_path, "Delivery")
+    if not isinstance(value, str):
+        value = ""
+    value = value.strip()
+    if (
+        not value
+        or value in {"(none)", "none", "N/A"}
+        or (value.startswith("<") and value.endswith(">"))
+    ):
+        return Path(plan_path).stem
+    return value
+
+
+def _active_delivery_members(
+    workspace_root: Path, delivery: str, current_plan: Path
+) -> list[Path]:
+    """Return other unarchived Plans that still belong to this Delivery."""
+    plans_root = workspace_root / ".wopal-space" / "plans"
+    if not plans_root.exists():
+        return []
+    members: list[Path] = []
+    current_resolved = current_plan.resolve()
+    for candidate in plans_root.rglob("*.md"):
+        if "done" in candidate.relative_to(plans_root).parts:
+            continue
+        if candidate.resolve() == current_resolved:
+            continue
+        candidate_delivery = _delivery_id(str(candidate))
+        if candidate.stem == delivery or candidate_delivery == delivery:
+            members.append(candidate)
+    return sorted(members)
+
+
 # ============================================
 # Archive Plan File
 # ============================================
@@ -717,6 +751,25 @@ def cmd_archive(args: argparse.Namespace) -> int:
     plan_issue = get_plan_issue(plan_path)
     plan_name = Path(plan_path).stem  # Extract plan name for commit message
     repo = resolve_space_repo(plan_issue, workspace_root)
+    keep_worktree = getattr(args, "keep_worktree", False)
+
+    delivery = _delivery_id(plan_path)
+    delivery_members = _active_delivery_members(
+        workspace_root, delivery, Path(plan_path)
+    )
+    is_delivery_owner = delivery == plan_name
+    if is_delivery_owner and delivery_members:
+        log_error(
+            "Delivery owner must be archived last; active members remain: "
+            + ", ".join(member.stem for member in delivery_members)
+        )
+        return 1
+    if not is_delivery_owner and not keep_worktree:
+        log_error(
+            "Shared Delivery member must be archived with --keep-worktree; "
+            f"owner '{delivery}' performs the final branch/worktree cleanup"
+        )
+        return 1
 
     if plan_issue and not repo:
         log_warn(f"Cannot resolve space repo for Issue #{plan_issue}; skipping Issue sync")
@@ -734,8 +787,6 @@ def cmd_archive(args: argparse.Namespace) -> int:
     #    aborts before any mutation.
     worktree_handled = False
     cleanup_target = None  # (project_path, branch, resolved wt_path)
-    keep_worktree = getattr(args, "keep_worktree", False)
-
     if keep_worktree:
         log_info("Evolution mode (--keep-worktree): skipping worktree and branch cleanup")
     elif project:

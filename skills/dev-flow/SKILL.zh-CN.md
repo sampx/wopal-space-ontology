@@ -58,7 +58,7 @@ description: >
 
 标准链路：
 
-`plan new → submit → approve --confirm → implementation/review → complete → user validation → verify --confirm → archive`
+`plan new → submit → approve --confirm → implementation/review → complete → user validation → integrate（有开发分支时）→ verify --confirm → archive`
 
 状态机：
 
@@ -99,11 +99,37 @@ flow.sh approve <plan> --confirm [mode-flags]
 
 | 模式 | 适用情况 | 命令 |
 |---|---|---|
-| 标准隔离（默认） | 正常开发 | `approve --confirm` |
-| 主干直实施 | 用户明确要求不建 worktree | `approve --confirm --no-worktree` |
-| 既有分支继续演进 | 用户要求复用已有 worktree/feature 分支 | `approve --confirm --existing-worktree <path>` |
+| 标准隔离（默认） | 正常开发。脚本创建开发分支和额外 worktree；开发中的逐条提交留在开发分支，正式集成默认压成一条提交 | `approve --confirm` |
+| 主干直实施 | 用户明确要求不建 worktree。直接在正式分支实施，不创建开发分支，不走 `integrate`，也不做 squash | `approve --confirm --no-worktree` |
+| 既有分支继续演进 | 用户要求复用已有 worktree/feature 分支；多个 Plan 可以明确归入同一个 Delivery，共用一次正式集成 | `approve --confirm --existing-worktree <path>` |
 
-`--no-worktree` 与 `--existing-worktree` 语义不同，不能互相替代。演进模式收尾使用 `--keep-worktree`。详细行为见 `references/commands.md`。
+`--no-worktree` 与 `--existing-worktree` 语义不同，不能互相替代。`--keep-worktree` 只用于归档后仍需保留开发目录的场景；共享 Delivery 的中间成员需要保留，负责人最后归档时按正常流程清理。详细行为见 `references/commands.md`。
+
+### 一次正式交付与提交记录
+
+有开发分支的模式把“开发过程”和“正式交付”分开记录：开发分支可以保留多条工作、评审修复和验证修复提交；正式分支默认只增加一条总结这次交付结果的提交。正常归档后，开发分支和额外 worktree 会被删除，所以这些逐条开发记录只保证保留到归档前。
+
+Plan 用以下固定字段描述这次交付：
+
+| 字段 | 含义 |
+|---|---|
+| `Delivery` | 一次正式交付的编号。单 Plan 由自己负责；多个 Plan 共用交付时，都填写负责人 Plan 名称。 |
+| `Commit Subject` | 正式分支上交付提交的标题。共享 Delivery 的所有 Plan 必须完全一致。 |
+| `Integration Strategy` | 正式集成方式。默认 `squash`，即把开发分支上的多条提交压成正式分支的一条；只有用户在集成前明确选择时才用 `preserve-history` 保留多条提交。 |
+| `Integration Branch` | 接收最终改动的正式分支，例如 `main`。 |
+| `Work Branch` | 保存开发过程中各条提交的开发分支。新建分支最长 55 个字符；超长时只截短 Plan 名称部分，并追加由完整名称算出的稳定四位校验码。 |
+| `Delivery Base Commit` | 本次交付开始前，正式分支上的共同起点。共享 Delivery 的所有 Plan 必须一致。 |
+| `Verification Commit` | 用户实际检查过的提交。有开发分支时指开发分支提交；`--no-worktree` 时指正式分支上用户检查到的提交。 |
+| `Integration Commit` | 有开发分支时，正式分支最终生成的交付提交。共享 Delivery 只由负责人 Plan 记录一次，成员 Plan 读取同一记录；`--no-worktree` 不使用此字段。 |
+
+`Commit Subject` 的权责链固定为四步：
+
+1. **起草**：写 Plan 的人必须在开发开始前填好，按 `type(scope): result` 说明最终做成了什么；Issue 标题只能作为参考，不能代替 Plan 字段。
+2. **冻结**：用户执行 `approve --confirm` 批准 Plan 时，标题随 Plan 一起确认并冻结。
+3. **变更**：冻结后只有用户要求修改已批准 Plan 时才能改标题；改完必须重新取得用户确认。
+4. **使用**：`integrate` 只读取 Plan 里的 `Commit Subject` 原样使用，不生成、不拼接、不改写，也不追加自动文字。走 PR 时，正式合并标题也必须与该字段逐字相同。
+
+多个 `--existing-worktree` Plan 可以共用一次 Delivery。第一个获批的 Plan 是负责人，记录共同的正式分支、开发分支、共同起点、集成方式和提交标题；后续成员必须填写同一个 `Delivery`，并复用这些记录。任何一项不一致，`approve` 都应拒绝。正式集成只做一次；从任一成员启动 `integrate` 时，都必须查齐同一 Delivery 中尚未归档的成员，并把共同起点之后的全部改动一起处理。
 
 ## Executing：实施、验收、评审、Agent Verification
 
@@ -184,31 +210,37 @@ flow.sh complete <plan>
 
 | 场景 | 流程 |
 |---|---|
-| worktree 可直接运行 | 用户在 worktree 验证 → 合并 → `verify --confirm` |
-| 必须在规范路径运行 | `verify-switch` → 用户验证 → 合并 → `verify --confirm` |
-| 用户明确选择先合并再验证 | 合并 → 用户在集成分支验证 → `verify --confirm` |
-| `--no-worktree` | 用户直接在集成分支验证 → `verify --confirm` |
-| `--existing-worktree` 演进模式 | 用户在保留 worktree 验证 → `verify --confirm --keep-worktree` |
+| 标准隔离，worktree 可直接运行 | 用户在开发 worktree 验证 → `integrate <issue-or-plan> --confirm` → `verify --confirm` |
+| 标准隔离，必须在规范路径运行 | `verify-switch` → 用户在开发分支验证 → 回到正式分支 → `integrate <issue-or-plan> --confirm` → `verify --confirm` |
+| 用户明确选择先集成再验证 | `integrate <issue-or-plan> --confirm` → 用户在正式分支验证 → `verify --confirm` |
+| `--no-worktree` | 用户直接在正式分支验证 → `verify --confirm`；不运行 `integrate` |
+| 共享 Delivery | 用户完成整组 Plan 的验证 → 只运行一次 `integrate <任一成员> --confirm` → 每个成员分别 `verify --confirm` |
 
-默认先验证再合并；“先合并再验证”必须由用户明确选择。
+默认先验证再集成；“先集成再验证”必须由用户明确选择。`integrate --confirm` 表示用户明确同意把已验证的开发分支内容写入正式分支。命令执行时记录开发分支当前提交为各成员的 `Verification Commit`；默认 `squash` 后，把正式分支生成的交付提交记为负责人 Plan 的 `Integration Commit`。后续每个成员执行 `verify --confirm` 时，都检查这同一条正式交付提交，不能把正式分支后来出现的其他提交当成本次交付。
+
+`preserve-history` 只是明确例外：只有 `Integration Strategy` 已写明 `preserve-history`，并且用户在集成前明确选择保留开发历史时，正式分支才保留多条开发提交。默认流程不能退回普通 `git merge`，因为那会把中间开发提交或额外 merge commit 带进正式分支。
 
 验证期间需要返工时仍遵守上一节的冲突规则：能在现有 DESIGN + Plan 内解决，由主控者决定返工；需要改 Plan 或设计，先让用户确认。
 
-用户明确确认验证通过并授权相应收尾后，按所选模式完成合并并执行：
+用户明确确认验证通过并授权相应收尾后，按所选模式完成正式集成，并执行：
 
 ```bash
 flow.sh verify <plan> --confirm [--keep-worktree]
 flow.sh archive <plan> [--keep-worktree]
 ```
 
+共享 Delivery 的成员必须等同组全部 Plan 都完成正式集成和 `verify --confirm` 后再归档。先归档非负责人 Plan，并使用 `--keep-worktree` 保留共用开发分支和 worktree；最后归档负责人 Plan，不加 `--keep-worktree`，由正常归档流程统一删除共用开发分支和 worktree。
+
 ## 分支与 worktree 边界
 
 分支和 worktree 的创建/删除由 dev-flow 脚本管理：
 
 - `approve` 创建或绑定；
-- `verify-switch` / `archive` 负责移除；
+- `verify-switch` 只负责让用户在规范路径查看开发分支，不负责正式合入；
+- 有开发分支时，`integrate` 负责把已验证内容写入正式分支；执行者不要手动运行普通 `git merge`；
+- `archive` 负责正常清理开发分支和 worktree；共享 Delivery 只在负责人最后归档时清理一次；
 - 主控者不要手动创建、删除 feature 分支或 worktree；
-- 标准模式下，主控者唯一需要手工做的分支动作是用户授权后的 feature → integration 合并；默认优先 squash，用户明确要求保留历史时再使用 `--no-ff`。
+- `--no-worktree` 从一开始就在正式分支实施，没有开发分支，也没有 `integrate` 或归档清理开发分支这一步。
 
 不要加载其他 worktree 管理技能去接管 dev-flow 已经管理的 worktree。
 
@@ -220,7 +252,8 @@ flow.sh archive <plan> [--keep-worktree]
 | 修改已批准 Plan 实质内容 | 明确确认具体 Plan 修订 |
 | 修改 DESIGN | 明确确认设计目标/设计修订 |
 | 用户验证结果 | 用户明确确认验证通过或指出失败 |
-| merge / `verify --confirm` | 按当前验证方案取得明确授权 |
+| `integrate --confirm` | 有开发分支时，用户明确同意把本次 Delivery 写入正式分支 |
+| `verify --confirm` | 用户明确确认对应 Plan 的验证结果并授权状态推进 |
 | `reset` | 用户明确要求重置 |
 
 不要把“提交吧”之类单一指令扩展解释成整个收尾流程的授权。

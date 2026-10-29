@@ -10,10 +10,10 @@
 | `Done completion failed` | 勾选所有 Task Done checkbox |
 | `Agent Verification failed` | 补齐 Agent Verification checkbox |
 | `dirty workspace` | 清理/提交 或使用 worktree 隔离 |
-| `PR not merged yet` | 等 merge 后再 `verify --confirm` |
+| `PR not merged yet` | 用户验证后运行 `flow.sh integrate <plan> --confirm`，由 integrate 完成正式 PR 合入 |
 | `User Validation gate failed` | 让用户完成验证并勾选最终 checkbox |
-| `Feature branch not yet merged`（squash 后仍报错） | 确认合并方式：tree 相等判据已自动识别 squash/ff/--no-ff。若仍报错,检查 Plan `Verification Commit` 字段是否残留旧 SHA(错误 fill 或 stale),删掉该字段后重试 |
-| `Feature branch not yet merged`（main 在 feature 分叉后前进过） | 集成分支在 feature 分叉后合入了并行提交时，整树相等判据（L2）必然失效——main tree 含并行提交内容，即使 squash 已正确完成。此时使用**变更集判据**（L2.5）：feature 相对 merge-base 的每个变更路径与集成分支逐一比对，全部一致即判定已合入。若仍报错，检查 feature 是否真的合入（`git diff --quiet main <feature> -- <path>` 逐路径验证）；确认已合入后可在 Plan 补写 `Verification Commit`（squash commit SHA）重试 |
+| `Integration Commit is missing` | 本次 Delivery 尚未正式集成；完成用户验证后运行 `flow.sh integrate <plan> --confirm` |
+| `Recorded Integration Commit ... is not on ...` | Plan 记录与正式分支不一致；先检查负责人 Plan 的 `Integration Commit` / `Integration Branch`，不要用当前 HEAD 代替本次交付提交 |
 
 ## 边缘场景
 
@@ -22,27 +22,18 @@
 3. `complete` 时 Agent Verification 未完成 — 先补齐
 4. 实施评审未 PASS 时执行 complete — 停止，修复后按 `df-implement-review` 复审
 5. 评审预算耗尽仍未 PASS — 保留未解决 finding，交给用户决定下一步
-6. PR 未 merge 时 `verify --confirm` — 等 merge
+6. PR 尚未正式合入时 `verify --confirm` — 先运行 `integrate --confirm`
 7. 目标项目工作区不干净 — 清理或使用 worktree 隔离
 8. 参数选择：Issue 驱动传 issue number，无 Issue 传 plan-name
-9. **squash 合并后 verify 通过** — 默认支持。squash 的 feature tip 不是 main
-   祖先，但 tree 相等判据（L2）会识别已合并。合并后 feature 分支保留到
-   archive 才删除，verify 期间不要手动删分支
-10. **实施基线可追溯** — approve 记录 `Base Commit`（集成分支 HEAD），
-    verify 记录 `Final Commit`（合入后 HEAD）。两字段对照可确定 feature
-    影响范围，revert 时用 `git diff Base..Final` 查看完整变更
-11. **main 前进 + squash 合并** — feature 从旧 main 分叉且 main 在开发期间
-    合入过并行提交时，L2 整树判据失效；变更集判据（L2.5）逐路径比对自动
-    识别。`Verification Commit` 字段在 complete 时写入（feature tip SHA），
-    若分支不在空间仓库（verify-switch 后），complete 会回退到项目仓库解析，
-    仍失败则显式告警并靠 L2/L2.5 兜底
-12. **`Verification Commit` 字段缺失** — complete 已自动写入（含跨仓库回退）。
-    历史 plan 缺失时可在 verify 前手工补写 squash commit SHA 跳过 L2/L2.5
+9. **squash 后 verify 仍精确** — `integrate` 记录用户实际验证过的 work-branch SHA 为 `Verification Commit`，并把正式分支生成的提交记录为负责人 Plan 的 `Integration Commit`；verify 校验这条固定提交，不依赖当前 main HEAD。
+10. **实施基线可追溯** — `Delivery Base Commit` 是交付开始前的正式分支提交；`Verification Commit` 是用户实际检查的开发提交；`Integration Commit` 是正式交付提交。三者职责不要混用。
+11. **main 在开发期间前进** — 默认 squash 仍只增加一条本次 Delivery 提交；verify 读取负责人 Plan 的固定 `Integration Commit`，正式分支后来出现的其他提交不会被误认成本次交付。
+12. **历史 Plan** — 缺少新 Delivery 字段的存量 Plan 仍保留旧 merge 检测兼容路径；新 Plan 只使用新的 Verification/Integration Commit 语义。
 
 ## PR 工作流（可选）
 
 默认不走 PR。仅当仓库要求 PR 合并或需要 CI/branch protection 时使用：
 
 ```text
-complete --pr → PR opened → PR merged → verify --confirm → archive
+complete --pr → PR opened → user validation → integrate --confirm → verify --confirm → archive
 ```
