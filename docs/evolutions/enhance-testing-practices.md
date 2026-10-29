@@ -148,9 +148,9 @@ behavior unit, independently testable.
 **Verify**: 检查 frontmatter、assembly 引用与 `git diff --check`。
 
 **Done**:
-Task output: pending
-Files touched: pending
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 新增跨语言 Testing Best Practices rule 的中英文版本，并声明为 coding type-default capability。
+Files touched: `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md`, `assembly/archetypes/coding.yaml`, `docs/evolutions/enhance-testing-practices.md`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ### Task 2: Remove duplicated language-level policy and reference it from Ellamaka
 
