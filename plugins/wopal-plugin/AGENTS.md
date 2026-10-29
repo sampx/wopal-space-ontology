@@ -171,6 +171,7 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 
 ## 5. Testing
 
+- Plugin behavior changes that meet the canonical `rules/testing.md` TDD applicability criteria must use TDD; keep the failing assertion at the observable plugin boundary instead of testing private implementation structure.
 - New modules must have `*.test.ts` covering main paths and edge cases
 - Code style: TypeScript ESM, `.js` extension imports; Vitest framework, tests co-located with source
 

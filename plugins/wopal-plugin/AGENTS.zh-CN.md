@@ -171,6 +171,7 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 
 ## 5. 测试
 
+- 插件行为变更只要满足 canonical `rules/testing.md` 的 TDD 适用条件，就必须使用 TDD；失败断言放在可观察的插件行为边界，不测试私有实现结构。
 - 新增模块必须有 `*.test.ts`，覆盖主路径和边界条件
 - 代码风格：TypeScript ESM，`.js` 后缀导入；Vitest 框架，测试与源文件同目录
 

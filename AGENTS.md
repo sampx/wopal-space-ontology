@@ -82,7 +82,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 
 ## Testing
 
-- General test design and TDD decisions follow the assembled `rules/testing.md` (**Testing Best Practices**). Repository/package rules add only local runners, fixtures, helpers, or host/protocol constraints.
+- General test design and TDD decisions follow the assembled `rules/testing.md` (**Testing Best Practices**). Repository/package rules must keep that inheritance visible to the agent; they may name local behavior boundaries where TDD is required and add local runners, fixtures, helpers, or host/protocol constraints, but must not redefine the general RED/GREEN decision semantics.
 - After any declarative content change, remind the user to restart ellamaka for verification. Do not commit frequently before verification passes.
 
 ## Code Review Rules

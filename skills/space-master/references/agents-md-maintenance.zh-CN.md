@@ -217,7 +217,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 - [ ] 适用时已先生成偏好语言版本
 - [ ] 强制文档是引用而非复制
 - [ ] 没有从 `BUSINESS_RULES.md` 抽取规则写进正文
-- [ ] Testing 章节遵循空间的 canonical testing rule，不重复通用 TDD/测试理论；这里只记录项目特有命令、分层、fixture/helper、runner 注册和宿主/人工验证边界
+- [ ] Testing 章节显式继承空间的 canonical testing/TDD rule；可以写明项目特有的 TDD 行为边界，但不重复通用 RED/GREEN 判定理论；项目特有命令、分层、fixture/helper、runner 注册和宿主/人工验证边界继续写清楚
 - [ ] 偏好语言版本的标题与英文模板一致
 - [ ] `User-Supplied Rules` 未变：无增、无改、无删、无重排，原始规范迁移除外
 - [ ] 未过时的原规则都保留；删除的在方案中有理由

@@ -110,7 +110,7 @@ Never execute follow-up tasks before compaction completes.
 
 #### Testing
 
-Coding spaces use the assembled `testing.md` rule as the canonical owner of general testing principles and TDD decision semantics. Project and directory specs inherit that rule and add only genuinely local runners, fixtures/helpers, host/protocol constraints, and verification entry points. Work that does not benefit from a RED cycle still requires risk-appropriate automated or observable verification as defined by `testing.md`.
+Coding spaces use the assembled `testing.md` rule as the canonical owner of general testing principles and TDD decision semantics. Project and directory specs must make that inheritance explicit so an agent working under a nested `AGENTS.md` still sees that TDD applies; they may name local behavior boundaries where TDD is required and add genuinely local runners, fixtures/helpers, host/protocol constraints, and verification entry points, but must not redefine the general RED/GREEN decision semantics. Work that does not benefit from a RED cycle still requires risk-appropriate automated or observable verification as defined by `testing.md`.
 
 #### Project Workflow
 

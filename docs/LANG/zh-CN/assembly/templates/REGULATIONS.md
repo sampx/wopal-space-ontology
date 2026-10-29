@@ -110,7 +110,7 @@
 
 #### Testing
 
-coding 空间的通用测试原则与 TDD 判定统一由装配的 `testing.md` 规则拥有。项目/目录规范继承该规则，只补充真正特有的 runner、fixture/helper、宿主/协议约束与验证入口；不适合 RED→GREEN 的改动仍必须按 `testing.md` 提供与风险匹配的自动化或可观察验证。
+coding 空间的通用测试原则与 TDD 判定统一由装配的 `testing.md` 规则拥有。项目/目录规范必须显式写明这层继承关系，确保 Agent 进入更深层 `AGENTS.md` 后仍能看到 TDD 要求；可以写明本地哪些行为边界必须使用 TDD，并补充真正特有的 runner、fixture/helper、宿主/协议约束与验证入口，但不得另写一套通用 RED/GREEN 判定语义。不适合 RED→GREEN 的改动仍必须按 `testing.md` 提供与风险匹配的自动化或可观察验证。
 
 #### 项目工作流
 

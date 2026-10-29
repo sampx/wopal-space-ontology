@@ -52,7 +52,7 @@ Canonical references:
 
 ## Testing
 
-- <Follow the space's canonical testing rule for general TDD/test-design semantics; add only project-specific runners, layers, fixtures/helpers, or host/protocol verification constraints here>
+- <State explicitly that this project inherits the space's canonical testing/TDD rule. If this project has behavior boundaries where TDD is required, name those boundaries here; do not restate the general RED/GREEN decision theory. Add project-specific runners, layers, fixtures/helpers, or host/protocol verification constraints.>
 - <unit test directory and command; integration test directory and command; which project logic belongs to each layer>
 - <reusable fixtures, contract helpers and isolation/cleanup rules; how new tests are registered so they cannot be silently omitted>
 - <which host APIs, external systems, or real runtime boundaries require manual verification; state why no automated gate can cover them>

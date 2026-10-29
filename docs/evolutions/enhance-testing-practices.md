@@ -113,6 +113,7 @@ empty when nothing new is added; one row reads
 5. [x] Ellamaka AGENTS 引用通用 Testing Best Practices，同时保留它已有的项目特有 Test Isolation Rules。
 6. [x] 中英文 rule 与项目 AGENTS 语义一致，`git diff --check` 通过。
 7. [x] `testing.md` 是通用 TDD 判定的唯一 owner；AGENTS/REGULATIONS/维护模板不再要求所有代码改动机械制造 RED，工作流技能只保留其自身执行与 Plan 字段规则。
+8. [x] 项目/目录 AGENTS 必须显式继承 canonical Testing/TDD 规则；可以写明本地 TDD 适用边界，但不得复制一套通用 RED/GREEN 判定理论。
 
 ### User Validation
 
@@ -178,9 +179,9 @@ Task output: `testing.md` 已装配为 coding 默认 rule；TypeScript/Python �
 Files touched: `assembly/archetypes/coding.yaml`, `rules/typescript.md`, `docs/LANG/zh-CN/rules/typescript.md`, `rules/python.md`, `docs/LANG/zh-CN/rules/python.md`, `docs/evolutions/enhance-testing-practices.md`; Ellamaka `AGENTS.md`, `AGENTS.zh-CN.md` in project commit `7ff07b48e3`
 - [x] The implementation agent has completed all development and verification steps above.
 
-Validation rework: 用户在 validating 阶段要求把 dev-flow 已验证的 TDD 判定语义上提，并彻底消除 AGENTS/REGULATIONS/维护模板中的 blanket TDD 双真相源。`testing.md` 现负责 TDD 适用条件、`TDD: false != no testing`、删除/重构规则与重复 case 原则；空间/项目规范只保留本地测试机制。同步修正了 `space-master` AGENTS 维护模板与检查表，避免未来再次要求每个 package 复制通用 TDD 政策。
+Validation rework: 用户在 validating 阶段要求把 dev-flow 已验证的 TDD 判定语义上提，并彻底消除 AGENTS/REGULATIONS/维护模板中的 blanket TDD 双真相源。`testing.md` 现负责 TDD 适用条件、`TDD: false != no testing`、删除/重构规则与重复 case 原则。随后用户纠正了“去重”边界：项目/目录规范不能因此把 TDD 要求删到不可见；它们必须显式继承 canonical Testing/TDD，并可声明本地哪些行为边界必须使用 TDD，只是不再复制通用 RED/GREEN 判定理论。同步修正了 `space-master` AGENTS 维护模板与检查表，避免未来再次把“去重”误做成“移除 TDD”。
 Additional ontology files touched: `AGENTS.md`, `AGENTS.zh-CN.md`, `assembly/templates/REGULATIONS.md`, `docs/LANG/zh-CN/assembly/templates/REGULATIONS.md`, `plugins/wopal-plugin/AGENTS.md`, `plugins/wopal-plugin/AGENTS.zh-CN.md`, `dsh/plugins/dsh-sandbox-roots/AGENTS.md`, `dsh/plugins/dsh-sandbox-roots/AGENTS.zh-CN.md`, `skills/space-master/templates/agent-rules.md`, `skills/space-master/references/agents-md-maintenance.md`, `skills/space-master/references/agents-md-maintenance.zh-CN.md`.
-External consumer commits: Ellamaka project rules `5cc928b75e` (`docs(test): centralize testing policy ownership`); space runtime REGULATIONS `445ef51` (`docs(test): align space testing policy ownership`).
+External consumer commits: initial Ellamaka ownership cleanup `5cc928b75e`, followed by explicit TDD inheritance repair `809bbf8fd2`; initial space runtime alignment `445ef51`, followed by explicit TDD inheritance repair `4b0b79f`.
 
 ---
 

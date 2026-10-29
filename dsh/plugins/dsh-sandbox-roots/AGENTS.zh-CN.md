@@ -1,6 +1,6 @@
 ---
 name: dsh-sandbox-roots
-description: 沙箱可写根扩展插件（@wopal/dsh-sandbox-roots）——插件依赖解析与验证边界
+description: 沙箱可写根扩展插件（@wopal/dsh-sandbox-roots）——插件依赖解析、验证与 TDD 边界
 ---
 
 # dsh-sandbox-roots — Agent 规范
@@ -27,6 +27,7 @@ pnpm check       # typecheck + test + build 全链
 
 ## 测试
 
+- 通用 TDD 适用条件统一遵循 canonical `rules/testing.md`。`src/` 中可观察行为变更只要满足这些条件，就必须先写能失败的 `tests/*.test.ts` 断言再实现；纯行为保持型重构使用已有安全网保持全绿，不制造假的 RED。
 - 修改逻辑后运行 `pnpm test`，并在 `tests/*.test.ts` 中保留覆盖对应插件行为的回归测试。
 - 上游行为复刻代码（如从 REF 复制的 `internal/containment.ts`）继续由聚焦的回归测试锁定其复制行为。
 
