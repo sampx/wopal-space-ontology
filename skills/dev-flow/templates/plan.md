@@ -13,8 +13,14 @@
 - **Project Type**: {ptype}
 - **Created**: {date}
 - **Status**: planning
-- **Base Commit**: (recorded automatically at approve; integration-branch HEAD)
-- **Final Commit**: (recorded automatically at verify; integration-branch HEAD)
+- **Delivery**: {plan_name}
+- **Commit Subject**: <type(scope): delivered result>
+- **Integration Strategy**: squash
+- **Integration Branch**: (recorded automatically at approve when a work branch exists)
+- **Work Branch**: (recorded automatically at approve when a work branch exists)
+- **Delivery Base Commit**: (recorded automatically at approve; integration-branch HEAD before this Delivery)
+- **Verification Commit**: (recorded when the user-authorized validation point is integrated or verified)
+- **Integration Commit**: (recorded on the Delivery owner after formal integration; unused by --no-worktree)
 
 ## Scope Assessment
 

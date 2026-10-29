@@ -255,7 +255,6 @@ def _switch_standard(
     """
     branch = wt_ctx.branch
     wt_path = str(_resolve_wt_path(wt_ctx.path, workspace_root))
-    merge_target = "main"
 
     # Get repo_root from Plan metadata (Project Path)
     project = get_plan_field(plan_path, "Target Project")
@@ -295,9 +294,9 @@ def _switch_standard(
     print()
     log_step("Verification steps:")
     print(f"  1. Run tests in the project repo")
-    print(f"  2. After verification, merge manually:")
-    print(f"     cd {repo_root} && git checkout {merge_target} && git pull && git merge {branch}")
-    print(f"  3. Run: flow.sh verify {issue} --confirm")
+    print(f"  2. After verification, return to the integration branch")
+    print(f"  3. Run: flow.sh integrate {issue} --confirm")
+    print(f"  4. Run: flow.sh verify {issue} --confirm")
     return True
 
 

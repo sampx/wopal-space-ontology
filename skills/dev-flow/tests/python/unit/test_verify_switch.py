@@ -180,7 +180,7 @@ class TestVerifyConfirmDirectMerge:
 
         mock_resolve.side_effect = ResolveActivePlanError(
             "Feature branch 'feature/test-1-slug' has not been merged. "
-            "Run verify-switch and merge manually before verify."
+            "Run verify-switch, validate, then use flow.sh integrate before verify."
         )
 
         args = MagicMock()
@@ -412,8 +412,9 @@ class TestPlanMetadataCommitsToSpaceRepo:
         # Merge/verify guidance reaches the user.
         out = capsys.readouterr().out
         assert "flow.sh verify 42 --confirm" in out
-        assert "git checkout main" in out
-        assert f"git merge {VS_BRANCH}" in out
+        assert "return to the integration branch" in out
+        assert "flow.sh integrate" in out
+        assert "git merge" not in out
 
     def test_dirty_canonical_warns_but_switches(self, tmp_path, capsys):
         ws, project, plan = _make_switch_workspace(tmp_path)

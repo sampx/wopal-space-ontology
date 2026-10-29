@@ -178,6 +178,75 @@ class TestCommitPaths:
         assert "M  other.txt" in status
 
 
+class TestFormalDeliveryGitHelpers:
+    """Git helper surface used by the formal Delivery command layer."""
+
+    def test_inspection_helpers_report_real_commit_relationships(self, tmp_path):
+        from lib.git import (
+            commit_exists,
+            get_commit_subject,
+            get_merge_base,
+            is_ancestor,
+        )
+
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(repo),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "checkout", "-b", "work"], cwd=str(repo),
+            capture_output=True, check=True,
+        )
+        (repo / "work.txt").write_text("work\n")
+        subprocess.run(["git", "add", "work.txt"], cwd=str(repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "work subject"], cwd=str(repo),
+            capture_output=True, check=True,
+        )
+        work_tip = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(repo),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+        assert get_merge_base(str(repo), "main", "work") == base
+        assert commit_exists(str(repo), work_tip) is True
+        assert get_commit_subject(str(repo), work_tip) == "work subject"
+        assert is_ancestor(str(repo), base, work_tip) is True
+        assert is_ancestor(str(repo), work_tip, "main") is False
+
+    def test_paths_have_changes_is_path_scoped(self, tmp_path):
+        from lib.git import GitMutationFailure, paths_have_changes
+
+        repo = tmp_path / "repo"
+        _git_init(repo)
+        (repo / "tracked.txt").write_text("v1\n")
+        (repo / "other.txt").write_text("v1\n")
+        subprocess.run(
+            ["git", "add", "tracked.txt", "other.txt"], cwd=str(repo), check=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "add files"], cwd=str(repo),
+            capture_output=True, check=True,
+        )
+        (repo / "other.txt").write_text("v2\n")
+        assert paths_have_changes(str(repo), ["tracked.txt"]) is False
+        (repo / "tracked.txt").write_text("v2\n")
+        assert paths_have_changes(str(repo), ["tracked.txt"]) is True
+
+        # A failed status query is not the same as a clean path set. Corrupt
+        # the real index so git itself supplies the failure diagnostics.
+        index = repo / ".git" / "index"
+        index.write_bytes(b"not-a-git-index\n")
+        failure = paths_have_changes(str(repo), ["tracked.txt"])
+        assert isinstance(failure, GitMutationFailure)
+        assert failure.command[:3] == ["git", "status", "--porcelain"]
+        assert failure.cwd == str(repo)
+        assert failure.exit_code != 0
+        assert (failure.stderr or failure.stdout).strip()
+
+
 class TestCommitPathsFailureDiagnostics:
     """commit_paths failures retain command, cwd, exit code, stdout/stderr."""
 

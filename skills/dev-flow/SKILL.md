@@ -58,7 +58,7 @@ When implementation or validation exposes a problem:
 
 Standard chain:
 
-`plan new → submit → approve --confirm → implementation/review → complete → user validation → verify --confirm → archive`
+`plan new → submit → approve --confirm → implementation/review → complete → user validation → integrate (when a work branch exists) → verify --confirm → archive`
 
 State machine:
 
@@ -99,11 +99,37 @@ flow.sh approve <plan> --confirm [mode-flags]
 
 | Mode | Use when | Command |
 |---|---|---|
-| Standard isolation (default) | normal development | `approve --confirm` |
-| Trunk-direct | user explicitly asks for no worktree | `approve --confirm --no-worktree` |
-| Existing branch evolution | user asks to reuse an existing worktree/feature branch | `approve --confirm --existing-worktree <path>` |
+| Standard isolation (default) | normal development. The script creates a work branch and worktree; development commits stay on the work branch, and formal delivery is squashed by default | `approve --confirm` |
+| Trunk-direct | user explicitly asks for no worktree. Implement directly on the integration branch; create no work branch, do not run `integrate`, and do not squash | `approve --confirm --no-worktree` |
+| Existing branch evolution | user asks to reuse an existing worktree/feature branch; multiple Plans may explicitly share one Delivery and one formal integration | `approve --confirm --existing-worktree <path>` |
 
-`--no-worktree` and `--existing-worktree` are different semantics and are not substitutes. Evolution mode closes with `--keep-worktree`. See `references/commands.md` for exact behavior.
+`--no-worktree` and `--existing-worktree` are different semantics and are not substitutes. Use `--keep-worktree` only when the worktree must survive an archive step; shared-Delivery members keep it until the owner is archived last. See `references/commands.md` for exact behavior.
+
+### Formal delivery and commit records
+
+Modes with a work branch separate development history from formal delivery. The work branch may contain multiple implementation, review-fix, and validation-fix commits; the integration branch receives one summary commit by default. Normal archive removes the work branch and extra worktree, so per-step development history is guaranteed only until archive.
+
+Plans use these fixed metadata fields:
+
+| Field | Meaning |
+|---|---|
+| `Delivery` | The formal delivery identifier. A single Plan owns itself; Plans sharing a delivery all name the owner Plan. |
+| `Commit Subject` | The exact subject used for the formal delivery commit. Every Plan in one Delivery must use the same value. |
+| `Integration Strategy` | How the work reaches the integration branch. Default `squash`; `preserve-history` is allowed only when the user explicitly chooses it before integration. |
+| `Integration Branch` | The formal branch that receives the delivered change, such as `main`. |
+| `Work Branch` | The branch that keeps development commits. Newly generated names are at most 55 characters; when longer, only the Plan-name tail is shortened and a stable four-character checksum derived from the full name is appended. |
+| `Delivery Base Commit` | The integration-branch commit immediately before this Delivery began. Shared-Delivery Plans use the same value. |
+| `Verification Commit` | The exact commit the user validated. With a work branch it is a work-branch commit; with `--no-worktree` it is the validated integration-branch commit. |
+| `Integration Commit` | The formal commit created on the integration branch for a work-branch Delivery. It is recorded once on the owner Plan and shared by the members. `--no-worktree` has no Integration Commit. |
+
+`Commit Subject` has one ownership chain:
+
+1. **Draft**: the Plan author writes it before implementation, using `type(scope): result` to describe the delivered outcome. An Issue title may inform the draft but does not replace this field.
+2. **Freeze**: `approve --confirm` confirms and freezes it with the rest of the Plan.
+3. **Change**: after freeze, it changes only when the user asks to revise the approved Plan; the revised Plan must be confirmed again.
+4. **Use**: `integrate` passes the Plan's `Commit Subject` through verbatim. It does not generate, concatenate, rewrite, or append automatic text. PR delivery uses the same exact subject.
+
+Multiple `--existing-worktree` Plans may share one Delivery. The first approved Plan is the owner and records the shared integration branch, work branch, base commit, integration strategy, and commit subject. Later members name that owner in `Delivery` and reuse the same values; `approve` refuses any mismatch. Formal integration happens once. Starting `integrate` from any member discovers all unarchived Plans with that Delivery and includes every change after the shared base.
 
 ## Executing: implementation, acceptance, review, Agent Verification
 
@@ -184,31 +210,37 @@ Common validation modes:
 
 | Scenario | Flow |
 |---|---|
-| worktree can run directly | user validates in worktree → merge → `verify --confirm` |
-| canonical path is required | `verify-switch` → user validates → merge → `verify --confirm` |
-| user explicitly chooses merge-first | merge → user validates on integration branch → `verify --confirm` |
-| `--no-worktree` | user validates directly on integration branch → `verify --confirm` |
-| `--existing-worktree` evolution mode | user validates in kept worktree → `verify --confirm --keep-worktree` |
+| standard isolation, worktree can run directly | user validates in the development worktree → `integrate <issue-or-plan> --confirm` → `verify --confirm` |
+| standard isolation, canonical path is required | `verify-switch` → user validates the work branch → return to the integration branch → `integrate <issue-or-plan> --confirm` → `verify --confirm` |
+| user explicitly chooses integrate-first | `integrate <issue-or-plan> --confirm` → user validates on the integration branch → `verify --confirm` |
+| `--no-worktree` | user validates directly on the integration branch → `verify --confirm`; do not run `integrate` |
+| shared Delivery | user validates the whole Delivery → run `integrate <any-member> --confirm` once → each member runs `verify --confirm` |
 
-Default to validating before merge. Merge-first is a user choice, not a controller default.
+Default to validating before integration. Integrate-first is a user choice, not a controller default. `integrate --confirm` is the user's explicit authorization to write the validated work-branch content to the integration branch. It records the current work-branch commit as each member's `Verification Commit`; after the default squash it records the formal integration-branch commit as the owner Plan's `Integration Commit`. Each later `verify --confirm` checks that same formal delivery commit instead of treating a newer unrelated integration-branch commit as this Delivery.
+
+`preserve-history` is an explicit exception only: the integration branch keeps the development commits only when `Integration Strategy` is already `preserve-history` and the user explicitly chooses that history-preserving delivery before integration. The default path must not fall back to ordinary `git merge`, which can carry intermediate commits or an extra merge commit into formal history.
 
 Rework during validation follows the same conflict rule: the controller may decide fixes inside the existing DESIGN + Plan; any Plan or design change requires user confirmation first.
 
-After the user explicitly confirms validation and authorizes the corresponding closure, finish the selected merge path and run:
+After the user explicitly confirms validation and authorizes the corresponding closure, finish the selected formal integration path and run:
 
 ```bash
 flow.sh verify <plan> --confirm [--keep-worktree]
 flow.sh archive <plan> [--keep-worktree]
 ```
 
+For a shared Delivery, archive only after every member has completed formal integration and `verify --confirm`. Archive non-owner Plans first with `--keep-worktree`; archive the owner last without it so the common work branch and worktree are removed once.
+
 ## Branch and worktree boundaries
 
 Dev-flow scripts own branch/worktree creation and deletion:
 
 - `approve` creates or binds them;
-- `verify-switch` / `archive` remove them;
+- `verify-switch` only moves validation into the canonical project path; it does not formally integrate the work;
+- when a work branch exists, `integrate` is the only normal path that writes the validated Delivery to the integration branch; the controller does not run a manual ordinary `git merge`;
+- `archive` performs normal work-branch/worktree cleanup; a shared Delivery cleans them only when the owner is archived last;
 - the controller does not manually create or delete feature branches or worktrees;
-- in standard mode, the only manual branch action is the user-authorized feature → integration merge; prefer squash by default, and use `--no-ff` only when the user explicitly wants history preserved.
+- `--no-worktree` starts and stays on the integration branch, so it has no work branch, no `integrate` step, and no work-branch cleanup at archive.
 
 Do not load a separate worktree-management skill to take over worktrees already owned by dev-flow.
 
@@ -220,7 +252,8 @@ Do not load a separate worktree-management skill to take over worktrees already 
 | substantive approved-Plan change | explicit confirmation of that Plan revision |
 | DESIGN change | explicit confirmation of the design target/revision |
 | user validation result | explicit pass confirmation or failure feedback |
-| merge / `verify --confirm` | explicit authorization appropriate to the chosen validation mode |
+| `integrate --confirm` | when a work branch exists, explicit authorization to write this Delivery to the integration branch |
+| `verify --confirm` | explicit confirmation of that Plan's validation result and authorization to advance its state |
 | `reset` | explicit reset request |
 
 Do not expand a single instruction such as “commit it” into authorization for the whole closing sequence.

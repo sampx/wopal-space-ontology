@@ -7,6 +7,39 @@ Split from infra/git.py — this module handles only gh CLI commands.
 import subprocess
 
 
+def merge_pull_request(
+    repo_path: str,
+    pr_url: str,
+    *,
+    strategy: str,
+    subject: str,
+) -> tuple[bool, str]:
+    """Merge a PR with the exact formal Delivery subject.
+
+    Returns `(True, "")` on success, otherwise `(False, diagnostics)`.
+    """
+    method = "--squash" if strategy == "squash" else "--merge"
+    command = [
+        "gh", "pr", "merge", pr_url,
+        method,
+        "--subject", subject,
+        "--body", "",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        return False, str(exc)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        return False, f"exit {result.returncode}: {detail}"
+    return True, ""
+
+
 def get_issue_labels(issue_number: int | str, repo: str) -> list[str]:
     """Get current labels for an issue.
 

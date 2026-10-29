@@ -96,14 +96,14 @@ def _create_pr_common(project_path: Path, title: str, body: str) -> str:
     return pr_url
 
 
-def _create_pr(issue_number: int, project_path: Path) -> str:
+def _create_pr(issue_number: int, project_path: Path, subject: str) -> str:
     """Create a Pull Request for the issue."""
-    return _create_pr_common(project_path, f"#{issue_number}", f"Closes #{issue_number}")
+    return _create_pr_common(project_path, subject, f"Closes #{issue_number}")
 
 
-def _create_pr_for_plan(plan_name: str, project_path: Path) -> str:
+def _create_pr_for_plan(plan_name: str, project_path: Path, subject: str) -> str:
     """Create a Pull Request for a plan (no-issue mode)."""
-    return _create_pr_common(project_path, plan_name, f"Plan: {plan_name}")
+    return _create_pr_common(project_path, subject, f"Plan: {plan_name}")
 
 
 def _get_plan_name(plan_path: str) -> str:
@@ -215,52 +215,6 @@ def _resolve_code_repo(
     return active.commit_repo_root
 
 
-def _record_verification_commit(
-    plan_path: str, workspace_root: Path, active: "ActivePlanInfo"
-) -> str:
-    """Resolve the feature branch tip SHA and store it as Verification Commit.
-
-    The field feeds verify's L1 ancestor check. The feature branch lives in
-    the project repo, not the space repo — after verify-switch removes the
-    worktree the branch is reachable only from the code repo. Try the commit
-    repo first, then fall back to the code repo; warn loudly instead of
-    silently skipping when the branch is unresolvable everywhere (a missing
-    field degrades verify to the weaker tree/changeset criteria).
-    """
-    wt_meta = get_plan_worktree(plan_path)
-    if not wt_meta or not wt_meta.get("branch"):
-        return ""
-
-    branch = wt_meta["branch"]
-    candidates = [active.commit_repo_root]
-    code_repo = _resolve_code_repo(plan_path, workspace_root, active)
-    if code_repo not in candidates:
-        candidates.append(code_repo)
-
-    for repo in candidates:
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", branch],
-                cwd=str(repo),
-                capture_output=True,
-                text=True,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            continue
-        if result.returncode == 0 and result.stdout.strip():
-            set_plan_field(
-                plan_path, "Verification Commit", result.stdout.strip()
-            )
-            return result.stdout.strip()
-
-    log_warn(
-        "Could not resolve feature branch "
-        f"'{branch}' in any repo — Verification Commit not recorded; "
-        "verify will fall back to tree/changeset detection."
-    )
-    return ""
-
-
 # ============================================
 # Verification guidance helpers
 # ============================================
@@ -301,10 +255,10 @@ def _print_standard_verification_guidance(wt_ctx, issue, workspace_root, plan_pa
     print("### Verification Options")
     print("")
     print(f"  A) Verify in worktree: {worktree_path}")
-    print("     After verification, manually merge feature branch to integration.")
+    print(f"     After verification: flow.sh integrate {issue} --confirm")
     print("")
     print(f"  B) Switch branch: flow.sh verify-switch {issue}")
-    print("     Run verify-switch to checkout feature branch at canonical path, then verify.")
+    print("     Run verify-switch to checkout the work branch at canonical path, then verify.")
 
 
 # ============================================
@@ -424,11 +378,15 @@ def cmd_complete(args: argparse.Namespace) -> int:
             return 1
 
         pr_url = ""
+        commit_subject = get_plan_field(active_plan_path, "Commit Subject")
+        if not commit_subject or commit_subject in ("(none)", "N/A"):
+            log_error("Cannot create PR: Commit Subject is missing from the approved Plan")
+            return 1
 
         if plan_issue:
-            pr_url = _create_pr(plan_issue, project_path)
+            pr_url = _create_pr(plan_issue, project_path, commit_subject)
         else:
-            pr_url = _create_pr_for_plan(plan_name, project_path)
+            pr_url = _create_pr_for_plan(plan_name, project_path, commit_subject)
 
         if not pr_url:
             return 1
@@ -469,7 +427,9 @@ def cmd_complete(args: argparse.Namespace) -> int:
         print("")
         print("Status: verifying (PR opened)")
         print("")
-        print("Waiting for PR merge. After user confirms, run:")
+        print("PR opened. After user validation, run formal integration:")
+        print(f"  flow.sh integrate {next_ref} --confirm")
+        print("Then run:")
         print(f"  flow.sh verify {next_ref} --confirm")
 
     else:
@@ -480,14 +440,6 @@ def cmd_complete(args: argparse.Namespace) -> int:
             log_error("Failed to update Plan status")
             return 1
         log_success(f"Plan status updated: {target_status}")
-
-        # Store feature branch tip SHA for robust merge detection in verify --confirm.
-        # The feature branch lives in the project repo; the helper falls back
-        # to the code repo when the space repo cannot resolve it (e.g. after
-        # verify-switch removed the worktree).
-        _record_verification_commit(
-            str(active.active_plan_path), workspace_root, active
-        )
 
         # Plan-only commit (durability gate: no Issue sync when it fails)
         commit_msg = _build_plan_only_commit_msg(plan_issue, plan_name)

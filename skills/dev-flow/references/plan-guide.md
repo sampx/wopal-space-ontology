@@ -239,7 +239,7 @@ For a delegated Plan Task, pass only the context needed to do the work:
 
     ## Context
     - Working path: <project/worktree absolute path>
-    - Baseline: <Base Commit from Plan Metadata>
+    - Baseline: <Delivery Base Commit from Plan Metadata>
     - Follow project/module AGENTS.md
 
     ## Report
@@ -352,11 +352,12 @@ Worktree directory = branch. The branch name carries "unique and mappable back t
 | Stage | Branch | Plan status | Notes |
 |------|---------|----------|------|
 | `planning` | integration branch (main or space/<name>) | `planning` | Plan baseline committed on the integration branch |
-| `approve --confirm` | integration branch → create feature branch | `executing` | Commit executing + Worktree metadata on the integration branch first, then create the worktree |
+| `approve --confirm` | integration branch → create work branch | `executing` | Freeze Delivery metadata, commit executing + Worktree metadata, then create the worktree |
 | Implementation (executing) | feature branch | `executing` | Implementation happens in the feature branch's worktree |
 | `complete` | feature branch | `verifying` | Plan-only commit of the active Plan (dirty implementation tree aborts) |
 | User validation | feature branch | `verifying` | The user validates on the feature branch |
-| `verify --confirm` | integration branch | `done` | Plan-only commit to the integration branch |
+| `integrate --confirm` | work branch → integration branch | `verifying` | Default squash creates one formal commit using the frozen `Commit Subject`; records Verification/Integration Commit identities |
+| `verify --confirm` | integration branch | `done` | Checks the recorded Delivery commit, then makes the Plan-only done commit |
 | `archive` | integration branch | archived | Moved to done/, worktree cleaned up |
 
 **Plan-only commit principle**: lifecycle scripts commit only Plan status changes, never implementation code. The controller creates each Task's implementation commit only after controller acceptance; delegated implementers do not commit. Scripts abort on a dirty implementation tree rather than committing implementation code themselves.

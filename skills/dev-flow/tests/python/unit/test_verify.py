@@ -57,44 +57,35 @@ def _write_plan(tmp_path, content: str, name: str = "42-feature-dev-flow-test.md
     return plan_file
 
 
-# -- Test: Final Commit recording -------------------------------------------------
+def test_recorded_integration_commit_is_delivery_identity_not_current_head(tmp_path):
+    """verify accepts the recorded formal commit even after main advances later."""
+    from commands.verify import _check_recorded_integration
 
-class TestVerifyRecordsFinalCommit:
-    """verify 应记录 Final Commit(合入后集成分支 HEAD)到 Plan metadata。"""
+    project = tmp_path / "projects" / "gesp"
+    _shell_init_repo(project)
+    (project / "delivery.txt").write_text("delivered\n")
+    _shell_git("add", "delivery.txt", cwd=project)
+    subject = "feat(gesp): exact delivery"
+    _shell_git("commit", "-m", subject, cwd=project)
+    integration_commit = _shell_git("rev-parse", "HEAD", cwd=project).stdout.strip()
+    (project / "later.txt").write_text("later\n")
+    _shell_git("add", "later.txt", cwd=project)
+    _shell_git("commit", "-m", "chore: later unrelated work", cwd=project)
 
-    def test_final_commit_records_integration_head(self, tmp_path):
-        """Final Commit 应取集成分支 HEAD(standard: main)。"""
-        from commands.verify import _record_final_commit
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD)
-        proj_dir = tmp_path / "projects" / "gesp"
-        proj_dir.mkdir(parents=True)
-        (proj_dir / ".git").mkdir()
+    plan = _write_plan(
+        tmp_path,
+        f"""- **Status**: verifying
+- **Project Path**: projects/gesp
+- **Delivery**: 42-feature-dev-flow-test
+- **Commit Subject**: {subject}
+- **Integration Branch**: main
+- **Work Branch**: work-delivery
+- **Verification Commit**: work-tip-123
+- **Integration Commit**: {integration_commit}
+""",
+    )
 
-        with patch("commands.verify.get_branch_head", return_value="deadbeef") as mock_head:
-            with patch("commands.verify.set_plan_field", return_value=True) as mock_set:
-                _record_final_commit(str(plan_path), tmp_path)
-
-        mock_head.assert_called_once()
-        mock_set.assert_called_once_with(
-            str(plan_path), "Final Commit", "deadbeef"
-        )
-
-    def test_final_commit_uses_main_branch(self, tmp_path):
-        """standard 项目 Final Commit 用 main 分支。"""
-        from commands.verify import _record_final_commit
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD)
-        proj_dir = tmp_path / "projects" / "gesp"
-        proj_dir.mkdir(parents=True)
-        (proj_dir / ".git").mkdir()
-
-        with patch("commands.verify.get_branch_head", return_value="abc123") as mock_head:
-            with patch("commands.verify.set_plan_field", return_value=True):
-                _record_final_commit(str(plan_path), tmp_path)
-
-        cmd = mock_head.call_args[0][0]
-        assert cmd == str(tmp_path / "projects" / "gesp")
-        branch = mock_head.call_args[0][1]
-        assert branch == "main"
+    assert _check_recorded_integration(str(plan), tmp_path) == 0
 
 
 # -- Test: _check_feature_branch_merged function -------------------------------
@@ -237,64 +228,12 @@ class TestCheckFeatureBranchMerged:
         assert "--merged" in cmd
         assert "main" in cmd
 
-    def test_verify_keep_worktree_skips_merge_check_and_records_feature_head(self, tmp_path):
-        """verify --keep-worktree 应跳过合并检测并将 Final Commit 记录为 feature 分支 HEAD。"""
-        import argparse
-        from commands.verify import cmd_verify
-
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD, name="42-keep.md")
-        # Ensure worktree directory exists
-        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
-        wt_dir.mkdir(parents=True)
-
-        with patch("commands.verify.find_workspace_root", return_value=tmp_path):
-            with patch("commands.verify.find_plan", return_value=str(plan_path)):
-                with patch("commands.verify.check_user_validation"):
-                    with patch("commands.verify.get_branch_head", return_value="feature_tip_sha_123"):
-                        with patch("commands.verify.commit_paths", return_value=True):
-                            args = argparse.Namespace(
-                                target="42",
-                                confirm=True,
-                                keep_worktree=True,
-                            )
-                            result = cmd_verify(args)
-
-        assert result == 0
-        from plan import get_plan_field
-        assert get_plan_field(str(plan_path), "Final Commit") == "feature_tip_sha_123"
-
-    def test_verify_keep_worktree_aborts_when_head_unresolvable(self, tmp_path):
-        """verify --keep-worktree 在无法获取 feature HEAD 时报错中止，不推进到 done。"""
-        import argparse
-        from commands.verify import cmd_verify
-
-        plan_path = _write_plan(tmp_path, PLAN_VERIFYING_STANDARD, name="42-err.md")
-        # Ensure worktree directory exists on disk so it passes is_dir() check and tests get_branch_head failure
-        wt_dir = tmp_path / ".worktrees" / "gesp-issue-1-slug"
-        wt_dir.mkdir(parents=True)
-
-        with patch("commands.verify.find_workspace_root", return_value=tmp_path):
-            with patch("commands.verify.find_plan", return_value=str(plan_path)):
-                with patch("commands.verify.check_user_validation"):
-                    with patch("commands.verify.get_branch_head", return_value=""):
-                        args = argparse.Namespace(
-                            target="42",
-                            confirm=True,
-                            keep_worktree=True,
-                        )
-                        result = cmd_verify(args)
-
-        assert result == 1
-        from plan import get_plan_status
-        assert get_plan_status(str(plan_path)) == "verifying"
-
-
 # ============================================
 # cmd_verify durability gate (Task 4, AC#6)
 # ============================================
 #
 # Real construction: a temp workspace repo holding a verifying Plan and a
-# project repo supplying Final Commit. The Plan rewrite, the git commit and
+# project repo supplying the no-worktree Verification Commit. The Plan rewrite, the git commit and
 # the retry run for real; network side effects (PR lookups / Issue sync /
 # gh close) are mocked so the failure path can assert they are unreached.
 
@@ -311,6 +250,10 @@ VERIFY_PLAN_TEMPLATE = """\
 - **Project Type**: standard
 - **Project Path**: projects/gesp
 - **Status**: verifying
+- **Integration Branch**: main
+- **Work Branch**: (none)
+- **Verification Commit**: (none)
+- **Integration Commit**: (none)
 
 ## Goal
 
@@ -380,7 +323,7 @@ class TestVerifyDurabilityGate:
         assert result == 1
         assert plan.read_text() == original
         assert "- **Status**: verifying" in plan.read_text()
-        assert "Final Commit" not in plan.read_text()
+        assert "- **Verification Commit**: (none)" in plan.read_text()
         # No staged Plan residue: a retry sees the same clean state.
         assert _shell_git(
             "status", "--porcelain", "--", VERIFY_PLAN_REL, cwd=ws
@@ -404,7 +347,11 @@ class TestVerifyDurabilityGate:
         assert second == 0
         committed = _shell_git("show", f"HEAD:{VERIFY_PLAN_REL}", cwd=ws).stdout
         assert "- **Status**: done" in committed
-        assert "Final Commit" in committed
+        verification_commit = _shell_git(
+            "rev-parse", "main", cwd=ws / "projects" / "gesp"
+        ).stdout.strip()
+        assert f"- **Verification Commit**: {verification_commit}" in committed
+        assert "Final Commit" not in committed
         assert _shell_git(
             "log", "-1", "--format=%s", cwd=ws
         ).stdout.strip() == "docs(plan): verify plan #204"
