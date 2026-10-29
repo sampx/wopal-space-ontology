@@ -5,7 +5,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-10-28
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: isolated
 - **Worktree**: .worktrees/ontology-refactor-dev-flow-history
 - **Branch**: ontology-refactor-dev-flow-history
@@ -306,6 +306,8 @@ Files touched（实际修改的文件）: skills/dev-flow/references/{commands.m
 ### Task 4: 实施评审返工（第 1 轮 BLOCK findings）
 
 **Origin**: mandatory implementation review 对 `c72c19f..5421b40` 判 `BLOCK`（3 Blocker + 2 Warning）。本 Task 只修复 B-01～B-03、W-01～W-02 及其直接影响面，不重新打开已通过的设计项。
+
+**Verification Intent**: AC#1, AC#3, AC#4, AC#6, AC#8, AC#9（只验证第 1 轮评审 findings 及其直接影响面）
 
 **Behavior**:
 - integrate 在任何正式 Git mutation 前同时检查 canonical checkout 和仍存在的 Delivery worktree；任一处 dirty 都拒绝，且不写 Verification / Integration Commit。
