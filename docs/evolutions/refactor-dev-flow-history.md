@@ -10,7 +10,7 @@
 - **Worktree**: .worktrees/ontology-refactor-dev-flow-history
 - **Branch**: ontology-refactor-dev-flow-history
 - **Base Commit**: 02c0b9e021384091cd76e5437a4182133032bd65
-- **Final Commit**: (none)
+- **Final Commit**: 3092408a76c1910d3cb94b0f98b1ce77c6695cf6
 
 Stage 为 draft，表示这是待用户审阅的草稿。尚未批准和实施，所以 Mode、Worktree、Branch、Base Commit、Final Commit 都留空。这里的 Worktree、Branch 等记录本提案自己的实施环境；后文讨论的同名字段属于 dev-flow 项目计划，两者不要混淆。
 
