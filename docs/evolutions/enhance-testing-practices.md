@@ -128,33 +128,32 @@ Tasks split by behavior group, not by file. One Task = one cohesive
 behavior unit, independently testable.
 -->
 
-### Task 1: Add the shared testing rule and assembly
+### Task 1: Add the shared testing rule
 
-**Verification Intent**: 1, 2, 3, 6
+**Verification Intent**: 2, 3, 6
 
 **Behavior**:
-- coding space 装配后，通用测试任务会获得 `testing.md` Rule；规则给出跨语言的稳定测试设计约束且无固定框架/比例绑定。
+- `testing.md` Rule 给出跨语言的稳定测试设计约束且无固定框架/比例绑定。
 
 **Pre-read**: `rules/typescript.md`, `rules/python.md`, `assembly/archetypes/coding.yaml`, `.wopal/AGENTS.md`
 
-**Design**: 中文 review 版本先写，再同步正式英文 runtime source；新增 rule 后加入 coding archetype。
+**Design**: 中文 review 版本先写，再同步正式英文 runtime source。
 
 **TDD**: false — 声明式内容变更，以结构/装配验证代替代码 TDD。
 
 **Changes**:
 1. 新增中英文 `testing.md`。
-2. 将 `testing.md` 加入 coding archetype。
 
-**Verify**: 检查 frontmatter、assembly 引用与 `git diff --check`。
+**Verify**: 检查 frontmatter、中英文语义与 `git diff --check`。
 
 **Done**:
 Task output: 新增跨语言 Testing Best Practices rule 的中英文版本，并声明为 coding type-default capability。
-Files touched: `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md`, `assembly/archetypes/coding.yaml`, `docs/evolutions/enhance-testing-practices.md`
+Files touched: `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md`, `docs/evolutions/enhance-testing-practices.md`
 - [x] The implementation agent has completed all development and verification steps above.
 
 ### Task 2: Remove duplicated language-level policy and reference it from Ellamaka
 
-**Verification Intent**: 4, 5, 6
+**Verification Intent**: 1, 4, 5, 6
 
 **Behavior**:
 - TypeScript/Python 规则只保留技术栈特有测试约束；Ellamaka 项目规范引用通用 Testing Best Practices，同时继续约束 TISO/fixture/Bun/process-global 等项目事实。
@@ -166,15 +165,16 @@ Files touched: `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md`, `assembly
 **TDD**: false — 文档/规则结构变更。
 
 **Changes**:
-1. 精简 TypeScript/Python Testing 段。
-2. 更新 Ellamaka 双语 AGENTS 引用。
+1. 将 `testing.md` 加入 coding archetype。
+2. 精简 TypeScript/Python Testing 段。
+3. 更新 Ellamaka 双语 AGENTS 引用。
 
 **Verify**: 中英文语义对照、grep 无冲突规则、`git diff --check`。
 
 **Done**:
-Task output: pending
-Files touched: pending
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: `testing.md` 已装配为 coding 默认 rule；TypeScript/Python 只保留技术栈特有测试约定；Ellamaka 双语 AGENTS 已改为引用 Testing Best Practices，并保留项目特有 Test Isolation Rules（项目提交 `7ff07b48e3`）。
+Files touched: `assembly/archetypes/coding.yaml`, `rules/typescript.md`, `docs/LANG/zh-CN/rules/typescript.md`, `rules/python.md`, `docs/LANG/zh-CN/rules/python.md`, `docs/evolutions/enhance-testing-practices.md`; Ellamaka `AGENTS.md`, `AGENTS.zh-CN.md` in project commit `7ff07b48e3`
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 

@@ -159,6 +159,8 @@ with open('file.txt', 'r') as f:
 
 ## 测试
 
+- 测试价值、分层、确定性、隔离、异步同步、flaky 修复和验证成本统一遵循 `testing.md` 通用规则；本节只保留 Python/pytest 特有约定。
 - 使用 `pytest` 作为测试框架
 - 测试文件命名：`test_*.py`
 - 测试函数命名：`test_*`
+- 资源/状态的建立与清理优先使用 `tmp_path`、`monkeypatch` 和有明确 scope 的 pytest fixture，不要自行堆叠进程全局修改。

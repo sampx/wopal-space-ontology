@@ -159,6 +159,8 @@ with open('file.txt', 'r') as f:
 
 ## Testing
 
+- Follow the shared `testing.md` rule for test value, layering, determinism, isolation, async synchronization, flaky-test handling, and verification cost. This section contains only Python/pytest-specific conventions.
 - Use `pytest` as the test framework
 - Test file naming: `test_*.py`
 - Test function naming: `test_*`
+- Prefer pytest fixtures such as `tmp_path`, `monkeypatch`, and scoped fixtures for resource/state setup and cleanup rather than ad-hoc global mutation.

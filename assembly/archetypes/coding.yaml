@@ -31,6 +31,7 @@ skills:
 
 # 声明该空间加载的规则
 rules:
+  - testing.md
   - typescript.md
   - python.md
 
