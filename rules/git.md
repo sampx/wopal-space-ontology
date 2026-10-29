@@ -1,98 +1,112 @@
-# Git 与 Issue 工程规范
+---
+trigger: model_decision
+description: Follow this rule when performing Git, branch, merge, commit, or Issue operations in WopalSpace repositories.
+keywords:
+  - 'git'
+  - 'commit'
+  - 'branch'
+  - 'merge'
+  - 'issue'
+  - 'pull request'
+  - 'pr'
+---
 
-本文档为 Wopal 空间内所有仓库的 Git 提交、分支管理及 Issue 路由之详细执行标准。仅在执行 Git 提交、合并及 Issue 操作时按需读取。
+# Git and Issue Engineering Rules
+
+This rule defines shared execution standards for Git and Issue operations in WopalSpace repositories. Load it only when the task actually performs Git, branch, merge, commit, or Issue work.
+
+An owning workflow takes precedence over this shared rule. When `dev-flow`, `ontology-evolution`, or another capability defines branch naming, commit ownership, integration, publication, or Issue routing, follow that workflow rather than inventing or imposing a second Git process here.
 
 ---
 
-## 1. Issue 规范
+## 1. Issue Rules
 
-### 标题格式
+### Title format
 
 `<type>(<scope>): <description>`
 
-- **type**（必选）：见下方 Label 映射。
-- **scope**（可选）：括号包裹，小写简洁，全局不明确时可省略。
-- **description**（必选）：英文祈使句，首字母小写，结尾无句号；≤70 chars（以 type 前缀后的文本计算），首行总长 ≤100 chars。
+- **type** is required; use the label mapping below.
+- **scope** is optional, lowercase, concise, and wrapped in parentheses.
+- **description** is an English imperative phrase, starts lowercase, has no trailing period, is at most 70 characters after the type prefix, and keeps the full first line at most 100 characters.
 
-**Label 映射**：
+**Label mapping**:
 - `feat` / `enhance` → `type/feature`
 - `fix` → `type/bug`
 - `refactor` → `type/refactor`
 - `docs` → `type/docs`
 - `test` → `type/test`
 - `chore` → `type/chore`
-- `perf` 无 label
+- `perf` → no type label
 
-### Issue 项目归属与流程路由
+### Project ownership and workflow routing
 
-`--project` 填改动对象所在的空间组件，决定 `project/<name>` 标签、Plan/提案目录，以及后续走哪套流程：
+`--project` names the component being changed. It determines the `project/<name>` label and the owning workflow:
 
-| Issue 要改的东西 | `--project` | 流程 |
+| Change target | `--project` | Owning workflow |
 |---|---|---|
-| `.wopal/` 下的本体能力资产（skills、rules、agents、commands、plugins、assembly） | `wopal-space-ontology` | 本体进化流程 |
-| `projects/` 下的代码仓库 | 该仓库名 | 开发流程 |
+| Reusable capability assets under `.wopal/` (`skills`, `rules`, `agents`, `commands`, `plugins`, `assembly`) | `wopal-space-ontology` | `ontology-evolution` |
+| A code repository under `projects/` | That repository name | `dev-flow` |
 
-- 本体工作固定用 `wopal-space-ontology`，不得写 `ontology`、`space` 等变体。
-- 标为 `wopal-space-ontology` 的 Issue 一律走本体提案，不走开发流程的 Plan、分支与 worktree。
-- 所有 Issue/Plan 一律创建并存储于空间仓库，由开发流程自动定位；`--project` 仅决定 Plan 目录划分，禁止质疑归属。
+- Ontology work uses the canonical project name `wopal-space-ontology`; do not substitute aliases such as `ontology` or `space`.
+- For ontology work, let `ontology-evolution` decide the path: an implementation defect in already-agreed behavior uses its instant repair path; a capability or contract change uses the proposal lifecycle.
+- Do not route ontology capability work through a `dev-flow` Plan, and do not route project code work through an ontology proposal unless the owning workflow explicitly says otherwise.
+- `--project` selects ownership and routing; it does not authorize moving records between repositories or bypassing the owning workflow.
 
 ---
 
-## 2. Git 工作流
+## 2. Git Workflow
 
-### 基本法
+### Base rules
 
-- **显式指定目标仓库**：必须用 `git -C <path>` 显式指定目标仓库；空间根目录是独立 Git repo，禁止依赖默认工作目录对子项目执行 Git 操作。
-- **实施前前置检查**：
-  1. `git status`（有未提交变更先提醒用户提交）
-  2. `git log --oneline -5`（非本会话未推送提交先报告）
-- **提交前确认检查**：
-  1. `git status` + `git diff --staged --name-only`（确认变更范围与提交意图一致，无其他任务文件）
-  2. `git log --oneline -5`
-  3. 确认不在 detached HEAD。
-- **提交语言**：空间内所有 repo 一律使用英文提交信息，包括空间根仓库、`projects/*` 与 `.wopal/` worktree。提交信息是面向 Git 历史的工程记录，不随文档正文语言变化。
-- **分层提交**：先项目后空间；变更路径决定检查哪个仓库（`projects/*/` 的变更不检查空间根仓库）；在项目内完成 add → commit → push。
+- **Name the target repository explicitly**: use `git -C <path>` for direct Git inspection or manual Git operations. The space root is a separate repository; never rely on the current working directory to target a nested project implicitly.
+- **Respect workflow-owned mutations**: when the active workflow owns commits, integration, PR publication, or cleanup, use that workflow's commands and gates instead of replacing them with raw Git.
+- **Before manual mutation**:
+  1. inspect `git status` and preserve unrelated work;
+  2. inspect `git log --oneline -5` and report unexpected local-only history;
+  3. never use reset, stash, clean, force-push, or branch deletion to reshape someone else's work unless the owning workflow and user authorization explicitly permit that exact action.
+- **Before a manual commit**:
+  1. inspect `git status` and `git diff --staged --name-only` to confirm scope;
+  2. inspect `git log --oneline -5`;
+  3. confirm HEAD is attached to the intended branch.
+- **Commit language**: use English commit messages in every repository in the space, including the space root, `projects/*`, and ontology worktrees. Git history language does not follow the document body language.
+- **Repository ownership**: commit a change in the repository that owns it. Do not stage project-repository content through the space-root repository or bypass the workflow that owns `.wopal` capability changes.
 
-### 提交格式
+### Commit format
 
 `<type>(scope): <description> [#ref]`
 
-- **type** 必选（见下表）；scope 可选，括号包裹、小写简洁（如 `(api)`、`(cli)`），全局不明确时省略。
-- **description**：祈使句，英文首字母小写，结尾无句号；≤70 chars，有 Issue ref 时 ≤60 chars；首行总长 ≤100。
-- **body**（可选）：空行分隔，解释 what/why 而非 how，每行 ≤72 chars；破坏性变更以 `BREAKING CHANGE:` 开头。
-- **原子提交**：相关变更合为一提交，不相关变更拆分，便于回滚与 bisect。
+- `type` is required; `scope` is optional, lowercase, and concise.
+- `description` is an English imperative phrase, starts lowercase, has no trailing period, is at most 70 characters (60 when an Issue ref is appended), and keeps the full first line at most 100 characters.
+- Optional body text is separated by a blank line, explains what/why rather than how, and keeps lines at most 72 characters. Breaking changes start with `BREAKING CHANGE:`.
+- Keep commits atomic: combine one coherent change and split unrelated changes so history remains reversible and bisectable.
 
-| Type | 用途 | 版本变更 | Type | 用途 | 版本变更 |
-|------|------|----------|------|------|----------|
-| `feat` | 新功能 | MINOR | `enhance` | 功能增强 | MINOR |
-| `fix` | Bug 修复 | PATCH | `perf` | 性能优化 | — |
-| `refactor` | 重构（功能不变） | — | `ci` | CI/CD 配置 | — |
-| `docs` | 文档更新 | — | `build` | 构建系统 | — |
-| `test` | 测试相关 | — | `revert` | 回滚提交 | — |
-| `chore` | 构建/工具 | — | `style` | 代码格式（无逻辑变更） | — |
+| Type | Use | Version | Type | Use | Version |
+|------|-----|---------|------|-----|---------|
+| `feat` | new capability | MINOR | `enhance` | capability enhancement | MINOR |
+| `fix` | bug fix | PATCH | `perf` | performance | — |
+| `refactor` | behavior-preserving refactor | — | `ci` | CI/CD | — |
+| `docs` | documentation | — | `build` | build system | — |
+| `test` | tests | — | `revert` | revert | — |
+| `chore` | tooling/maintenance | — | `style` | formatting only | — |
 
-### 分支策略
+### Branch ownership
 
-| 分支 | 用途 |
-|------|------|
-| `main` | 主分支，稳定版本 |
-| `feature/*` | 功能开发 |
-| `bugfix/*` | Bug 修复 |
-| `hotfix/*` | 紧急修复 |
-| `refactor/*` | 重构 |
+- Do not impose a universal `feature/*`, `bugfix/*`, `hotfix/*`, or `refactor/*` convention on workflow-owned branches.
+- `dev-flow` owns its Work Branch and Integration Branch semantics; `ontology-evolution` owns ontology isolation and `contribute/<slug>` contribution branches.
+- For manual repository work that is genuinely outside an owning workflow, choose a short, meaningful branch name and follow that repository's own rules.
 
-### 合并验证（结构变更铁律）
+### Manual merge verification for structural changes
 
-特性分支含文件重命名、目录重组、多文件合并/拆分等结构变更时，合并禁止依赖 Git 自动合并；无冲突 ≠ 变更无损。
+When a merge is manual and not already owned by a workflow, structural changes such as renames, directory moves, file merges, or file splits require explicit verification; “no Git conflict” does not prove the result is lossless.
 
-**合并前必须执行**：
-1. `git merge-base` 找到共同祖先；
-2. 列出目标分支新增提交；
-3. 逐文件分类判断（1:1 rename 可自动处理但须验证；merge/split 必须手动移植）；
-4. 上报分类结果，获用户确认后执行 merge。
+Before the manual merge:
+1. find the merge base;
+2. list the target branch's new commits;
+3. classify structural changes by file (a 1:1 rename may be auto-merged but still requires verification; merge/split transformations require explicit porting);
+4. report the classification and obtain the user decision required by the owning process before mutating history.
 
 ---
 
-## 3. 提交禁令
+## 3. Commit Prohibitions
 
-敏感凭证（`.env`、密钥）与临时产物（`__pycache__/`、`node_modules/`、`.ruff_cache/`、IDE 配置）一律不得进入仓库。
+Never commit credentials or temporary/generated workspace artifacts such as `.env`, private keys, `__pycache__/`, `node_modules/`, `.ruff_cache/`, or IDE-local configuration unless the repository explicitly defines a safe tracked exception.
