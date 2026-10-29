@@ -236,7 +236,7 @@ Plan 不新增 Gap 关联元数据字段。阶段与 Gap 的关系由产品阶�
 
     ## Context
     - Working path: <项目/worktree 绝对路径>
-    - Baseline: <Plan Metadata 的 Base Commit>
+    - Baseline: <Plan Metadata 的 Delivery Base Commit>
     - Follow project/module AGENTS.md
 
     ## Report
@@ -349,11 +349,12 @@ Worktree 目录 = branch。分支名承载「唯一且可映射回 Plan」的职
 | 阶段 | 归属分支 | Plan 状态 | 说明 |
 |------|---------|----------|------|
 | `planning` | 集成分支（main 或 space/<name>） | `planning` | Plan 基线在集成分支上提交 |
-| `approve --confirm` | 集成分支 → 创建 feature 分支 | `executing` | 先在集成分支提交 executing + Worktree 元数据，再创建 worktree |
+| `approve --confirm` | 集成分支 → 创建开发分支 | `executing` | 冻结 Delivery 元数据，先提交 executing + Worktree 元数据，再创建 worktree |
 | 实施（executing） | feature 分支 | `executing` | 实施在 feature 分支的 worktree 中进行 |
 | `complete` | feature 分支 | `verifying` | Plan-only 提交活动 Plan（脏实施树报错退出） |
 | 用户验证 | feature 分支 | `verifying` | 用户在 feature 分支上验证实施结果 |
-| `verify --confirm` | 集成分支 | `done` | Plan-only 提交到集成分支 |
+| `integrate --confirm` | 开发分支 → 集成分支 | `verifying` | 默认 squash 为一条正式提交，标题逐字使用冻结的 `Commit Subject`；记录 Verification/Integration Commit |
+| `verify --confirm` | 集成分支 | `done` | 校验已记录的本次 Delivery 提交后，再做 Plan-only done 提交 |
 | `archive` | 集成分支 | 归档 | 移至 done/，清理 worktree |
 
 **Plan-only commit 原则**：生命周期脚本只提交 Plan 状态变更，不提交实施代码。Task 的实施提交由主控者在验收通过后创建；被委派的实施者不提交。脚本遇到脏实施树时报错退出，而非代为提交代码。

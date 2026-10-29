@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 # test_complete_verification_commit.py
 #
-# complete 必须在 plan 所在仓库写入 Verification Commit 字段（供 verify L1
-# 祖先检测）。当 feature 分支不在空间仓库（verify-switch 移除 worktree 后，
-# 分支只存在于项目仓库）时，rev-parse 必须回退到代码仓库，失败则显式告警
-# 而不是静默跳过。
-#
-# 同时覆盖 complete 的 Plan commit durability gate（Task 3）：commit 失败
+# complete 只推进到 verifying，不提前写 Verification Commit；该字段只在
+# 用户实际验证后的 integrate（或 --no-worktree verify）记录。
+# 本文件覆盖 complete 的 Plan commit durability gate（Task 3）：commit 失败
 # 时不得执行 Issue sync、不得返回 0，且 Plan 必须回到可重试状态。
 
 import unittest
 import json
 import sys
-import os
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -26,115 +22,6 @@ from support.git_fixtures import (
     install_failing_hook as _shell_install_failing_hook,
     shell_git as _shell_git,
 )
-
-from commands.complete import _record_verification_commit
-
-
-def _write_plan(tmp_path: str, branch: str = "feature/test-1-slug") -> str:
-    content = f"""\
-# test-plan
-
-## Metadata
-- **Status**: executing
-- **Target Project**: gesp
-- **Project Type**: standard
-- **Project Path**: projects/gesp
-- **Issue**: #42
-- **Worktree**:
-  - branch: {branch}
-  - path: .worktrees/gesp-issue-1-slug
-
-## Goal
-
-Test.
-"""
-    plan_path = os.path.join(tmp_path, "42-feature-test.md")
-    with open(plan_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return plan_path
-
-
-class ActiveInfo:
-    def __init__(self, repo_root: str):
-        self.commit_repo_root = Path(repo_root)
-        self.repo_relative_plan_path = "x.md"
-
-
-class TestRecordVerificationCommit(unittest.TestCase):
-    def setUp(self):
-        import tempfile
-        self.tmp = tempfile.mkdtemp(prefix="dev-flow-vc-")
-        self.space_repo = os.path.join(self.tmp, "space")
-        self.code_repo = os.path.join(self.tmp, "code")
-        os.makedirs(self.space_repo)
-        os.makedirs(self.code_repo)
-        self.plan_path = _write_plan(self.tmp)
-        self.active = ActiveInfo(self.space_repo)
-
-    def tearDown(self):
-        import shutil
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def _fake_run(self, cmd, cwd=None, **kwargs):
-        if cmd[0] == "git" and cmd[1] == "rev-parse":
-            if Path(cwd) == Path(self.space_repo):
-                return MagicMock(
-                    returncode=128, stdout="", stderr="fatal: unknown revision"
-                )
-            return MagicMock(returncode=0, stdout="abc123def456\n")
-        return MagicMock(returncode=0, stdout="")
-
-    def test_falls_back_to_code_repo_when_space_repo_lacks_branch(self):
-        with patch(
-            "commands.complete.subprocess.run", side_effect=self._fake_run
-        ):
-            with patch(
-                "commands.complete.resolve_project_path",
-                return_value=Path(self.code_repo),
-            ):
-                result = _record_verification_commit(
-                    self.plan_path, Path(self.tmp), self.active
-                )
-
-        self.assertEqual(result, "abc123def456")
-        with open(self.plan_path, encoding="utf-8") as f:
-            content = f.read()
-        self.assertIn("- **Verification Commit**: abc123def456", content)
-
-    def test_warns_when_branch_unresolvable_everywhere(self):
-        def fake_run(cmd, cwd=None, **kwargs):
-            if cmd[0] == "git" and cmd[1] == "rev-parse":
-                return MagicMock(returncode=128, stdout="", stderr="fatal")
-            return MagicMock(returncode=0, stdout="")
-
-        with patch(
-            "commands.complete.subprocess.run", side_effect=fake_run
-        ):
-            with patch("commands.complete.log_warn") as mock_warn:
-                result = _record_verification_commit(
-                    self.plan_path, Path(self.tmp), self.active
-                )
-
-        self.assertEqual(result, "")
-        mock_warn.assert_called_once()
-        with open(self.plan_path, encoding="utf-8") as f:
-            content = f.read()
-        self.assertNotIn("Verification Commit", content)
-
-    def test_no_worktree_metadata_skips(self):
-        import tempfile
-        no_wt = os.path.join(tempfile.mkdtemp(prefix="dev-flow-vc-nw-"))
-        plan_path = os.path.join(no_wt, "p.md")
-        with open(plan_path, "w", encoding="utf-8") as f:
-            f.write("# p\n\n## Metadata\n- **Status**: executing\n")
-
-        with patch("commands.complete.get_plan_worktree", return_value=None):
-            result = _record_verification_commit(
-                plan_path, Path(no_wt), self.active
-            )
-
-        self.assertEqual(result, "")
-
 
 # ============================================
 # cmd_complete durability gate (Task 3, AC#3)
@@ -173,13 +60,15 @@ def _make_complete_workspace(tmp_path, no_issue: bool = False):
     _shell_git("remote", "add", "origin", str(origin), cwd=ws)
     project = ws / "projects" / "ontology"
     _shell_init_repo(project)
-    # The Worktree feature branch exists in the project repo, so
-    # _record_verification_commit resolves it and writes the field.
     _shell_git("branch", "feature/complete-vc", cwd=project)
 
     plan_text = (
         FIXTURE_106.read_text()
-        .replace("- **Status**: planning", "- **Status**: executing")
+        .replace(
+            "- **Status**: planning",
+            "- **Status**: executing\n"
+            "- **Commit Subject**: fix(ontology): complete approved delivery",
+        )
         .replace(
             "- **Status**: executing",
             "- **Status**: executing\n- **Worktree**:\n"
@@ -202,9 +91,6 @@ def _make_complete_workspace(tmp_path, no_issue: bool = False):
         assert "- **Issue**" not in plan_text
     assert "executing" in plan_text
     assert plan_text.count("`python -m pytest") == 2
-    # The Worktree branch must be resolvable so _record_verification_commit
-    # writes the Verification Commit field before the Plan commit — only then
-    # does the failure path prove that write gets rolled back (W-03 gap).
     assert "- **Worktree**:" in plan_text
 
     plan = ws / COMPLETE_PLAN_REL
@@ -250,8 +136,7 @@ class TestCompleteDurabilityGate:
         assert result == 1
         assert plan.read_text() == original
         assert "- **Status**: executing" in plan.read_text()
-        # The Verification Commit field was written before the failed commit
-        # and must be gone after the restore.
+        # complete never owns Verification Commit.
         assert "Verification Commit" not in plan.read_text()
         # No staged Plan residue: a retry sees the same clean state.
         assert _shell_git(
@@ -275,8 +160,7 @@ class TestCompleteDurabilityGate:
         assert second == 0
         committed = _shell_git("show", f"HEAD:{COMPLETE_PLAN_REL}", cwd=ws).stdout
         assert "- **Status**: verifying" in committed
-        # The Verification Commit write also survives the successful retry.
-        assert "Verification Commit" in committed
+        assert "Verification Commit" not in committed
         assert _shell_git("log", "-1", "--format=%s", cwd=ws).stdout.strip() == (
             "docs(plan): complete plan #106"
         )

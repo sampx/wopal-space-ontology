@@ -36,6 +36,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -43,7 +44,7 @@ from lib.logging import log_info, log_success, log_error, log_warn, log_step
 from lib.workspace import find_workspace_root, detect_space_repo
 from workflow import update_plan_status, parse_plan_status, STATUS_PLANNING, STATUS_REVIEWING
 from plan import find_plan
-from plan import get_plan_project, get_plan_issue, get_plan_status
+from plan import get_plan_project, get_plan_issue, get_plan_status, get_plan_field
 from plan import resolve_project_path
 from validation import check_doc_plan, ValidationError
 from issue import (
@@ -56,6 +57,7 @@ from lib.git import (
     get_current_branch,
     get_branch_head,
     get_common_git_dir,
+    get_merge_base,
 )
 from lib.plan_commit import commit_and_push_plan, RESULT_OK, RESULT_PUSH_FAILED
 from lib.plan_state import PlanFieldSnapshot, recover_plan_after_failed_commit
@@ -80,7 +82,21 @@ def _derive_branch(project: str, plan_name: str) -> str:
     Returns:
         Branch name string
     """
-    return f"{project}-{plan_name}"
+    full = f"{project}-{plan_name}"
+    max_length = 55
+    if len(full) <= max_length:
+        return full
+
+    checksum = hashlib.sha256(full.encode("utf-8")).hexdigest()[:4]
+    # Keep the project portion byte-for-byte and shorten only the Plan-name
+    # tail. Layout: <project>-<plan-head>-<hash4>.
+    available_plan_chars = max_length - len(project) - 1 - 1 - len(checksum)
+    if available_plan_chars < 1:
+        raise ValueError(
+            f"Project name '{project}' is too long to derive a <=55 character work branch"
+        )
+    plan_head = plan_name[:available_plan_chars].rstrip("-") or plan_name[:1]
+    return f"{project}-{plan_head}-{checksum}"
 
 
 def _has_unmerged_files(repo_path: str) -> bool:
@@ -99,6 +115,145 @@ def _has_unmerged_files(repo_path: str) -> bool:
         text=True,
     )
     return bool(result.stdout.strip())
+
+
+def _field_is_unset(value: str) -> bool:
+    value = (value or "").strip()
+    return (
+        not value
+        or value in {"(none)", "none", "N/A"}
+        or (value.startswith("<") and value.endswith(">"))
+        or "recorded automatically" in value
+    )
+
+
+def _prepare_delivery_fields(
+    *,
+    plan_path: str,
+    plan_name: str,
+    workspace_root: Path,
+    project_path: Path | None,
+    branch: str,
+    existing_worktree: str | None,
+    no_worktree: bool,
+) -> tuple[dict[str, str] | None, str]:
+    """Resolve the approved Plan's formal Delivery metadata.
+
+    No-worktree Plans intentionally have no formal-integration identity. A
+    work-branch Plan must carry a human-authored Commit Subject; no title is
+    generated here or later on the delivery path.
+    """
+    if no_worktree:
+        return {
+            "Delivery": "(none)",
+            "Commit Subject": "(none)",
+            "Integration Strategy": "(none)",
+            "Integration Branch": "(none)",
+            "Work Branch": "(none)",
+            "Delivery Base Commit": "(none)",
+            "Verification Commit": "(none)",
+            "Integration Commit": "(none)",
+        }, ""
+
+    if not project_path:
+        return None, "Cannot resolve project repository for Delivery metadata"
+
+    integration_branch = get_current_branch(project_path) or "main"
+    delivery = get_plan_field(plan_path, "Delivery")
+    if _field_is_unset(delivery):
+        delivery = plan_name
+
+    subject = get_plan_field(plan_path, "Commit Subject")
+    if _field_is_unset(subject):
+        return None, "Commit Subject must be written in the Plan before approve"
+
+    strategy = get_plan_field(plan_path, "Integration Strategy")
+    if _field_is_unset(strategy):
+        strategy = "squash"
+    if strategy not in ("squash", "preserve-history"):
+        return None, "Integration Strategy must be squash or preserve-history"
+
+    # Shared Delivery membership is only valid when explicitly reusing the
+    # owner's worktree. The owner is the first approved Plan whose name is the
+    # Delivery id; later members inherit missing shared fields but reject any
+    # explicit disagreement.
+    if delivery != plan_name:
+        if not existing_worktree:
+            return None, "A shared Delivery requires --existing-worktree"
+        try:
+            owner_path = find_plan(delivery, str(workspace_root))
+        except FileNotFoundError:
+            return None, f"Delivery owner Plan not found: {delivery}"
+
+        owner_integration_commit = get_plan_field(owner_path, "Integration Commit")
+        if not _field_is_unset(owner_integration_commit):
+            return None, (
+                f"Delivery {delivery} is already formally integrated; "
+                "new members cannot join it"
+            )
+
+        owner_fields = {
+            field: get_plan_field(owner_path, field)
+            for field in (
+                "Commit Subject",
+                "Integration Strategy",
+                "Integration Branch",
+                "Work Branch",
+                "Delivery Base Commit",
+            )
+        }
+        for field, owner_value in owner_fields.items():
+            if _field_is_unset(owner_value):
+                return None, f"Delivery owner is missing required field '{field}'"
+            member_value = get_plan_field(plan_path, field)
+            if not _field_is_unset(member_value) and member_value != owner_value:
+                return None, (
+                    f"Shared Delivery mismatch for {field}: "
+                    f"'{member_value}' != '{owner_value}'"
+                )
+        if branch != owner_fields["Work Branch"]:
+            return None, (
+                f"Shared Delivery mismatch for Work Branch: "
+                f"'{branch}' != '{owner_fields['Work Branch']}'"
+            )
+        if subject != owner_fields["Commit Subject"]:
+            return None, (
+                f"Shared Delivery mismatch for Commit Subject: "
+                f"'{subject}' != '{owner_fields['Commit Subject']}'"
+            )
+        return {
+            "Delivery": delivery,
+            **owner_fields,
+            "Verification Commit": "(none)",
+            "Integration Commit": "(none)",
+        }, ""
+
+    work_branch = branch
+    if not work_branch:
+        return None, "Work Branch is required for a formal Delivery"
+
+    if existing_worktree:
+        base_commit = get_merge_base(
+            str(project_path), integration_branch, work_branch
+        )
+    else:
+        try:
+            base_commit = get_branch_head(str(project_path), integration_branch)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            base_commit = ""
+    if not base_commit:
+        return None, "Could not resolve Delivery Base Commit"
+
+    return {
+        "Delivery": delivery,
+        "Commit Subject": subject,
+        "Integration Strategy": strategy,
+        "Integration Branch": integration_branch,
+        "Work Branch": work_branch,
+        "Delivery Base Commit": base_commit,
+        "Verification Commit": "(none)",
+        "Integration Commit": "(none)",
+    }, ""
 
 
 # ============================================
@@ -422,6 +577,19 @@ def cmd_approve(args: argparse.Namespace) -> int:
         print(f"  2. 默认会创建 worktree 隔离（当前使用了 --no-worktree）")
         print("")
         return 1
+
+    delivery_fields, delivery_error = _prepare_delivery_fields(
+        plan_path=plan_path,
+        plan_name=plan_name,
+        workspace_root=workspace_root,
+        project_path=Path(project_path) if project_path else None,
+        branch=branch,
+        existing_worktree=existing_worktree,
+        no_worktree=bool(args.no_worktree),
+    )
+    if delivery_fields is None:
+        log_error(delivery_error)
+        return 1
     
     # ============================================
     # STATE TRANSITION (Plan fields first, then one commit)
@@ -432,6 +600,14 @@ def cmd_approve(args: argparse.Namespace) -> int:
     # Best-effort: an unreadable Plan cannot be snapshotted, but then the
     # writes below fail on their own and the rollback reports it truthfully.
     snapshot = PlanFieldSnapshot.capture(plan_path)
+
+    for field, value in delivery_fields.items():
+        if not set_plan_field(plan_path, field, value):
+            log_error(f"Failed to record {field}")
+            return _abort_after_state_write(
+                plan_path, snapshot, current_status, workspace_root,
+                issue_number, rollback_commit=False,
+            )
 
     # Write Worktree metadata (branch + path) to Plan
     if wt_rel is not None:
@@ -459,31 +635,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
 
     log_success("Plan status updated to: executing")
 
-    # Record Base Commit (implementation baseline) BEFORE the state-transition
-    # commit, so the approval commit already contains the real SHA and leaves
-    # no uncommitted Base Commit line behind. Baseline source: for an isolated
-    # worktree it is the project's integration branch (main) HEAD; for
-    # --existing-worktree evolution mode it is the current HEAD of that
-    # worktree's branch (the previous Plan's landing point).
-    base_commit = ""
-    try:
-        if existing_worktree and worktree_path and branch:
-            base_commit = get_branch_head(str(worktree_path), branch)
-        elif project_path:
-            base_commit = get_branch_head(str(project_path), "main")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        base_commit = ""
-
-    if base_commit:
-        if not set_plan_field(plan_path, "Base Commit", base_commit):
-            log_error("Failed to record Base Commit")
-            return _abort_after_state_write(
-                plan_path, snapshot, current_status, workspace_root,
-                issue_number, rollback_commit=False,
-            )
-        log_success(f"Base Commit recorded: {base_commit}")
-
-    # Commit/push the Plan baseline (executing + Worktree metadata + Base Commit)
+    # Commit/push the Plan baseline (executing + Worktree + Delivery metadata).
     result = commit_and_push_plan(plan_path, issue_number, workspace_root, message_prefix="approve")
     if result == RESULT_PUSH_FAILED:
         # Issue #215: push failure must not abort approve mid-lifecycle.

@@ -114,6 +114,29 @@ def get_dirty_lines(repo_path: str) -> list[str]:
     return [line for line in result.stdout.split("\n") if line.strip()]
 
 
+def paths_have_changes(
+    repo_path: str, paths: list[str]
+) -> bool | GitMutationFailure:
+    """Return whether named paths changed, or a structured status failure.
+
+    Query failure must stay distinct from a clean result. Formal Delivery
+    callers use this before deciding whether Plan metadata is durable; treating
+    a failed `git status` as clean can otherwise report false success.
+    """
+    if not paths:
+        return False
+    command = ["git", "status", "--porcelain", "--", *paths]
+    result = subprocess.run(
+        command,
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return GitMutationFailure.from_completed(command, repo_path, result)
+    return bool(result.stdout.strip())
+
+
 def get_current_branch(repo_path: str) -> str:
     """Get current branch name.
 
@@ -170,6 +193,41 @@ def get_branch_head(repo_path: str, branch: str) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout.strip()
+
+
+def get_merge_base(repo_path: str, left: str, right: str) -> str:
+    """Return the merge-base SHA for two refs, or empty string on failure."""
+    result = subprocess.run(
+        ["git", "merge-base", left, right],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def commit_exists(repo_path: str, commit: str) -> bool:
+    """Return whether `commit` resolves to a commit object."""
+    if not commit:
+        return False
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def get_commit_subject(repo_path: str, commit: str) -> str:
+    """Return a commit's subject verbatim, or empty string on failure."""
+    result = subprocess.run(
+        ["git", "show", "-s", "--format=%s", commit],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.rstrip("\n") if result.returncode == 0 else ""
 
 
 def commit_all(repo_path: str, message: str) -> bool | GitMutationFailure:
@@ -431,6 +489,118 @@ def _is_ancestor(repo_root: str, older: str, newer: str) -> bool:
     """True if commit `older` is an ancestor of (or equal to) `newer`."""
     result = _run_git(repo_root, "merge-base", "--is-ancestor", older, newer)
     return result.returncode == 0
+
+
+def is_ancestor(repo_root: str, older: str, newer: str) -> bool:
+    """Public ancestry predicate for command-layer Git state checks."""
+    return _is_ancestor(repo_root, older, newer)
+
+
+def integrate_branch(
+    repo_root: str,
+    *,
+    integration_branch: str,
+    work_branch: str,
+    delivery_base: str,
+    strategy: str,
+    commit_subject: str,
+) -> str | GitMutationFailure:
+    """Create one formal Delivery commit from a validated work branch.
+
+    The caller owns Plan/business validation. This helper owns all Git
+    mutations and returns the resulting formal commit SHA or structured Git
+    diagnostics on failure.
+    """
+    if not get_branch_head(repo_root, integration_branch):
+        return GitMutationFailure(
+            command=["git", "rev-parse", integration_branch], cwd=repo_root,
+            exit_code=1, stdout="", stderr=f"Unknown integration branch: {integration_branch}",
+        )
+    if not get_branch_head(repo_root, work_branch):
+        return GitMutationFailure(
+            command=["git", "rev-parse", work_branch], cwd=repo_root,
+            exit_code=1, stdout="", stderr=f"Unknown work branch: {work_branch}",
+        )
+    if not _is_ancestor(repo_root, delivery_base, work_branch):
+        return GitMutationFailure(
+            command=["git", "merge-base", "--is-ancestor", delivery_base, work_branch],
+            cwd=repo_root, exit_code=1, stdout="",
+            stderr="Delivery Base Commit is not an ancestor of Work Branch",
+        )
+    if not _is_ancestor(repo_root, delivery_base, integration_branch):
+        return GitMutationFailure(
+            command=["git", "merge-base", "--is-ancestor", delivery_base, integration_branch],
+            cwd=repo_root, exit_code=1, stdout="",
+            stderr="Delivery Base Commit is not an ancestor of Integration Branch",
+        )
+
+    current = get_current_branch(repo_root)
+    if current != integration_branch:
+        checkout_cmd = ["git", "checkout", integration_branch]
+        checkout = _run_git(repo_root, "checkout", integration_branch)
+        if checkout.returncode != 0:
+            return GitMutationFailure.from_completed(checkout_cmd, repo_root, checkout)
+
+    if strategy == "squash":
+        merge_cmd = ["git", "merge", "--squash", work_branch]
+        merge = _run_git(repo_root, "merge", "--squash", work_branch)
+        if merge.returncode != 0:
+            return GitMutationFailure.from_completed(merge_cmd, repo_root, merge)
+        commit_cmd = ["git", "commit", "-m", commit_subject]
+        commit = _run_git(repo_root, "commit", "-m", commit_subject)
+        if commit.returncode != 0:
+            return GitMutationFailure.from_completed(commit_cmd, repo_root, commit)
+    elif strategy == "preserve-history":
+        merge_cmd = ["git", "merge", "--no-ff", work_branch, "-m", commit_subject]
+        merge = _run_git(
+            repo_root, "merge", "--no-ff", work_branch, "-m", commit_subject
+        )
+        if merge.returncode != 0:
+            return GitMutationFailure.from_completed(merge_cmd, repo_root, merge)
+    else:
+        return GitMutationFailure(
+            command=["git", "merge"], cwd=repo_root, exit_code=1,
+            stdout="", stderr=f"Unsupported Integration Strategy: {strategy}",
+        )
+
+    head = get_branch_head(repo_root, integration_branch)
+    if not head:
+        return GitMutationFailure(
+            command=["git", "rev-parse", integration_branch], cwd=repo_root,
+            exit_code=1, stdout="", stderr="Could not resolve formal Integration Commit",
+        )
+    return head
+
+
+def fast_forward_from_remote(
+    repo_root: str, branch: str, remote: str = "origin"
+) -> str | GitMutationFailure:
+    """Fetch `remote/branch`, checkout branch, and fast-forward to it."""
+    fetch_cmd = ["git", "fetch", remote, branch]
+    fetch = _run_git(repo_root, "fetch", remote, branch)
+    if fetch.returncode != 0:
+        return GitMutationFailure.from_completed(fetch_cmd, repo_root, fetch)
+
+    current = get_current_branch(repo_root)
+    if current != branch:
+        checkout_cmd = ["git", "checkout", branch]
+        checkout = _run_git(repo_root, "checkout", branch)
+        if checkout.returncode != 0:
+            return GitMutationFailure.from_completed(checkout_cmd, repo_root, checkout)
+
+    remote_ref = f"{remote}/{branch}"
+    merge_cmd = ["git", "merge", "--ff-only", remote_ref]
+    merge = _run_git(repo_root, "merge", "--ff-only", remote_ref)
+    if merge.returncode != 0:
+        return GitMutationFailure.from_completed(merge_cmd, repo_root, merge)
+
+    head = get_branch_head(repo_root, branch)
+    if not head:
+        return GitMutationFailure(
+            command=["git", "rev-parse", branch], cwd=repo_root,
+            exit_code=1, stdout="", stderr=f"Could not resolve branch head: {branch}",
+        )
+    return head
 
 
 def push_repo(repo_root: str, branch: str | None = None) -> bool | GitMutationFailure:

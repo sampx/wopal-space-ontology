@@ -177,19 +177,19 @@ integrate 只用于有开发分支的交付（默认模式和 --existing-worktre
 
 可由执行者用命令检查的结果：
 
-1. [ ] **有开发分支时主分支只留一条交付记录**：用真实临时 Git 仓库建立至少 3 条工作、评审修复或验证修复提交。无论正式分支没有前进还是期间有其他提交进入，默认集成后正式分支只增加一条新提交（不是把两条分支接在一起的合并提交），标题与 Commit Subject 完全一致，也没有把中间开发提交带进正式分支。归档前，开发分支仍指向包含全部开发提交的版本；正常归档后，开发分支和额外工作目录均已删除。
-2. [ ] **两条路径各自成立**：有开发分支的默认模式和 --existing-worktree 使用同一压缩合并规则，Issue 只影响关联信息。--no-worktree 仍在主分支直实施：不创建开发分支和额外工作目录，不执行压缩合并，归档时也不删除任何开发分支。
-3. [ ] **提交记录指向准确**：有开发分支时，Verification Commit 只指用户检查过的开发分支提交，Integration Commit 只指主分支实际生成的交付提交；--no-worktree 只记录主分支上用户检查到的提交，不写 Integration Commit。verify --confirm 必须检查本次交付记录的提交编号。
-4. [ ] **共用一次交付**：多个 --existing-worktree Plan 加入同一 Delivery 时，approve 拒绝不同开发分支、正式分支、起点或提交标题；integrate 从任一成员 Plan 都会包含共同起点之后的全部成员改动，只生成一条正式交付记录，并把同一个 Integration Commit 提供给所有成员 Plan 的 verify。
-5. [ ] **保留多条提交是明确例外**：只有 Integration Strategy 写明 preserve-history，且用户在合入前明确选择时，正式分支才保留所有开发提交。默认方式不能改成普通合并（可能把多条中间提交一起带进正式分支）。
-6. [ ] **现有安全门继续有效**：用户确认、实现审查、防止覆盖其他人未提交改动的检查、供用户检查时切换到开发分支的方式和 PR 检查都通过回归验证。有开发分支的单 Plan 正常归档仍删除开发分支和额外工作目录；--no-worktree 的归档不涉及开发分支清理。
-7. [ ] **分支长度准确**：Plan 名称继续执行现有的 20 字符限制。新建开发分支最多 55 个字符；超过时只截短 Plan 名称部分并附加稳定的四位校验码。旧 Plan 和已存在的分支保持原样。
-8. [ ] **共用分支只清理一次**：共用 Delivery 的非负责人 Plan 归档时保留开发分支，让其他成员还能完成归档；负责人 Plan 最后归档时删除共用开发分支和工作目录。全部归档结束后，不得留下这次交付的分支或工作目录。
-9. [ ] **提交标题的权责链可核查**：技能说明里写明起草人、冻结时点、变更权限和“脚本只读取不改写”四条规则；integrate 与 PR 合并命令所使用的提交标题必须与 Plan 字段逐字相同，其正式交付标题路径上不得有生成、拼接或改写逻辑；成员 Plan 标题不一致时 approve 拒绝。
+1. [x] **有开发分支时主分支只留一条交付记录**：用真实临时 Git 仓库建立至少 3 条工作、评审修复或验证修复提交。无论正式分支没有前进还是期间有其他提交进入，默认集成后正式分支只增加一条新提交（不是把两条分支接在一起的合并提交），标题与 Commit Subject 完全一致，也没有把中间开发提交带进正式分支。归档前，开发分支仍指向包含全部开发提交的版本；正常归档后，开发分支和额外工作目录均已删除。
+2. [x] **两条路径各自成立**：有开发分支的默认模式和 --existing-worktree 使用同一压缩合并规则，Issue 只影响关联信息。--no-worktree 仍在主分支直实施：不创建开发分支和额外工作目录，不执行压缩合并，归档时也不删除任何开发分支。
+3. [x] **提交记录指向准确**：有开发分支时，Verification Commit 只指用户检查过的开发分支提交，Integration Commit 只指主分支实际生成的交付提交；--no-worktree 只记录主分支上用户检查到的提交，不写 Integration Commit。verify --confirm 必须检查本次交付记录的提交编号。
+4. [x] **共用一次交付**：多个 --existing-worktree Plan 加入同一 Delivery 时，approve 拒绝不同开发分支、正式分支、起点或提交标题；integrate 从任一成员 Plan 都会包含共同起点之后的全部成员改动，只生成一条正式交付记录，并把同一个 Integration Commit 提供给所有成员 Plan 的 verify。
+5. [x] **保留多条提交是明确例外**：只有 Integration Strategy 写明 preserve-history，且用户在合入前明确选择时，正式分支才保留所有开发提交。默认方式不能改成普通合并（可能把多条中间提交一起带进正式分支）。
+6. [x] **现有安全门继续有效**：用户确认、实现审查、防止覆盖其他人未提交改动的检查、供用户检查时切换到开发分支的方式和 PR 检查都通过回归验证。有开发分支的单 Plan 正常归档仍删除开发分支和额外工作目录；--no-worktree 的归档不涉及开发分支清理。
+7. [x] **分支长度准确**：Plan 名称继续执行现有的 20 字符限制。新建开发分支最多 55 个字符；超过时只截短 Plan 名称部分并附加稳定的四位校验码。旧 Plan 和已存在的分支保持原样。
+8. [x] **共用分支只清理一次**：共用 Delivery 的非负责人 Plan 归档时保留开发分支，让其他成员还能完成归档；负责人 Plan 最后归档时删除共用开发分支和工作目录。全部归档结束后，不得留下这次交付的分支或工作目录。
+9. [x] **提交标题的权责链可核查**：技能说明里写明起草人、冻结时点、变更权限和“脚本只读取不改写”四条规则；integrate 与 PR 合并命令所使用的提交标题必须与 Plan 字段逐字相同，其正式交付标题路径上不得有生成、拼接或改写逻辑；成员 Plan 标题不一致时 approve 拒绝。
 
 ### User Validation
 
-需要用户亲自观察确认的结果：
+需要用户确认的结果；本次用户明确说明该行为主要面向 Agent、缺少可直接观察的用户界面，并授权由 Agent 使用真实临时 Git 场景代做验证，以该结果作为本次 User Validation：
 
 #### Scenario 1: 正式分支的提交容易看懂
 
@@ -203,7 +203,9 @@ integrate 只用于有开发分支的交付（默认模式和 --existing-worktre
 - Pass criteria（通过标准）: 默认方式没有额外的合并提交，也没有把工作、评审或验证的中间提交带到正式分支；本次交付只有一条含义明确的正式提交。
 - Failure feedback（失败时提供的内容）: 提供 git log --graph --first-parent --oneline -12 的输出，并说明哪条提交或标题不清楚。
 
-- [ ] 用户已亲自验证上述结果并确认通过。
+- [x] 用户已明确授权 Agent 代做本场景验证，并接受该验证结果作为本次 User Validation。
+
+**Validation record (2026-10-29)**: Agent 在独立临时 Git 仓库中建立 `main` + `work-delivery`，开发分支依次产生 implementation / review correction / validation correction 三条提交，同时让 `main` 先进入一条无关提交，再调用正式 `integrate_local_delivery(..., strategy="squash")`。结果：`main_before..main` 只有 1 条正式提交；正式标题逐字为 `feat(dev-flow): simulated formal delivery`；三条开发提交均不是 `main` ancestor；`work-delivery` tip 保持不变；Integration Commit 等于新的 `main` HEAD。随后执行关键真实 Git 场景回归（Shared Delivery、成员 PR、冲突 PR、dirty worktree、metadata durability/retry、preserve-history、no-worktree、55 字符分支、共享归档、固定 Integration Commit）→ `26 passed`；全量 `python -m pytest tests/python/ -q` → `560 passed, 42 subtests passed`；`bash scripts/flow.sh integrate --help` 正常；`wopal space evo check refactor-dev-flow-history` → `Result: OK`。验证结论：通过。
 
 ## Implementation
 
@@ -234,11 +236,11 @@ Task 是实施任务。Verification Intent 列出它对应的验收标准；Pre-
 **Verify**: 实施期回填文档一致性检查命令；逐项对照 D-01 至 D-09，确认每个字段和流程都有清楚解释，且没有与本提案相矛盾的句子。
 
 **Done**:
-Task output（结果摘要）: (backfilled after verification)
-Files touched（实际修改的文件）: (backfilled after implementation)
-- [ ] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
+Task output（结果摘要）: 已更新 dev-flow 中文审阅版，明确有开发分支与正式分支的历史边界、默认 squash 单提交、--no-worktree 主分支直实施、共享 Delivery、Verification/Integration Commit、Commit Subject 四步权责链、55 字符开发分支规则和共享归档清理。验证执行 `git diff --check` 与 D-01 至 D-09 文档一致性扫描，结果均 PASS。
+Files touched（实际修改的文件）: skills/dev-flow/SKILL.zh-CN.md
+- [x] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
 
-**User checkpoint after Task 1**: Task 1 完成并提交后，Wopal 将中文审阅版交给用户确认。用户明确同意后才开始 Task 2。未获得确认前，不改英文正式版、Plan 模板和运行脚本。
+**User direction after Task 1**: 用户明确纠正本检查点：进入实施后不中途停机确认，中英文 Skill 说明连续完成，随后继续脚本与测试实现；全部实现和自动验证完成后再进行一次最终评审/验证。
 
 ### Task 2: 同步英文正式说明和 Plan 模板
 
@@ -252,7 +254,7 @@ Files touched（实际修改的文件）: (backfilled after implementation)
 
 **Pre-read**: .wopal/skills/dev-flow/SKILL.md、references/commands.md、templates/plan.md、.wopal/skills/dev-flow/AGENTS.md。
 
-**Design**: 仅在用户确认 Task 1 的中文审阅版后开始。具体实现之前先按本提案冻结的字段和行为同步英文内容，不再自行补充产品决策。
+**Design**: 按用户对原检查点的明确修订，Task 1 完成后直接开始。具体实现之前按本提案冻结的字段和行为同步英文内容，不再自行补充产品决策。
 
 **TDD**: false（本 Task 只同步文档，不改变程序行为，因此无需先写测试）— 本 Task 只同步文档和模板，不改变程序行为；程序测试放在 Task 3。
 
@@ -264,9 +266,9 @@ Files touched（实际修改的文件）: (backfilled after implementation)
 **Verify**: 实施期回填文档一致性检查命令，并逐项确认：中英文语义一致；Plan 模板含 Commit Subject 字段；默认指引不再要求普通合并；技能说明中能直接找到“谁起草、何时冻结、如何变更、脚本只读取”四条规则。
 
 **Done**:
-Task output（结果摘要）: (backfilled after verification)
-Files touched（实际修改的文件）: (backfilled after implementation)
-- [ ] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
+Task output（结果摘要）: 已将用户确认的交付历史规则同步到英文正式 Skill、命令参考和 Plan 模板；中英文均明确 Delivery 字段、提交标题四步权责链、默认 squash、共享 Delivery、--no-worktree 直实施，以及 integrate 取 Commit Subject 原值；旧的手工普通 merge 指引已移除。
+Files touched（实际修改的文件）: skills/dev-flow/SKILL.md；skills/dev-flow/references/commands.md；skills/dev-flow/templates/plan.md；docs/evolutions/refactor-dev-flow-history.md
+- [x] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
 
 ### Task 3: 实现统一合入命令并检查提交记录
 
@@ -297,9 +299,41 @@ Files touched（实际修改的文件）: (backfilled after implementation)
 **Verify**: 实施期回填 dev-flow 单元测试与集成测试命令。必须包含真实 Git 提交关系检查：有开发分支时多条开发提交最终只在主分支形成一条交付提交，提交标题与 Plan 字段逐字相同；长项目和 Plan 名称生成的开发分支不超过 55 个字符；归档后开发分支和额外工作目录都不存在；--no-worktree 全程没有创建开发分支。
 
 **Done**:
-Task output（结果摘要）: (backfilled after verification)
-Files touched（实际修改的文件）: (backfilled after implementation)
-- [ ] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
+Task output（结果摘要）: 已实现 `flow.sh integrate` 与完整 Delivery 元数据流；默认 squash、明确 preserve-history、PR 合入均逐字使用 Plan `Commit Subject`。approve 会冻结/校验共享 Delivery 并生成 ≤55 字符稳定开发分支；complete 不再提前写 Verification Commit；verify 以固定 Integration Commit 核验本次交付，--no-worktree 只记录用户实际检查的正式分支 Verification Commit；共享 Delivery 按“成员保留、负责人最后清理”归档。integrate 的 Plan 记录提交失败可安全重试，不会重复正式合入。TDD 红灯确认后完成实现。验证：`python -m pytest tests/python/unit/test_integrate.py tests/python/unit/test_complete_verification_commit.py -q` → 16 passed；`python -m pytest tests/python/ -q` → 547 passed, 42 subtests passed；`bash scripts/flow.sh integrate --help` 正常；生产路径旧 Final Commit / 手工 merge 残留扫描为空；`git diff --check` 通过。
+Files touched（实际修改的文件）: skills/dev-flow/references/{commands.md,plan-guide.md,plan-guide.zh-CN.md,troubleshooting.md}；skills/dev-flow/scripts/commands/{approve.py,archive.py,complete.py,integrate.py,verify.py,verify_switch.py}；skills/dev-flow/scripts/{flow.py,flow.sh}；skills/dev-flow/tests/python/unit/{test_approve.py,test_archive_delivery.py,test_complete_verification_commit.py,test_integrate.py,test_verify.py,test_verify_switch.py}；docs/evolutions/refactor-dev-flow-history.md
+- [x] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
+
+### Task 4: 实施评审返工（第 1 轮 BLOCK findings）
+
+**Origin**: mandatory implementation review 对 `c72c19f..5421b40` 判 `BLOCK`（3 Blocker + 2 Warning）。本 Task 只修复 B-01～B-03、W-01～W-02 及其直接影响面，不重新打开已通过的设计项。
+
+**Behavior**:
+- integrate 在任何正式 Git mutation 前同时检查 canonical checkout 和仍存在的 Delivery worktree；任一处 dirty 都拒绝，且不写 Verification / Integration Commit。
+- Shared Delivery 从所有成员统一解析 PR identity；任一合法成员创建的唯一 PR 都成为该 Delivery 的正式 PR 路径，不同 PR URL 则拒绝。
+- Delivery 一旦已有 Integration Commit 即关闭新成员加入；已正式集成后的 Work Branch 若继续前进，重跑 integrate 明确拒绝而不是再次集成或静默成功。
+- 本次新增 Git / GitHub mutation 与查询统一通过 `scripts/lib/git.py` / `scripts/lib/github.py`，command 层只负责编排 Delivery 状态。
+- Shared Delivery approve 的五个共同字段逐项都有回归测试，并保留实际 existing-worktree branch 与 Work Branch 不一致的行为测试。
+
+**TDD**: true — 先用真实 Git worktree / bare origin 复现 B-01～B-03，并用参数化测试补齐 W-02，再实现修复。
+
+**Changes**:
+1. B-01：integrate 解析所有成员 Plan 的 Worktree metadata；仍存在的 worktree 若有 staged / unstaged / untracked 变更，正式合入前直接失败。canonical checkout 的 dirty gate 保持不变。
+2. B-02：PR URL 改为 Delivery 级统一解析；唯一 PR 可记录在任一成员，integrate 走该 PR 并在成功后把同一 PR identity 写回所有成员；多个不同 URL 在 Git mutation 前拒绝。
+3. B-03：approve 在 owner 已有 Integration Commit 时拒绝新成员；integrate retry 要求所有成员 Verification Commit 一致且等于当前 Work Branch tip，否则判定 Delivery 已关闭且分支发生漂移并拒绝。
+4. W-01：新增正式交付 Git helper（commit existence / subject / ancestry / merge-base / path-scoped status / branch integration / remote fast-forward）集中到 `lib/git.py`；PR merge 集中到 `lib/github.py`；approve / integrate / verify 不再新增直接 Git subprocess 调用。
+5. W-02：Shared Delivery mismatch 测试参数化覆盖 Commit Subject、Integration Strategy、Integration Branch、Work Branch、Delivery Base Commit 五字段，并单独覆盖真实 existing-worktree branch mismatch。
+
+**Verify**: `python -m pytest tests/python/unit/test_integrate.py tests/python/unit/test_approve.py tests/python/unit/test_verify.py tests/python/unit/test_git_semantics.py::TestFormalDeliveryGitHelpers -q`；`python -m pytest tests/python/ -q`；`git diff --check`；扫描本轮 command-layer diff 中新增 direct Git subprocess。
+
+**Done**:
+Task output（结果摘要）: 第 1 轮评审的 3 Blocker + 2 Warning 已全部按直接影响面修复。真实 Git 回归证明：dirty registered worktree 会在 main 前进和 VC/IC 写入前阻断；成员 Plan 持有的唯一 PR 会成为 Shared Delivery 的正式 PR 路径并同步给全组，冲突 PR identity 会拒绝；正式集成后的 Work Branch 漂移会拒绝重跑，owner 已有 Integration Commit 后 approve 不再允许 late member。Git/GitHub 正式交付操作已收口到 `lib/git.py` / `lib/github.py`。W-02 五字段参数化与实际 worktree branch mismatch 均已锁定。验证：聚焦 `60 passed`；全量 `559 passed, 42 subtests passed`；本轮 command-layer diff 新增 direct Git 调用扫描为 0；`git diff --check` PASS。
+Files touched（实际修改的文件）: skills/dev-flow/scripts/commands/{approve.py,integrate.py,verify.py}；skills/dev-flow/scripts/lib/{git.py,github.py}；skills/dev-flow/tests/python/unit/{test_approve.py,test_git_semantics.py,test_integrate.py}；docs/evolutions/refactor-dev-flow-history.md
+- [x] 执行者已完成本 Task 的工作，验收者已检查 Verify 结果并回填记录。
+
+**Implementation Review 记录**: 第 1 轮对 `c72c19f..5421b40` 判 `BLOCK`（3 Blocker + 2 Warning），Task 4 完成全部返工；第 2 轮对 `5421b40..e65dc11` 确认原 5 项均已修复，但发现 W-01 helper 化直接引入的 durability Blocker B-N01（Plan path status query 失败被误判为 clean）。主控按 TDD 自修：`paths_have_changes()` 将 clean / changed / Git query failure 分为 `False` / `True` / `GitMutationFailure`，`_commit_plan_records()` 对 query failure fail-loud；真实损坏 Plan repo index 的完整 integrate→失败→修复 index→retry 回归证明正式分支始终只有一条交付 commit，Plan VC/IC 最终 durable。修复提交 `809e9f0`，相关模块 `62 passed`，全量 `560 passed, 42 subtests passed`。用户明确要求“有 BLOCK 必须再次评审”，因此追加第 3 轮 fix verification；对 `e65dc11..809e9f0` 的最终评审结论为 `PASS`（Blocker 0 / Warning 0，B-N01 FIXED，direct blast radius clean）。Implementation Review gate 至此通过。
+
+**第 2 轮终局复审后的主控自修**：复审确认第 1 轮 B-01～B-03 / W-01～W-02 已全部修复，但发现 W-01 helper 化直接引入 B-N01：`paths_have_changes()` 把 path-scoped `git status` 查询失败与 clean 同样返回 False，使正式代码已经集成后可能跳过 Plan metadata commit 并错误返回成功。评审预算已用尽，因此主控仅修复该直接 blast-radius 缺陷，不开启第三轮设计/实现评审。修复后 `paths_have_changes()` 在 status 非零时返回 `GitMutationFailure`，`_commit_plan_records()` 明确记录诊断并非零失败；真实损坏 Plan repo index 的回归证明：formal main 可已前进，但命令返回失败且不会声称 VC/IC 已持久化；恢复 index 后重试只提交既有 Delivery records，正式分支仍只有第一次生成的单条 formal commit。验证：B-N01 RED 两测均失败；修复后聚焦 `3 passed`，相关 `test_integrate.py + test_git_semantics.py` 共 `62 passed`，全量 `560 passed, 42 subtests passed`，`git diff --check` PASS。
+Files touched（本次终局自修）: skills/dev-flow/scripts/lib/git.py；skills/dev-flow/scripts/commands/integrate.py；skills/dev-flow/tests/python/unit/{test_git_semantics.py,test_integrate.py}；docs/evolutions/refactor-dev-flow-history.md
 
 ## Delegation Strategy
 
@@ -307,11 +341,12 @@ Files touched（实际修改的文件）: (backfilled after implementation)
 
 | Wave | Task | Executor | Depends on | Why delegated |
 |------|------|----------|------------|---------------|
-| 1 | Task 1 | fae | none | 先整理中文说明，供用户阅读确认 |
-| 2 | Task 2 | fae | Task 1 + 用户确认 | 用户同意中文版后，再同步英文正式说明和模板 |
+| 1 | Task 1 | fae | none | 整理中文说明 |
+| 2 | Task 2 | fae | Task 1 | 连续同步英文正式说明和模板，不设中间用户门 |
 | 3 | Task 3 | fae | Task 2 | 文字说明确认一致后，再改命令和检查程序 |
+| 4 | Task 4 | Wopal/controller | Task 3 + implementation review round 1 | 按评审 findings 做一轮完整返工并准备复审 |
 
-Task 1 完成并由 Wopal 验收、提交后，暂停并请用户确认中文审阅版。确认之前不能开始 Task 2。
+实施阶段连续完成 Task 1 → Task 2 → Task 3；第 1 轮 implementation review 若有 finding，则在 `implementing` 内完成 Task 4 返工和第 2 轮复审；只有复审通过后才进入用户最终验证。
 
 ## Delivery
 

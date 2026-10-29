@@ -14,6 +14,7 @@ from commands.approve import register_approve_parser, cmd_approve
 from commands.submit import register_submit_parser, cmd_submit
 from commands.complete import register_complete_parser, cmd_complete
 from commands.verify import register_verify_parser, cmd_verify
+from commands.integrate import register_integrate_parser, cmd_integrate
 from commands.plan import register_plan_parser, cmd_plan
 from commands.reset import register_reset_parser, cmd_reset
 from commands.verify_switch import run_verify_switch
@@ -54,6 +55,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Register verify subcommand
     register_verify_parser(subparsers)
+
+    # Register formal Delivery integration
+    register_integrate_parser(subparsers)
 
     # Register plan subcommand
     register_plan_parser(subparsers)
@@ -96,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  submit                       Submit Plan for review (planning -> reviewing)")
         print("  approve                      Approve a reviewed Plan (--confirm required)")
         print("  complete                     Mark implementation complete")
+        print("  integrate                    Integrate a validated Delivery")
         print("  verify                       Verify and confirm completion")
         print("  verify-switch                Switch workspace for worktree verification")
         print("  archive                      Archive a completed Plan")
@@ -133,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     # Dispatch verify subcommand
     if args.command == "verify":
         return cmd_verify(args)
+
+    if args.command == "integrate":
+        return cmd_integrate(args)
 
     # Dispatch plan subcommand
     if args.command == "plan":
