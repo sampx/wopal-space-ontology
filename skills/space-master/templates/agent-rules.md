@@ -1,6 +1,7 @@
 ---
 name: <Project or Module(dir)> AGENT RULES
 description: <One-line stable description of the current project or directory module responsibility>
+maintenance: <When this file should change; prohibit one-off tasks, implementation facts and bug records>
 ---
 
 # Agent Development Rules
@@ -30,15 +31,31 @@ Canonical references:
 | Scenario | Command | When |
 |---|---|------|
 
+<!-- Record actual entry commands. When reusable project scripts, fixtures or contract helpers exist, name them here or under Testing so agents do not rebuild equivalents. -->
+
+## Quality Gates
+
+<!-- Every gate must be an existing executable command. Do not list a manual review as a quality gate. -->
+
+| Gate | Command | Blocks work when |
+|---|---|---|
+| Format / lint / type check | `<command>` | `<failure condition>` |
+| Unit tests | `<command>` | `<failure condition>` |
+| Integration tests | `<command>` | `<failure condition>` |
+| Build / package | `<command>` | `<failure condition>` |
+
 ## Implementation Rules
 
-- <technical implementation rule>
-- <project-specific UI/UX or output rule if applicable>
+- <module ownership and coding-style rule; name the formatter/linter/typecheck entry when applicable>
+- <canonical error type, stable fields and side-effect uncertainty rule>
+<!-- For CLI/service projects, add concrete rules for success/failure streams, output format, exit codes, log sink, rotated files, recorded fields and forbidden content. For libraries or UI, replace these with the applicable public-contract or user-visible-state rules. -->
 
 ## Testing
 
 - <For testable pure logic, follow TDD: write a failing test first, then implement code to make it pass>
-- <state which project logic must be covered by automated tests and which host APIs, external systems, or real runtime boundaries require manual verification>
+- <unit test directory and command; integration test directory and command; which project logic belongs to each layer>
+- <reusable fixtures, contract helpers and isolation/cleanup rules; how new tests are registered so they cannot be silently omitted>
+- <which host APIs, external systems, or real runtime boundaries require manual verification; state why no automated gate can cover them>
 
 ## Code Review Rules
 
@@ -49,9 +66,8 @@ Canonical references:
      project-specific checkpoints below; never bake any single project's
      rules into this template. -->
 
-Generic review method lives in the review skills this space assembles
-(reference the code-change review skill and the plan/proposal review
-skill that actually exist here).
+Use the review process configured for this project. Reference the
+actual review skill, command, or checklist instead of restating it.
 
 Report a defect only when the diff introduces it and the finding names a
 concrete trigger, the affected behavior, and evidence in the changed code.

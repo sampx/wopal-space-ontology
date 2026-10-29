@@ -60,16 +60,16 @@ It is the single specification point for commands, status, channels/upload gates
 When creating or updating a project-level or directory-level `AGENTS.md`, work by these rules:
 
 1. **Audit existing rules first**: before updating an existing `AGENTS.md`, audit every current rule (per the Rule Audit criteria in the reference):
-   - **Delete**: code no longer exists / structure guarantees it (single source of truth) / it is a design detail with no actionable constraint (a long-lived *working constraint* stays summarized even when DESIGN documents the topic) / pure implementation fact
-   - **Keep**: safety boundaries (deletion scope, single credential write path), behavior constraints, long-lived working constraints (logging, output/routing, host/release/DSH, testing and verification, coding discipline), the `Code Review Rules` section (heading kept verbatim, content audited normally), User-Supplied Rules
+   - **Delete**: the referenced code no longer exists / structure or CI guarantees it / it is a design detail with no actionable constraint (a long-lived *working constraint* stays summarized even when DESIGN documents the topic) / pure implementation fact
+   - **Keep**: safety boundaries (deletion scope, single credential write path), behavior constraints, long-lived working constraints (logging, output/routing, deployment/release limits, testing and verification, coding discipline), the `Code Review Rules` section (heading kept verbatim, content audited normally), User-Supplied Rules
    - **Fix**: directory descriptions outdated, conflicts with a newer design mechanism, language versions drifted
-2. **Plan before writing**: present the audit classification (keep / delete / fix with reasons) plus the proposed change list, and wait for user confirmation
-3. **Review version first, formal version second**: update `AGENTS.<locale>.md` first, then the formal English `AGENTS.md` after approval
-4. **Code Review Rules section**: code projects' `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories may omit it). The section carries a direction-level skeleton only: a reference to the space's assembled review skills, the defect-report boundary, and project-specific checkpoints. Only the reusable template must not
-   carry any single project's concrete rules
-5. Not updating is the default and legitimate outcome — update only when code, tests, config, and existing docs cannot carry the boundary
+2. **Establish quality gates first**: before writing rules, wire the stack's standard formatter, linter/static analysis, type checker, unit runner and integration runner into executable project commands; the rulebook names those commands and failure conditions instead of asking agents to judge manually
+3. **Plan before writing**: present the audit classification (keep / delete / fix with reasons) plus the proposed change list, and wait for user confirmation
+4. **Review version first, formal version second**: update `AGENTS.<locale>.md` first, keeping every heading identical to the English template and translating only the body; after approval, update the formal English `AGENTS.md`
+5. **Code Review Rules section**: code projects' `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories may omit it). The section carries a direction-level skeleton only: a reference to the review process the project uses, the defect-report boundary, and project-specific checkpoints. The reusable template must not carry any single project's concrete rules
+6. Not updating is the default and legitimate outcome — update only when code, tests, config, and existing docs cannot carry the boundary
 
-**Full specification** (content boundaries, workflow, quality checklist) lives in `references/agents-md-maintenance.md`. The `/cupdate-agent-rules` command is an entry point only and carries no specification.
+**Full specification**: `references/agents-md-maintenance.md`.
 
 ## README Maintenance
 
@@ -80,7 +80,7 @@ When creating or updating a project-level `README.md`, work by these rules:
 3. **Review version first, formal version second**: when the user's preferred language is not English, create `README.<locale>.md` for review first; update the formal English `README.md` after confirmation
 4. **Verify commands**: install / run / development commands are always verified from package and config files — never guess
 
-**Full specification** (capability awareness, template, quality checklist) lives in `references/readme-maintenance.md`. The `/cupdate-readme` command is an entry point only and carries no specification.
+**Full specification**: `references/readme-maintenance.md`.
 
 ---
 
@@ -115,5 +115,5 @@ The skill body covers the essentials. When troubleshooting or encountering edge 
 | Document | What you'll find |
 |----------|------------------|
 | `references/skills-maintenance.md` | Full lifecycle details, security scan checks, quality evaluation criteria |
-| `references/agents-md-maintenance.md` | Full AGENTS.md maintenance specification: content boundaries, rule audit criteria, workflow, quality checklist |
+| `references/agents-md-maintenance.md` | Full AGENTS.md maintenance specification: quality gates, content boundaries, rule audit criteria, workflow, quality checklist |
 | `references/readme-maintenance.md` | Full README maintenance specification: capability awareness, language version rules, template, quality checklist |

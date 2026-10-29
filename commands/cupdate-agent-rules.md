@@ -14,8 +14,8 @@ Create or update project-level or directory-level `AGENTS.md`.
 
 ## How to Work
 
-This command is an entry point only — the authoritative specification lives in the `space-master` skill.
+The authoritative specification lives in the `space-master` skill.
 
 1. Load the `space-master` skill.
-2. Follow the **AGENTS.md Maintenance** section in the skill and its `references/agents-md-maintenance.md` for the full workflow: rule audit, confirmation plan, language version order, link and heading rules, document-set consistency, and quality checklist.
+2. Follow the **AGENTS.md Maintenance** section in the skill and its `references/agents-md-maintenance.md`: rule audit, quality gates, confirmation plan, language version order, and checklist.
 3. If the command cannot be resolved, use the skill's routing table to find the right workflow.
