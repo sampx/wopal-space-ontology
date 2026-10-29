@@ -6,6 +6,8 @@ Use native `git` and GitHub CLI `gh` to create, revise, and close out upstream P
 
 The user decides each upstream publication. Authorization to create a PR does not authorize later review-fix publication, merging, or deletion. An explicit request to synchronize and clean up that PR includes its closeout; ordinary sync does not. Do not add/change remotes without authorization or switch the host ontology repository's branch. Use `wopal space` operations for sparse assembly and private-content protection.
 
+When an owned contribution is discovered in `MERGED` state while its contribution worktree or branch still exists, closeout becomes the mandatory next-step discussion. Before ending the interaction, verify the merge/return facts, report the exact residual resources, and obtain the user's cleanup decision. Do not stop at “merged, awaiting closeout”. If the user's current instruction already includes cleanup of that PR, that instruction is the deletion authorization; run the closeout checks and clean it up without another confirmation.
+
 ## Branch and Worktree
 
 - New contributions use `contribute/<slug>`. Use a short English topic of 2–4 words, at most 24 characters, such as `plan-lookup`; lowercase letters, digits, and single hyphens only, with no leading/trailing hyphen.
@@ -148,6 +150,8 @@ gh pr edit <pr-number> --repo "$UPSTREAM" --body-file "$BODY"
 Use ordinary push only. If rejected, stop and inspect divergence; never force push. After interrupted push/PR creation, continue the original branch from current Git/GitHub facts; do not re-copy commits, change branches, or open another PR merely to retry. Retain open PR workspaces and conflict scenes.
 
 ## Return and Authorized Cleanup
+
+A merged contribution is not operationally finished while owned contribution resources remain unresolved. The interaction must end in one of two explicit states: cleanup completed under authorization, or the retained worktree/branch reported as intentionally preserved because cleanup was not authorized or a safety check failed.
 
 The user decides merging; review approval alone does not authorize the Agent to merge. Neither returned synchronization step owns contribution-resource deletion.
 

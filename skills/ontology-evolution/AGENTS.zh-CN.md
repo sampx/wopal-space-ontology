@@ -1,6 +1,6 @@
 ---
 name: ontology-evolution
-description: 本体能力进化 — 撰写进化提案并落地（状态机、稀疏隔离、交付归用户）
+description: 本体能力进化 — 持续观察、汇总、提案与落地（状态机、稀疏隔离、交付归用户）
 ---
 
 # Agent 开发规则
@@ -14,12 +14,12 @@ description: 本体能力进化 — 撰写进化提案并落地（状态机、�
 
 ## 2. 架构与目录
 
-本技能只包含文档与提案模板。机制——状态机命令、稀疏安全、隔离——由 wopal CLI 实现（`wopal space evo`）；技能自身不保留任何脚本层。
+本技能只包含协作/路由规范、参考文档与提案模板。机制——状态机命令、稀疏安全、隔离——由 wopal CLI 实现（`wopal space evo`）；技能自身不保留任何脚本层。
 
 | 目录 | 职责 |
 |---|---|
 | `templates/proposal.md` | 带撰写注释的提案骨架；提案格式的唯一来源 |
-| `references/` | 命令参考与背景说明 |
+| `references/` | 命令参考、能力路由说明与背景资料 |
 
 稀疏状态**只能**通过 `wopal space` 命令族写入。在空间稀疏工作树中直接执行 `git add -A`、`git checkout` 或 `git sparse-checkout` 会破坏范围与索引的一致性。上游贡献在独立、完整检出的贡献 worktree 内使用原生 Git，规范见 `references/contribution.zh-CN.md`。
 
@@ -39,7 +39,7 @@ description: 本体能力进化 — 撰写进化提案并落地（状态机、�
 
 ### 提交粒度
 
-实施不提交。每完成一个 task 一次提交，落工作分支——该 task 的内容连同提案记录。命令级机制见 `SKILL.md`。
+实施不提交。每完成一个 task 一次提交，落工作分支——该 task 的内容连同提案记录。落地主流程见 `references/landing.zh-CN.md`；具体命令行为见 `references/commands.md`。
 
 ### 缺陷立即修复
 

@@ -174,9 +174,8 @@ workspace copy of the proposal (the isolation worktree's copy in isolated
 mode, `.wopal`'s in quick mode) and committed together with the task's code:
 one commit per finished task, on the working branch.
 
-The review gate, the validation view (`switch`), and the `integrate`
-confirmation gate belong to the landing flow delivered by wopal-cli (#240);
-that flow is stated once in `SKILL.md` — this reference covers command
+The review gate, validation view (`switch`), and `integrate` confirmation gate
+belong to the landing workflow in `landing.md`; this reference covers command
 behavior only.
 
 Omitting the name switches to **instant mode** (below).
