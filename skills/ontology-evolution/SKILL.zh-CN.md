@@ -165,6 +165,7 @@ draft → accepted → implementing → validating → archived
 - 做 `space status/sync`、`ontology status/sync`、能力 add/remove 或处理 upload gate 时，读取 [`references/maintenance.zh-CN.md`](references/maintenance.zh-CN.md)。
 - 创建、修改、重试或收尾上游 PR 时，再读取 [`references/contribution.zh-CN.md`](references/contribution.zh-CN.md)。
 - 同步授权不等于 PR 发布、合并或删除授权；这些都是用户的独立决定。
+- 已合并的贡献如果仍保留 contribution worktree 或分支，就还没有完成收尾：Agent 必须在同一次交互中主动报告残留并取得用户的清理决定后再结束。当前指令已经明确授权清理该 PR 时直接执行，不重复确认；普通同步仍然绝不隐含删除授权。
 
 ---
 

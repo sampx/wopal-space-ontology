@@ -29,7 +29,7 @@ Read this file for status inspection, space / ontology synchronization, capabili
 - **Upstream**: the pending `local main → origin → upstream` file set.
 - Local / remote `contribute/*` branches, worktrees, and PR state.
 
-“Merged, awaiting closeout” is a reminder, not deletion authorization.
+“Merged, awaiting closeout” is not deletion authorization, but it is an action-required state rather than a passive note. When status shows a merged PR with retained contribution resources, the Agent must surface the exact residue and obtain the user's cleanup decision in the same interaction before concluding. If cleanup for that PR is already authorized, follow `contribution.md` immediately; ordinary synchronization still never authorizes deletion.
 
 ## Shared assembly vs local selection
 
