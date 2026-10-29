@@ -108,9 +108,9 @@ Never execute follow-up tasks before compaction completes.
 - Never record one-off design decisions, single-bug fix records, implementation details, or directory/API/command inventories.
 - After a code refactor or Plan implementation, sync outdated information in the specs, and keep the (multi-)language versions consistent.
 
-#### TDD
+#### Testing
 
-Code projects (`projects/`, ontology-worktree) enforce TDD: write a failing test first (red) → implement to pass (green) → refactor, adjusting tests alongside. Feature code without corresponding tests is incomplete and forbidden to commit. Exempt: documentation, configuration, pure scripts, typo fixes, and other changes without logic.
+Coding spaces use the assembled `testing.md` rule as the canonical owner of general testing principles and TDD decision semantics. Project and directory specs inherit that rule and add only genuinely local runners, fixtures/helpers, host/protocol constraints, and verification entry points. Work that does not benefit from a RED cycle still requires risk-appropriate automated or observable verification as defined by `testing.md`.
 
 #### Project Workflow
 

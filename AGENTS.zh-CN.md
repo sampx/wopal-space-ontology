@@ -82,7 +82,7 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 ## 测试
 
-- 插件代码遵循 TDD：先写失败测试，再实现代码使测试通过。
+- 通用测试设计与 TDD 判定统一遵循装配的 `rules/testing.md`（**测试最佳实践**）；仓库/包规范只补充本地 runner、fixture、helper 与宿主/协议约束。
 - 本项目声明式内容变更后，提醒用户重启 ellamaka 验证加载结果；验证通过前不要频繁提交。
 
 ## Code Review Rules
@@ -132,7 +132,7 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 ### 插件代码
 
 `plugins/wopal-plugin/` 按该目录自己的 `AGENTS.md` 审（运行时路径
-`.wopal/plugins/wopal-plugin/AGENTS.md`），包括其中的 TDD 规则。
+`.wopal/plugins/wopal-plugin/AGENTS.md`），包括其中的插件专属测试 runner 与 fixture 规则。
 
 ### 不该提的意见
 

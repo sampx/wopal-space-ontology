@@ -171,7 +171,6 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 
 ## 5. 测试
 
-- 遵循 TDD：先写失败测试，再实现使其通过
 - 新增模块必须有 `*.test.ts`，覆盖主路径和边界条件
 - 代码风格：TypeScript ESM，`.js` 后缀导入；Vitest 框架，测试与源文件同目录
 

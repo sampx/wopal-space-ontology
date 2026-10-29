@@ -171,7 +171,6 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 
 ## 5. Testing
 
-- Follow TDD: write a failing test first, then implement to make it pass
 - New modules must have `*.test.ts` covering main paths and edge cases
 - Code style: TypeScript ESM, `.js` extension imports; Vitest framework, tests co-located with source
 

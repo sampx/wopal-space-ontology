@@ -31,7 +31,11 @@ keywords:
 - Assert outcomes, state, protocols, or effects rather than private implementation details, call counts, or internal structure unless those details are themselves part of the public contract.
 - A success-path test must prove output or final state, not merely that no exception was thrown. Trigger failure paths explicitly and assert the specific error, preserved state, and cleanup result.
 - Apply fault-injection / mutation thinking to important logic: deliberately introducing the target defect should make existing tests fail reliably. Coverage percentage is not a substitute for that proof.
-- For behavior code, prefer red → green → refactor: first make a test fail because the behavior is missing or wrong, then implement it. The test itself should prove that it can catch the problem before the fix.
+- Use red → green → refactor when all three are true: the change adds, fixes, or intentionally changes observable behavior; that behavior can be expressed as an automated assertion before implementation; and the test will remain useful regression protection after delivery.
+- TDD is a behavior-design tool, not a mandatory RED ceremony for every code edit. Pure behavior-preserving refactors, removal of obsolete internals, move/rename/import cleanup, config/build/CI/metadata/dependency changes, presentation-only layout/style work, exploratory work, and glue better proved by integration/smoke verification may skip a RED cycle, but still require risk-appropriate evidence.
+- When removing behavior or code, remove tests whose only purpose was to assert the deleted behavior and keep or update tests that protect surviving contracts. If the removal creates a new observable behavior (for example, an old command must now be rejected), test that behavior; never test merely that source code disappeared.
+- Pure refactors keep existing behavior and regression tests green. If the legacy area lacks a safety net, add characterization/regression coverage for current behavior before refactoring; do not manufacture a fake RED for unchanged behavior.
+- Do not stack multiple tests that prove the same behavior only through different implementation paths. Consolidate same-shaped input/output cases with a data-driven or parameterized form when practical.
 
 ## Lowest-Cost Sufficient Layer
 

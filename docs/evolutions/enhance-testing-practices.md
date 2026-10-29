@@ -78,6 +78,7 @@
 | Testing Rule | `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md` | create | 跨语言测试最佳实践唯一 owner |
 | Language Rules | `rules/typescript.md`, `docs/LANG/zh-CN/rules/typescript.md`, `rules/python.md`, `docs/LANG/zh-CN/rules/python.md` | modify | 去除重复通用原则，只保留语言/runner 特有内容 |
 | Coding Assembly | `assembly/archetypes/coding.yaml` | modify | coding 空间默认装配 testing rule |
+| Rule ownership consumers | `AGENTS.md`, `AGENTS.zh-CN.md`, `assembly/templates/REGULATIONS.md`, `docs/LANG/zh-CN/assembly/templates/REGULATIONS.md`, `skills/space-master/templates/agent-rules.md`, `skills/space-master/references/agents-md-maintenance*.md`, `plugins/wopal-plugin/AGENTS*.md`, `dsh/plugins/dsh-sandbox-roots/AGENTS*.md` | modify | 移除 blanket TDD 双真相源；只保留本地 runner/fixture/helper/host/protocol 约束 |
 | Ellamaka project rules | `projects/ellamaka/AGENTS.md`, `projects/ellamaka/AGENTS.zh-CN.md` | modify outside ontology | 引用通用规则并保留项目特有测试约束 |
 
 ## Assembly Intent
@@ -111,6 +112,7 @@ empty when nothing new is added; one row reads
 4. [x] TypeScript/Python Rule 不再各自维护一套冲突的通用测试理论；语言规则只保留 runner/命名等技术栈特有内容。
 5. [x] Ellamaka AGENTS 引用通用 Testing Best Practices，同时保留它已有的项目特有 Test Isolation Rules。
 6. [x] 中英文 rule 与项目 AGENTS 语义一致，`git diff --check` 通过。
+7. [x] `testing.md` 是通用 TDD 判定的唯一 owner；AGENTS/REGULATIONS/维护模板不再要求所有代码改动机械制造 RED，工作流技能只保留其自身执行与 Plan 字段规则。
 
 ### User Validation
 
@@ -175,6 +177,10 @@ Files touched: `rules/testing.md`, `docs/LANG/zh-CN/rules/testing.md`, `docs/evo
 Task output: `testing.md` 已装配为 coding 默认 rule；TypeScript/Python 只保留技术栈特有测试约定；Ellamaka 双语 AGENTS 已改为引用 Testing Best Practices，并保留项目特有 Test Isolation Rules（项目提交 `7ff07b48e3`）。
 Files touched: `assembly/archetypes/coding.yaml`, `rules/typescript.md`, `docs/LANG/zh-CN/rules/typescript.md`, `rules/python.md`, `docs/LANG/zh-CN/rules/python.md`, `docs/evolutions/enhance-testing-practices.md`; Ellamaka `AGENTS.md`, `AGENTS.zh-CN.md` in project commit `7ff07b48e3`
 - [x] The implementation agent has completed all development and verification steps above.
+
+Validation rework: 用户在 validating 阶段要求把 dev-flow 已验证的 TDD 判定语义上提，并彻底消除 AGENTS/REGULATIONS/维护模板中的 blanket TDD 双真相源。`testing.md` 现负责 TDD 适用条件、`TDD: false != no testing`、删除/重构规则与重复 case 原则；空间/项目规范只保留本地测试机制。同步修正了 `space-master` AGENTS 维护模板与检查表，避免未来再次要求每个 package 复制通用 TDD 政策。
+Additional ontology files touched: `AGENTS.md`, `AGENTS.zh-CN.md`, `assembly/templates/REGULATIONS.md`, `docs/LANG/zh-CN/assembly/templates/REGULATIONS.md`, `plugins/wopal-plugin/AGENTS.md`, `plugins/wopal-plugin/AGENTS.zh-CN.md`, `dsh/plugins/dsh-sandbox-roots/AGENTS.md`, `dsh/plugins/dsh-sandbox-roots/AGENTS.zh-CN.md`, `skills/space-master/templates/agent-rules.md`, `skills/space-master/references/agents-md-maintenance.md`, `skills/space-master/references/agents-md-maintenance.zh-CN.md`.
+External consumer commits: Ellamaka project rules `5cc928b75e` (`docs(test): centralize testing policy ownership`); space runtime REGULATIONS `445ef51` (`docs(test): align space testing policy ownership`).
 
 ---
 

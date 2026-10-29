@@ -82,7 +82,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 
 ## Testing
 
-- Plugin code follows TDD: write a failing test first, then implement code to make it pass.
+- General test design and TDD decisions follow the assembled `rules/testing.md` (**Testing Best Practices**). Repository/package rules add only local runners, fixtures, helpers, or host/protocol constraints.
 - After any declarative content change, remind the user to restart ellamaka for verification. Do not commit frequently before verification passes.
 
 ## Code Review Rules
@@ -143,7 +143,7 @@ type or a parameter.
 ### Plugin code
 
 Review `plugins/wopal-plugin/` against its own `AGENTS.md` (runtime path
-`.wopal/plugins/wopal-plugin/AGENTS.md`), including its TDD rule.
+`.wopal/plugins/wopal-plugin/AGENTS.md`), including its plugin-specific test runner and fixture rules.
 
 ### Out of scope
 

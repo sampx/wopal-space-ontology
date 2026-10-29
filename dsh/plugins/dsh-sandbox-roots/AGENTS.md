@@ -1,6 +1,6 @@
 ---
 name: dsh-sandbox-roots
-description: Sandbox writable-roots extension plugin (@wopal/dsh-sandbox-roots) — plugin dependency-resolution boundary and mandatory TDD
+description: Sandbox writable-roots extension plugin (@wopal/dsh-sandbox-roots) — plugin dependency-resolution and verification boundaries
 ---
 
 # dsh-sandbox-roots — Agent Rules
@@ -29,13 +29,10 @@ pnpm build       # tsdown, output into lib/
 pnpm check       # typecheck + test + build full chain
 ```
 
-## TDD is mandatory
+## Testing
 
-All logic in `src/` (including `internal/` pure functions and the three
-service subclasses) requires a failing test first (`tests/*.test.ts`), then
-the implementation; refactors adjust tests in step. Upstream-behavior
-replication (e.g. `internal/containment.ts` copied from REF) is likewise
-locked by tests.
+- Run `pnpm test` for changed logic and keep regression coverage under `tests/*.test.ts` for the affected plugin behavior.
+- Upstream-behavior replication such as `internal/containment.ts` stays locked by focused regression tests against the behavior copied from REF.
 
 ## Plugin dependency resolution (highest priority)
 

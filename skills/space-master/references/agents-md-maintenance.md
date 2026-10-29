@@ -217,7 +217,7 @@ A small update (no frontmatter, path, or scope change; 1–2 sections) may compr
 - [ ] Preferred-language version generated first when applicable
 - [ ] Canonical documents referenced, not copied
 - [ ] No rules extracted from `BUSINESS_RULES.md` into the body
-- [ ] Testing section has a TDD requirement and separates automated from manual boundaries
+- [ ] Testing section follows the space's canonical testing rule instead of restating general TDD/test philosophy; it records only project-specific commands, layers, fixtures/helpers, runner registration, and host/manual verification boundaries
 - [ ] Preferred-language headings identical to the English template
 - [ ] `User-Supplied Rules` unchanged: no additions, modifications, deletions, or reordering, except original specification migrations
 - [ ] Non-obsolete original rules preserved; deletions justified in the plan
