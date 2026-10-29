@@ -80,6 +80,13 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 
 - Plugin internal architecture, logging, type safety, error handling, development, and testing rules: **follow** `.wopal/plugins/wopal-plugin/AGENTS.md`.
 
+### Ontology worktree branch safety
+
+- `.wopal` is the live ontology view consumed by this space's agents and Runtime. Under normal operation it must stay checked out on the registered `space/<name>` branch from `STRUCTURE.md`.
+- An agent must not switch `.wopal` onto a proposal, feature, or other temporary branch for implementation, commits, review, experiments, or workflow convenience. Isolated implementation belongs in a derived worktree; bounded direct maintenance stays on the registered space branch.
+- A temporary `.wopal` branch switch is allowed only when the user explicitly asks for it, or during an actual validation flow that needs the Runtime/agents to load a candidate branch. Return to the registered space branch immediately after that validation view ends.
+- Before and after any allowed switch, verify the current branch and worktree state and preserve unrelated uncommitted changes.
+
 ## Testing
 
 - General test design and TDD decisions follow the assembled `rules/testing.md` (**Testing Best Practices**). Repository/package rules must keep that inheritance visible to the agent; they may name local behavior boundaries where TDD is required and add local runners, fixtures, helpers, or host/protocol constraints, but must not redefine the general RED/GREEN decision semantics.

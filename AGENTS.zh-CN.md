@@ -80,6 +80,13 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 - 插件内部架构、日志、类型安全、错误处理、开发与测试细则，**遵循** `.wopal/plugins/wopal-plugin/AGENTS.md`。
 
+### 本体 worktree 分支安全
+
+- `.wopal` 是当前空间 Agent 与 Runtime 实时消费的正式本体视图，正常情况下必须保持检出 `STRUCTURE.md` 注册的 `space/<name>` 分支。
+- Agent 不得为了实施、提交、评审、临时试验或流程便利，主动把 `.wopal` 切到 proposal、feature 或其它临时分支；隔离实施使用派生 worktree，小范围直接维护就在注册空间分支完成。
+- 只有两种情况允许临时切换 `.wopal`：用户明确要求切换；或已经进入验证过程，需要让 Runtime/Agent 临时加载候选分支进行验证。验证切换结束后立即恢复注册空间分支。
+- 任何允许的切换前后都必须核对当前分支与工作区状态，并保护无关未提交修改。
+
 ## 测试
 
 - 通用测试设计与 TDD 判定统一遵循装配的 `rules/testing.md`（**测试最佳实践**）；仓库/包规范必须让 Agent 明确看到这层继承关系，可以写明本地哪些行为边界必须使用 TDD，并补充 runner、fixture、helper 与宿主/协议约束，但不得另写一套通用 RED/GREEN 判定语义。

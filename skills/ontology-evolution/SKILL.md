@@ -76,7 +76,7 @@ Only when Wopal explicitly requests `synthesize`, Maka:
 1. Merges same-root / duplicate signals and drops weak evidence or issues already covered by existing capability.
 2. Generalizes mature signals and checks for private contamination.
 3. Finds the capability owner before deciding whether to repair or create capability.
-4. Writes proposals only for coherent changes that still hold after synthesis; **zero proposals is a valid result**.
+4. Decides whether the change fits direct maintenance or needs a formal proposal, and gives that recommendation to the user; **never creates a proposal without explicit user confirmation**. Zero proposals is a valid result.
 
 ## Capability routing
 
@@ -98,6 +98,23 @@ When ownership overlaps, the boundary is unclear, or a formal proposal is about 
 
 The point of a proposal is not to archive what happened; it is to make the same kind of situation go better next time.
 
+## Decide whether a proposal is needed first
+
+A formal proposal is for evolution that needs its own design, implementation, review, or validation boundary. It is not the default entry for every ontology edit. Before creating one, explicitly ask the person who raised the problem whether they want a proposal; do not create one automatically merely because the target is a reusable capability.
+
+Prefer direct maintenance of an existing capability when all of the following describe the work:
+
+- an existing capability owner is clear, with no new whole asset or ownership split;
+- the expected change touches fewer than 10 files;
+- no dedicated automated test, human validation, or multi-stage validation flow is needed;
+- the change does not alter a cross-capability contract, assembly model, loading lifecycle, or high-risk migration boundary.
+
+Make this kind of change directly on the registered `space/<name>` branch and commit it by name through instant mode. Do not create a proposal, working branch, or extra worktree.
+
+When the scope is materially larger, needs dedicated testing or validation, adds a whole capability asset, changes a cross-capability contract, or needs staged implementation and review, explain why and recommend a formal proposal. Run `wopal space evo new` only after the user confirms that choice.
+
+When the boundary is unclear, ask whether the user wants a proposal instead of silently choosing the heavier workflow.
+
 ## Generalize first
 
 - Remove absolute paths, project / product / customer names, session ids, timestamps, commit hashes, and other local detail.
@@ -115,6 +132,8 @@ The point of a proposal is not to archive what happened; it is to make the same 
 Ask in order: does it hold in another space? Another project of the same type? Any space? When uncertain, place it lower.
 
 ## Write it
+
+Only enter this section after the user has explicitly confirmed that a proposal is wanted.
 
 Use `wopal space evo new "<title>"` to create `docs/evolutions/<name>.md` from `templates/proposal.md`, then fill the template completely.
 
@@ -153,8 +172,9 @@ Before landing, read [`references/landing.md`](references/landing.md). For concr
 ## Defect repair vs evolution
 
 - **Defect**: agreed behavior is implemented incorrectly → use `wopal space evo commit` in instant mode; no proposal.
-- **Evolution**: add capability, change a contract, or change how future work should behave → use the proposal lifecycle.
-- When the distinction is unclear, do not silently choose the fast path.
+- **Small capability maintenance**: a bounded change inside an existing owner, expected to touch fewer than 10 files and need no dedicated test/validation flow → maintain it directly on the registered space branch; no proposal by default.
+- **Formal evolution**: add a whole capability, change a cross-capability contract, require dedicated testing/validation, or need staged implementation → recommend the proposal lifecycle, but create the proposal only after explicit user confirmation.
+- When the distinction is unclear, ask whether the user wants a proposal. Do not silently escalate to a formal proposal or bypass a formal flow the user requested.
 
 ---
 
