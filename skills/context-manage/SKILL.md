@@ -25,7 +25,10 @@ When invoked directly, select the workflow from the user's explicit intent. Do n
    - completed research, analysis, and key decision rationale
    - critical discoveries and important reference materials
    - related files, project paths, and current working location
-   - rules and constraints that must continue to apply
+   - active or mandatory skills that still apply to the unfinished work, including their paths and any skill references that must be reloaded; do not list every skill used in the session when it is no longer relevant
+   - applicable workspace/project/module rules that must continue to apply, such as `AGENTS.md`, space regulations, or other governing instructions
+   - authoritative workflow/design context that still governs the work, such as the active DESIGN, Plan/Issue/Proposal and its current lifecycle state
+   - other rules and constraints that must continue to apply
    - current progress, unfinished work, and next steps
    - the handoff reason, when supplied by the user
 5. Verify that the file exists, is readable, and is located under the space root's `.wopal-space/.tmp/` directory.
@@ -33,7 +36,7 @@ When invoked directly, select the workflow from the user's explicit intent. Do n
 
    > Restore context from the handoff file, then report it and wait for confirmation before continuing:
    > 1. Read the handoff file `@.wopal-space/.tmp/.working-context-20261020-143000.md` in full (if this message already carries the file content, use it directly and do not read the file again)
-   > 2. Rebuild the working environment from the handoff: fully read the important related files and key references named there; if the handoff conflicts with current files or code, prefer current evidence
+   > 2. Rebuild the working environment from the handoff: reload the active/mandatory skills and applicable rules named there, then fully read the authoritative design/workflow documents and important references it names; if the handoff conflicts with current files or code, prefer current evidence
    > 3. Report the restored context: what is being done, where it stands, what comes next, and the goal you are about to pursue
    > 4. Stop there and wait for the user to confirm the restored context is correct. Do not begin any further work before that confirmation, even when the handoff records an obvious next step
    > 5. Only after the user confirms, delete the handoff file and then continue with the next step recorded in it; if safe deletion is unavailable, keep the file and say so explicitly
@@ -47,11 +50,11 @@ When invoked directly, select the workflow from the user's explicit intent. Do n
    - The user's message contains only a path (including an `@` reference) → read the file at that path.
    - The user's message contains no path → look for the newest `.working-context-*.md` under `<space-root>/.wopal-space/.tmp/`; when the result is ambiguous or uncertain, confirm with the user first instead of guessing.
 2. Read the handoff file content in full (when the message already carries the content, it takes precedence); do not rely on a snippet or summary.
-3. Restore the current objective, user concerns, progress, key decisions, relevant paths, rules, next steps, and the important materials referenced by the previous session.
-4. To rebuild the same working environment, fully read the important related files and key references named by the handoff. Re-analyze relevant code or run verifiable checks when needed instead of relying only on stale conclusions in the handoff text.
+3. Restore the current objective, user concerns, progress, key decisions, relevant paths, active/mandatory skills, applicable rules, authoritative workflow/design context and lifecycle state, next steps, and the important materials referenced by the previous session.
+4. To rebuild the same working environment, reload the active/mandatory skills and any required skill references named by the handoff, then read the applicable rules and authoritative design/workflow documents before continuing implementation. Read other important references as needed. Re-analyze relevant code or run verifiable checks when needed instead of relying only on stale conclusions in the handoff text.
 5. If the handoff conflicts with current files or code, prefer current evidence and call out the difference in the recovery summary.
 6. Report the restored state in the user's preferred language: what is being done, where it stands, what comes next, and the goal you are about to pursue. Then stop and wait for the user to confirm it is correct; do not continue on your own.
-7. The recovery itself is straightforward reading and summarizing; there is no need to deliberately load a skill or follow a fixed procedure. Simply apply this section's priority rules and deletion rules during recovery.
+7. The recovery procedure itself does not require loading `context-manage` again, but any active/mandatory skills recorded in the handoff must be reloaded before work resumes. Apply this section's priority and deletion rules during recovery.
 8. Delete the handoff file only after the user confirms the restored context. Follow the current workspace deletion rules and available safe-delete mechanism; if safe deletion is unavailable, keep the file and say so explicitly. Never delete before that confirmation, because the file is the only record of what has to be re-checked.
 9. After the user confirms, continue with the unfinished next step from the previous session.
 
