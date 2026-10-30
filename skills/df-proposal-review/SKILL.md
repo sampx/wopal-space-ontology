@@ -25,6 +25,36 @@ In Plan mode, `flow.sh plan check` already gates form: field presence, placehold
 
 If the proposal is fine, say so quickly and stop. This review is invoked deliberately, not for ceremony.
 
+### Separate proposal defects from an execution site that is not ready yet
+
+Report only problems where the **proposal itself would lead the work wrong**. Do not turn ordinary workflow state, unfinished closeout, or a final-validation resource that is not provisioned yet into a design defect.
+
+The following are normally **not findings**:
+
+- a design, Plan, or code change is still uncommitted, while the content itself exists and can be checked;
+- CI, a test host, an external account, real hardware, or a platform environment is needed only at the final release gate and is not provisioned yet;
+- a dependency is not installed or a build artifact does not exist yet, when the Plan schedules that work before it is needed;
+- the artifact is in a normal lifecycle state such as reviewing, draft, or proposed;
+- an AC correctly says it must remain unchecked when the required environment is unavailable, rather than falsely claiming that environment already exists.
+
+These become findings only when the proposal **incorrectly depends on the condition already being true**, **provides no viable path to obtain it when needed**, or would therefore cause the implementation to be wrong or the goal to be undeliverable.
+
+Severity calibration: **a Blocker must show that following the proposal would produce the wrong implementation, dead-end execution, or an undeliverable goal. “There is still a step to do before implementation or final validation” is not, by itself, a Blocker.**
+
+### Classify what is wrong before assigning severity
+
+The reader needs to know what to change, not just see a red label. Classify every Blocker / Warning first:
+
+- **Design gap** — the target state, architecture, safety boundary, or product decision is not closed; DESIGN / PRD must change.
+- **Plan gap** — the design is sound, but tasks, interfaces, dependencies, or handoff information are insufficient; revise the Plan.
+- **Verification gap** — the implementation path is sound, but the AC / proof cannot establish the outcome; revise validation.
+- **Reality mismatch** — a repository fact the proposal relies on is false, so execution would go the wrong way.
+- **Lean** — the work can succeed, but the proposal creates unnecessary machinery; severity caps at WARNING.
+
+An **Execution dependency** (for example, a real Linux host needed at a final release gate) is not itself a finding. Report it only when it becomes a false premise or there is no viable way to obtain it when required, using the closest category above.
+
+Before emitting a Blocker / Warning, be able to complete this sentence: **“If followed as written, when {concrete trigger} happens, {concrete failure/rework/verification hole} results.”** If you cannot, do not use Blocker / Warning.
+
 ## How to work: read once, three lists, then verify
 
 Efficiency is part of review quality — a review that burns time returns noise. Work in two passes.
@@ -80,6 +110,8 @@ The repo is the only authority. Settle each fact claim mechanically; never wave 
 **State the revision you checked against** — Base Commit, worktree HEAD, or integration HEAD. A finding without a revision rots the moment anyone commits. If the artifact declares a worktree, probe at the worktree's HEAD.
 
 Then check agreement with the authorities it cites (design docs, `AGENTS.md`, existing interfaces): find what the authority says and compare. Divergence the artifact acknowledges or justifies is a decision; silent divergence is a broken contract. When two documents conflict, establish which one is authoritative for the model this artifact implements before calling it.
+
+This check is about **content truth and execution premises**, not Git hygiene. An uncommitted change is not itself a design defect. Report it only when the proposal claims content is present in a specific revision and the actual execution path will read only that revision, so following the proposal would lose a required contract. In that case, describe the concrete failure chain; never stop at “it is not committed yet.”
 
 Severity: a false premise the work leans on, a silent divergence from a safety constraint, an AC command that cannot run → **BLOCKER**. Silent doc divergence with no effect on the work → **WARNING**; minor wording or line-number drift → **INFO**.
 
@@ -154,7 +186,7 @@ This gate also applies to the skill itself: when the deliverable of an ontology 
 
 Aim to converge review within **two rounds** (initial review + one re-review):
 
-1. **First review must be exhaustive**: report every finding in one report, including borderline ones. Withholding findings is defective service.
+1. **First review covers every material defect**: report in one pass everything that changes implementation, validation, or design decisions; a borderline concern with no concrete trigger and impact is not a finding. Merge multiple symptoms of one root cause instead of spamming the report.
 2. **Re-review focuses on fix verification**: verify reported fixes and check directly touched areas. Avoid inventing ungrounded preferences late.
 
 The review skill reports defects objectively without artificial stopping points. Iteration budgets, stopping gates, and escalation to the user belong to the controlling workflow (such as `dev-flow`).
@@ -177,12 +209,14 @@ At review start, build one todo item per question and mark them off as you go. A
 ## Summary
 - Review type: Proposal (Plan mode | Document mode)
 - Verdict: PASS | REVISE | BLOCK
+- Readout: Implementable | Plan / validation revision needed | Design change needed
 - Counts: Blocker N / Warning N / Info N / Unverified N
 - Verified against: {Base Commit | worktree HEAD | integration HEAD}
 - Lean count: {net: -N lines, -M dependencies possible | Lean already}
 
 ## Blocker
 ### B-01: {issue title}
+- Kind: Design gap | Plan gap | Verification gap | Reality mismatch | Lean
 - Location: `{artifact}:{line}`
 - Reality: `{file}:{line}` or `{command output}` — {why this contradicts the artifact}
 - Impact: {how execution fails}

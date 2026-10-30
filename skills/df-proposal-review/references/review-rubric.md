@@ -90,6 +90,8 @@ The repo is the only authority. Check each claim mechanically — never wave one
 
 **Revision discipline**: state which revision every check ran against — Base Commit, worktree HEAD, or integration HEAD. When the artifact declares a worktree, probe at the worktree's HEAD, not the integration branch.
 
+Revision discipline makes fact checks reproducible; it is not a Git-hygiene gate. When the design / Plan is still uncommitted and the review target is the current working-tree content, **“uncommitted” is not itself a finding**. Report a problem only when the execution path will read a specific committed revision and the proposal falsely assumes that revision already contains required content; describe that actual failure chain.
+
 ### 3.2 Anchor-drift judgement
 
 Line anchors locate code; they are not contracts. Probe the anchor and read a few lines around it:
@@ -264,6 +266,8 @@ Four classes, defined by what the reader should do:
 | **INFO** | Improvement worth knowing, no action required | "Would a reasonable author shrug?" |
 | **Unverified** | Claim could not be settled from the workspace | "Could I not check this?" |
 
+Blockers and Warnings also pass an impact gate: they must name a **concrete trigger → concrete failure, rework, or verification hole**. “It is not ready yet,” “it is not committed yet,” or “the final environment is not provisioned yet” is insufficient by itself.
+
 Deliberately absent: **size/count thresholds**. Task count, file count, wave count, document length are never defects. Context budget is managed per task; a large cohesive artifact is normal.
 
 ### Calibration drills
@@ -273,6 +277,8 @@ Deliberately absent: **size/count thresholds**. Task count, file count, wave cou
 | Task references a function no other task creates | BLOCKER (Q1) |
 | Task registers 5 error codes, a later task uses a 6th | BLOCKER (Q1) |
 | Anchor `file.ts:964` lands at 967 on the described function | no finding |
+| A DESIGN change is uncommitted during review, but the current working-tree content is the review target and the Plan does not claim it is already in a commit | no finding |
+| An AC requires final validation on a real Linux host and explicitly remains unchecked without that evidence; the current development machine has no Linux host | no finding (Execution dependency) |
 | Plan contradicts a design doc it also cites, without acknowledgement | WARNING (Q2) |
 | Plan contradicts a design doc and states "this supersedes §X of doc Y" | no finding |
 | Reduction to "v1" where `D-04` sanctions the static layer | no finding (Q3) |
