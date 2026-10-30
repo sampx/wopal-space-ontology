@@ -11,6 +11,7 @@
 | 命令 | 说明 |
 |------|------|
 | `plan new <issue>` | 创建新 Plan |
+| `plan new --umbrella ...` | 创建无代码项目归属的伞型 Plan |
 | `plan status <plan-id>` | 查看 Plan 完整状态 |
 | `plan list [--issue]` | 列出活跃 Plan（`--issue` 含 GitHub Issues） |
 | `submit <plan>` | 提交人工审阅（planning → reviewing） |
@@ -26,8 +27,9 @@
 
 | 命令 | 说明 |
 |------|------|
-| `issue create --title "..." --project <name> --body-file <path>` | 创建 Issue（`--body-file` 为主路径） |
-| `issue edit <issue> [--title] [--type] [--project] [--body-file] [--append]` | 编辑 Issue（标题/类型/项目/body） |
+| `issue create --title "..." [--project <name> ...] --body-file <path>` | 创建 Issue；项目标签 0..N（`--body-file` 为主路径） |
+| `issue edit <issue> [--title] [--type] [--add-project X] [--remove-project X] [--body-file] [--append]` | 编辑 Issue；项目标签逐个增删 |
+| `issue merge --into <umbrella> <issue...>` | 多 Issue、一份实施时归并 Issue |
 | `issue close <issue>` | 关闭 Issue |
 | `issue delete <issue>` | 删除 Issue |
 | `issue list [--project X] [--status Y] [--limit N]` | 列出空间仓库未完成 Issue（含 repo URL，可按 project/status 过滤） |
@@ -58,7 +60,7 @@
 | 顺序 | 依据 | 说明 |
 |------|------|------|
 | 1 | 文件名前缀 | `<issue_number>-*.md` |
-| 2 | Plan 元数据 `- **Issue**:` | 覆盖先建 Plan、后挂 Issue 的情况；多编号字段（`#249, #250`）中任一编号都命中 |
+| 2 | Plan 元数据 `- **Issue**:` | 覆盖先建 Plan、后挂 Issue 的情况；当前契约只接受一个 `#N` |
 | 3 | 活跃优先 | 同一编号命中多个 Plan 时，`done/` 下的归档 Plan 让位给活跃 Plan |
 
 同一编号命中多个活跃 Plan 时命令**失败关闭**，打印候选路径并退出，不会随便挑一个。这时改用 Plan 名字执行（`flow.sh plan status <plan-name>`），既不改名也不重建 Plan——改名会孤立 feature 分支与 worktree，重建会让一个 Issue 出现两份进度。
@@ -114,8 +116,11 @@ flow.sh plan status enhance-dev-flow-resolver    # Plan 名字（歧义时）
 ### issue create 参数速记
 
 ```bash
-# 最小创建（--body-file 为主路径）；标题自由文本，type 由 --type 显式指定
-flow.sh issue create --title "add skills remove command" --project <name> --type feat --body-file body.md
+# 最小创建（项目标签可省略）
+flow.sh issue create --title "add skills remove command" --type feat --body-file body.md
+
+# 一个 Issue 可声明多个受影响项目
+flow.sh issue create --title "coordinate api and web" --project api --project web --type feat --body-file body.md
 
 # --type 可选覆盖（默认从标题宽松前缀推断）
 --type feat
@@ -130,17 +135,29 @@ flow.sh issue create --title "add skills remove command" --project <name> --type
 ```bash
 flow.sh issue edit <issue> --body-file <path>     # 全量替换 body
 flow.sh issue edit <issue> --append <path>        # 追加到 body 末尾
-flow.sh issue edit <issue> --title "fix(api): ..." # 改标题（自动同步 type/project 标签）
-flow.sh issue edit <issue> --type fix --project <name>  # 改类型/项目标签
+flow.sh issue edit <issue> --title "fix(api): ..." # 改标题
+flow.sh issue edit <issue> --type fix --add-project api --add-project web
+flow.sh issue edit <issue> --remove-project legacy-api
 ```
 
 **行为**：
 - `--body-file`：用文件内容替换整个 Issue body
 - `--append`：在现有 body 末尾追加文件内容，用 `\n\n` 分隔
-- `--title` / `--type` / `--project`：更新标题与对应标签（`type/*`、`project/*` 组自动同步）
+- `--title` / `--type`：更新标题/类型；type label 仍保持单值组同步
+- `--add-project` / `--remove-project`：只增删指定 `project/*`，不清除其它项目标签；均可重复
 - 空文件或文件不存在时报错退出（exit 1）
 - 文件不以 `#` 或 `-` 开头时输出 warning
 - 不指定 body 参数时保持 body 不变，仅应用标题/类型/项目变更
+
+### issue merge
+
+多个 Issue 实际只需要一份实施时，先归并，再创建一个普通 Plan：
+
+```bash
+flow.sh issue merge --into 40 41 42
+```
+
+目标 Issue 记录 `Merged from`；来源 Issue 记录 `Merged into`、移除活动状态标签并以 `not planned` 关闭。相同目标的重试不会重复写关系；来源已经归并到另一个目标时，命令在写入前失败。
 
 ### issue close / delete
 
@@ -199,7 +216,10 @@ Agent 定位 Issue 的顺序：已知编号 → `issue view`；需要浏览/筛�
 ```bash
 # 创建
 flow.sh plan new <issue> --type <type> --slug <slug>  # 从 Issue 创建（type/slug 必填，无 scope 段）
-flow.sh plan new --project <name> --type <type> --slug <slug> [--title "..."]  # 无 Issue 创建（--project 选择该模式）
+flow.sh plan new <issue> --project <name> --type <type> --slug <slug>  # Issue 无项目或多项目时显式选本 Plan 项目
+flow.sh plan new --project <name> --type <type> --slug <slug> [--title "..."]  # 无 Issue 普通 Plan
+flow.sh plan new --umbrella --type <type> --slug <slug> [--title "..."]       # 无 Issue 伞型 Plan
+flow.sh plan new <issue> --umbrella --type <type> --slug <slug>               # 带一个 Issue 的伞型 Plan
 # 阶段关联：默认继承 Issue body 的 Product/Phase；--product <name> --phase <id> 可覆盖（须成对，缺一报错；无关联时两项均留空）
 
 # 查询
@@ -212,6 +232,8 @@ flow.sh plan check <plan-name-or-path>  # 校验 Plan 质量（Issue 号 / Plan 
 ```
 
 `plan list` 默认离线，仅扫描本地 Plan 文件。`--issue` 增加 GitHub Issues 合并展示，无 Plan 的 Issue 显示 `[recorded]`。
+
+普通 Plan 的 `Issue` 字段只允许 `N/A` 或一个 `#N`，且必须有一个 Target Project。伞型 Plan 创建到 `.wopal-space/plans/_umbrella/`，无 Target Project / Project Path；`plan status <umbrella>` 实时汇总 `Child Plans` 的项目、Issue、状态与缺失情况。
 
 ### sync
 
@@ -243,6 +265,8 @@ flow.sh approve <plan> --confirm --existing-worktree <path> # 独立分支演进
 
 `approve` 不带 `--confirm` 时报错退出，提示使用 `submit`。`--confirm` 接受 `reviewing` 或 `planning`（快捷路径）→ `executing`。
 
+伞型 Plan 的 `approve --confirm` 只推进并持久化 Plan 状态，不创建 worktree、Work Branch 或 Delivery。`--existing-worktree` 不适用于伞型 Plan。
+
 **模式选择**：
 1. **默认模式**：创建独立 feature 分支与工作树（`.worktrees/<project>-<plan-name>`），记录集成分支 HEAD 为 Base Commit。
 2. **`--no-worktree`**：直接在集成分支（main）实施，不建分支不建工作树。
@@ -268,6 +292,8 @@ flow.sh integrate <issue-or-plan> --confirm
 5. 正式提交标题直接使用 Plan 的 `Commit Subject`。PR 路径使用平台的 squash 合并时也必须使用同一标题。
 6. 把正式分支实际生成的提交记录为负责人 Plan 的 `Integration Commit`；成员随后执行 `verify --confirm` 时都校验这同一提交。
 
+伞型 Plan 没有代码 Delivery；对伞型 Plan 调用 `integrate` 会失败并提示改为操作子 Plan。
+
 ### verify --confirm [--keep-worktree]
 
 ```bash
@@ -276,6 +302,8 @@ flow.sh verify <plan> --confirm --keep-worktree # 归档时仍需保留共用 wo
 ```
 
 `--no-worktree` 不使用 `Integration Commit`；`verify --confirm` 校验并记录用户实际查看到的 integration-branch commit 作为 `Verification Commit`。
+
+伞型 Plan 在 `verifying` 阶段只读子 Plan：所有子 Plan 必须已经 `done` 或 `archived`，并且伞型 Plan 自己的 User Validation 通过，才能 `verify --confirm` 进入 `done`。
 
 ### archive [--keep-worktree]
 
@@ -286,6 +314,8 @@ flow.sh archive <plan> --keep-worktree # 演进模式（保留 worktree 与分�
 
 共享 Delivery 先归档非负责人 Plan，并对这些成员使用 `--keep-worktree`；最后归档负责人 Plan，不带 `--keep-worktree`，由正常清理一次性删除共用 work branch 和 worktree。
 
+伞型 Plan 只有在所有子 Plan 已进入各自 `done/` 归档目录后才能归档；伞型归档不执行代码 worktree/branch 清理。
+
 ### complete --pr
 
 ```bash
@@ -295,6 +325,8 @@ flow.sh complete <issue> --pr    # PR 路径（默认不走 PR）
 ### verify-switch
 
 切换工作空间到特性分支供用户验证。
+
+伞型 Plan 没有特性分支，`verify-switch` 会拒绝并提示操作具体子 Plan。
 
 执行流程：
 1. 检查规范路径 git 状态（脏时输出 warning，不阻塞）

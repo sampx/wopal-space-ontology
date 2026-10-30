@@ -27,6 +27,18 @@ description: >
 
 受限环境中，如果命令需要写 Git metadata，使用当前 Harness 自带的授权机制取得能力；不要修改权限配置绕过限制。命令失败时保留原始错误并停止，不手工伪造成功状态。
 
+## Issue / Plan 选择规则
+
+先按下面顺序判断，再进入生命周期；不要用复杂 Plan 结构代替这个判断：
+
+1. **Issue 记录问题或目标**。`project/*` 标签表示影响范围，可以没有、一个或多个；Issue 本身不决定某一份实施一定落在哪个项目。
+2. **普通 Plan 是一份实施**。最多关联一个 Issue，并且必须只属于一个 Target Project。
+3. **多个 Issue，实际只有一份实施** → 先用 `issue merge --into` 合成一个保留 Issue，再创建一个普通 Plan；不要写多 Issue Plan。
+4. **一个目标需要多份实施**（包括同一项目多份 Plan 或跨项目 Plan）→ 创建伞型 Plan；每个子 Plan 仍是普通 Plan。
+5. **伞型 Plan 只协调，不代做**。它没有自己的代码项目、worktree 或 Delivery，只读取子 Plan 状态并按门禁推进自己；绝不替子 Plan 改状态或改子 Issue。
+
+具体 Issue 标签、归并命令见 `references/issue-guide.md`；普通/伞型 Plan 写法见 `references/plan-guide.zh-CN.md`；完整命令行为见 `references/commands.md`。
+
 ## DESIGN、Plan 与实现
 
 **层级固定为：DESIGN → 已批准 Plan → 实现。**
@@ -63,6 +75,8 @@ description: >
 状态机：
 
 `planning → reviewing → executing → verifying → done → archived`
+
+伞型 Plan 复用同一状态机，但不走代码集成：`approve` 不建 worktree/Delivery；`complete` 要求所有子 Plan 至少到 `verifying`；`verify --confirm` 要求所有子 Plan 已 `done` 或 `archived`；`archive` 要求所有子 Plan 已归档。`integrate` / `verify-switch` 只对普通 Plan 使用。
 
 | 阶段 | 主控动作 | 用户门 |
 |---|---|---|

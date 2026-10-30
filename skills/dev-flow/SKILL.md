@@ -27,6 +27,18 @@ Do not `source` the script or bypass `flow.sh` for lifecycle state it owns. Full
 
 In restricted environments, use the current harness's native approval mechanism when a command needs Git-metadata writes. Do not change permission configuration to bypass restrictions. If a command fails, preserve the original error and stop rather than fabricating a successful state.
 
+## Choosing Issue and Plan shape
+
+Apply these rules in order before entering the lifecycle; do not use a complicated Plan shape to avoid making this decision:
+
+1. **An Issue records a problem or goal.** Its `project/*` labels describe impact scope and may be absent, singular, or multiple; they do not force one implementation project.
+2. **A normal Plan is one implementation.** It links at most one Issue and belongs to exactly one Target Project.
+3. **Several Issues, one implementation** → merge them first with `issue merge --into`, keep one Issue, then create one normal Plan. Do not create a multi-Issue Plan.
+4. **One goal, several implementations** — including several Plans in one project or Plans across projects — → create an umbrella Plan. Every child remains a normal Plan.
+5. **An umbrella coordinates; it never implements for its children.** It owns no code project, worktree, or Delivery. It reads child state to gate its own lifecycle and never advances child state or mutates child Issues.
+
+See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.md` for normal and umbrella Plan authoring, and `references/commands.md` for exact commands.
+
 ## DESIGN, Plan, implementation
 
 **The hierarchy is fixed: DESIGN → approved Plan → implementation.**
@@ -63,6 +75,8 @@ Standard chain:
 State machine:
 
 `planning → reviewing → executing → verifying → done → archived`
+
+Umbrella Plans reuse the same state machine but have no code-integration path: `approve` creates no worktree/Delivery; `complete` requires every child to be at least `verifying`; `verify --confirm` requires every child to be `done` or `archived`; `archive` requires every child to be archived. `integrate` / `verify-switch` apply only to normal Plans.
 
 | Stage | Controller action | User gate |
 |---|---|---|

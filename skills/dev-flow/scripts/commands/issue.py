@@ -2,9 +2,11 @@
 # issue.py - Issue management commands for dev-flow
 #
 # Commands:
-#   issue create --title "<title>" --project <name> [--type <type>] [options]
-#   issue edit <issue> [--title <title>] [--type <type>] [--project <name>]
+#   issue create --title "<title>" [--project <name> ...] [--type <type>] [options]
+#   issue edit <issue> [--title <title>] [--type <type>]
+#                  [--add-project <name> ...] [--remove-project <name> ...]
 #                  [--body-file <path>] [--append <path>]
+#   issue merge --into <umbrella> <issue...>
 #   issue close <issue>
 #   issue delete <issue>
 #   issue list [--project X] [--status Y] [--limit N]
@@ -26,6 +28,8 @@ from issue import (
     ensure_label_exists,
     sync_type_label_group,
     sync_project_label_group,
+    remove_project_label,
+    remove_status_labels,
 )
 from labels import (
     normalize_plan_type,
@@ -74,13 +78,46 @@ def get_issue_info(issue_number: str, repo: str) -> dict:
     return json.loads(result.stdout)
 
 
-def extract_project_from_labels(issue_info: dict) -> str:
-    """Extract project name from issue labels."""
-    for label in issue_info.get("labels", []):
-        name = label.get("name", "")
-        if name.startswith("project/"):
-            return name[8:]  # Remove "project/" prefix
-    return ""
+def _validate_project_name(project: str) -> bool:
+    """Return whether a project name is valid for project/* labels."""
+    return bool(re.match(r'^[a-z0-9-]+$', project))
+
+
+def _normalize_issue_ref(value: str | int) -> str:
+    """Normalize #123 / 123 into a positive decimal issue number."""
+    text = str(value).strip()
+    if text.startswith("#"):
+        text = text[1:]
+    if not text.isdigit() or int(text) <= 0:
+        raise ValueError(f"Invalid issue number: {value}")
+    return str(int(text))
+
+
+def _ensure_merge_history_line(body: str, line: str) -> str:
+    """Add one visible merge-history line exactly once."""
+    normalized = body or ""
+    if re.search(rf"(?m)^{re.escape(line)}\s*$", normalized):
+        return normalized
+
+    heading = re.search(r"(?m)^## Merge History\s*$", normalized)
+    if not heading:
+        prefix = normalized.rstrip()
+        if prefix:
+            prefix += "\n\n"
+        return f"{prefix}## Merge History\n\n{line}\n"
+
+    after_heading = normalized[heading.end():]
+    next_heading = re.search(r"(?m)^##\s+", after_heading)
+    section_end = heading.end() + (next_heading.start() if next_heading else len(after_heading))
+    before = normalized[:section_end].rstrip()
+    after = normalized[section_end:]
+    separator = "\n\n" if after and not after.startswith("\n") else "\n"
+    return f"{before}\n{line}{separator}{after.lstrip(chr(10)) if after else ''}"
+
+
+def _merged_into_target(body: str) -> str | None:
+    match = re.search(r"(?m)^- Merged into: #(\d+)\s*$", body or "")
+    return match.group(1) if match else None
 
 
 
@@ -91,21 +128,18 @@ def extract_project_from_labels(issue_info: dict) -> str:
 def cmd_issue_create(args: argparse.Namespace) -> int:
     """Create structured GitHub Issue."""
     title = args.title
-    project = args.project
+    projects = list(getattr(args, "project", None) or [])
     
     # Validate required args
     if not title:
         log_error("Missing --title")
         return 1
-    if not project:
-        log_error("Missing --project")
-        return 1
-    
-    # Validate project name format
-    if not re.match(r'^[a-z0-9-]+$', project):
-        log_error(f"Invalid project name: {project}")
-        log_error("Project name must be lowercase alphanumeric with hyphens")
-        return 1
+    # Validate project name format when project scope is already known.
+    for project in projects:
+        if not _validate_project_name(project):
+            log_error(f"Invalid project name: {project}")
+            log_error("Project name must be lowercase alphanumeric with hyphens")
+            return 1
     
     # Validate title format
     try:
@@ -155,7 +189,8 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
     repo = detect_space_repo(workspace_root)
     ensure_flow_labels_exist(repo)
     ensure_label_exists(type_label, repo)
-    ensure_label_exists(f"project/{project}", repo)
+    for project in projects:
+        ensure_label_exists(f"project/{project}", repo)
     
     # Build gh args
     gh_args = [
@@ -165,8 +200,9 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
         "--body", body,
         "--label", "status/planning",
         "--label", type_label,
-        "--label", f"project/{project}",
     ]
+    for project in projects:
+        gh_args.extend(["--label", f"project/{project}"])
     
     # Run gh issue create
     result = subprocess.run(gh_args, capture_output=True, text=True)
@@ -192,7 +228,7 @@ def cmd_issue_create(args: argparse.Namespace) -> int:
 # ============================================
 
 def cmd_issue_edit(args: argparse.Namespace) -> int:
-    """Edit an existing Issue: title, type, project, and body.
+    """Edit an existing Issue: title, type, project labels, and body.
 
     Body modes:
       --body-file  replace the whole body with file content
@@ -205,7 +241,7 @@ def cmd_issue_edit(args: argparse.Namespace) -> int:
 
     repo = detect_space_repo(find_workspace_root())
 
-    # Fetch current issue for title/project fallback and append mode
+    # Fetch current issue for title/type fallback and append mode.
     issue_info = get_issue_info(issue_number, repo)
     current_body = issue_info.get("body", "")
     current_title = issue_info.get("title", "")
@@ -232,8 +268,18 @@ def cmd_issue_edit(args: argparse.Namespace) -> int:
             return 1
         next_type = inferred
 
-    # --- Determine next project (for label sync) ---
-    next_project = args.project or extract_project_from_labels(issue_info)
+    # --- Determine project label mutations ---
+    add_projects = list(getattr(args, "add_project", None) or [])
+    remove_projects = list(getattr(args, "remove_project", None) or [])
+    for project in [*add_projects, *remove_projects]:
+        if not _validate_project_name(project):
+            log_error(f"Invalid project name: {project}")
+            log_error("Project name must be lowercase alphanumeric with hyphens")
+            return 1
+    overlap = sorted(set(add_projects) & set(remove_projects))
+    if overlap:
+        log_error(f"Project cannot be both added and removed: {', '.join(overlap)}")
+        return 1
 
     # --- Resolve body ---
     body_file = getattr(args, "body_file", None) or getattr(args, "append", None)
@@ -279,11 +325,119 @@ def cmd_issue_edit(args: argparse.Namespace) -> int:
     # --- Sync labels ---
     type_label = plan_type_to_issue_label(next_type)
     sync_type_label_group(issue_number, type_label, repo)
-    if next_project:
-        project_label = f"project/{next_project}"
-        sync_project_label_group(issue_number, project_label, repo)
+    for project in add_projects:
+        sync_project_label_group(issue_number, f"project/{project}", repo)
+    for project in remove_projects:
+        remove_project_label(issue_number, f"project/{project}", repo)
 
-    log_success(f"Issue #{issue_number} updated (title/type/project + {mode})")
+    log_success(f"Issue #{issue_number} updated (title/type/projects + {mode})")
+    return 0
+
+
+# ============================================
+# issue merge command
+# ============================================
+
+def cmd_issue_merge(args: argparse.Namespace) -> int:
+    """Merge duplicate Issues into an already-authored umbrella Issue."""
+    try:
+        umbrella = _normalize_issue_ref(args.into)
+        raw_sources = [_normalize_issue_ref(value) for value in (args.issues or [])]
+    except ValueError as exc:
+        log_error(str(exc))
+        return 1
+
+    # Deduplicate while preserving the user's order.
+    sources = list(dict.fromkeys(raw_sources))
+    if not sources:
+        log_error("Missing source issues to merge")
+        return 1
+    if umbrella in sources:
+        log_error(f"Issue #{umbrella} cannot be merged into itself")
+        return 1
+
+    repo = detect_space_repo(find_workspace_root())
+
+    # Preflight every Issue before the first mutation so bad input cannot
+    # create an avoidable half-merge.
+    try:
+        umbrella_info = get_issue_info(umbrella, repo)
+        source_infos = {source: get_issue_info(source, repo) for source in sources}
+    except RuntimeError:
+        log_error("Failed to read all issues for merge")
+        return 1
+
+    for source, info in source_infos.items():
+        existing_target = _merged_into_target(info.get("body", ""))
+        if existing_target and existing_target != umbrella:
+            log_error(
+                f"Issue #{source} is already merged into #{existing_target}; "
+                f"cannot merge it into #{umbrella}"
+            )
+            return 1
+
+    umbrella_body = umbrella_info.get("body", "") or ""
+    next_umbrella_body = umbrella_body
+    for source in sources:
+        next_umbrella_body = _ensure_merge_history_line(
+            next_umbrella_body, f"- Merged from: #{source}"
+        )
+
+    if next_umbrella_body != umbrella_body:
+        result = subprocess.run(
+            ["gh", "issue", "edit", umbrella, "--repo", repo,
+             "--body", next_umbrella_body],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            log_error(f"Failed to record merge sources on umbrella Issue #{umbrella}")
+            return 1
+
+    for source in sources:
+        info = source_infos[source]
+        source_body = info.get("body", "") or ""
+        next_source_body = _ensure_merge_history_line(
+            source_body, f"- Merged into: #{umbrella}"
+        )
+        if next_source_body != source_body:
+            result = subprocess.run(
+                ["gh", "issue", "edit", source, "--repo", repo,
+                 "--body", next_source_body],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                log_error(f"Failed to record merge target on Issue #{source}")
+                return 1
+
+        # A merged source is no longer an active work item. Removing status
+        # labels is independent from close state, which keeps retries safe.
+        source_labels = [
+            label.get("name", "")
+            for label in info.get("labels", [])
+            if isinstance(label, dict)
+        ]
+        if not remove_status_labels(source, repo, source_labels):
+            log_error(
+                f"Failed to remove active status labels from merged Issue #{source}; "
+                "source was not closed"
+            )
+            return 1
+        if str(info.get("state", "")).upper() != "CLOSED":
+            result = subprocess.run(
+                ["gh", "issue", "close", source, "--repo", repo,
+                 "--reason", "not planned"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                log_error(f"Failed to close merged Issue #{source}")
+                return 1
+
+    log_success(
+        f"Merged {', '.join(f'#{source}' for source in sources)} into #{umbrella}"
+    )
     return 0
 
 
@@ -508,7 +662,9 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     # issue create
     create_parser = issue_subparsers.add_parser("create", help="Create new issue")
     create_parser.add_argument("--title", required=False, help="Issue title")
-    create_parser.add_argument("--project", required=False, help="Project name")
+    create_parser.add_argument(
+        "--project", action="append", help="Project name (repeatable; optional)"
+    )
     create_parser.add_argument("--type", help="Issue type (feat/fix/perf/etc.)")
     create_parser.add_argument("--body", help="Raw issue body")
     create_parser.add_argument("--body-file", help="Read issue body from file")
@@ -518,9 +674,21 @@ def register_issue_parser(subparsers: argparse._SubParsersAction) -> None:
     edit_parser.add_argument("issue_number", nargs="?", help="Issue number to edit")
     edit_parser.add_argument("--title", help="New issue title")
     edit_parser.add_argument("--type", help="New issue type")
-    edit_parser.add_argument("--project", help="New project")
+    edit_parser.add_argument(
+        "--add-project", action="append", help="Add a project label (repeatable)"
+    )
+    edit_parser.add_argument(
+        "--remove-project", action="append", help="Remove a project label (repeatable)"
+    )
     edit_parser.add_argument("--body-file", help="Replace issue body with file content")
     edit_parser.add_argument("--append", help="Append file content to issue body")
+
+    # issue merge
+    merge_parser = issue_subparsers.add_parser(
+        "merge", help="Merge duplicate issues into an umbrella issue"
+    )
+    merge_parser.add_argument("--into", required=True, help="Umbrella issue number")
+    merge_parser.add_argument("issues", nargs="+", help="Source issue numbers to merge")
     
     # issue list
     list_parser = issue_subparsers.add_parser("list", help="List open issues in space repo")
@@ -552,6 +720,8 @@ def cmd_issue(args: argparse.Namespace) -> int:
         return cmd_issue_create(args)
     elif args.issue_cmd == "edit":
         return cmd_issue_edit(args)
+    elif args.issue_cmd == "merge":
+        return cmd_issue_merge(args)
     elif args.issue_cmd == "list":
         return cmd_issue_list(args)
     elif args.issue_cmd == "view":

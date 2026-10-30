@@ -36,7 +36,9 @@ from plan import (
     get_plan_status,
     get_plan_worktree,
     get_plan_field,
+    is_umbrella_plan,
 )
+from lib.umbrella import child_gate_failures
 from plan import (
     resolve_project_path,
 )
@@ -745,8 +747,17 @@ def cmd_archive(args: argparse.Namespace) -> int:
     if not guard_status(current_status, "done", input_ref):
         return 1
 
+    umbrella = is_umbrella_plan(plan_path)
+    if umbrella:
+        failures = child_gate_failures(plan_path, workspace_root, "archive")
+        if failures:
+            log_error("Cannot archive umbrella Plan; child Plans are not archived:")
+            for failure in failures:
+                log_error(f"  - {failure}")
+            return 1
+
     # Extract Plan metadata
-    project = get_plan_project(plan_path)
+    project = "" if umbrella else get_plan_project(plan_path)
     plan_type = get_plan_type(plan_path) or "chore"
     plan_issue = get_plan_issue(plan_path)
     plan_name = Path(plan_path).stem  # Extract plan name for commit message

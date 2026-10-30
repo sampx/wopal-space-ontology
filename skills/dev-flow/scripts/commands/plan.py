@@ -43,8 +43,8 @@ from plan import find_plan, find_plan_by_issue, find_plan_by_name
 from lib.project import AmbiguousPlanError
 from plan import make_plan_name
 from plan import ValidationError as NamingValidationError
-from plan import get_plan_status
-from issue import ensure_label_exists, sync_status_label_group
+from plan import get_plan_status, is_umbrella_plan
+from issue import ensure_label_exists, sync_project_label_group, sync_status_label_group
 from labels import normalize_plan_type
 from labels import ValidationError as LabelsValidationError
 from workflow import PLAN_STATES
@@ -76,13 +76,36 @@ def _get_issue_info(issue_number: int, repo: str) -> dict:
     return json.loads(result.stdout)
 
 
-def _extract_project_from_labels(issue_info: dict) -> str:
-    """Extract project name from issue labels."""
+def _extract_projects_from_labels(issue_info: dict) -> list[str]:
+    """Extract all distinct project names from an Issue, preserving order."""
+    projects: list[str] = []
     for label in issue_info.get("labels", []):
         name = label.get("name", "")
-        if name.startswith("project/"):
-            return name[8:]  # Remove "project/" prefix
-    return ""
+        if not name.startswith("project/"):
+            continue
+        project = name[8:]
+        if project and project not in projects:
+            projects.append(project)
+    return projects
+
+
+def _select_issue_project(issue_number: int, issue_info: dict, explicit: str | None) -> str:
+    """Resolve the one project a normal Plan will implement in."""
+    if explicit:
+        return explicit
+
+    projects = _extract_projects_from_labels(issue_info)
+    if len(projects) == 1:
+        return projects[0]
+    if not projects:
+        raise ValueError(
+            f"Issue #{issue_number} has no project label; pass --project <name> "
+            "to choose this Plan's implementation project"
+        )
+    raise ValueError(
+        f"Issue #{issue_number} has multiple project labels "
+        f"({', '.join(projects)}); pass --project <name> to choose this Plan's project"
+    )
 
 
 def _extract_body_field(body: str, field_name: str) -> str | None:
@@ -241,6 +264,11 @@ def create_plan_from_template(
         raise FileNotFoundError("Plan template not found")
     
     template_content = template_path.read_text()
+
+    # HTML comments in the template are authoring guidance, not Plan content.
+    # Strip them before placeholder replacement so generated Plans contain only
+    # the material an author is expected to complete or review.
+    template_content = re.sub(r'<!--.*?-->', '', template_content, flags=re.DOTALL)
     
     # Build metadata values (just the value part, not the full line)
     issue_value = f"#{issue_number}" if issue_number else "N/A"
@@ -302,6 +330,52 @@ def create_plan_from_template(
     return plan_file
 
 
+def create_umbrella_plan_from_template(
+    plan_name: str,
+    plan_dir: Path,
+    issue_number: int | None,
+    plan_type: str,
+    workspace_root: Path,
+    product: str | None = None,
+    phase: str | None = None,
+) -> Path:
+    """Create a coordination-only umbrella Plan in the reserved directory."""
+    plan_file = plan_dir / f"{plan_name}.md"
+    if plan_file.exists():
+        raise FileExistsError(f"Plan already exists: {plan_file}")
+    plan_dir.mkdir(parents=True, exist_ok=True)
+
+    template_path = (
+        workspace_root / ".wopal" / "skills" / "dev-flow" / "templates" /
+        "umbrella-plan.md"
+    )
+    if not template_path.exists():
+        raise FileNotFoundError(f"Umbrella Plan template not found at {template_path}")
+
+    content = template_path.read_text()
+    content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
+    values = {
+        "{plan_name}": plan_name,
+        "{issue}": f"#{issue_number}" if issue_number else "N/A",
+        "{type}": plan_type,
+        "{product}": product or "",
+        "{phase}": phase or "",
+        "{date}": date.today().strftime("%Y-%m-%d"),
+    }
+    for placeholder, value in values.items():
+        content = content.replace(placeholder, value)
+
+    content = re.sub(
+        r'^(- \*\*(?:Product|Phase)\*\*:)[ \t]+$',
+        r'\1',
+        content,
+        flags=re.MULTILINE,
+    )
+    content = re.sub(r'\n{3,}', '\n\n', content).rstrip() + "\n"
+    plan_file.write_text(content)
+    return plan_file
+
+
 # ============================================
 # plan command (subcommand dispatch)
 # ============================================
@@ -351,15 +425,20 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
         issue_number = int(args.issue)
     title = args.title
     project = args.project
+    umbrella = bool(getattr(args, "umbrella", False))
     plan_type_arg = args.type
     slug_arg = getattr(args, 'slug', None)
 
     # Issue mode is selected by the positional Issue number; no-issue mode by
     # --project. Fail fast before touching git.
-    if not issue_number and not project:
+    if umbrella and project:
+        log_error("Umbrella Plans do not have a Target Project; omit --project")
+        return 1
+    if not issue_number and not project and not umbrella:
         log_error("Either an Issue number or --project is required")
         print("Usage: flow.sh plan new <issue> --type <type> --slug <slug>")
         print("   or: flow.sh plan new --project <name> --type <type> --slug <slug> [--title \"<free text>\"]")
+        print("   or: flow.sh plan new --umbrella --type <type> --slug <slug> [<issue>]")
         return 1
 
     # type and slug are always explicit. The Plan name is <issue?>-<type>-<slug>
@@ -427,14 +506,15 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             log_error(f"Issue #{issue_number} has no title")
             return 1
 
-        # Extract project from labels (or use --project override)
-        if not project:
-            project = _extract_project_from_labels(issue_info)
-
-        if not project:
-            log_error(f"Cannot determine project from Issue #{issue_number}")
-            log_error("Please add a 'project/<name>' label to the Issue")
-            return 1
+        if not umbrella:
+            # A normal Plan always implements in exactly one project. Issue
+            # labels describe impact scope and can therefore be empty or plural;
+            # only a single label is safe to infer automatically.
+            try:
+                project = _select_issue_project(issue_number, issue_info, project)
+            except ValueError as e:
+                log_error(str(e))
+                return 1
 
         # Normalize type
         try:
@@ -451,7 +531,8 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
             return 1
 
         # Extract Project Type and Project Path from Issue body
-        issue_project_type, issue_project_path = _extract_project_metadata_from_body(issue_info)
+        if not umbrella:
+            issue_project_type, issue_project_path = _extract_project_metadata_from_body(issue_info)
         # Extract Product and Phase from Issue body
         issue_product, issue_phase = _extract_product_phase_from_body(issue_info)
     else:
@@ -477,22 +558,37 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
     log_info(f"Plan name: {plan_name}")
 
     # Resolve plan directory
-    plan_dir = _resolve_plan_dir(project, workspace_root)
+    plan_dir = (
+        workspace_root / ".wopal-space" / "plans" / "_umbrella"
+        if umbrella
+        else _resolve_plan_dir(project, workspace_root)
+    )
 
     # Create plan file from template
     try:
-        plan_file = create_plan_from_template(
-            plan_name,
-            plan_dir,
-            issue_number,
-            plan_type,
-            project,
-            workspace_root,
-            project_path=issue_project_path,
-            project_type=issue_project_type,
-            product=product_value,
-            phase=phase_value,
-        )
+        if umbrella:
+            plan_file = create_umbrella_plan_from_template(
+                plan_name,
+                plan_dir,
+                issue_number,
+                plan_type,
+                workspace_root,
+                product=product_value,
+                phase=phase_value,
+            )
+        else:
+            plan_file = create_plan_from_template(
+                plan_name,
+                plan_dir,
+                issue_number,
+                plan_type,
+                project,
+                workspace_root,
+                project_path=issue_project_path,
+                project_type=issue_project_type,
+                product=product_value,
+                phase=phase_value,
+            )
         log_success(f"Plan created: {plan_file}")
     except (FileExistsError, FileNotFoundError) as e:
         log_error(str(e))
@@ -500,17 +596,29 @@ def _cmd_plan_new(args: argparse.Namespace) -> int:
 
     # Issue mode: Update Issue labels
     if issue_number:
+        if not umbrella:
+            # The Plan owns only its chosen project label. The additive sync
+            # helper deliberately preserves every other project/* label.
+            project_label = f"project/{project}"
+            ensure_label_exists(project_label, repo)
+            sync_project_label_group(issue_number, project_label, repo)
         ensure_label_exists("status/planning", repo)
         sync_status_label_group(issue_number, "status/planning", repo)
 
         # Output summary
         print(f"Plan: {plan_file}")
-        print(f"Issue: #{issue_number} | Project: {project} | Status: planning")
+        if umbrella:
+            print(f"Issue: #{issue_number} | Umbrella | Status: planning")
+        else:
+            print(f"Issue: #{issue_number} | Project: {project} | Status: planning")
         print(f"Next: flow.sh approve {issue_number}")
     else:
         # No-issue mode: Output summary
         print(f"Plan: {plan_file}")
-        print(f"Project: {project} | Status: planning")
+        if umbrella:
+            print("Umbrella | Status: planning")
+        else:
+            print(f"Project: {project} | Status: planning")
         print(f"Next: flow.sh approve {plan_name}")
 
     return 0
@@ -602,6 +710,9 @@ def get_plan_metadata(plan_file: str) -> dict:
     type_match = re.search(r'^\- \*\*Type\*\*:\s*(.+)', content, re.MULTILINE)
     metadata['type'] = type_match.group(1).strip().lower() if type_match else ''
 
+    kind_match = re.search(r'^\- \*\*Plan Kind\*\*:\s*(.+)', content, re.MULTILINE)
+    metadata['kind'] = kind_match.group(1).strip().lower() if kind_match else 'normal'
+
     return metadata
 
 
@@ -673,6 +784,35 @@ def _cmd_plan_status(input_ref: str) -> int:
         print(f"  Active: {active_plan_file} (worktree)")
     print(f"  Status: {status}")
     print(f"  Created: {created}")
+
+    if is_umbrella_plan(str(active_plan_file)):
+        from lib.umbrella import resolve_child_states
+
+        print("  Kind: umbrella")
+        print("")
+        print("Child Plans:")
+        children = resolve_child_states(str(active_plan_file), workspace_root)
+        if not children:
+            print("  (none declared)")
+        for child in children:
+            if child.missing:
+                declared_project = child.declared_project or "-"
+                print(
+                    f"  {child.name} | project={declared_project} | "
+                    "issue=- | status=MISSING"
+                )
+                continue
+            child_project = child.project or child.declared_project or "-"
+            child_issue = f"#{child.issue}" if child.issue else "-"
+            child_status = child.status or "unknown"
+            print(
+                f"  {child.name} | project={child_project} | "
+                f"issue={child_issue} | status={child_status}"
+            )
+
+        print("")
+        print(f"State Machine: {_get_status_display_list(status)}")
+        return 0
 
     # Read Worktree metadata from Plan (written by approve --confirm)
     try:
@@ -1008,6 +1148,11 @@ def register_plan_parser(subparsers: argparse._SubParsersAction) -> None:
     new_parser.add_argument(
         "--phase",
         help="Phase id for phase linkage, e.g. P3 (optional; must pair with --product)",
+    )
+    new_parser.add_argument(
+        "--umbrella",
+        action="store_true",
+        help="Create a coordination-only umbrella Plan under plans/_umbrella",
     )
 
     # ---- plan status ----

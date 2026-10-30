@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # test_issue_edit_meta.py - Test cmd_issue_edit title/type/project updates
 #
-# Test Case: issue edit command (--title / --type / --project metadata updates)
+# Test Case: issue edit command metadata updates
 #
 # Scenarios:
 #   1. --title updates the issue title
 #   2. --type syncs the type label group
-#   3. --project syncs the project label group
-#   4. project falls back to existing label when --project omitted
+#   3. --add-project adds only the requested project label
+#   4. --remove-project removes only the requested project label
 
 import unittest
 import sys
@@ -27,7 +27,8 @@ def _make_args(**overrides):
         "issue_number": "42",
         "title": None,
         "type": None,
-        "project": None,
+        "add_project": None,
+        "remove_project": None,
         "body_file": None,
         "append": None,
     }
@@ -36,7 +37,7 @@ def _make_args(**overrides):
 
 
 class TestIssueEditMeta(unittest.TestCase):
-    """Test cmd_issue_edit metadata updates (title/type/project)"""
+    """Test cmd_issue_edit metadata updates (title/type/project)."""
 
     def _run_edit(self, args, issue_info=None):
         """Run cmd_issue_edit with standard mocks, return (result, gh_call_args)."""
@@ -54,8 +55,9 @@ class TestIssueEditMeta(unittest.TestCase):
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
                     with patch("commands.issue.sync_type_label_group"):
                         with patch("commands.issue.sync_project_label_group"):
-                            result = cmd_issue_edit(args)
-                            return result, mock_run.call_args[0][0]
+                            with patch("commands.issue.remove_project_label"):
+                                result = cmd_issue_edit(args)
+                                return result, mock_run.call_args[0][0]
 
     def test_title_update_passes_new_title_to_gh(self):
         """--title updates the issue title via gh issue edit"""
@@ -81,7 +83,8 @@ class TestIssueEditMeta(unittest.TestCase):
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
                     with patch("commands.issue.sync_type_label_group") as mock_sync_type:
                         with patch("commands.issue.sync_project_label_group"):
-                            result = cmd_issue_edit(args)
+                            with patch("commands.issue.remove_project_label"):
+                                result = cmd_issue_edit(args)
 
         self.assertEqual(result, 0)
         mock_sync_type.assert_called_once()
@@ -90,9 +93,9 @@ class TestIssueEditMeta(unittest.TestCase):
         self.assertEqual(type_args[0], "42")
         self.assertEqual(type_args[1], "type/bug")
 
-    def test_project_syncs_label_group(self):
-        """--project syncs the project label group"""
-        args = _make_args(project="other-project")
+    def test_add_project_adds_only_requested_label(self):
+        """--add-project adds the requested project without replacing others."""
+        args = _make_args(add_project=["other-project"])
         with patch("commands.issue.detect_space_repo", return_value="test/repo"):
             with patch("commands.issue.get_issue_info") as mock_get:
                 mock_get.return_value = {
@@ -104,7 +107,8 @@ class TestIssueEditMeta(unittest.TestCase):
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
                     with patch("commands.issue.sync_type_label_group"):
                         with patch("commands.issue.sync_project_label_group") as mock_sync_project:
-                            result = cmd_issue_edit(args)
+                            with patch("commands.issue.remove_project_label"):
+                                result = cmd_issue_edit(args)
 
         self.assertEqual(result, 0)
         mock_sync_project.assert_called_once()
@@ -112,26 +116,29 @@ class TestIssueEditMeta(unittest.TestCase):
         self.assertEqual(project_args[0], "42")
         self.assertEqual(project_args[1], "project/other-project")
 
-    def test_project_falls_back_to_existing_label(self):
-        """project falls back to existing project/ label when --project omitted"""
-        args = _make_args()  # no title/type/project changes, body untouched
+    def test_remove_project_removes_only_requested_label(self):
+        """--remove-project removes the requested project without touching others."""
+        args = _make_args(remove_project=["existing"])
         with patch("commands.issue.detect_space_repo", return_value="test/repo"):
             with patch("commands.issue.get_issue_info") as mock_get:
                 mock_get.return_value = {
                     "body": "## Goal\n\ntest",
                     "title": "feat(test): old title",
-                    "labels": [{"name": "type/feature"}, {"name": "project/existing"}],
+                    "labels": [
+                        {"name": "type/feature"},
+                        {"name": "project/existing"},
+                        {"name": "project/other"},
+                    ],
                 }
                 with patch("commands.issue.subprocess.run") as mock_run:
                     mock_run.return_value = MagicMock(returncode=0, stderr="")
                     with patch("commands.issue.sync_type_label_group"):
-                        with patch("commands.issue.sync_project_label_group") as mock_sync_project:
-                            result = cmd_issue_edit(args)
+                        with patch("commands.issue.sync_project_label_group"):
+                            with patch("commands.issue.remove_project_label") as mock_remove:
+                                result = cmd_issue_edit(args)
 
         self.assertEqual(result, 0)
-        mock_sync_project.assert_called_once()
-        project_args = mock_sync_project.call_args[0]
-        self.assertEqual(project_args[1], "project/existing")
+        mock_remove.assert_called_once_with("42", "project/existing", "test/repo")
 
 
 if __name__ == "__main__":

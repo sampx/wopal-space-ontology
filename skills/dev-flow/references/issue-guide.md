@@ -7,21 +7,45 @@ Issue 创建、编写、同步的详细指导。核心规则见 SKILL.md。
 **必须使用 `flow.sh issue create`**，禁止直接调 `gh issue create`。脚本通过 `detect_space_repo` 自动检测空间仓库，无需手动指定 `--repo`。
 
 ```bash
-flow.sh issue create --title "add skills remove command" --project <name> --type feat
+flow.sh issue create --title "add skills remove command" --type feat
+flow.sh issue create --title "coordinate api and web" --project api --project web --type feat
 ```
 
 **创建错误的 Issue 必须彻底删除**（`flow.sh issue delete`），不能只是 close。用户不喜欢仓库里留垃圾记录。
 
 ### `--project` 怎么填
 
-`--project` 决定 Issue 的 `project/<name>` 标签，也决定后续 Plan 落在 `.wopal-space/plans/<name>/`。它填的是**工作对象所在的空间组件**，不是流程名，也不是话题名：
+`--project` 是可选、可重复参数，只给 Issue 增加 `project/<name>` 影响范围标签。Issue 可以有 0..N 个项目标签；它们**不再决定某一份 Plan 的目录**。普通 Plan 创建时仍必须选定自己的唯一项目：Issue 恰好只有一个 `project/*` 时可以自动采用；没有或有多个时必须显式传 `plan new ... --project <name>`。
+
+项目名填的是**工作对象所在的空间组件**，不是流程名，也不是话题名：
 
 | Issue 要改的东西 | `--project` | 后续流程 |
 |---|---|---|
 | 本体组件（本体 worktree 下的 skills、rules、agents、commands、plugins、assembly） | 该组件在 `STRUCTURE.md` 里的项目名 | `ontology-evolution` |
 | `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | `dev-flow` |
 
-名字从 `STRUCTURE.md` 读，不要凭印象猜。它同时是 Plan 目录名和 Issue 标签名，写错会让 Plan 落到错误目录。
+名字从 `STRUCTURE.md` 读，不要凭印象猜。Issue 标签表示影响范围；普通 Plan 的 Target Project 才决定 Plan 落到 `.wopal-space/plans/<name>/`。
+
+### 增删项目标签
+
+不要再用“设置唯一项目”的思路编辑 Issue。项目标签按单个标签增删，其他 `project/*` 保持不动：
+
+```bash
+flow.sh issue edit 42 --add-project api --add-project web
+flow.sh issue edit 42 --remove-project legacy-api
+```
+
+### 多个 Issue 归并成一份实施
+
+如果多个 Issue 实际描述同一份实施，先归并 Issue，再创建一个普通 Plan：
+
+```bash
+flow.sh issue merge --into 40 41 42
+```
+
+`#40` 保留为伞型/主 Issue，并记录 `Merged from`；来源 Issue 记录 `Merged into: #40`，移除活动状态标签并以 `not planned` 关闭。重复执行同一归并是幂等的；已经归并到别处的 Issue 会在写入前被拒绝。
+
+**不要**为了保留多个 Issue 而写 `Issue: #40, #41` 之类的多 Issue Plan。普通 Plan 的 Issue 字段最多一个。
 
 ### 本体相关的 Issue 不走 dev-flow
 
@@ -135,5 +159,7 @@ flow.sh sync <issue> --body-only
 |------|--------|------|
 | Issue 驱动 | Issue 号、"处理 issue"、"开发" | 先创建 Issue → 再出 Plan |
 | 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan new --project ... --type ... --slug ...` |
+
+一个目标需要**多份**实施时，不要合并成一个跨项目普通 Plan；改用 `flow.sh plan new --umbrella ...`，再用普通子 Plan 分别实施。详见 `references/plan-guide.md` / `references/plan-guide.zh-CN.md`。
 
 两者都是 dev-flow 流程，区别在于是否有 Issue 载体。

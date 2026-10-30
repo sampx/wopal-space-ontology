@@ -641,25 +641,52 @@ def sync_type_label_group(issue_number: int, target_label: str, repo: str) -> No
 
 
 def sync_project_label_group(issue_number: int, target_label: str, repo: str) -> None:
-    """Sync project label group on Issue.
-    
-    Dynamically removes any project/* labels and adds the target.
-    """
+    """Ensure one project label exists without removing other projects."""
     current_labels = get_issue_labels(issue_number, repo)
-    
-    labels_to_remove = [l for l in current_labels if re.match(r'^project/', l) and l != target_label]
-    labels_to_add = [target_label] if target_label not in current_labels else []
-    
-    if not labels_to_add and not labels_to_remove:
+
+    if target_label in current_labels:
         return
-    
+
+    ensure_label_exists(target_label, repo)
+    args = ['gh', 'issue', 'edit', str(issue_number), '--repo', repo]
+    args.extend(['--add-label', target_label])
+    subprocess.run(args, capture_output=True)
+
+
+def remove_project_label(issue_number: int | str, target_label: str, repo: str) -> None:
+    """Remove one project label without modifying any other project labels."""
+    current_labels = get_issue_labels(issue_number, repo)
+    if target_label not in current_labels:
+        return
+
+    subprocess.run(
+        ['gh', 'issue', 'edit', str(issue_number), '--repo', repo,
+         '--remove-label', target_label],
+        capture_output=True,
+    )
+
+
+def remove_status_labels(
+    issue_number: int | str,
+    repo: str,
+    current_labels: list[str] | None = None,
+) -> bool:
+    """Remove every active dev-flow status label from an Issue.
+
+    Returns False when GitHub rejects the mutation so callers can stop before
+    performing a later irreversible action such as closing the Issue.
+    """
+    if current_labels is None:
+        current_labels = get_issue_labels(issue_number, repo)
+    labels_to_remove = [label for label in STATUS_LABELS if label in current_labels]
+    if not labels_to_remove:
+        return True
+
     args = ['gh', 'issue', 'edit', str(issue_number), '--repo', repo]
     for label in labels_to_remove:
         args.extend(['--remove-label', label])
-    for label in labels_to_add:
-        args.extend(['--add-label', label])
-    
-    subprocess.run(args, capture_output=True)
+    result = subprocess.run(args, capture_output=True, text=True)
+    return result.returncode == 0
 
 
 def sync_status_label_group(issue_number: int | str, target_label: str, repo: str) -> None:

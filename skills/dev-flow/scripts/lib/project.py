@@ -122,20 +122,23 @@ _ISSUE_FIELD = re.compile(r"^-\s*\*\*Issue\*\*:[ \t]*(.*)$", re.MULTILINE)
 _ISSUE_NUMBER = re.compile(r"#(\d+)")
 
 
-def _plan_issues(plan_file: Path) -> set[int]:
-    """Read every Issue number from a Plan's metadata field.
+def _plan_issue(plan_file: Path) -> int | None:
+    """Read a Plan's single Issue number from metadata.
 
-    Accepts both the single form (``**Issue**: #249``) and the list form
-    (``**Issue**: #249, #250``), so any linked Issue resolves the same Plan.
+    Multi-Issue Plan metadata is intentionally not interpreted. Current Plans
+    have a 0..1 Issue contract; archived historical documents are left as-is
+    rather than kept alive through a compatibility resolver.
     """
     try:
         head = plan_file.read_text(encoding="utf-8", errors="ignore")[:4000]
     except OSError:
-        return set()
+        return None
     match = _ISSUE_FIELD.search(head)
     if not match:
-        return set()
-    return {int(number) for number in _ISSUE_NUMBER.findall(match.group(1))}
+        return None
+    value = match.group(1).strip()
+    single = re.fullmatch(r"#(\d+)", value)
+    return int(single.group(1)) if single else None
 
 
 def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
@@ -158,7 +161,7 @@ def find_plan(input_ref: str, workspace_root: Path) -> PlanLocation:
             f
             for d in dirs
             for f in sorted(d.glob("*.md"))
-            if f.is_file() and wanted in _plan_issues(f)
+            if f.is_file() and wanted == _plan_issue(f)
         ]
         if matches:
             active = [f for f in matches if f.parent.name != "done"]

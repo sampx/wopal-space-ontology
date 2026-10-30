@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lib.workspace import find_workspace_root
 from plan import ValidationError as PlanNameValidationError
-from plan import validate_plan_name
+from plan import get_plan_issue, is_umbrella_plan, validate_plan_name
 from workflow import PLAN_STATES
 
 
@@ -52,6 +52,10 @@ def check_doc_plan(plan_file: str) -> None:
     issues.extend(check_plan_status(content))
     issues.extend(check_product_phase(content))
     issues.extend(check_plan_name(plan_file))
+    issues.extend(check_issue_contract(content))
+    issues.extend(check_template_residue(content))
+    issues.extend(check_project_contract(content))
+    issues.extend(check_umbrella_child_issue_contract(plan_file, content))
 
     project_path_issue = _check_project_path(content)
     if project_path_issue:
@@ -105,6 +109,143 @@ def check_product_phase(content: str) -> list[str]:
             issues.append("Metadata: Product and Phase must be declared together")
 
     return issues
+
+
+def check_issue_contract(content: str) -> list[str]:
+    """A Plan may link zero or one Issue, never an Issue list."""
+    match = re.search(r'^-\s+\*\*Issue\*\*:[ \t]*(.*)$', content, re.MULTILINE)
+    if not match:
+        return []
+
+    value = _strip_md(match.group(1))
+    if not value or value.lower() in {"n/a", "none"}:
+        return []
+    if re.fullmatch(r'#\d+', value):
+        return []
+    return ["Issue: Plan may reference at most one Issue in the form '#N'"]
+
+
+_AUTHOR_PLACEHOLDER_PREFIXES = (
+    "type(scope): delivered result",
+    "Describe ",
+    "Current architecture",
+    "Research summary",
+    "Contract definition",
+    "List ",
+    "excluded item",
+    "component",
+    "role in this change",
+    "behavioral criterion",
+    "user-visible behavior",
+    "what the user is validating",
+    "project spec section",
+    "setup condition",
+    "one real copy-paste command",
+    "action ",
+    "specific observable result",
+    "logs, diff, screenshot",
+    "user-validation confirmation",
+    "Agent Verification entries",
+    "required for project/phase Plans",
+    "observable outcome",
+    "important boundary",
+    "files/docs the Plan author",
+    "optional: task-local contract",
+    "optional: hard implementation limits",
+    "executable command",
+    "controller accepted this Task",
+    "agent name",
+    "assignment rationale",
+    "decision and rationale",
+    "context document path",
+    "item 1",
+    "item 2",
+    "brief reason when false",
+    "backfilled by the controller after acceptance",
+    "umbrella-level outcome",
+    "replace with a manual validation scenario",
+)
+
+
+def check_template_residue(content: str) -> list[str]:
+    """Reject author-only template guidance while allowing technical metavariables."""
+    issues: list[str] = []
+    if re.search(r'<!--.*?-->', content, re.DOTALL):
+        issues.append("Template residue: HTML comment remains in Plan")
+
+    for match in re.finditer(r'<([^<>\n]+)>', content):
+        inner = match.group(1).strip()
+        if inner.startswith(_AUTHOR_PLACEHOLDER_PREFIXES):
+            line = _line_at(content, match.start())
+            issues.append(f"[L{line}] Template residue: author placeholder '<{inner}>'")
+    return issues
+
+
+def check_project_contract(content: str) -> list[str]:
+    """Normal Plans own one project; umbrella Plans own none."""
+    kind_m = re.search(r'^-\s+\*\*Plan Kind\*\*:[ \t]*(.*)$', content, re.MULTILINE)
+    kind = _strip_md(kind_m.group(1)).lower() if kind_m else "normal"
+    target_m = re.search(
+        r'^-\s+\*\*Target Project\*\*:[ \t]*(.*)$', content, re.MULTILINE
+    )
+    target = _strip_md(target_m.group(1)) if target_m else ""
+    path_m = re.search(
+        r'^-\s+\*\*Project Path\*\*:[ \t]*(.*)$', content, re.MULTILINE
+    )
+    project_path = _strip_md(path_m.group(1)) if path_m else ""
+
+    if kind == "umbrella":
+        issues = []
+        if target:
+            issues.append("Umbrella Plan must not declare Target Project")
+        if project_path:
+            issues.append("Umbrella Plan must not declare Project Path")
+        return issues
+    if kind != "normal":
+        return [f"Plan Kind: unsupported value '{kind}'"]
+    if not target:
+        return ["Target Project is required for a normal Plan"]
+    return []
+
+
+def _workspace_root_from_plan_path(plan_file: str) -> Path | None:
+    """Infer workspace root from a Plan stored under .wopal-space/plans/."""
+    path = Path(plan_file).resolve()
+    for parent in path.parents:
+        if parent.name == ".wopal-space":
+            return parent.parent
+    return None
+
+
+def check_umbrella_child_issue_contract(
+    plan_file: str, content: str
+) -> list[str]:
+    """The umbrella Issue may not be rebound to multiple child Plans."""
+    if not is_umbrella_plan(plan_file):
+        return []
+    umbrella_issue = get_plan_issue(plan_file)
+    if not umbrella_issue:
+        return []
+
+    workspace_root = _workspace_root_from_plan_path(plan_file)
+    if workspace_root is None:
+        return []
+
+    # Import lazily to keep the validation/Plan dependency surface simple.
+    from lib.umbrella import resolve_child_states
+
+    reused = [
+        child.name
+        for child in resolve_child_states(plan_file, workspace_root)
+        if not child.missing and child.issue == umbrella_issue
+    ]
+    if len(reused) <= 1:
+        return []
+    return [
+        "Umbrella child Issue contract: umbrella Issue "
+        f"#{umbrella_issue} is reused by multiple child Plans: "
+        + ", ".join(reused)
+    ]
 
 
 def _check_project_path(content: str) -> str | None:

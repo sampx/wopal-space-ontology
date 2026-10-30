@@ -35,6 +35,7 @@ from commands.plan import (
     _cmd_plan_status,
     _cmd_plan_new,
     _derive_project_path,
+    create_plan_from_template,
     cmd_plan,
     register_plan_parser,
 )
@@ -369,30 +370,6 @@ class TestCmdPlanDispatch(unittest.TestCase):
         resolver.assert_called_once()
         fetch_issue.assert_not_called()
 
-    def test_plan_new_ambiguous_issue_writes_no_plan_file(self):
-        """End-to-end guard: ambiguity aborts before any file is written."""
-        ws = Path(self.tmp_dir)
-        plans = ws / ".wopal-space" / "plans" / "gesp"
-        plans.mkdir(parents=True)
-        (ws / ".git").mkdir()
-        (plans / "enhance-one.md").write_text("- **Issue**: #249, #250\n")
-        (plans / "fix-two.md").write_text("- **Issue**: #250\n")
-        before = sorted(p.name for p in plans.glob("*.md"))
-
-        args = Namespace(
-            plan_command="new",
-            issue="250",
-            title=None, project=None, type="enhance", slug="duplicate",
-        )
-        with patch('commands.plan.find_workspace_root', return_value=ws), \
-             patch('commands.plan.detect_space_repo', return_value="owner/repo"), \
-             patch('commands.plan._get_issue_info') as fetch_issue:
-            result = cmd_plan(args)
-
-        assert result == 1
-        fetch_issue.assert_not_called()
-        assert sorted(p.name for p in plans.glob("*.md")) == before
-
     def test_plan_new_falls_through_to_creation(self):
         """plan new 42 falls through to creation logic."""
         ws = Path(self.tmp_dir)
@@ -573,6 +550,134 @@ class TestCmdPlanNewIssueMode(unittest.TestCase):
                             # Plan name carries issue, type and the explicit slug
                             call_kwargs = mock_create.call_args
                             self.assertEqual(call_kwargs[0][0], "42-feature-explicit-slug")
+
+    def test_issue_mode_without_project_rejects_issue_with_no_project_labels(self):
+        ws = Path(self.tmp_dir)
+        args = self._make_args(project=None, slug="project-select")
+        issue_info = {
+            "title": "add skills remove command",
+            "body": "",
+            "number": 42,
+            "state": "open",
+            "labels": [],
+        }
+        with patch('commands.plan.find_workspace_root', return_value=ws):
+            with patch('commands.plan.detect_space_repo', return_value='test/repo'):
+                with patch('commands.plan.find_plan_by_issue', side_effect=FileNotFoundError):
+                    with patch('commands.plan._get_issue_info', return_value=issue_info):
+                        with patch('commands.plan.create_plan_from_template') as create:
+                            result = _cmd_plan_new(args)
+
+        self.assertEqual(result, 1)
+        create.assert_not_called()
+
+    def test_issue_mode_without_project_rejects_issue_with_multiple_project_labels(self):
+        ws = Path(self.tmp_dir)
+        args = self._make_args(project=None, slug="project-select")
+        issue_info = {
+            "title": "add skills remove command",
+            "body": "",
+            "number": 42,
+            "state": "open",
+            "labels": [
+                {"name": "project/wopal-cli"},
+                {"name": "project/wopal-site"},
+            ],
+        }
+        with patch('commands.plan.find_workspace_root', return_value=ws):
+            with patch('commands.plan.detect_space_repo', return_value='test/repo'):
+                with patch('commands.plan.find_plan_by_issue', side_effect=FileNotFoundError):
+                    with patch('commands.plan._get_issue_info', return_value=issue_info):
+                        with patch('commands.plan.create_plan_from_template') as create:
+                            result = _cmd_plan_new(args)
+
+        self.assertEqual(result, 1)
+        create.assert_not_called()
+
+    def test_issue_mode_auto_selects_the_only_project_label(self):
+        ws = Path(self.tmp_dir)
+        args = self._make_args(project=None, slug="project-select")
+        issue_info = {
+            "title": "add skills remove command",
+            "body": "",
+            "number": 42,
+            "state": "open",
+            "labels": [{"name": "project/wopal-cli"}],
+        }
+        with patch('commands.plan.find_workspace_root', return_value=ws):
+            with patch('commands.plan.detect_space_repo', return_value='test/repo'):
+                with patch('commands.plan.find_plan_by_issue', side_effect=FileNotFoundError):
+                    with patch('commands.plan._get_issue_info', return_value=issue_info):
+                        with patch('commands.plan._resolve_plan_dir', return_value=Path(self.tmp_dir) / "plans"):
+                            with patch('commands.plan.create_plan_from_template') as create:
+                                create.return_value = Path(self.tmp_dir) / "plans" / "42-feature-add-skills-remove-command.md"
+                                with patch('commands.plan.ensure_label_exists'):
+                                    with patch('commands.plan.sync_status_label_group'):
+                                        with patch('commands.plan.sync_project_label_group'):
+                                            result = _cmd_plan_new(args)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(create.call_args.args[4], "wopal-cli")
+
+    def test_explicit_project_is_added_to_issue_without_replacing_other_projects(self):
+        ws = Path(self.tmp_dir)
+        args = self._make_args(project="wopal-cli", slug="project-select")
+        issue_info = {
+            "title": "add skills remove command",
+            "body": "",
+            "number": 42,
+            "state": "open",
+            "labels": [{"name": "project/wopal-site"}],
+        }
+        with patch('commands.plan.find_workspace_root', return_value=ws):
+            with patch('commands.plan.detect_space_repo', return_value='test/repo'):
+                with patch('commands.plan.find_plan_by_issue', side_effect=FileNotFoundError):
+                    with patch('commands.plan._get_issue_info', return_value=issue_info):
+                        with patch('commands.plan._resolve_plan_dir', return_value=Path(self.tmp_dir) / "plans"):
+                            with patch('commands.plan.create_plan_from_template') as create:
+                                create.return_value = Path(self.tmp_dir) / "plans" / "42-feature-add-skills-remove-command.md"
+                                with patch('commands.plan.ensure_label_exists') as ensure:
+                                    with patch('commands.plan.sync_status_label_group'):
+                                        with patch('commands.plan.sync_project_label_group') as sync_project:
+                                            result = _cmd_plan_new(args)
+
+        self.assertEqual(result, 0)
+        ensure.assert_any_call("project/wopal-cli", "test/repo")
+        sync_project.assert_called_once_with(42, "project/wopal-cli", "test/repo")
+
+
+class TestCreatePlanFromTemplate(unittest.TestCase):
+    def test_generated_plan_strips_html_comments(self):
+        root = Path(tempfile.mkdtemp())
+        try:
+            template = root / ".wopal" / "skills" / "dev-flow" / "templates" / "plan.md"
+            template.parent.mkdir(parents=True)
+            template.write_text(
+                "# {plan_name}\n\n"
+                "<!-- author-only guidance -->\n\n"
+                "## Metadata\n\n"
+                "- **Issue**: {issue}\n"
+                "- **Type**: {type}\n"
+                "- **Target Project**: {project}\n"
+                "- **Product**: {product}\n"
+                "- **Phase**: {phase}\n"
+                "- **Project Path**: {path}\n"
+                "- **Created**: {date}\n"
+                "- **Status**: planning\n"
+            )
+            plan = create_plan_from_template(
+                "42-feature-clean-plan",
+                root / "plans",
+                42,
+                "feature",
+                "demo",
+                root,
+            )
+            generated = plan.read_text()
+            self.assertNotIn("<!--", generated)
+            self.assertNotIn("author-only guidance", generated)
+        finally:
+            shutil.rmtree(root)
 
 
 class TestDeriveProjectPath(unittest.TestCase):

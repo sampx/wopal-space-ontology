@@ -17,6 +17,9 @@ META = """# test-plan
 
 ## Metadata
 
+- **Plan Kind**: umbrella
+- **Issue**: N/A
+- **Type**: test
 - **Product**:
 - **Phase**:
 - **Status**: planning

@@ -6,6 +6,23 @@ So a Plan's job is to state three things: **what is wanted (behavior)**, **what 
 
 One line: **pin the contract surface, open up the implementation surface.**
 
+## Choose a normal or umbrella Plan first
+
+- **Normal Plan = one implementation**: it links 0..1 Issue and must have exactly one Target Project. When created from an Issue, the only `project/*` label may be inferred; zero or multiple project labels require explicit `--project <name>`.
+- **Several Issues but one implementation**: run `issue merge --into` first, then author one normal Plan. Multi-Issue Plan metadata is not supported.
+- **One goal requiring several implementations**: use an umbrella Plan. Umbrellas live under `.wopal-space/plans/_umbrella/` and own no Target Project / Project Path. Every child remains a normal Plan, whether several children share one project or span projects.
+- `Child Plans` stores only child Plan name, Target Project, and responsibility. Issue/status are read live from the child rather than copied into the umbrella.
+- An umbrella never advances child state. Its `complete` gate requires every child to be at least `verifying`; `verify --confirm` requires every child `done/archived`; `archive` requires every child archived. `integrate` and `verify-switch` do not apply to umbrellas.
+
+Examples:
+
+```bash
+flow.sh plan new 42 --project api --type feature --slug endpoint
+flow.sh plan new --project api --type feature --slug local-task
+flow.sh plan new --umbrella --type enhance --slug release-train
+flow.sh plan new 42 --umbrella --type enhance --slug release-train
+```
+
 ## Writing style
 
 Write Plan content in the user's preferred language while keeping template headings and field names unchanged. Prefer plain, direct language that a human reviewer can understand without engineering context. Avoid jargon, abbreviations, and abstract technical wording when ordinary words are enough.
@@ -251,7 +268,7 @@ If the implementer is also the controller, keep the same order: implementation �
 
 ## Validation and advancement
 
-`plan check` is intentionally mechanical. It checks only lifecycle metadata needed by the workflow: valid `Status`, Product/Phase pairing, and a usable Project Path when Target Project is set. It does **not** judge design quality, TDD choice, Behavior wording, Interface/Constraints, or User Validation prose; those belong to authoring/review.
+`plan check` is intentionally mechanical. It checks lifecycle structure needed by the workflow: valid `Status`, Product/Phase pairing, the 0..1 Issue contract, normal-vs-umbrella project ownership, a usable Project Path for normal Plans, and authoring residue such as HTML comments / known template placeholders. It does **not** judge design quality, TDD choice, Behavior wording, Interface/Constraints, or User Validation prose; those belong to authoring/review.
 
 `complete`/`verify` only gate completion state: Task Done, Agent Verification, and User Validation checkboxes must be completed where those sections exist.
 
@@ -278,7 +295,7 @@ The Plan name is the authoritative identifier used to derive feature branches. N
 Anywhere a lifecycle command takes a `plan-id`, an Issue number works. Resolution order is fixed:
 
 1. **Filename prefix** — `<issue_number>-*.md`; a hit wins immediately.
-2. **Metadata lookup** — when the filename carries no number (Plan created first, Issue linked later), read the `- **Issue**:` field. A multi-Issue list (`#249, #250`) resolves the same Plan from **any** of its numbers.
+2. **Metadata lookup** — when the filename carries no number (Plan created first, Issue linked later), read the single `- **Issue**: #N` field. Multi-Issue metadata is invalid and is not a compatibility lookup path.
 3. **Active first** — when a number matches several Plans, archived Plans under `done/` are ignored; only active Plans are considered.
 
 If two active Plans still match the same number, the command **fails loudly and lists the candidates** rather than guessing. Re-run with the Plan name; do not rename the Plan and do not create another one:

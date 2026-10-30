@@ -211,18 +211,21 @@ class TestSyncTypeLabelGroup(unittest.TestCase):
 class TestSyncProjectLabelGroup(unittest.TestCase):
     """Test sync_project_label_group wrapper."""
 
+    @patch("issue.ensure_label_exists")
     @patch("issue.get_issue_labels")
     @patch("issue.subprocess")
-    def test_removes_old_project_labels(self, mock_subprocess, mock_get_labels):
-        """sync_project_label_group: removes old project/* labels."""
+    def test_preserves_old_project_labels_when_adding(
+        self, mock_subprocess, mock_get_labels, mock_ensure
+    ):
+        """Adding one project label must not remove another project label."""
         mock_get_labels.return_value = ["project/old-project", "status/planning"]
         sync_project_label_group("42", "project/new-project", "owner/repo")
         run_call = mock_subprocess.run.call_args_list[-1]
         args = run_call[0][0]
-        self.assertIn("--remove-label", args)
-        self.assertIn("project/old-project", args)
+        self.assertNotIn("--remove-label", args)
         self.assertIn("--add-label", args)
         self.assertIn("project/new-project", args)
+        mock_ensure.assert_called_once_with("project/new-project", "owner/repo")
 
 
 # ============================================

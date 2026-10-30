@@ -6,6 +6,23 @@ Plan 有两类读者：**评审的人**（要能看懂你要什么）和**实施
 
 一句话：**把契约面钉死，把实现面放开。**
 
+## 先选普通 Plan 还是伞型 Plan
+
+- **普通 Plan = 一份实施**：Issue 为 0..1 个，Target Project 必须且只能有一个。若从 Issue 创建且 Issue 恰好只有一个 `project/*`，可以自动采用；Issue 没有项目标签或有多个项目标签时，必须显式 `--project <name>`。
+- **多个 Issue 但只有一份实施**：先 `issue merge --into`，再写一个普通 Plan；禁止多 Issue Plan。
+- **一个目标需要多份实施**：使用伞型 Plan。它统一放在 `.wopal-space/plans/_umbrella/`，自身没有 Target Project / Project Path；子 Plan 仍各自遵守普通 Plan 规则，同项目多份、跨项目多份都允许。
+- 伞型 Plan 的 `Child Plans` 只记录子 Plan 名称、Target Project 与职责。子 Plan 的 Issue 和状态从子 Plan 实时读取，不复制到伞型 Plan。
+- 伞型 Plan 不替子 Plan 推进状态：`complete` 只在全部子 Plan 至少 `verifying` 时放行；`verify --confirm` 要求全部子 Plan `done/archived`；`archive` 要求全部子 Plan 已归档。它不运行 `integrate` / `verify-switch`。
+
+创建示例：
+
+```bash
+flow.sh plan new 42 --project api --type feature --slug endpoint
+flow.sh plan new --project api --type feature --slug local-task
+flow.sh plan new --umbrella --type enhance --slug release-train
+flow.sh plan new 42 --umbrella --type enhance --slug release-train
+```
+
 ## 写作风格
 
 Plan 内容使用用户偏好语言，模板的结构性 heading 和字段名保持不变。正文优先用清楚、直接的大白话，让不了解实现细节的人也能评审；能用普通话说明的，不堆技术黑话、缩写和抽象术语。
@@ -248,7 +265,7 @@ Task 本身已经承载 `Design Source`、Behavior、Pre-read、需要时的 Int
 
 ## 验证与推进
 
-`plan check` 刻意保持机械、最小：只检查流程命令真正依赖的 Metadata——`Status` 合法、Product/Phase 成对、设置 Target Project 时 Project Path 可用。它不判断 Design Source 是否写得好、TDD 是否选对、Behavior 文案、Interface/Constraints 或 User Validation 场景质量；这些属于 Plan 编写和评审。
+`plan check` 刻意保持机械：只检查流程真正依赖的结构——`Status` 合法、Product/Phase 成对、Issue 为 0..1、普通/伞型 Plan 的项目归属正确、普通 Plan 的 Project Path 可用，以及 HTML comment / 已知模板占位文本等作者残留。它不判断 Design Source 是否写得好、TDD 是否选对、Behavior 文案、Interface/Constraints 或 User Validation 场景质量；这些属于 Plan 编写和评审。
 
 `complete` / `verify` 只检查完成状态：存在的 Task Done、Agent Verification、User Validation checkbox 必须完成。
 
@@ -275,7 +292,7 @@ Plan name 是权威标识，用于派生 feature 分支。命名必须精简—�
 生命周期命令收 `plan-id` 的地方都可以直接给 Issue 编号，解析顺序固定：
 
 1. **文件名前缀**——`<issue_number>-*.md` 命中即用。
-2. **元数据回查**——文件名没有编号时（先建 Plan、后挂 Issue），读 `- **Issue**:` 字段；字段里写多个编号（`#249, #250`）时，**任意一个编号都能找回同一个 Plan**。
+2. **元数据回查**——文件名没有编号时（先建 Plan、后挂 Issue），读取唯一的 `- **Issue**: #N` 字段。多 Issue 元数据属于非法 Plan，不再作为兼容回查路径。
 3. **活跃优先**——同一编号命中多个 Plan 时，忽略 `done/` 下的归档 Plan，只在活跃 Plan 里选。
 
 仍有两个活跃 Plan 命中同一编号时，命令**直接报错并列出候选路径**，不做猜测。此时用 Plan 名字重新执行，不要改名、也不要再建一个 Plan：
