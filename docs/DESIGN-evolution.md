@@ -1,7 +1,7 @@
 # DESIGN — Evolution Loop
 
 > **Status**: Active
-> **Updated**: 2026-10-25
+> **Updated**: 2026-10-31
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -31,6 +31,7 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 6. **机制安全，不设审批门控**：CLI 默认 dry-run 预览，`--confirm` 才落盘；agent 按用户意图直接执行 `--confirm`，不引入额外审批门控。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
 7. **共享内容与空间选择正交**：共享资产的 Git 新增、修改、删除随提交上行；空间装配选择以完整能力或 `path:` 身份记录在空间根仓库，只决定当前空间物化范围。共享资产可只在一个空间挂载，其选择不阻止内容上行。
 8. **显式选择**：装配命令和新增整项资产的进化集成能更改空间挂载选择；已装配资产的内部文件编辑保持 Git 内容语义。同步范围由当前装配单、能力/`path:` 级选择及临时游离文件保护重算；未提交私有内容不得进入本体 Git，内部文件删除不触发本地卸载。
+9. **提案按复杂度触发**：新增一个完整 Skill / Rule / Command 本身不构成提案理由。普通能力新增、修改与修复可以直接在注册空间分支维护；只有需要独立设计、跨能力契约、复杂迁移、专门评审或多阶段验证时才进入正式提案流程。
 
 ## Self-Evolution Loop
 
@@ -145,7 +146,7 @@ draft → accepted → implementing → validating → archived
 
 本体能力的改动先在空间侧落地，再经 `space sync` 汇入 local main，最后由用户决定是否经 原生 Git/GitHub PR 回流上游。默认实施模式是**从 `.wopal` 派生稀疏 worktree**：派生的 worktree 继承空间的稀疏装配范围，实施边界因此天然等于空间确权的能力范围，宿主中央仓库无需切换分支。
 
-快速模式在 `.wopal` 空间分支内直接小步提交，适用于 typo、bug-fix 与用户明确指定的小范围文件改动；判定不清时默认走隔离模式。
+快速模式在 `.wopal` 空间分支内直接小步提交，适用于 typo、bug-fix、普通能力新增以及用户明确指定的小范围文件改动；判定不清或涉及独立设计/高风险验证时才进入隔离提案模式。
 
 稀疏装配带来三条硬约束：
 
@@ -171,21 +172,21 @@ draft → accepted → implementing → validating → archived
 |------|------|------|
 | `space status` | — | 只读：refs 双向差异、稀疏健康、当前有效装配与本地选择（include / exclude / private / 未登记未跟踪文件） |
 | `space sync` | 双向 | 先整合空间共享内容、再 fast-forward 下行；上行前阻止已登记的私有内容泄漏，按当前装配事实重算范围；CLI 默认 dry-run 预览，`--confirm` 落盘 |
-| `space capability add/remove` | — | 无旗标：调整类型装配单，变更按正常本体 Git 提交上行；`--local`：以能力或 `path:<ref>` 完整身份调整本空间选择，CLI 提交空间根仓库状态，不生成本体内容提交 |
+| `space capability add/remove` | — | 无旗标：调整类型默认装配；`--local`：调整本空间装配。`add` 遇到当前 worktree 新建但尚未入池的完整能力时，先安全纳入空间分支共享内容，再完成对应装配 |
 | `space evo <family>` | — | 提案落地：提案状态机、隔离实施、稀疏安全落盘、集成与验证切换；CLI `space evo` 命令族为唯一操作面 |
 | `ontology capability list` | — | 只读：列出本体拥有的全部能力，供空间装配挑选 |
 | `ontology sync` | 三角 | `upstream ⇄ origin ⇄ local main` 三步双向对齐（fork：origin/main merge 进 local → upstream/main merge 进同一 local 结果 → local push origin；clone 仅 origin/main → local），`ontology update` 为兼容别名 |
 | `git` + `gh`（技能指导） | 上行 | 选取已验证的主题改动 → upstream PR（fork 模式）；一个 PR 复用一个分支/worktree |
 
-**内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力或通用路径是否在本空间挂载由装配单和空间选择决定。`space capability` 无旗标调整类型装配单，变更按正常提交上行；`--local` 调整空间根仓库 `space-meta.json` 中的 `include` / `exclude` / `private`，由 CLI 限定路径提交。显式卸载完整资产与共享删除其内部文件是不同操作。新建共享资产可只由当前空间挂载；进化提交/集成根据明确的整项资产归属一次登记，无需对每个内部文件手动 add/remove。多空间目录删除与重命名以全部适用装配单的候选树引用完整性为门禁，详见 `./DESIGN-assembly.md`。
+**内容与挂载分界**：文件是否共享由是否进入本体 Git 决定，能力是否被某个空间使用由类型装配单和空间本地覆盖决定。`space capability` 无旗标调整类型默认装配，`--local` 调整当前空间的 `include` / `exclude`；新能力若已经在当前 worktree 创建，`add` 同时负责把完整资产安全纳入空间分支。显式卸载完整资产与共享删除其内容是不同操作。多空间目录删除与重命名以全部适用装配单的候选树引用完整性为门禁，详见 `./DESIGN-assembly.md`。
 
 **上行不泄漏私有内容（上行闸）**：`space sync` 上行前校验空间独有提交的变更路径（`git diff --no-renames --name-only main...space/<name>`）是否落在已登记的 `private` 能力根下；命中即拒绝并给出可执行的解除私有登记或撤出提交路径。`include` / `exclude` 只记录挂载选择，不进入内容泄漏判定。写入命令在提交前执行相同私有检查；sync 闸为手动 Git 提交兜底。
 
 `space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。向上游贡献使用 fork 分支上的原生 Git/GitHub PR，clone 模式 `ontology sync` 塌缩为单向下行拉取。
 
-`ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对新建能力，内容先按共享提交或显式私有登记选定归属，再按能力身份确定本空间是否挂载。
+`ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对刚在当前 worktree 创建的新能力，`space capability add` 可以直接完成共享纳管与装配。若只想把能力放入共享池而不改变任何装配，使用普通本体提交即可。
 
-空间内日常能力进化由 Maka 提炼为提案、经用户批准后，由 Wopal 主控、委派 Fae 规范实施，提交由主控按任务落盘，再经 `space sync` 汇入 local main，最终经原生 Git/GitHub PR 回流 upstream。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
+空间内普通能力维护直接在注册空间分支完成并提交，再经 `space sync` 汇入 local main。需要独立设计、跨能力契约或多阶段验证的复杂演进才进入提案流程。空间装配出的能力组合若具备类型通用性，可沉淀为类型装配单，供同类空间复用。
 
 ## Distribution Boundary
 
