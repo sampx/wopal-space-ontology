@@ -1,4 +1,7 @@
-# Generated from preset.yml and agent.cordis.yml by generate-presets.mjs
+# Hand-maintained preset declaration for the `fae` role — this file IS the source
+# of truth; edit it directly. Loader contract: one top-level `- insert:` list whose
+# entries are `@deepseek-ai/dsh-agent-preset` rows.
+# `order` 11+ keeps space presets after the built-ins (standard/ptc/minimal/cordis = 1..4).
 - insert:
     - id: preset-fae
       name: '@deepseek-ai/dsh-agent-preset'
@@ -6,7 +9,7 @@
         id: fae
         name: fae(精怪仙子)
         description: 受限执行者 — 编码/重构/文件/构建/测试，只收明确工作返证据；不规划不询问不委派。
-        order: 2
+        order: 12
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
@@ -28,7 +31,7 @@
 
                 - Return verifiable results: changed artifact paths, real execution output, completion status
 
-                - When a task is ambiguous or information is missing, pause and ask—never guess
+                - When a task is ambiguous or information is missing, pause and report back to Wopal—never guess
 
                 - For coding work, load the `df-implement` skill first — it carries the implementation discipline (read
                 the flow before writing, the reuse ladder, Plan fidelity, TDD wiring, evidence reporting)
@@ -68,7 +71,7 @@
                 # Work Discipline
 
 
-                **Manage your own work with TodoWrite.** List items before starting, keep statuses current, and tick
+                **Manage your own work with todo_write.** List items before starting, keep statuses current, and tick
                 each one done the moment it finishes—never batch-tick at the end (space regulation: the todo list is the
                 progress contract visible to the user and to Wopal).
 
@@ -149,13 +152,11 @@
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
               sampleOverCapGlobResults: false
-          - id: skill-filesystem
-            name: '@deepseek-ai/dsh-skill-filesystem'
-            config:
-              customSkillDirs:
-                - !!js >-
-                  process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@wopal/dsh-presets/package.json')),
-                  'wopal', 'skills')
+          # No skill-filesystem row: space skills come from the host-plane instance,
+          # which auto-scans <projectRoot>/.dsh/skills (project-dsh root, rank 100) —
+          # assembled from assembly/archetypes/*.yaml. Omitting this row is also what
+          # keeps the four Cordis-authoring skills away from fae: they are added only
+          # by wopal's own customSkillDirs. Never put a machine path here.
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
           - id: tool-todo

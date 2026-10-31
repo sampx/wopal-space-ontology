@@ -18,8 +18,8 @@ fae 是它的执行者、rook 是它的审查者——wopal 通过委派组把�
 
 ## 安装与运行
 
-本目录是生成源，DSH 0.2 运行时加载 `@wopal/dsh-presets` 标准 bundle 中的 `wopal/preset.patch.yml`。生成、安装（`ellamaka dsh plugin --profile web add <agents-presets 目录>`）、配置及回退步骤见 [bundle 说明](../README.md)。修改后重新生成、安装，在新会话验证；旧 `.agent-presets` 软链不再是加载入口。
+本目录是手工维护的真相源：`preset.patch.yml` 直接编辑，无生成脚本。安装、版本兼容、校验及回退步骤见 [bundle 说明](../README.md)。改完重装 bundle 并重启产品，在新会话验证。
 
-wopal 技能全开，`skill-filesystem.config.customSkillDirs` 应指向空间技能根（含 agents-collab / space-master 等）——当前样例留空，需按安装时技能根实际路径补齐。
+wopal 的 `skill-filesystem.config.customSkillDirs` **只挂包内那 4 个 Cordis 创作技能**，锚在 preset 自身 `baseUrl`（随包分发，换机换挂载点都成立）。空间技能不在此声明：宿主层的 `skill-filesystem` 自动扫描 `<projectRoot>/.dsh/skills`（project-dsh 根，rank 100，projectRoot = 最近的含 `.git` 目录）。`agents-collab` 等是否可见由装配决定（`assembly/archetypes/coding.yaml` 的 `skills:` 清单），缺失应跑装配补齐 —— **严禁在 preset 里写绝对路径去兜**。
 
-> **skills/ 目录说明**：`skills/` 保存随 wopal preset 发售的两个技能（editing-cordis-compositions、cordis-plugin-development）。每个技能正文开头有「dsh in ellamaka (WopalSpace deployment constraints)」约束节，记录本部署对官方 dsh CLI 约定的覆盖（DSH_HOME、~/.dsh、官方 preset 安装路径等）。本目录由 git 版本管理，运行时侧不再回写。
+> **skills/ 目录说明**：`skills/` 保存随 wopal preset 分发的 4 个技能（`editing-cordis-compositions`、`cordis-plugin-development`、`cordis-composition-reference`、`agent-experience`）。每个技能正文开头有「dsh in ellamaka (WopalSpace deployment constraints)」约束节，记录本部署对官方 dsh CLI 约定的覆盖（DSH_HOME、~/.dsh、官方 preset 安装路径等）。本目录由 git 版本管理，运行时侧不再回写。fae / rook 不挂本目录。

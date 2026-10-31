@@ -26,4 +26,6 @@ rook 不单独声明技能目录，作为 wopal 子代理继承父组成的技�
 
 ## 安装与运行
 
-本目录是生成源，DSH 0.2 运行时加载 `@wopal/dsh-presets` 标准 bundle 的声明补丁。生成、安装、配置及回退步骤见 [bundle 说明](../README.md)。修改后重新生成、安装，在新会话验证；旧 `.agent-presets` 软链不再是加载入口。
+本目录是手工维护的真相源：`preset.patch.yml` 直接编辑，无生成脚本。安装、版本兼容、校验及回退步骤见 [bundle 说明](../README.md)。改完重装 bundle 并重启产品，在新会话验证。
+
+rook **不声明 `skill-filesystem` 行**：空间技能由宿主层自动提供（扫 `<projectRoot>/.dsh/skills`，rank 100）。正因为不声明，它也拿不到编排者专属的那 4 个 Cordis 创作技能（只有 wopal 用 `customSkillDirs` 挂）。禁止在此写机器绝对路径。只读边界由 fs 沙箱执行策略承担，不因技能可见而放宽。
