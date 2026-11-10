@@ -32,7 +32,7 @@ In restricted environments, use the current harness's native approval mechanism 
 Apply these rules in order before entering the lifecycle; do not use a complicated Plan shape to avoid making this decision:
 
 1. **An Issue records a problem or goal.** Its `project/*` labels describe impact scope and may be absent, singular, or multiple; they do not force one implementation project.
-2. **One Plan is one implementation.** It links at most one Issue and belongs to exactly one Target Project.
+2. **One Plan is one implementation.** It links at most one Issue and belongs to exactly one Target Project. A Plan with `Issue: N/A` stands on its own: it has no Issue to sync, close, or relabel, and the Plan file is the record of the work.
 3. **Several Issues, one implementation** → merge them first with `issue merge --into`, keep one Issue, then create one Plan. Do not create a multi-Issue Plan.
 4. **One confirmed overall delivery goal, several independent implementations** — within one project or across projects — → create the Plans separately and organize them in Active Plan Graph `groups`. Sharing a project, Phase, or time period alone is not a reason to group Plans. Express implementation order only with Graph `edges`.
 5. **A Graph group is a flat organization container, not a Plan.** Each Plan belongs to at most one group; groups contain only submitted, non-archived Plan nodes and cannot nest. A group owns no Issue, lifecycle state, Acceptance Criteria, worktree, or Delivery, and no Plan lifecycle command targets it.
@@ -113,11 +113,11 @@ Write the Plan's actual content in the user's preferred language; keep structura
 
 `Delegation Strategy` must assign Tasks from the currently available agents based on capability and Task relationships; the Agent column contains only the specific agent name.
 
-After substantive Plan content changes, run `flow.sh sync <plan> --body-only` so the Issue's Goal / Scope / Acceptance Criteria and Plan link remain aligned.
+Only an Issue-bound Plan mirrors its content to GitHub. After a substantive change to a Plan whose metadata has `Issue: #N`, run `flow.sh sync-issue <plan> --body-only` so the Issue's Goal / Scope / Acceptance Criteria and Plan link stay aligned. A Plan with `Issue: N/A` has no Issue to update; the Plan file is its own record, so skip that step.
 
 After writing the Plan, the controller must run `flow.sh submit <plan>` to reach `reviewing` before asking the user to review it. `submit` already runs `plan check`; a manual check first is unnecessary.
 
-While the Plan is in `reviewing`, it is not approved yet. The controller may revise it from user feedback and sync it again; no reset and no second submit are required. The user's approval applies to the current Plan version.
+While the Plan is in `reviewing`, it is not approved yet. The controller may revise it from user feedback; an Issue-bound Plan is synced again with `sync-issue`, and no reset or second submit is required. The user's approval applies to the current Plan version.
 
 After explicit user approval, run:
 
@@ -217,7 +217,7 @@ flow.sh complete <plan>
 When implementation or validation reveals disagreement among the Plan, DESIGN, and code reality, the controller classifies the problem:
 
 - **Implementation problem**: existing DESIGN + approved Plan already answer it → fix the code inside the current boundaries and re-verify.
-- **Plan problem**: continuing requires a substantive approved-Plan change → explain cause and impact, then wait for user confirmation before revising and syncing the Plan.
+- **Plan problem**: continuing requires a substantive approved-Plan change → explain cause and impact, then wait for user confirmation before revising the Plan and syncing its Issue, if it has one.
 - **Design problem**: continuing requires a DESIGN change → get the user's decision on the design target, run the appropriate design-maintenance flow, then realign the Plan.
 
 Do not use `reset` as a substitute for this decision. `reset` is destructive and runs only on explicit user request.

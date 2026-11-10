@@ -151,7 +151,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     
     if not input_arg:
         log_error("Issue number or Plan name required")
-        print("Usage: flow.sh sync <issue-or-plan> [--body-only] [--labels-only]")
+        print("Usage: flow.sh sync-issue <issue-or-plan> [--body-only] [--labels-only]")
         return 1
     
     if body_only and labels_only:
@@ -166,7 +166,10 @@ def cmd_sync(args: argparse.Namespace) -> int:
     
     issue_number = extract_primary_plan_issue(plan_file)
     if not issue_number:
-        log_error(f"Plan has no linked Issue: {plan_file}")
+        log_error(
+            f"Plan has no linked Issue, so there is nothing to sync: {plan_file}"
+        )
+        print("Plan-driven work needs no Issue sync; continue with the Plan itself.")
         return 1
     
     repo = detect_space_repo(find_workspace_root())
@@ -201,8 +204,15 @@ def cmd_sync(args: argparse.Namespace) -> int:
 # ============================================
 
 def register_sync_parser(subparsers: argparse._SubParsersAction) -> None:
-    """Register sync subcommand."""
-    sync_parser = subparsers.add_parser("sync", help="Sync Plan to Issue")
+    """Register the sync-issue subcommand (Issue-bound Plans only)."""
+    sync_parser = subparsers.add_parser(
+        "sync-issue",
+        help="Write an Issue-bound Plan back to its Issue body/labels",
+        description=(
+            "Write the Plan's Goal / Scope / Acceptance Criteria and | Plan | link row "
+            "back to the linked Issue. Does nothing for a Plan whose Issue field is N/A."
+        ),
+    )
     sync_parser.add_argument("issue_or_plan", nargs="?", help="Issue number or Plan name")
     sync_parser.add_argument("--body-only", action="store_true", help="Only update Issue body")
     sync_parser.add_argument("--labels-only", action="store_true", help="Only update labels")

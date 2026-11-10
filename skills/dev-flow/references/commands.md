@@ -47,7 +47,7 @@
 
 | 命令 | 说明 |
 |------|------|
-| `sync <issue> [--body-only\|--labels-only]` | Plan → Issue 同步 |
+| `sync-issue <issue> [--body-only\|--labels-only]` | 把带 Issue 的 Plan 写回该 Issue；`Issue: N/A` 的 Plan 不适用 |
 | `reset <issue>` | 重置 Plan 到 planning 状态 |
 
 ---
@@ -62,7 +62,7 @@ Graph 维护是 dev-flow 主控职责，不属于 delegated implementer。Plan �
 
 ## 用 Issue 编号定位 Plan
 
-`submit` / `approve` / `complete` / `verify` / `archive` / `sync` / `reset` / `plan status` 等命令的 `plan-id` 位置，可以直接写 Issue 编号。解析按以下顺序，命中即停：
+`submit` / `approve` / `complete` / `verify` / `archive` / `sync-issue` / `reset` / `plan status` 等命令的 `plan-id` 位置，可以直接写 Issue 编号。解析按以下顺序，命中即停：
 
 | 顺序 | 依据 | 说明 |
 |------|------|------|
@@ -94,7 +94,7 @@ flow.sh plan status enhance-dev-flow-resolver    # Plan 名字（歧义时）
 | `verify --confirm` | `scripts/commands/verify.py` `_commit_plan_status_or_rollback`（commit_paths → `git.py` `commit_paths`） | commit 失败：结构化诊断 + 分层恢复 + 非零退出；不 sync/close | `cmd_verify` 的 sync/close 块仅在 commit 成功后；close 吞错见记录性结论 #1 | 符合契约 |
 | `verify-switch` | `scripts/commands/verify_switch.py` `_git_fetch`（fetch）；`_remove_worktree`（worktree remove → `_prune_worktrees` prune）；`_git_checkout`（checkout）；Plan 元数据 commit 经 `_update_plan_after_switch`（commit_paths） | 全部保留 command/cwd/exit/stderr；元数据 commit 失败：非零 + 手册指引；prune 属 janitor（rc+stderr 双查，报告后继续） | worktree removal 先于 checkout；元数据 commit 失败阻断成功返回 | 符合契约（B-04 修复） |
 | `archive` | `scripts/commands/archive.py` `archive_plan_file`（`git mv` stage）；`commit_archived_plan`（commit_paths → push_repo → is_commit_pushed，`scripts/lib/git.py`）；`_cleanup_worktree` → `scripts/lib/worktree.py` `clean_worktree`（→ `delete_branch`） | stage/commit/push 失败：结构化诊断 + 非零退出；commit fallback 保留双 attempt 证据；push 绑定当前分支并在 origin 验证包含（`is_commit_pushed`）；cleanup 失败：partial + 非零 | durability（commit + push 验证）成功后才执行 Issue sync/link/labels（`cmd_archive` sync 块）、cleanup、close（`cmd_archive` close 块） | 符合契约 |
-| `reset` / `plan new` / `sync` / `issue *` | 无本地 Git mutation（仅 Plan 文件 / GitHub API）；首次提交在 `submit` | — | — | 符合契约 |
+| `reset` / `plan new` / `sync-issue` / `issue *` | 无本地 Git mutation（仅 Plan 文件 / GitHub API）；首次提交在 `submit` | — | — | 符合契约 |
 
 注：`--no-worktree` / `--existing-worktree` / `--keep-worktree` 会跳过或改变对应的 refs / worktree / checkout mutation；实际执行以所选模式的实际路径为准。
 
@@ -240,12 +240,14 @@ flow.sh plan check <plan-name-or-path>  # 校验 Plan 质量（Issue 号 / Plan 
 
 Plan 的 `Issue` 字段只允许 `N/A` 或一个 `#N`，且必须有一个 Target Project。一个目标需要多份实施时，分别创建多份 Plan，再按 `references/active-plan-graph.zh-CN.md` 在 Graph `groups` 中组织；不再创建额外协调 Plan。
 
-### sync
+### sync-issue
+
+把 Plan 的 Goal / Scope / Acceptance Criteria 与 `| Plan |` 链接行写回它关联的 Issue。只对元数据带 `Issue: #N` 的 Plan 有意义；`Issue: N/A` 的 Plan 没有可同步对象，直接跳过。
 
 ```bash
-flow.sh sync <issue>           # 全量同步（三章节 + | Plan | 链接行 + labels）
-flow.sh sync <issue> --body-only    # 仅 body（三章节 + | Plan | 链接行）
-flow.sh sync <issue> --labels-only  # 仅 labels（不触碰 body）
+flow.sh sync-issue <issue>              # 全量同步（三章节 + | Plan | 链接行 + labels）
+flow.sh sync-issue <issue> --body-only   # 仅 body（三章节 + | Plan | 链接行）
+flow.sh sync-issue <issue> --labels-only # 仅 labels（不触碰 body）
 ```
 
 **同步内容**：body 侧 = 三章节（`## Goal` / `## Scope` / `## Acceptance Criteria`）外科式替换 + `## Related Resources` 的 `| Plan |` 链接行更新；三章节与链接行之外的 Issue body 内容（`## Context`、`## Goal` 前元信息行、`## Depends on` / `## Demo`、其它表格行等）逐字保留，不重写、不规范化。详见 `references/issue-guide.md`。

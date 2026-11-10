@@ -148,9 +148,9 @@ Issue 标题是**自由文本**，不再强制 `type(scope): description` 格式
 
 **不需要同步的章节**：`Implementation`、`Technical Context`、`Delegation Strategy` 等仅存在于 Plan 的章节。
 
-**同步命令**：
+**同步命令**（仅适用于带 Issue 的 Plan）：
 ```bash
-flow.sh sync <issue> --body-only
+flow.sh sync-issue <issue> --body-only
 ```
 
 ## Issue 驱动 vs 无 Issue 流程

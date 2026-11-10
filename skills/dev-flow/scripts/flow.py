@@ -88,9 +88,10 @@ def main(argv: list[str] | None = None) -> int:
         print("  issue delete    Delete an Issue")
         print("  issue list      List open Issues in the space repo (with repo URL)")
         print("  issue view      View a single Issue by number")
-        print("  sync            Sync Plan to Issue (three sections + | Plan | link row + labels)")
-        print("  sync --body-only    Sync only the Issue body (three sections + | Plan | link row)")
-        print("  sync --labels-only  Sync Issue labels only (body untouched)")
+        print("  sync-issue      Write an Issue-bound Plan back to its Issue (three sections + | Plan | link row + labels)")
+        print("  sync-issue --body-only    Sync only the Issue body (three sections + | Plan | link row)")
+        print("  sync-issue --labels-only  Sync Issue labels only (body untouched)")
+        print("  (no Issue linked: skip sync-issue, the Plan itself is the record)")
         print("")
         print("Workflow commands:")
         print("  plan new <issue>              Create a new Plan from Issue")
@@ -116,8 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "issue":
         return cmd_issue(args)
 
-    # Dispatch sync subcommand
-    if args.command == "sync":
+    # Dispatch sync-issue subcommand
+    if args.command == "sync-issue":
         return cmd_sync(args)
 
     # Dispatch archive subcommand

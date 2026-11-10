@@ -32,7 +32,7 @@ description: >
 先按下面顺序判断，再进入生命周期；不要用复杂 Plan 结构代替这个判断：
 
 1. **Issue 记录问题或目标**。`project/*` 标签表示影响范围，可以没有、一个或多个；Issue 本身不决定某一份实施一定落在哪个项目。
-2. **一个 Plan 就是一份实施**。最多关联一个 Issue，并且必须只属于一个 Target Project。
+2. **一个 Plan 就是一份实施**。最多关联一个 Issue，并且必须只属于一个 Target Project。`Issue: N/A` 的 Plan 自成一体：没有 Issue 需要同步、关闭或改标签，Plan 文件本身就是这项工作的记录。
 3. **多个 Issue，实际只有一份实施** → 先用 `issue merge --into` 合成一个保留 Issue，再创建一个 Plan；不要写多 Issue Plan。
 4. **一个已确认的总体目标需要多份独立实施**（同项目或跨项目）→ 分别创建 Plan，并在 Active Plan Graph 的 `groups` 中组织；只有同项目、同 Phase 或时间相近，不构成建组理由。实施先后只用 Graph `edges` 表达。
 5. **Graph group 只是单层组织结构，不是 Plan**。一个 Plan 最多属于一个 group，group 只能直接包含已 submit 且未 archive 的 Plan 节点、不能嵌套；它没有 Issue、状态机、Acceptance Criteria、worktree 或 Delivery，也不参与任何 Plan 生命周期命令。
@@ -113,11 +113,11 @@ Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/
 
 `Delegation Strategy` 必须根据当前可用 Agent 的能力和 Task 关系分配任务；Agent 列只写具体 Agent 名称。
 
-Plan 内容改变后运行 `flow.sh sync <plan> --body-only` 同步 Issue 中的 Goal / Scope / Acceptance Criteria 与 Plan 链接。
+只有带 Issue 的 Plan 需要镜像到 GitHub。Plan 元数据为 `Issue: #N` 时，实质内容改变后运行 `flow.sh sync-issue <plan> --body-only`，同步 Issue 中的 Goal / Scope / Acceptance Criteria 与 Plan 链接。元数据为 `Issue: N/A` 的 Plan 没有 Issue 可更新，Plan 文件本身就是记录，跳过这一步。
 
 写完 Plan 后，主控者必须先运行 `flow.sh submit <plan>` 进入 `reviewing`，再请用户评审。`submit` 自动运行 `plan check`，无需先手动 check。
 
-在 `reviewing` 阶段，Plan 尚未批准。主控者可以根据用户意见直接修订并重新 sync，不需要 reset，也不需要再次 submit。用户批准的是当前版本的 Plan。
+在 `reviewing` 阶段，Plan 尚未批准。主控者可以根据用户意见直接修订；带 Issue 的 Plan 再用 `sync-issue` 重新同步，不需要 reset，也不需要再次 submit。用户批准的是当前版本的 Plan。
 
 用户明确批准后执行：
 
@@ -217,7 +217,7 @@ flow.sh complete <plan>
 实施或验证中出现 Plan、DESIGN 与代码现实不一致时，主控者先判断问题属于哪一类：
 
 - **实现问题**：现有 DESIGN + 已批准 Plan 已经给出答案 → 在原边界内修代码并重新验证。
-- **Plan 问题**：要继续必须改变已批准 Plan 的实质内容 → 向用户说明原因与影响，用户确认后再修 Plan 并 sync。
+- **Plan 问题**：要继续必须改变已批准 Plan 的实质内容 → 向用户说明原因与影响，用户确认后再修 Plan；该 Plan 有关联 Issue 时再同步 Issue。
 - **设计问题**：要继续必须改变 DESIGN → 让用户确认设计目标后进入相应设计维护流程，再让 Plan 重新对齐设计。
 
 不要用 `reset` 代替这个判断。`reset` 是破坏性操作，只在用户明确要求时使用。
