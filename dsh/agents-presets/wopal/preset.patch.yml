@@ -1,10 +1,34 @@
 # Hand-maintained preset declaration for the `wopal` role — this file IS the source
-# of truth; edit it directly. Loader contract: one top-level `- insert:` list whose
-# entries are `@deepseek-ai/dsh-agent-preset` rows.
+# of truth; edit it directly. Loader contract: a top-level patch list. `- insert:`
+# rows are `@deepseek-ai/dsh-agent-preset` definitions (agent-scoped); `- id:` rows
+# without `insert` patch an already-composed top-level row (profile-scoped).
 # `order` 11+ keeps space presets after the built-ins (standard/ptc/minimal/cordis = 1..4).
 # Space skills reach this preset through the official project-dsh root (rank 100,
 # <projectRoot>/.dsh/skills); customSkillDirs below adds the four Cordis-authoring
 # skills that travel with this bundle (rank 300) — orchestrator-only, fae/rook omit it.
+#
+# ── 品牌净化：这两个 patch 是「profile 组合层」，不是 preset 内的 plugins 行 ──────
+# 本文件整体是一层 Loader patch（bundle patch 层），按 id 命中 base / web-app 组合包
+# 已经定义的顶层行，因此能覆盖顶层插件配置；`insert` 里的 rows 才是 agent 作用域的。
+# 代价：作用于整个 profile 的所有 agent，而非仅本 preset 的会话。
+#
+# 1) 去掉固定开场白 "You are an AI agent powered by DeepSeek Harness."（order -1000）。
+#    注意 patch 是整体替换 config，故必须重申 web-app 同款 personaPrefix，
+#    否则 "You are a coding agent powered by {{model}} model." 也会一起消失
+#    （本 preset 会话被 persona 行遮蔽无感，其它 preset / 子 agent 会受影响）。
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    includeHarnessIdentity: false
+    personaPrefix: 'You are a coding agent powered by the {{model}} model.'
+#
+# 2) 该行只贡献两段系统提示词（harness:source order 10000、app:web-surface 10100）
+#    与两行运行时快照（checkout 路径、Web GUI URL）。关闭它即彻底移除这四处
+#    "DeepSeek Harness" 字眼，且不触碰任何工具守则。
+- id: harness-dev-context
+  name: '@deepseek-ai/dsh-harness-dev-context'
+  disabled: true
+
 - insert:
     - id: preset-wopal
       name: '@deepseek-ai/dsh-agent-preset'
@@ -273,8 +297,6 @@
                 config:
                   provider: fork
                   toolName: subagent_fork
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
               - id: tool-subagent-codex
                 name: '@deepseek-ai/dsh-tool-subagent'
                 disabled: true

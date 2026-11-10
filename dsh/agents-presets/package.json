@@ -1,9 +1,9 @@
 {
   "name": "@wopal/dsh-presets",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
-  "description": "WopalSpace agent preset bundles (wopal / fae / rook), hand-maintained, requires dsh >= 0.2.1-rc.5 (agentPreset delegation contract)",
+  "description": "WopalSpace agent preset bundles (wopal / fae / rook), hand-maintained, requires dsh >= 0.2.2-rc.1",
   "exports": {
     "./package.json": "./package.json"
   },
@@ -13,10 +13,10 @@
     "rook"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.5"
+    "dsh": ">=0.2.2-rc.1"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.2.1-rc.5"
+    "@deepseek-ai/dsh": ">=0.2.2-rc.1"
   },
   "dsh": {
     "bundle": {
