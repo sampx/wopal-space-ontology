@@ -102,6 +102,8 @@ Severity: defect with a concrete scenario and a behavior the design did not sanc
 
 ## Q4 — Do the tests prove it, and did the change leave orphans?
 
+**Complete user-workflow acceptance.** For a delivery affecting public commands or user journeys, read the applicable project `AGENTS.md` acceptance contract and map the promised user task to its automated test. Verify that the test actually exercises the public entry point through observable final state, meaningful failures, and persistent-state safety invariants. A mocked core side effect, an internal-function-only test, or an `.e2e.test` filename is not proof of the journey. Local isolated E2E can prove a complete journey without GitHub. Report a missing test only when the governing contract or delivery scope requires that behavior, using the existing Q4 severity rules.
+
 Three parts (in **Repo audit** mode, run only the third part across the whole project, ranked biggest cut first).
 
 **Test effectiveness.** Map each behavior the design promises to its covering tests, then read what they actually assert. Broken patterns: skipped tests, circular proofs, placeholder assertions, existence-only assertions. The bar: **would this test fail if the behavior broke?** Skipped/circular/placeholder for a behavior the design requires → **BLOCKER**; a behavior the design explicitly promises with no test at all → **WARNING**. An untested code path that the design never mentions is not a finding — implementation freedom is not a coverage gap.

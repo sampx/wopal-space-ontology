@@ -119,6 +119,8 @@ Severity: a false premise the work leans on, a silent divergence from a safety c
 
 ### Q3 — Will executing it deliver the goal?
 
+**Full-journey acceptance check.** For Plans involving public commands or user journeys, read the applicable project `AGENTS.md` acceptance contract. Check that the tasks and ACs can prove the user completes the target task through a real public entry point, reaches the observable final outcome, and respects important failure and side-effect safety invariants. A list of existing tests, green status, or mocked internal tests alone cannot establish a complete workflow. Automatable journey checks belong to Agent Verification, not a manual command-by-command burden on User Validation. Local E2E does not require GitHub access. Review only the Plan's declared product scope.
+
 The expensive failure: passes every check and still under-delivers.
 
 1. **Goal covered.** Split the Goal into its parts; each part needs a task.
