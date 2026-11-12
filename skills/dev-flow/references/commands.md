@@ -103,7 +103,7 @@ flow.sh plan status enhance-dev-flow-resolver    # Plan 名字（歧义时）
 - 任一关键 Git mutation 非零退出时，最终诊断必须保留 **command、cwd、exit code 与原始 stdout/stderr**；不得把底层失败降格为裸 `False` / warning 后沿成功路径继续。
 - 关键 Git durability 未达成时，依赖它的后续步骤必须终止：Issue sync/close、外部状态推进、worktree / branch 等破坏性清理不得先行；清理自身失败时明确报告未完成的部分，不伪装成完整回滚。
 - push 失败按各命令既有契约处理（本地提交已持久化时如实告警，由后续 push 同步），本参考不改变远端策略。
-- worktree 删除只使用非强制命令；有未提交内容或已初始化 submodule 时保留 worktree 和分支，不使用 force 绕过 Git 的保护。
+- worktree 删除优先使用非强制命令；如仅因已初始化 submodule 而被 Git 拒绝，必须先确认主工作树无暂存、未暂存或未跟踪修改，子模块干净且 pin 提交有可信远端引用（含主 checkout 的同源子模块），方可安全重试 `--force`。无法确认时保留 worktree 和分支。
 - Agent 不得静默绕过失败：完整上报，由用户决定下一步。
 
 ### 记录性结论

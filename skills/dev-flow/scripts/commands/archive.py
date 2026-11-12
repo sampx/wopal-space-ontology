@@ -184,11 +184,15 @@ def _cleanup_worktree(
         log_success(f"Branch '{branch}' deleted")
     elif branch_status == "absent":
         log_info(f"Branch '{branch}' already absent")
+    elif not removed:
+        log_warn(
+            f"Branch '{branch}' retained because the worktree could not be "
+            "removed safely; retry cleanup after resolving the reported work."
+        )
     elif branch_status == "skipped":
         log_warn(
-            f"Branch '{branch}' is currently checked out in {project_path} — "
-            "deletion skipped; switch that checkout away and delete the "
-            "branch manually."
+            f"Branch '{branch}' remains checked out in a worktree; "
+            "detach it before deleting the branch."
         )
     for err in result.get('errors', []):
         log_warn(f"Cleanup warning: {err}")

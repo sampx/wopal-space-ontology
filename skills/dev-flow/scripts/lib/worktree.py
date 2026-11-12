@@ -425,7 +425,37 @@ def _git_output(path: Path, *args: str) -> tuple[int, str]:
     return result.returncode, (result.stdout + result.stderr).strip()
 
 
-def _local_only_work(worktree_path: Path) -> tuple[bool, list[str]]:
+def _pinned_submodule_recoverable(
+    project_dir: Path, worktree_path: Path, config_key: str,
+    relative: str, pinned: str,
+) -> bool:
+    """Accept a pinned commit also advertised by the primary checkout's origin.
+
+    A linked worktree can have a separately initialized shallow submodule
+    without the fork's remote-tracking ref. Only trust the primary checkout
+    when its submodule origin matches the URL declared in .gitmodules.
+    """
+    rc, expected_origin = _git_output(
+        worktree_path, "config", "-f", ".gitmodules", "--get",
+        config_key.removesuffix(".path") + ".url",
+    )
+    if rc != 0 or not expected_origin:
+        return False
+    primary = project_dir / relative
+    if not primary.is_dir() or primary.resolve() == (worktree_path / relative).resolve():
+        return False
+    rc, actual_origin = _git_output(primary, "remote", "get-url", "origin")
+    if rc != 0 or actual_origin != expected_origin:
+        return False
+    rc, containing = _git_output(primary, "branch", "-r", "--contains", pinned)
+    return rc == 0 and any(
+        line.strip().startswith("origin/") for line in containing.splitlines()
+    )
+
+
+def _local_only_work(
+    worktree_path: Path, project_dir: Path,
+) -> tuple[bool, list[str]]:
     """Report tracked changes and local-only work in a worktree.
 
     Returns:
@@ -439,12 +469,10 @@ def _local_only_work(worktree_path: Path) -> tuple[bool, list[str]]:
     )
     if rc != 0:
         return True, []
-    parent_lines = []
-    for line in lines.splitlines():
-        if line.startswith(" M ") or line.startswith("M  "):
-            continue
-        parent_lines.append(line)
-    parent_changed = bool(parent_lines)
+    # Every porcelain entry is local work, including staged tracked edits.
+    # --ignore-submodules=none also reports dirty or mismatched submodules.
+    # Ignored build artifacts do not appear in this output.
+    parent_changed = bool(lines)
 
     registered = worktree_path / ".gitmodules"
     if not registered.is_file():
@@ -458,9 +486,8 @@ def _local_only_work(worktree_path: Path) -> tuple[bool, list[str]]:
         return parent_changed, []
 
     unsafe: list[str] = []
-    for relative in (
-        line.split(maxsplit=1)[1] for line in names.splitlines() if " " in line
-    ):
+    for entry in (line.split(maxsplit=1) for line in names.splitlines() if " " in line):
+        config_key, relative = entry
         child = worktree_path / relative
         if not child.is_dir():
             continue
@@ -483,6 +510,10 @@ def _local_only_work(worktree_path: Path) -> tuple[bool, list[str]]:
             child, "branch", "-r", "--contains", head.strip(),
         )
         if rc != 0 or not containing:
+            if _pinned_submodule_recoverable(
+                project_dir, worktree_path, config_key, relative, pinned.strip(),
+            ):
+                continue
             unsafe.append(relative)
     return parent_changed, unsafe
 
@@ -491,7 +522,7 @@ def _remove_clean_worktree(
     project_dir: Path, worktree_path: Path, *, allow_force: bool,
 ) -> None:
     """Remove one worktree after confirming no local-only work remains."""
-    parent_changed, unsafe_submodules = _local_only_work(worktree_path)
+    parent_changed, unsafe_submodules = _local_only_work(worktree_path, project_dir)
     if parent_changed or unsafe_submodules:
         details = []
         if parent_changed:
