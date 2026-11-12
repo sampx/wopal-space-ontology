@@ -88,7 +88,7 @@ Whether an approved Plan or DESIGN should change is not an implementation-level 
 
 ## TDD
 
-For changes to public commands or user-facing workflows, read the applicable project `AGENTS.md` acceptance contract first. Map each new or changed user behavior to an observable outcome, meaningful failure case, and state-safety invariant; check whether existing tests actually prove those outcomes. Internal unit or mocked collaboration tests prove only their own boundary. When they cannot prove a user can complete the task through the real public entry point, add the required workflow-level verification. A complete journey can be Local E2E on isolated resources; it does not require Internet access. Report the test layer, executed commands, observed result, and CI ownership to the controller; a green suite or test filename alone is not acceptance evidence.
+For changes to public commands or user-facing workflows, read the applicable project `AGENTS.md` acceptance contract first. Map each new or changed user behavior to an observable outcome, meaningful failure case, and state-safety invariant; check whether existing tests actually prove those outcomes. Internal unit or mocked collaboration tests prove only their own boundary. When they cannot prove a user can complete the task through the real public entry point, add E2E verification of the complete journey, using isolated resources or real external services as the task requires. Report the test layer, executed commands, observed result, and CI ownership to the controller; a green suite or test filename alone is not acceptance evidence.
 
 Use TDD only when it actually helps define behavior, not mechanically every time a file changes.
 

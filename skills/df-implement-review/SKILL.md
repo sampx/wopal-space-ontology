@@ -102,7 +102,7 @@ Severity: defect with a concrete scenario and a behavior the design did not sanc
 
 ## Q4 — Do the tests prove it, and did the change leave orphans?
 
-**Complete user-workflow acceptance.** For a delivery affecting public commands or user journeys, read the applicable project `AGENTS.md` acceptance contract and map the promised user task to its automated test. Verify that the test actually exercises the public entry point through observable final state, meaningful failures, and persistent-state safety invariants. A mocked core side effect, an internal-function-only test, or an `.e2e.test` filename is not proof of the journey. Local isolated E2E can prove a complete journey without GitHub. Report a missing test only when the governing contract or delivery scope requires that behavior, using the existing Q4 severity rules.
+**Complete user-workflow acceptance.** For a delivery affecting public commands or user journeys, read the applicable project `AGENTS.md` acceptance contract and map the promised user task to its automated test. Verify that the test actually exercises the public entry point through observable final state, meaningful failures, and persistent-state safety invariants. A mocked core side effect, an internal-function-only test, or an `.e2e.test` filename is not proof of the journey. E2E can use isolated resources or real external services; network access does not determine the test layer. Report a missing test only when the governing contract or delivery scope requires that behavior, using the existing Q4 severity rules.
 
 Three parts (in **Repo audit** mode, run only the third part across the whole project, ranked biggest cut first).
 
