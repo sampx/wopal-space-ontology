@@ -31,9 +31,15 @@ Use exact technical terms where precision matters — especially `Design Source`
 
 For project/phase work, use only DESIGN/sub-DESIGN documents with `Status: Active` as design facts before splitting Tasks. Every Task uses **Design Source** to point to the concrete section, decision, or contract it implements; list multiple sources when needed. `N/A` is only for simple work with no project and no design basis.
 
+**Design work is upstream, not a Plan deliverable.** Settle design content, review, and documentation consistency through the design workflow before submitting an implementation Plan. Do not put DESIGN creation/revisions, design approval, or `verify-docset.py` into implementation Tasks, `Affected Files`, or functional Agent Verification. A design document is an authority cited through `Design Source`, not a file the implementing agent is tasked to write. Routine read-only consultation of the design is expected during implementation; editing or revalidating its content is not an implementation step. A separately requested documentation product can have its own delivery scope, but must not be used as a preliminary Task for a code Plan.
+
+**Derive Tasks from the design delta.** Compare the Active DESIGN's new/changed behavior and ownership with real code and all applicable entry paths. For each contract, name the implementation outcome, its Task owner, and the observable AC that would detect failure. An unchanged design contract can still need regression protection when implementation touches it; a documentation gate never proves a runtime contract.
+
 `Draft` / `Proposed` designs may appear only in Research Findings / References as explicitly unsettled forward-looking material. They never belong in Design Source and must not define Behavior, Key Interfaces, ACs, or implementation targets.
 
 Before approval, fix the Plan when it disagrees with Active DESIGN; if no Active design basis can be found, the Plan is not ready to submit. If the Active DESIGN itself conflicts with the user's goal, do not edit design on your own — ask the user to decide the design target. After approval, substantive changes to either the Plan or design require user confirmation.
+
+When implementation exposes a missing or contradictory design decision, stop affected work and return the conflict to the controller and user. Do not amend the design or expand/reduce Tasks during execution to work around it.
 
 ## How to define contracts: Key Interfaces
 
@@ -92,6 +98,8 @@ During final Agent Verification, the controller re-runs these commands and ticks
 ## How to split Tasks
 
 One Task should represent one cohesive outcome or behavior group and have an independently runnable `Verify`. Do not force every Task into TDD; TDD is chosen from the nature of the change.
+
+Start with the **implementation outcomes** identified from the design delta, not with a preliminary Task to write the DESIGN. Do not split off documentation consistency checks as a pseudo-delivery just to give a Task its own `Verification Intent`.
 
 Use three checks when splitting:
 
@@ -172,6 +180,8 @@ Actually touched files: (backfilled after controller acceptance)
 ### Agent Verification (everything automatable)
 
 Everything verifiable automatically goes here: tests, lint, typecheck, static checks, scriptable behavior assertions. Two-beat scheme above. Cross-Task verifications go at the end of the list, marked "(cross-Task)".
+
+For design-backed implementation Plans, ACs establish the delivered behavior and preservation of affected contracts. Checks that merely prove the controlling DESIGN is well-formatted, linked or indexed belong to the earlier design workflow, not to the Plan's AC list.
 
 Purely descriptive entries are forbidden: ❌ "build passes" / "feature works" / "no errors" — criteria must be able to catch a bad implementation.
 

@@ -44,8 +44,17 @@ See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.m
 **The hierarchy is fixed: DESIGN → approved Plan → implementation.**
 
 - DESIGN defines the target state.
-- The Plan defines what part is delivered now, with its boundaries and acceptance.
+- The Plan translates the settled design into implementation Tasks, with delivery boundaries and behavioral acceptance.
 - Implementation realizes that delivery inside those constraints.
+
+**Hard authoring boundary for design-backed Plans:**
+
+1. **Finish design first.** Resolve target behavior, ownership, edge cases and cross-module paths in Active DESIGN before deriving implementation Tasks. Design writing, design review and the document-set quality gate belong to the preceding design workflow.
+2. **Plan only implementation.** Each Task must deliver a concrete part of the settled design in running code, tests or other implementation artifacts. Never add Tasks to create, align, approve or verify the controlling DESIGN, and never add a document-format/consistency check as a feature Acceptance Criterion. Cite DESIGN through `Design Source`, not through an implementation task to author it.
+3. **Trace design changes to delivery.** Identify the new/changed design contracts and map each to implementation Tasks and observable acceptance; do not substitute a list of files, a green quality gate or a test command for that coverage.
+4. **Do not revise design during execution.** Implementers may read DESIGN but may not silently edit or re-decide it, including to make tests pass. If the agreed contract cannot be implemented, stop the affected work, explain the conflict and impact, and request the user's design decision before changing DESIGN or the approved Plan.
+
+This boundary governs Plans implementing a formal design; it does not prohibit an explicitly requested, standalone documentation deliverable whose *product* is documentation rather than the controlling DESIGN for a code change.
 
 ### Before Plan approval
 
@@ -64,7 +73,7 @@ Lifecycle records — status, checkboxes, AC verification commands, Done evidenc
 When implementation or validation exposes a problem:
 
 1. If it can be solved inside the existing DESIGN + approved Plan, the controller may investigate, decide, and continue.
-2. If the approved Plan or DESIGN must change, explain the conflict and impact to the user and let the user decide which side changes. Edit neither first.
+2. If the approved Plan or DESIGN must change, stop affected implementation, explain the conflict and impact to the user and let the user decide which side changes. Edit neither first; resume only after that decision.
 
 ## Lifecycle
 
@@ -109,7 +118,7 @@ Never force an illegal transition; return to the correct step instead.
 
 Create or locate Plans through `flow.sh plan ...`. Do not hand-create new Plan files or grep/glob around the space to guess where an existing Plan lives. Use `plan status` for a known name and `plan list` for browsing.
 
-Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. A Plan fixes behavior, acceptance, contracts, and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
+Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. Before splitting Tasks, compare the settled design against the existing implementation, extract the contracts that need to be delivered, and ensure every one has a Task and behavioral AC. A Plan fixes behavior, acceptance, contracts, and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
 
 `Delegation Strategy` must assign Tasks from the currently available agents based on capability and Task relationships; the Agent column contains only the specific agent name.
 

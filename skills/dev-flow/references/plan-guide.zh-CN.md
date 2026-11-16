@@ -31,9 +31,15 @@ Plan 内容使用用户偏好语言，模板的结构性 heading 和字段名保
 
 项目/阶段 Plan 只以 `Status: Active` 的 DESIGN/子 DESIGN 为设计事实，再拆 Task。每个 Task 用 **Design Source** 指向它实现的具体章节、决策或契约；跨多个设计面就列多个 source。只有没有项目、也没有设计依据的简单 Plan 才可写 `N/A`。
 
+**设计工作属于 Plan 的上游，不是实施任务。** 正式实施 Plan 提交之前，先在设计流程里完成设计内容、评审和文档一致性检查。不得把 DESIGN 的创建或修订、设计审批，或 `verify-docset.py` 写入实施 Task、`Affected Files` 或功能性 Agent Verification。DESIGN 是通过 `Design Source` 引用的依据，不是实施 Agent 要编写的文件；实施过程中照常只读查阅，不把编辑或重新验证设计内容当作实施步骤。用户单独要求交付的文档可以有独立范围，但不得把它塞进代码 Plan 当作前置 Task。
+
+**从设计变化推导 Task。** 对照 Active DESIGN 新增或变化的行为与归属，检查真实代码和所有适用入口。每项契约都明确对应的实施结果、Task 负责者，以及能够发现失败的可观察 AC。实施会触碰的既有契约即便没有设计变化，也可能需要回归保护；通过文档检查不能证明运行时行为正确。
+
 `Draft` / `Proposed` 设计只能放在 Research Findings / References 中作为前瞻参考，并明确其未定案；不能写入 Design Source，也不能据此确定 Behavior、Key Interfaces、AC 或实施目标。
 
 Plan 批准前，发现 Plan 与 Active DESIGN 不一致就修正 Plan；找不到 Active 设计依据，Plan 还不能提交。如果 Active DESIGN 本身与用户目标冲突，不要自行改设计，先让用户决定设计目标。Plan 批准后，实质修改 Plan 或设计都需要用户确认。
+
+实施时发现设计缺少关键决策或存在互相矛盾的约束，先停止受影响工作，把冲突交还主控者和用户。不得由实施者自行修改设计或扩大、缩减 Task 来绕过问题。
 
 ## 契约怎么定：Key Interfaces
 
@@ -91,6 +97,8 @@ Plan 阶段写不出未来的测试命令（测试文件还不存在），这不
 ## Task 怎么拆
 
 一个 Task 应该是一组高内聚的结果/行为，并且有可以独立运行的 `Verify`。不要把所有 Task 强行套进 TDD；是否 TDD 由改动性质决定。
+
+先根据设计变化确定**需要实现的结果**，不要把“先写 DESIGN”当成第一个 Task，也不要把文档一致性检查拆成单独的伪交付，只为让它占一个 `Verification Intent`。
 
 拆分时看三件事：
 
@@ -171,6 +179,8 @@ TDD 是用测试先定义行为的工具，不是“只要改代码就必须交�
 ### Agent Verification（可自动化的一切）
 
 所有能自动验证的都放这里：测试、lint、typecheck、静态检查、可脚本断言的行为。两拍制见上文。跨 Task 的验证放列表末尾，标注「（跨 Task）」。
+
+有正式设计依据的实施 Plan，AC 应证明已交付的行为和受影响契约没有回归。只检查所依据 DESIGN 是否格式正确、链接有效或被目录索引，属于更早的设计流程，不属于 Plan 的功能 AC。
 
 禁止纯描述条目：❌「代码构建通过」「功能正常」「无报错」——判据必须能抓住坏实现。
 

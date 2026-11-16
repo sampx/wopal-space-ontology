@@ -10,6 +10,8 @@ description: >
 
 Three artifacts share this skill because they are the same act at different sizes: a design document proposes what to build, a Plan proposes how to execute it, an evolution proposal proposes how to change a capability. All three are read before work starts, and all three die the same death — executed literally, they fail or over-deliver.
 
+**Review substance before mechanics.** For a DESIGN, first decide whether its goal, behavior, boundaries and ownership are correct, complete and implementable against the real call paths. For a design-backed Plan, first trace **each new or changed DESIGN contract → implementation Task → observable acceptance**, including real entry points, failure paths and preserved behavior. Only after closing that loop check task ordering, repository facts, commands and formatting. A correct-looking checklist cannot compensate for a missing design decision or undelivered behavior. Report consequential architecture/coverage findings before minor verification hygiene.
+
 ## Pick the mode
 
 Decide once, from the artifact itself:
@@ -19,9 +21,13 @@ Decide once, from the artifact itself:
 
 If the artifact has both faces (a design doc with a task list), run both modes.
 
+When asked to review a DESIGN **and** the Plan derived from it, review the DESIGN in Document mode first, then review Plan coverage of that design in Plan mode. Treat the working tree's current DESIGN content as the authority, even when uncommitted; do not drift into reviewing an older integration-branch version.
+
 ## What the script owns
 
 In Plan mode, `flow.sh plan check` already gates form: field presence, placeholder text, TDD↔Behavior pairing, checkbox shape, AC command presence, status validity. An evolution proposal has its own gate: `wopal space evo check`. Re-checking any of that is waste and produces noise. Your scope is what a regex cannot compute — whether the parts fit together, fit reality, and add up to the goal.
+
+A design-backed implementation Plan must not include Tasks to author, revise, approve or validate its controlling DESIGN. Design readiness and document quality gates precede the Plan; the Plan delivers implementation behavior. If such work appears in a Task or a feature AC, flag the misplaced ownership and check whether real implementation coverage was displaced. Do not focus the review on whether the document-check command happens to pass; that does not prove the implementation goal.
 
 If the proposal is fine, say so quickly and stop. This review is invoked deliberately, not for ceremony.
 
@@ -61,13 +67,13 @@ Before emitting a Blocker / Warning, be able to complete this sentence: **“If 
 
 Efficiency is part of review quality — a review that burns time returns noise. Work in two passes.
 
-**Pass 1 — read the artifact once, with line numbers.** While reading, fill three lists you will work from later:
+**Pass 1 — establish the goal and design-to-delivery map.** For DESIGN, write down the intended behavior, scope, ownership and actual code entry paths. For Plan, extract the new/changed clauses from its cited Active DESIGN and map each to its Task, AC and affected public/runtime path. Missing links here are the first findings. Then read the artifact once with line numbers and fill three verification lists:
 
 1. **Facts** — every concrete claim about the repo, the system, or other documents: counts, paths, line ranges, doc sections, IDs, commands, flags.
 2. **Symbols** — every code-like name in backticks (Plan mode) or every named component/capability (Document mode), with where it is created and where it is used.
 3. **Files** — every path mentioned anywhere, and where it was mentioned.
 
-**Pass 2 — answer the questions from the lists.** Plan mode: Q1 and Q3 need nothing but the artifact; only Q2 touches the repo — batch its commands and run them together. Document mode: consistency and goal checks run from the artifact, then reality checks against code and sibling documents. Do not re-read the artifact between checks — each return costs more than it saves.
+**Pass 2 — resolve coverage and design risks before checking the lists.** Document mode: D3/D1, then D2/D4; verify actual call paths and sibling contracts. Plan mode: Q3/Q1, then Q2/Q4; Q3 requires the cited DESIGN and the real implementation paths, not merely the Plan's own claims. Batch factual checks only after the behavioral trace. Do not re-read the artifact between checks — each return costs more than it saves.
 
 Verify, don't survey: `test -e` for paths, `sed -n 'Np'` for line anchors, `rg -n` for sections and symbols. Never read a whole design doc to confirm one section. A normal proposal settles in roughly 15–25 commands.
 
@@ -82,7 +88,7 @@ Claims you cannot settle go under `Unverified` — never inflated into findings.
 | Q3 | Will executing it deliver the goal? | goal parts without tasks, decisions quietly shrunk, ACs that prove nothing |
 | Q4 | Is this the lean way to deliver it? | speculative abstractions, reinvented infrastructure, unneeded dependencies |
 
-Q1–Q3 decide whether the Plan works. Q4 decides whether it works without bloat — a Plan can pass all three and still be the wrong shape. Q4 never blocks by itself: lean findings cap at WARNING.
+**Start at Q3, then Q1.** In design-backed Plans, compare the actual design delta with all Tasks and ACs, and walk the implementation's normal and bypass entry points. Do not infer completeness from the Plan's Affected Files or an AC checklist. Q2 checks reality only after the design coverage is established; Q4 checks lean delivery. Q4 never blocks by itself: lean findings cap at WARNING.
 
 ### Q1 — Do the parts fit together?
 
@@ -90,6 +96,7 @@ Q1–Q3 decide whether the Plan works. Q4 decides whether it works without bloat
 2. **Symbols have producers.** Every code-like name a task uses is created by an earlier task, spelled exactly the same. A task that "registers five error codes" and a later task that "fails fast with `TEMPLATE_MISSING`" break at that seam. This is the highest-yield check in the review.
 3. **Behavior specs are real.** Each Behavior in a TDD task can be turned into a failing test without guessing. "Works correctly" is unspecified behavior.
 4. **Order matches dependencies.** Every consumer comes after its producer. Overlap between tasks is a conflict only under declared parallel execution.
+5. **Tasks are implementation, not design production.** Writing or checking the controlling DESIGN is a pre-Plan activity; a Task for it is misplaced, even when the document is not yet committed. Determine whether that Task merely adds noise or hides absent implementation work.
 
 **Files are expected scope, not a contract.** The `Affected Files` table is the expected file list; do not audit task-level lists against it. Flag only a stale operation premise ("create" a file that already exists) or file overlap under declared parallel execution.
 
@@ -123,8 +130,8 @@ Severity: a false premise the work leans on, a silent divergence from a safety c
 
 The expensive failure: passes every check and still under-delivers.
 
-1. **Goal covered.** Split the Goal into its parts; each part needs a task.
-2. **Decisions delivered.** For each `D-xx`, the tasks deliver what it states — not a shadow of it. Watch for shrink words ("v1", "simplified", "hardcoded", "for now"), then adjudicate: does the shrink contradict the Goal, and is it explicitly sanctioned? Only a silent shrink is a finding.
+1. **Goal and design delta covered.** Split the agreed DESIGN's new/changed contracts into behaviors; each needs implementation Task coverage, including callers bypassing the main execution wrapper, and tests for critical regressions.
+2. **Decisions delivered.** For each `D-xx`, the tasks deliver what it states — not a shadow of it. Check paths against actual code, not just repeated phrasing in the Plan. Watch for shrink words ("v1", "simplified", "hardcoded", "for now"), then adjudicate: does the shrink contradict the Goal, and is it explicitly sanctioned? Only a silent shrink is a finding.
 3. **ACs that can fail.** If the feature were broken, would the criterion catch it? An AC that passes either way is decoration, not verification.
 4. **Handoff possible.** Could the implementer start from this artifact alone? Interfaces and outputs of earlier tasks are named, not implied. Flag only where missing information would cause a wrong turn.
 
@@ -155,6 +162,8 @@ Document mode has no tasks to schedule, so the questions reshape. Q4 keeps its n
 | D2 | Are its statements about reality true? | stale paths, claims the code contradicts, silent clashes with sibling documents |
 | D3 | Is the goal sound? | unmeasurable goals, boundary gaps, requirements nobody owns, silent decisions |
 | D4 | Is it lean? | features nobody asked for, structure copied from a template instead of earned |
+
+**Start with D3 and D1:** resolve the intended behavior, all relevant entry paths, ownership and failure semantics before treating document structure or consistency as a review result.
 
 ### D1 — Does the document cohere?
 
@@ -196,6 +205,8 @@ Aim to converge review within **two rounds** (initial review + one re-review):
 The review skill reports defects objectively without artificial stopping points. Iteration budgets, stopping gates, and escalation to the user belong to the controlling workflow (such as `dev-flow`).
 
 ## Verdict and report
+
+Order findings by effect on the user's goal: design correctness and missing implementation coverage first, validation gaps second, formatting or command hygiene last. A mechanical check alone cannot justify claiming a design or implementation review was deep.
 
 ```
 PASS   — no Blocker, no Warning
