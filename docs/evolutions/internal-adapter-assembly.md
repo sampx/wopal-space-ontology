@@ -6,7 +6,7 @@
 - **Type**: refactor
 - **Project Path**: .wopal
 - **Created**: 2026-10-10
-- **Stage**: validating
+- **Stage**: archived
 - **Mode**: quick
 - **Worktree**: (none)
 - **Branch**: (none)
@@ -83,7 +83,7 @@ coding 默认装配目前仍声明 dsh-adapter，外部包使用独立 Plugin SD
 - 通过判据：无需外部 adapter 的装配提示，现有模式可识别，工具交互和错误说明可理解。
 - 失败反馈：提供步骤、截图和脱敏提示，由 Agent 检查脚本日志；先保留证据再依次用 dev.sh stop frontend、stop backend 停止本次实例。
 
-- [ ] 用户已完成上述功能验证并确认结果符合预期
+- [x] 用户已完成上述功能验证并确认结果符合预期
 
 ## Implementation
 
