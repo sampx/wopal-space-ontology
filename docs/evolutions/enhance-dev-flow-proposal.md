@@ -60,7 +60,7 @@
 ### Key Decisions
 
 - D-01：`dev-flow` 与 Plan 是**位于 Proposal/Issue 与实施之间的可选编排层**。低风险、有界且可直接验收的已批准 Proposal 或明确 Issue 走 direct 直达 `df-implement`；跨项目、多个独立交付、复杂迁移、依赖较多或需要委派并行时才启用 `dev-flow` 拆 Plan，不因有 Proposal 就机械要求 Plan。
-- D-02：新 Plan 只有一个主要 Source：Issue #N 或 Proposal PATH；关联 Issue 只是追踪，DESIGN/PRD/无来源文本都不能成为新增 Plan 的实施授权。
+- D-02：新 Plan 只有一个主要 Source：Issue #N 或 Proposal PATH（规范路径为 `docs/products/<product>/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 或 `projects/<project>/docs/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`，实施期间稳定停留 `proposed/<class>/` 防断链，兼容存量前格式路径；`archived/` / `rejected/` 提案严禁作为新 Plan 来源）；关联 Issue 只是追踪，DESIGN/PRD/无来源文本都不能成为新增 Plan 的实施授权。
 - D-03：重要设计改变须先审查获批 Proposal，既有决定内的缺陷或明确工作走 Issue；Plan 不能扩大批准范围，冲突时停止并交用户决策。
 - D-04：Proposal→Plan 的 SOP：确认批准范围→识别独立可验收成果→按 Target Project 划分 Plan→检查覆盖/重复→记录真实跨 Plan 依赖。一个 Plan 只服务一个目标项目。
 - D-05：Plan→Task 的 SOP：行为成果、Pre-read、必要 Interface/Constraints、Verify、Done 证据和依赖必须清楚；既反对按文件机械碎片化，也反对不可独立验证的超大 Task。
@@ -68,7 +68,7 @@
 - D-07：跨 Plan 依赖只归 Active Graph；Plan 管内部 Task 顺序/委派，Graph 只存节点/边/组，不复制 Plan 状态；groups 不能推导依赖。原 Graph schema 保留。
 - D-08：现有 Plan 状态（planning、reviewing、executing、verifying、done）以及 submit/approve/complete/verify/integrate/archive 与第二次用户批准本轮保留；未来状态机或重复审批精简另行立项。
 - D-09：只有获批 Proposal 且 Delivery 与执行路径相符才允许实施；未批准/被拒/越界不得借 Plan 或 direct 路线绕过授权。
-- D-10：direct 和 Plan 交付都要求真实代码、测试、受影响 DESIGN 同步、独立评审和必要用户验证；部分 Plan done/archive 不自动把整个 Proposal 标记 implemented。
+- D-10：direct 和 Plan 交付都要求真实代码、测试、受影响 DESIGN 同步、独立评审和必要用户验证；部分 Plan done/archive 不自动把整个 Proposal 迁入 `implemented/<class>/` 或标记 `implemented`。
 - D-11：**同一次 dev-flow 改造**同时删除新来源链路错误的旧 DESIGN/Phase/GAPS 前置并接入 Source/批准检查，不能留待文档清理或再做一次 CLI 提案。
 - D-12：Graph 维护须与真实生命周期操作一致，Graph 更新失败或出现不可信状态，应暂停后续执行、调查并修复；不能伪造原命令已回滚。
 - D-13：历史无来源 Plan 保留可续办，新无来源 Plan 必拒绝；身份依赖可信记录/受控基线，不能仅按用户可修改的日期或文本判定，无法可靠判断须停止并上报。
@@ -126,9 +126,9 @@
 2. [ ] Task 按可独立验收的行为拆分，包含 Pre-read、必要接口/约束、依赖、Verify、Done 证据；无意义碎片化、巨型任务、伪依赖与扩范围被明确指出。
 3. [ ] Agent 能力与风险匹配；Task 并行候选同时检查代码与 `DESIGN-*.md` 的共享写集、契约、依赖、隔离、测试资源与提交所有权，确保并行分支只写各自模块子 DESIGN、共享主 `DESIGN.md` 由主控收口，危险并行改为串行或重新拆分。
 4. [ ] Graph 的合法 DAG 与分组通过；环、自边、重边、缺节点引用、把 groups 当 edges 或复制状态的负例被指出；schema 与历史文件不变。
-5. [ ] 新 Issue 与获批 Proposal 来源的 Plan 可由真实 CLI 创建、提交、批准；无来源、错误项目、未批准/被拒/越界来源被拒，失败不半写入。
+5. [ ] 新 Issue 与获批 Proposal（`proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 及前格式兼容）来源的 Plan 可由真实 CLI 创建、提交、批准；无来源、错误项目、未批准/被拒/`archived/`/越界来源被拒，失败不半写入。
 6. [ ] 旧无 Source/Issue: N/A 的 Plan 可靠识别并继续生命周期；新无来源 Plan 不能伪装历史文件绕过授权，身份有可信依据和真实回归。
-7. [ ] 获批 Proposal 可以 direct 或关联不同 Target Project 的多个 Plan；部分交付不自动变 implemented，真实跨 Plan 依赖与来源不失真。
+7. [ ] 获批 Proposal 可以 direct 或关联不同 Target Project 的多个 Plan（实施期稳定留在 `proposed/<class>/`）；部分交付不自动迁入 `implemented/` 或变 implemented，真实跨 Plan 依赖与来源不失真。
 8. [ ] 新 Plan 的创建、提交、批准/正式实施在本轮同时去掉旧 Phase/GAPS/目标态 DESIGN 前置并增加来源授权校验，不遗留半完成的旧入口。
 9. [ ] 旧 Plan 生命周期、normal/no-worktree/existing-worktree、commit subject、Git/PR 集成、用户验收和归档行为在测试中不退化，实际业务文件与 Graph 无改写。
 10. [ ] 新 direct/Plan 路线与代码、测试、所属模块现状 DESIGN、独立评审和用户验证相符；非法扩范围被阻止，中英文规则、`.wopal/rules/coding-workflow.md`（完整目标态）与实际命令一致。
@@ -247,7 +247,7 @@ Files touched: (实施后填写)
 ### Task 6: Proposal 来源与批准门禁
 
 **Verification Intent**: AC#5、AC#7、AC#8
-**Behavior**: 新 Source: Proposal 的 Plan 可草拟；只有真实 approved 且授权 Delivery: plan 的 Proposal 可推进执行；被拒/未批准/路径错误不越权。
+**Behavior**: 新 Source: Proposal 的 Plan 可草拟；只有真实 `approved` 且处于 `proposed/<class>/`（或前格式存量位置）并授权 `Delivery: plan` 的 Proposal 可推进执行；被拒/未批准/`archived/`/路径错误不越权。
 **Pre-read**: Task 5、enhance-dev-proposal 的模板/校验器、Plan 元数据与 Project Path 检查、既有同步 Issue 逻辑。
 **Design**: 新 Source 指唯一批准文件，Issue 只作关联；审批时校验用户授权已存在且 Plan 在批准范围内；既有第二次 approve --confirm 暂时保留，禁止通过 flag 误触发既有 Git/工作树副作用。
 **TDD**: true — 未批准/拒绝/越界/错误目录和正确 approved 样例。
@@ -303,7 +303,7 @@ Files touched: (实施后填写)
 | 7 | Task 7 | Wopal 主控 | Task 4、6 | direct、多 Plan 与 Graph 衔接 |
 | 8 | Task 8 | Wopal 主控 | Tasks 1–7 | 实际 CLI 与正式交付回归 |
 
-**同一份提案、八个 Task、一次用户批准与最终验收。** 每 Task 由 Wopal 主控亲自实施、实际验证、C2C/ChatGPT 加载 df-implement-review 独立只读评审、修复再复验，通过后回填并提交；不委派 Fae、不调用 Rook。用户仍独立批准、验证与授权正式集成。
+**同一份提案、八个 Task、一次用户批准与最终验收。** 由 Wopal 主控逐 Task 亲自实施、实际验证并回填提交，不委派 Fae、不调用 Rook；全部 Task 实施完成后由用户安排其他 Agent 加载 `df-implement-review` 执行独立只读评审。用户仍独立批准、验证与授权正式集成。
 
 ## Delivery
 

@@ -47,7 +47,7 @@
 
 ### Key Decisions
 
-- D-01：代码/测试/受影响的用户可读现状 DESIGN 同一交付同步：`df-implement` 仅保留轻量触发判据——纯内部重构不动 DESIGN；对外可见行为/接口/生效业务规则/限制变化或原文档写错时，**按需加载 `dev-doc-master`** 同步所属模块子 `DESIGN-<module>.md`；留下新长期工程约束时，**按需加载 `space-master`** 维护对应层级 `AGENTS.md`；测试遵循常驻 `rules/testing.md`。
+- D-01：代码/测试/受影响的用户可读现状 DESIGN 与 Proposal 生命周期同一交付同步：`df-implement` 仅保留轻量触发判据——纯内部重构不动 DESIGN；对外可见行为/接口/生效业务规则/限制变化或原文档写错时，**按需加载 `dev-doc-master`** 同步所属模块子 `DESIGN-<module>.md`；当完整交付一个已批准 Proposal 时同交付将其从 `proposals/proposed/<class>/` 迁入 `proposals/implemented/<class>/` 并改写为现在时 `Decision/Consequences`；当代码路径/符号/默认配置改动影响已有 `proposals/implemented/` 记录时同交付更新其事实引用（绝不修改 `archived/`）；留下新长期工程约束时，**按需加载 `space-master`** 维护对应层级 `AGENTS.md`；测试遵循常驻 `rules/testing.md`。
 - D-01a：**并行实施防文档冲突纪律**：并行 Task/分支中，实施者只能修改授权写集内所属模块的 `DESIGN-<module>.md`，**严禁越界修改共享主 `DESIGN.md` 或他人模块文档**；如在实施中发现授权写集之外的文档过时或写错，必须在交付报告的 `DESIGN Sync` 中上报主控处理。
 - D-02：实施者可在已批准的决定和范围内调整实现技术细节，但不能修改设计授权；冲突及时 STOP 并报告涉及的行为、影响与可选处理。
 - D-03：direct 和 Plan 路线使用相同的测试、文档同步、审查和验收质量标准；区别仅在组织方式和记录位置。
@@ -96,11 +96,11 @@
 
 ### Agent Verification
 
-1. [ ] 对已授权 direct 和 Plan 样例，实施者在实现公开行为后按需加载 `dev-doc-master` 同步所属模块子 DESIGN（纯内部重构不动文档），并提供具体代码、测试与文档对应关系；并行任务中发现写集外文档漂移仅上报主控而不越界修改共享主 `DESIGN.md`；有新长期工程约束时按需调用 `space-master`；不写未来未交付功能。
+1. [ ] 对已授权 direct 和 Plan 样例，实施者在实现公开行为后按需加载 `dev-doc-master` 同步所属模块子 DESIGN（纯内部重构不动文档），并在全范围交付时同步将 Proposal 从 `proposals/proposed/<class>/` 迁入 `proposals/implemented/<class>/`（改写 `Decision/Consequences`）或同步 `implemented/` 中的变更事实（不动 `archived/`），提供具体代码、测试与文档对应关系；并行任务中发现写集外文档漂移仅上报主控而不越界修改共享主 `DESIGN.md`；有新长期工程约束时按需调用 `space-master`；不写未来未交付功能。
 2. [ ] 对越权设计变化、缺失批准范围、接口冲突等负例，实施者 STOP 并报告，不擅自篡改 Proposal/Plan。
 3. [ ] 委派报告能被控制者复核，有真实测试与文件证据；实施者不会自己批准 Task、改 Done 或提交正式交付。
 4. [ ] 旧版已有 Plan 继续沿用旧流程，不被新文档规范追溯强制修改；没有真实业务文件变更。
-5. [ ] `df-implement-review` 能参照 `dev-doc-master` 审查清单（含 Slop Checklist）以代码/测试/文档实证指出缺实现、旧行为回归、错误失败边界、缺 DESIGN 更新、并行越界修改共享文档和用户读不懂的说明；合法实现可以通过，原有 Q1–Q4、只读原则、复审预算与报告结构保持；`.wopal/rules/coding-workflow.md` 中英版本已增量同步。
+5. [ ] `df-implement-review` 能参照 `dev-doc-master` 审查清单（含 Slop Checklist）以代码/测试/文档实证指出缺实现、旧行为回归、错误失败边界、缺 DESIGN 更新、Proposal 未按全交付迁移/误残留计划标题/非法改动 `archived/`、并行越界修改共享文档和用户读不懂的说明；合法实现可以通过，原有 Q1–Q4、只读原则、复审预算与报告结构保持；`.wopal/rules/coding-workflow.md` 中英版本已增量同步。
 6. [ ] `df-implement`、`df-implement-review` 两项 `description` 精准简洁、中文和英文触发语义一致；每项均通过 10 个应触发 + 10 个不应触发的实际近邻场景，覆盖编码实施、实施后 diff 评审、实施前方案评审、纯文档维护以及 dev-flow 的 Plan 管理。记录误选/漏选及修复复验，没有真实加载评估时不得声称已自动验证。
 
 ### DSH Principles → Tasks → Verification
@@ -112,7 +112,7 @@
 | `labs/ref-repos/deepseek-harness/.agents/skills/dsh-prose-standard/SKILL.md` | 保留所有重要条件、不变量、失败保证，避免代码清单和重复解释 | Task 2、4；AC#1、5 |
 | `labs/ref-repos/deepseek-harness/docs/AGENTS.md` | 事实只留一个所有者；需要的细节链接到所属层级 | Task 1、3、4；AC#3、4、5 |
 
-`direct`、Plan 验收主控权及 C2C 委派规则是 **WopalSpace 自有机制**，不是 DSH 提供的生命周期。
+`direct`、Plan 验收主控权及独立只读评审委派规则是 **WopalSpace 自有机制**，不是 DSH 提供的生命周期。
 
 ### User Validation
 
@@ -146,10 +146,10 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 2: 代码、测试、按需同步 DESIGN/AGENTS 与并行不越界及冲突停止
+### Task 2: 代码、测试、按需同步 DESIGN/Proposal/AGENTS 与并行不越界及冲突停止
 
 **Verification Intent**: AC#1、AC#2
-**Behavior**: 对外行为/接口/生效业务规则/限制变化时按需加载 `dev-doc-master` 同步所属模块子 DESIGN；有新长期工程约束时按需加载 `space-master`；纯内部重构不动文档；并行期不越界修改共享主 `DESIGN.md` 或他人模块文档，写集外漂移上报主控；缺少设计授权或暴露变更冲突时 STOP，不能通过提前改 DESIGN 使测试伪通过。
+**Behavior**: 对外行为/接口/生效业务规则/限制变化时按需加载 `dev-doc-master` 同步所属模块子 DESIGN；全范围交付已批准 Proposal 时同交付完成 `proposed/<class>/` → `implemented/<class>/` 迁移改写，或对路径/默认配置变更同交付同步 `implemented/` 事实（禁止修改 `archived/`）；有新长期工程约束时按需加载 `space-master`；纯内部重构不动文档；并行期不越界修改共享主 `DESIGN.md` 或他人模块文档，写集外漂移上报主控；缺少设计授权或暴露变更冲突时 STOP，不能通过提前改 DESIGN 使测试伪通过。
 **Pre-read**: Task 1、`dev-doc-master` 现状写作与防并行规则、`space-master` AGENTS 维护 SOP、`rules/testing.md`、`df-implement` STOP/report 规则。
 **Design**: 将按需调用 `dev-doc-master`/`space-master` 写入 `df-implement` 的轻量触发判据，绝不把文档模板或写作细则复制到 `df-implement`；明确并行写集边界，只改所属模块子文档、跨文档漂移写入 `DESIGN Sync` 上报主控。
 **TDD**: false — SOP + 事实语义样例（含并行不越界与纯内部重构反例），验证由 review 阶段进一步覆盖。
@@ -208,7 +208,7 @@ Files touched: (实施后填写)
 | 3 | Task 3 | Wopal 主控 | Task 2 | 交接证据落点 |
 | 4 | Task 4 | Wopal 主控 | Task 3 | 与实施证据同轮完成独立评审能力 |
 
-逐 Task 由 Wopal 实施/验证，经 C2C/ChatGPT 的 df-implement-review 独立只读评审通过再提交，不委派 Fae、不调用 Rook；最终用户验证与集成遵循本体进化现有规则。
+由 Wopal 主控逐 Task 实施/验证并提交，不委派 Fae、不调用 Rook；全部 Task 实施完成后由用户安排其他 Agent 加载 `df-implement-review` 执行独立只读评审；最终用户验证与集成遵循本体进化现有规则。
 
 ## Delivery
 
