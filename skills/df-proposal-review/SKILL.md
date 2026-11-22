@@ -65,6 +65,8 @@ Before emitting a Blocker / Warning, be able to complete this sentence: **“If 
 
 **Cost-benefit gate:** For each candidate finding, weigh how likely the problem is, its concrete user impact, and the development, testing, ongoing maintenance, and user review costs of fixing it. Prefer existing skill rules, agent judgment, and normal review; inability to prove a rule with 100% automated enforcement is not itself a defect. If a new mechanism's actual benefit does not clearly outweigh those costs, do not report it as a Blocker, Warning, or Info. When a fix is justified, recommend the smallest effective change.
 
+**Review-scope gate:** Judge design correctness, goal coverage, verifiability, and unnecessary complexity. Executor identities, delegation choices, and agent-engine selection are execution arrangements; default collaboration roles may be overridden by user choice or engine capabilities. Never report a design finding merely because a proposal departs from those defaults. If execution readiness is explicitly requested, discuss operational concerns separately from the design-quality verdict.
+
 ## How to work: read once, three lists, then verify
 
 Efficiency is part of review quality — a review that burns time returns noise. Work in two passes.
