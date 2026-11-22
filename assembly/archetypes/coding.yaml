@@ -32,6 +32,7 @@ skills:
 
 # 声明该空间加载的规则
 rules:
+  - coding-workflow.md
   - testing.md
   - typescript.md
   - python.md
@@ -46,11 +47,9 @@ commands:
   - help.md
   - cupdate-prd.md
   - cupdate-design.md
-  - cupdate-roadmap.md
   - cupdate-readme.md
   - cupdate-agent-rules.md
   - evaluate-skill.md
-  - cupdate-br.md
   - context-continue.md
   - context-handoff.md
   - context-recover.md

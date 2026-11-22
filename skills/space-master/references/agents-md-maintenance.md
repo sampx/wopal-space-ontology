@@ -6,7 +6,28 @@ Authoritative spec for creating or updating a project- or directory-level `AGENT
 
 ## 1. When to Update
 
-Update only when a completed change leaves a long-lived agent behavior boundary that code, tests, config, and existing docs cannot carry. **Not updating is a normal outcome**; never add rules just to close a process step.
+Update or run a Rule Audit only when a completed change leaves a long-lived agent behavior boundary (build/test commands, engineering gates, directory boundaries, or safety invariants) that code, tests, config, and existing docs cannot carry. **Not updating is a normal outcome** — never add or touch `AGENTS.md` on internal refactors, routine bug fixes, or changes without new long-lived constraints, and never add rules merely to satisfy process.
+
+### Hierarchy and ownership scoping (Space → Project → Docs / Module Directory)
+
+Unlike optional skills or triggered rules that an agent might skip, **`AGENTS.md` is automatically injected by the agent harness whenever an agent reads or edits files in that directory tree**. That makes tiered `AGENTS.md` files the **unbypassable ignition switch** connecting each project to engineering gates, `dev-doc-master`, and `verify-docset.py --check-sync`.
+
+Keep rules strictly tiered across **Space → Project → Docs / Module Directory** with zero cross-tier duplication:
+
+- **Space level (root)**: workspace-wide governance, cross-repo safety boundaries, and global routing rules.
+- **Project level (`<project>/AGENTS.md`)**: project tech-stack gates, build/test/logging/error contracts, **the `Doc sync / consistency` gate and standing present-state `DESIGN` sync rule**, and cross-module project rules.
+- **Project docs directory (`<project>/docs/AGENTS.md`)**: **recommended thin guardrail card (25–45 lines, hard limit 80)** whenever `<project>/docs/` exists in a space assembling `dev-doc-master`. Auto-injected whenever any agent enters `docs/`, it commands the agent to load `dev-doc-master` / `dev-proposal`, enforces the four non-negotiable redlines (present-state truth & active business rules, anti-conflict layout, universal coverage & readability, and fact-check honesty), wires the exact `verify-docset.py` command, and holds project-local doc conventions (glossary, target readers, user-calibrated style rules) — never copying full `dev-doc-master` templates or guides verbatim.
+- **Module / subdirectory level (such as `packages/*/AGENTS.md`, `scripts/AGENTS.md`, `src/<complex-module>/AGENTS.md`)**: **place only durable constraints unique to that directory** (15–45 lines, hard limit 100), linking parent `AGENTS.md` and the owning `docs/DESIGN-<module>.md`. Never repeat rules already governed by a parent `AGENTS.md`; **if a subdirectory adds no distinct long-lived constraint beyond its parent, do not create an `AGENTS.md` or add empty placeholder files**.
+
+### Template Selection by Tier (Single Sources of Truth)
+
+| Target Tier | Path Pattern | Template | Target Length | Creation Rule |
+|---|---|---|---|---|
+| **Project root** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 80–150 lines (max 300) | Required for code projects; wires `Doc sync` gate & `DESIGN` sync rule when `docs/DESIGN.md` exists; when bootstrapping/updating in a space assembling `dev-doc-master` and `<project>/docs/` exists without `<project>/docs/AGENTS.md`, proactively propose creating `<project>/docs/AGENTS.md` in the same confirmation plan |
+| **Docs directory** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 25–45 lines (max 80) | Recommended for every project with `docs/` in spaces assembling `dev-doc-master`; omits `Code Review Rules` |
+| **Module / subdirectory** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 15–45 lines (max 100) | On-demand only when `<dir>` carries durable local invariants/traps beyond `<project>/AGENTS.md`; omits project-wide sections |
+
+**Resolve rules by changed paths**: When executing a change, gather applicable `AGENTS.md` bottom-up along the touched paths (`subdir → project → space`) and run only the minimal sufficient checks covering that surface rather than scanning unrelated packages.
 
 ### Document ownership
 
@@ -36,9 +57,10 @@ Industry practice is the baseline only when the project has no settled conventio
 A gate is a check an agent can run without interpreting code. Scaffold every standard check the stack supports before documenting it:
 
 1. Pick the mainstream formatter, linter or static analyzer, type checker, unit runner, and integration runner for the language and framework.
-2. Wire them into the existing command surface (`package.json`, `Makefile`, build script). A gate must be executable.
+2. Wire them into the existing command surface (`package.json`, `Makefile`, build script). Every mechanical gate must point to a real executable command with explicit failure conditions.
 3. Put each exact command in the Quality Gates table with its blocking condition and the log or artifact to inspect on failure.
-4. Automate everything mechanically decidable; reserve manual verification for humans, external systems, or runtime observation.
+4. **Non-empty scope and positive/negative proof for mechanical scripts (mandatory)**: Whenever creating or changing a mechanical check script or inclusion/exclusion glob, verify that it **scans a non-empty real target set (preventing silent zero-match exit 0 passes)** and passes **at least 1 valid positive case and rejects at least 1 broken negative case**.
+5. **Leave semantic judgment to human or independent review**: Never encode structural clarity, newcomer readability, or behavioral completeness as brittle regex checks.
 
 AGENTS.md then names installed tools and commands. Build a missing scaffold before writing the rule that depends on it.
 
@@ -61,7 +83,7 @@ Use only the applicable rows and record project-specific choices.
 - English preference: update `AGENTS.md` directly.
 - The preferred-language version copies every heading from the English template; translate only body text, table cells, examples, and explanatory prose. Never translate or rename a heading.
 - Markdown heading levels only; no chapter numbers such as `## 1.`.
-- Structure comes from `templates/agent-rules.md`, the single source of truth.
+- Structure comes from the tier-matched template (`templates/agent-rules.md` for project root, `templates/agent-rules-docs.md` for `<project>/docs/`, `templates/agent-rules-subdir.md` for module/subdirectories), the single sources of truth.
 
 ## 3. Content Boundary Rules
 
@@ -89,11 +111,11 @@ Never write:
 
 **Two failure modes.** Over-stuffing pastes one-off decisions, bug stories, or DESIGN text verbatim, so later agents cannot tell a durable rule from history. Over-trimming deletes a working constraint because “DESIGN also describes it”, leaving the agent without the rule it must follow. When unsure, keep the summarized constraint.
 
-Merge duplicate and stale rules before adding. One sentence when one suffices. All links are relative: these files are committed and shared across machines. Canonical References lists only mandatory documents (PRD, DESIGN, business rules). Research, tutorials, and auxiliary specs are references.
+Merge duplicate and stale rules before adding, and never duplicate rules already covered by a parent `AGENTS.md`. One sentence when one suffices. All links are relative: these files are committed and shared across machines. Canonical References lists only mandatory documents (PRD, present-state DESIGN); if a legacy `BUSINESS_RULES.md` exists, treat it strictly as a read-only historical reference (active rules belong in the owning DESIGN). Research, tutorials, and auxiliary specs are references.
 
 ### The Code Review Rules Section
 
-- Code projects must include `## Code Review Rules`; documentation-only directories may omit it.
+- Code projects' root `AGENTS.md` must include `## Code Review Rules`; documentation-only directories (`docs/`) and lightweight module subdirectories (`templates/agent-rules-subdir.md`, inheriting from project root) omit it.
 - New projects generate it from the template; updates preserve it permanently — never delete, rename, or translate the heading.
 - Content is a direction-level skeleton: the review process this project actually uses, the defect-report boundary, and project-specific checkpoints written in each project's own file.
 
@@ -139,13 +161,16 @@ Start with the audit, not with translation or polish. Classify every rule keep, 
 1. Path given: use it.
 2. Project name given: locate the repository and confirm the inferred path.
 3. One match: confirm with the user. Several: list candidates and let the user choose.
-4. Project-level: `<project>/AGENTS.md`; directory-level: `<target-directory>/AGENTS.md`.
+4. Classify the target tier and matching template:
+   - Project root (`<project>/AGENTS.md`) → `templates/agent-rules.md` (if `<project>/docs/` exists in a space assembling `dev-doc-master` and `<project>/docs/AGENTS.md` is missing, note it to propose bootstrapping `<project>/docs/AGENTS.md` in Step 3).
+   - Docs directory (`<project>/docs/AGENTS.md`) → `templates/agent-rules-docs.md`.
+   - Module / subdirectory (`<project>/<dir>/AGENTS.md`) → `templates/agent-rules-subdir.md` (only when genuine local constraints exist beyond parent `AGENTS.md`; otherwise advise against creating an empty/redundant file).
 
 **Output**: target directory, target path, assumptions needing confirmation.
 
 ### Step 2: Collect Context
 
-Read the target `AGENTS.md` and nearest parent; related DESIGN (PRD only if it exists and is not merged into DESIGN; `BUSINESS_RULES.md` only if present); package/build/test/typecheck/lint config including gate commands; the code owning style, errors, CLI output, logging, and fixtures — extract commands and hard constraints, not source encyclopedias; `rules-context` when provided. Then run the Rule Audit on every existing rule.
+Read the target `AGENTS.md` and nearest parent; related DESIGN (PRD only if it exists and is not merged into DESIGN; treat any existing `BUSINESS_RULES.md` strictly as a read-only historical reference rather than a source for new rules); package/build/test/typecheck/lint config including mechanical gate commands and their non-empty scope; the code owning style, errors, CLI output, logging, and fixtures — extract commands and hard constraints, not source encyclopedias; `rules-context` when provided. Then run the Rule Audit on every existing rule.
 
 Typical locations:
 
@@ -169,7 +194,7 @@ Get explicit confirmation before writing. The plan includes:
 6. Architecture/directory plan.
 7. Quality Gates and dev/test standards: commands, failure conditions, fixtures and helpers, error handling, CLI output, logging.
 8. Where `rules-context` merges.
-9. Compression or split strategy if the result may exceed 300 lines.
+9. Compression or split strategy if the result may exceed the tier length ceiling (300 lines for project root; 80 for `docs/`; 100 for module subdirectories).
 10. Confirmation that `User-Supplied Rules` stays unchanged.
 11. Low-information content to drop: `N/A` placeholders, text duplicated from DESIGN, frontmatter, or global regulations, long catalogs.
 12. Per structure item: current fact, durable target constraint, or temporary plan.
@@ -197,26 +222,26 @@ A small update (no frontmatter, path, or scope change; 1–2 sections) may compr
 - [ ] Every existing rule audited against code and authoritative documents; result shown in the plan
 - [ ] frontmatter `name` and `description` present; body does not repeat them
 - [ ] `description` is single-line, stable, and suitable for automated discovery
-- [ ] Target and parent `AGENTS.md` considered when present
-- [ ] PRD, DESIGN, and `BUSINESS_RULES.md` referenced when present
+- [ ] Target and parent `AGENTS.md` considered when present, with zero cross-tier duplication (no subdirectory `AGENTS.md` created without unique local constraints)
+- [ ] Related PRD and present-state DESIGN referenced when present; any legacy `BUSINESS_RULES.md` treated strictly as read-only historical reference
 - [ ] No `N/A` placeholders for documents that do not exist
 - [ ] Body summarizes long-lived operating constraints; DESIGN is linked for detail
 - [ ] All long-lived operating constraints present: logging, output/routing, deployment and release limits, testing and verification, coding discipline
 - [ ] Style, error contract, CLI/output, log sink, and forbidden content stated with concrete commands, paths, types, or formats
-- [ ] Every Quality Gates row has an existing command and a blocking condition; nothing mechanical left to prose
+- [ ] Target tier matched to the right template (`templates/agent-rules.md`, `templates/agent-rules-docs.md`, or `templates/agent-rules-subdir.md`) and within its length ceiling (project: 80–150 / max 300; docs: 25–45 / max 80; subdir: 15–45 / max 100)
+- [ ] Every Quality Gates row has a real executable command and blocking condition; projects maintaining `docs/DESIGN.md` wire `Doc sync / consistency` (`verify-docset.py --check-sync` or wrapper) and the standing present-state `DESIGN` sync rule (and in spaces assembling `dev-doc-master`, propose bootstrapping `<project>/docs/AGENTS.md` if missing); added/updated mechanical scripts verified for non-empty scope and +/- cases; semantic checks left to independent review
 - [ ] Test commands, layers, fixtures, helpers, and runner registration explicit
-- [ ] Agent can implement without reopening source to rediscover conventions; no unnamed generic reminders
+- [ ] Agent can implement without reopening source to rediscover conventions; applicable checks resolvable bottom-up from changed paths; no unnamed generic reminders
 - [ ] README has no agent rules; DESIGN has no duplicated coding or test policy
 - [ ] No one-off design decision or single-bug record
 - [ ] No architecture diagram, API catalog, command catalog, or directory encyclopedia
 - [ ] Architecture lists only existing paths; target structures not presented as facts
 - [ ] Project-level document references subdirectory `AGENTS.md` instead of copying details
-- [ ] 80–150 lines targeted, 300 hard limit
 - [ ] Basic development and test commands preserved
 - [ ] Rules focus on implementation, testing, and verification
 - [ ] Preferred-language version generated first when applicable
 - [ ] Canonical documents referenced, not copied
-- [ ] No rules extracted from `BUSINESS_RULES.md` into the body
+- [ ] Active business rules remain in their owning DESIGN; no rules extracted from or added into a standalone `BUSINESS_RULES.md`
 - [ ] Testing section explicitly inherits the space's canonical testing/TDD rule; it may name project-specific behavior boundaries where TDD is required, but does not restate general RED/GREEN decision theory; local commands, layers, fixtures/helpers, runner registration, and host/manual verification boundaries remain explicit
 - [ ] Preferred-language headings identical to the English template
 - [ ] `User-Supplied Rules` unchanged: no additions, modifications, deletions, or reordering, except original specification migrations

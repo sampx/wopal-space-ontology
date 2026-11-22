@@ -1,176 +1,130 @@
-# DESIGN 参考 — 产品 / 项目 DESIGN 编写
+# DESIGN 参考 — 产品与项目现状 DESIGN 编写
 
-创建或更新产品 DESIGN 或项目 DESIGN。模板：`templates/design-product.md`（产品）、`templates/design-project.md`（项目）。
+创建或更新产品 DESIGN（`templates/design-product.md`）或项目/子模块现状 DESIGN（`templates/design-project.md`、`templates/design-sub.md`）。写作项目主/子现状 DESIGN 时，务必一并阅读 [`design-project-guide.md`](design-project-guide.md) 获取完整分片、实测取证、双场景同步与语义审查标准。
 
-## 两条设计流
+## 两类 DESIGN 的定位区分
 
-| 流 | 用例 | 链路 |
+| 类型 | 定位 | 模板 | 核心参考 |
+|---|---|---|---|
+| **产品 DESIGN**（含产品子 DESIGN） | 跨项目系统分层、子系统边界、运行时模型、端到端流程与能力路线图（**允许先于项目实施进行前瞻规划**） | `templates/design-product.md`、`templates/design-sub.md`（产品子 DESIGN 分支） | 本文件（产品章节）+ `consistency.md` |
+| **项目 / 子模块现状 DESIGN** | **已落地可核实的当前系统说明**：面向最终用户与新人说清当前提供了什么能力、架构与接口契约、生效业务规则及完整失败边界 | `templates/design-project.md`、`templates/design-sub.md`（项目模块分支） | 本文件 + [`design-project-guide.md`](design-project-guide.md) |
+
+## 两类工作流
+
+| 适用范围 | 上下文定位 | 演进与同步闭环 |
 |---|---|---|
-| 标准 | 需要跨项目架构协调的多项目产品 | PRD → 产品 DESIGN（架构 + 能力路线）→ 项目 DESIGN → Phase → Plan |
-| 简化 | 无关联产品的独立项目 | 项目 DESIGN（含产品级设计）→ Plan |
+| **多项目产品（标准）** | PRD → 产品 DESIGN（系统分层 + `Sibling DESIGNs` + 能力图） | 重大演进经 Proposal（`proposals/proposed/<class>/...`）审议批准后实施；交付时同步更新相关项目/模块现状 `DESIGN` 并将 Proposal 迁入 `implemented/<class>/` |
+| **独立项目（简化）** | 无产品 PRD 与产品 DESIGN（项目主 DESIGN 头部 `Parent Product: N/A`、`Parent Architecture: N/A`） | 现状以项目主/子 `DESIGN` 维护；重大演进经项目 `proposals/proposed/<class>/...` 审议，代码+测试+模块现状 `DESIGN`+Proposal 迁入 `implemented/` 同步交付；小修小改按双场景规则按需同步 |
 
-标准流中，产品 DESIGN 处理架构契约与能力图；项目 DESIGN 处理单项目内部架构。简化流中，项目 DESIGN 承担产品级职责（头部 `Parent Product: N/A`）。
+> 注记：项目级工作不再生成或更新 `Phase` 与 `GAPS.md`；未实施的能力目标与跨期演进决定归属 `Proposal`。
 
 ## 讨论焦点
 
-- **产品 DESIGN**：系统分层与子系统边界、运行时模型、端到端流程、能力路线（能力维度及其成熟步骤）。
-- **项目 DESIGN**：项目角色与边界、能力范围、模块架构、技术选型、接口契约、数据模型。
-- DESIGN 只保留架构、边界、契约、运行时模型与能力图。它不保留实施状态、交付进度、验收结果或任务清单。
+- **产品 DESIGN**：系统分层与子系统边界、运行时模型、端到端流程、能力路线（能力维度及其成熟步骤，描述方向而非排期）。
+- **项目 / 子模块现状 DESIGN**：用户优先的当前能力、关键限制、薄主地图架构、模块契约、技术选型、对外接口（触发条件/时序/副作用/失败后果）、生效业务规则、数据与状态所有权。
+- DESIGN 不保留任务清单、实施中状态勾选或审批会议过程记录。
 
-## 能力路线
+## 产品 DESIGN：能力路线（保留原貌）
 
-产品 DESIGN 的 `Capability Roadmap` 是能力图，不是阶段时间线。每行是一个能力维度；列是它的成熟步骤（当前形态 / 下一里程碑 / 目标形态），含归属项目。
-
-图描述方向，而非日期。它回答"这个能力还要长成什么形态"，绝不回答"何时交付"。这正是它不脱离现实的原因：能力的 方向由架构固定，而提前几个月猜测的阶段排期不是。
-
-阶段从这张图切出：阶段是一批可以一起验证的能力步骤。阶段的 Goal 追溯到一行与一个目标步骤。图的 `Phase` 条目只保留标题、Goal 与阶段文档链接。
-
-能力维度推进或出现新维度时，添加或更新对应行。新能力维度从项目设计中浮现——引入新架构关注点的项目 DESIGN 要在这里登记。
+产品 DESIGN 中的 `Capability Roadmap` 是方向性能力图，而非排期表。每行代表一个能力维度，列表示其成熟步骤与主责项目；仅阐述能力将向何形态演化，不写日期或实施进度表。当新能力维度出现或推进时更新对应行；后续演进决策通过产品或项目 Proposal 落地。
 
 ## 文档命名与拆分
 
 - 主产品 DESIGN 无后缀：`docs/products/<product-name>/DESIGN.md`。
-- 按主题拆分的子 DESIGN 用 `DESIGN-<topic>.md`（kebab-case），与主 DESIGN 同目录。无后缀 = 主，带后缀 = 子。
-- 主 DESIGN 过长时拆分（约超过 500 行，或单个章节约超过 150 行）。主文档保留章节摘要与指向子 DESIGN 的链接。
-- 子 DESIGN 头部保留父链接：`> **Parent**: ./DESIGN.md`。只有主题本身超过规模准则时，子 DESIGN 才能进一步拆分。
-- 主文档头部列出其全部子 DESIGN（`Sub-DESIGNs` 字段）。与子 DESIGN 父链接构成双向索引；必须与实际文件一致。
+- 项目主现状 DESIGN 无后缀（位于项目文档目录，如 `docs/DESIGN.md`）。
+- 模块/主题子 DESIGN 使用 `DESIGN-<module>.md`（kebab-case），与主文档同目录。
+- **多模块项目默认拆分（防多 Agent 并行冲突）**：项目只要存在多个独立模块或职责域，**默认将主 `DESIGN.md` 压薄为概念与模块地图，把详细契约拆入 `DESIGN-<module>.md`**（不必等到主文档超过 500 行才拆）；只有紧密耦合的单模块小项目保留单份 `DESIGN.md`。同时，紧密耦合的单一契约不要为了拆分而机械切碎（详细判据见 `design-project-guide.md`）。
+- **按归属选用 `templates/design-sub.md` 双场景契约**：分解**产品主 `DESIGN.md`** 的产品子 DESIGN 允许并应该在实施前规划目标架构与能力演进；分解**项目主 `DESIGN.md`** 的模块子 DESIGN 严格执行现状文档与代码实证契约，不写未交付能力。
+- **子文档指回主文档，全面取消主文档头部 `Sub-DESIGNs` 枚举**：每个子 DESIGN 头部必须包含 `> **Parent**: ./DESIGN.md`。**所有主 `DESIGN.md`（含产品 DESIGN 与项目主 DESIGN）头部均不写 `Sub-DESIGNs` 列表**——靠目录内 `DESIGN-*.md` 文件命名即可一眼辨识，主文档在正文章节或模块地图表按需链接，彻底消除并行碰撞主文档头部的风险与无意义脚本检查（词表中仅保留 `Sub-DESIGNs` 容忍存量未改老文档）。
 
-## 头部
+## 头部规则
 
-头部链接只承载强制文档：
+头部只承载强制依赖链接：
 
-- **产品 DESIGN**：`Product Intent`（该 DESIGN 遵循的 PRD）+ `Sibling DESIGNs`（其核心子系统的项目 DESIGN）+ `Sub-DESIGNs`（其下全部 `DESIGN-<topic>.md`）+ 存在时的 `Companion Documents`（BRANDING / API-CONTRACT 类真相源）。
-- **项目 DESIGN**：`Parent Architecture`（父产品 DESIGN）+ `Parent Product`（父 PRD）+ 存在时的 `Sub-DESIGNs` + 存在时的 `Companion Documents`。
+- **产品 DESIGN**：`Product Intent`（遵循的 PRD）+ `Sibling DESIGNs`（核心子系统的项目 DESIGN）+ 存在时的 `Companion Documents`。**不列出 `Sub-DESIGNs`。**
+- **项目主现状 DESIGN**：`Parent Architecture`（父产品 DESIGN，无则 `N/A`）+ `Parent Product`（父 PRD，无则 `N/A`）+ 存在时的 `Companion Documents`。**不列出 `Sub-DESIGNs`。**
+- **子 DESIGN（产品子 DESIGN / 项目模块子 DESIGN）**：`Parent: ./DESIGN.md` + `Parent Architecture` + `Parent Product`。
 
-## 产品 DESIGN 与项目 DESIGN
+## 产品 DESIGN 与项目 DESIGN 的契约关系
 
-产品 DESIGN 组织其核心子系统。每个子系统有自己的项目 DESIGN，承载该子系统的内部架构。二者是不同层级的文档，关系是归属，而非相邻。
+产品 DESIGN 统筹多个核心子系统，每个子系统由其独立的项目 DESIGN 承载内部细节。二者属于上下游架构契约归属：
 
-- 产品 DESIGN 的 `Core Projects` 章节为每个子系统赋予角色、边界与交互契约，并链接到该子系统的项目 DESIGN。
-- 这些项目 DESIGN 属于头部 `Sibling DESIGNs` 字段。产品 DESIGN 依赖它们的契约，因此产品架构的读者必须能从头部触达它们。**陈述本设计必须遵循之契约的文档就是兄弟——无论它的文件在哪里。**
-- 跨仓库位置不削弱链接。另一个仓库中的项目 DESIGN，当其契约约束本文档时仍是兄弟。仓库边界说明文件在哪里，不说明它们约束得多强。
-
-头部是读者理解本设计依赖什么的地图。把约束性文档移到末尾章节，等于告诉读者它是可选阅读——这与真相相反。
+- 产品 DESIGN 的 `Core Projects` 章节界定各子系统的角色、职责边界与跨项目交互契约，并链接到对应的项目 DESIGN。
+- 这些项目 DESIGN 必须在产品 DESIGN 头部的 `Sibling DESIGNs` 中声明，即便它位于另一座仓库内，只要其契约约束产品架构，就属于头部强制依赖而非末尾参考材料。
 
 ## Sibling DESIGNs vs Reference Documents
 
-区别是义务，不是邻近度：
+区别在于义务而非文件路径远近：
 
-- **Sibling DESIGNs**（头部）：本文档必须遵循其契约的文档。没有它们，读者无法评估本设计。
-- **Reference Documents**（末尾章节）：提供信息但不构成约束的材料——研究、外部规格、辅助笔记、第三方设计文档。
+- **Sibling DESIGNs**（头部）：本文档必须遵循其契约的上下游系统 DESIGN。
+- **Reference Documents**（末尾章节）：仅作背景参考的材料（外部规范、调研笔记、历史快照或辅助文档）。
 
-一份文档非此即彼，绝不同时。当文档的契约约束本设计时，它属于头部，即使它很长、在外部、在另一个仓库里、或由另一个团队编写。当它只是提供有用的背景时，它属于末尾章节。
-
-把每个相关文档都当"reference"的冲动，正是这个字段要阻止的。`Reference Documents` 不是"看起来相关"的文档桶；它承载读者会受益于跟随、但本设计不依赖的文档。
-
-## 子 DESIGN 枚举（强制、文件系统背书）
-
-`Sub-DESIGNs` 头部字段是文件系统事实：
-
-1. 写头部**前**运行 `ls <docs-dir>/DESIGN-*.md`（或 `glob`）。
-2. 在头部恰好列出那些文件——每文件一条，`./DESIGN-<topic>.md` 带一句用途。
-3. 写完后**重新**运行同一列举并与头部比对。
-
-漏掉真实文件、或列出不存在文件的头部，会失败质量门。这条规则存在是因为主 DESIGN 的读者把头部当作其文档树的完整地图；部分或幽灵清单会静默丢失或发明架构文档。
+一份文档不能同时出现在头部和末尾 `Reference Documents` 中。
 
 ## 头部中的伴随文档
 
-像 `BRANDING.md`（品牌真相源）或 `API-CONTRACT.md`（API 契约）这样的文档属于文档集，但不是 `DESIGN-<topic>.md` 分解。在 `Companion Documents` 头部字段、或主文档顶部的文档关系表中声明它们。绝不重命名它们以适应 `DESIGN-*.md` 模式，也绝不把它们并入 `Sub-DESIGNs`。这保持两个类别分明，防止命名漂移。
-
-反向错误同样真实：实际承载主 DESIGN 自身架构关注点的支持性文档，必须被识别为子设计，即使它原本以描述性名称写成，如 `TESTING.md` 或 `CAPABILITY-PROTOCOL.md`。留在原地会让文档树失去一个分支——文件存在，但主头部从不指向它。分类标准及随后的重命名见 `consistency.md`（Companion Documents vs Sub-DESIGNs）。
+像 `BRANDING.md`（品牌常量）或 `API-CONTRACT.md`（跨切面契约）等文件属于文档集但不是某模块子 DESIGN，在主文档头部 `Companion Documents` 或文档关系表声明，保持原名。反之，凡实际承担主 DESIGN 某个架构模块或子系统详述的支持性文件，必须识别并命名为 `DESIGN-<module>.md`，加上 `Parent: ./DESIGN.md` 并在主文档正文地图中链接（参见 `consistency.md` 的伴随文档 vs 子 DESIGN 判据）。
 
 ## 元数据字段语义
 
-- 子文档对项目父级使用 `Parent`：`Parent: ./DESIGN.md`。
-- `Parent Architecture` 保留给项目 DESIGN 之上的产品级文档。
-- `Status` / `Updated` 在每份文档上强制；每次编辑刷新 `Updated`。
-- `Status` 是 `Draft` / `Proposed` / `Active`。草稿描述仍在推演的目标态；正式文档（`Active`）定案且具有约束力。
-- 只有正式文档参与 GAPS 分析。草稿在被项目 `GAPS.md` 对照度量前先提升为 `Active`——差距需要定案目标才有意义。
-- 设计文档没有"已完成"状态。实现进度属于 Plan 与 `GAPS.md`；设计变化时文档就地修订并保持 `Active`。
-- `Sub-DESIGNs` 与 `Companion Documents` 只存在于主文档头部。
+- 通用必填字段：`Status`（`Draft` / `Proposed` / `Active`）与 `Updated`（`YYYY-MM-DD`，每次修改刷新）。
+- 对已落地运行的项目/子模块现状 DESIGN，`Status` 为 `Active`；仅尚未定型的新建草案使用 `Draft` / `Proposed`。设计文档没有 `"Completed"` 状态。
+- 子文档使用 `Parent: ./DESIGN.md` 指回直接父级，`Parent Architecture` 指回产品级 DESIGN，两者分别成行。
 
-## 讨论完成标准
+## 更新模式与同步流
 
-当以下条件满足时讨论可以结束、开始写作：产品 DESIGN 具有清晰的架构边界与当前阶段目标；项目 DESIGN（标准）具有清晰的内部决策；项目 DESIGN（简化）可以进入 Plan；剩余关键问题已列出且不阻塞架构表达。
-
-## 更新模式
-
-1. 保留既有路径与标题。
-2. 更新 `Updated` 日期。
-3. 对齐讨论结论与既有内容。
-4. 补齐缺失章节。
-5. 修订或移除过期内容；删除实施状态与交付进度。
-6. 未决项标记为需确认。
-
-**文档集一致性**：主更新 → 检查子 DESIGN 是否有过期契约；子 DESIGN 更新 → 检查分解出它的主 DESIGN 章节；任何 DESIGN 更新 → 检查产品 PRD 与阶段文档是否有矛盾。验证双向索引。
+1. 保留既有文件路径与英文标题。
+2. 先核实真实代码、配置与实际命令/测试运行证据（**详见 `design-project-guide.md`**）。
+3. 刷新 `Updated` 日期。
+4. 按双场景同步规则修改受影响章节（纯内部重构不动 DESIGN；单模块改动只改对应 `DESIGN-<module>.md` 不碰主文档；并行发现写集外漂移仅上报主控）。
+5. 补齐失效边界与生效业务规则，移除过期或无法在代码中核实的内容（无法实测之处显式标注未实测）。
 
 ## 质量清单
 
-- [ ] 选择了正确的模板：产品或项目
-- [ ] 文档语言跟随用户偏好
-- [ ] 头部包含当前 `Updated` 日期
-- [ ] `Status` 是 `Draft` / `Proposed` / `Active` 之一，且反映设计实际所处位置
-- [ ] 准确的既有内容被保留；过期内容被修订/移除
-- [ ] 未确认项被标记为需确认
-- [ ] 正文使用设计语言；无模板注释、过程说明、任务清单或命令转写
-- [ ] 无实施状态、交付进度、验收结果、checkbox 任务或"completed / pending"模块状态
-- [ ] 产品：以 PRD 为基础；Capability Roadmap 是能力图（行是能力维度，列是成熟步骤），阶段条目只保留标题 + Goal + 链接
-- [ ] 项目：以父 PRD/DESIGN 为基础（或 `Parent Product: N/A`）；能力范围仅目标态
-- [ ] 头部 = 仅强制链接；Reference Documents = 仅参考；无重复
-- [ ] 整个文档集已审查：受影响时对齐子 DESIGN、父 DESIGN、PRD、Phase
-- [ ] 双向子文档索引一致
-- [ ] 每个支持性文档按内容分类：承载主 DESIGN 关注点的都是子设计，被命名并被枚举；跨切面真相源保持伴随文档
-- [ ] 主文档中没有委派引用指向既非子设计也非声明伴随文档的文件
-- [ ] 产品 DESIGN：每个核心子系统的项目 DESIGN 都列在 `Sibling DESIGNs` 中，无论其位于哪个仓库
-- [ ] `Reference Documents` 不承载本设计必须遵循其契约的文档
+### 通用与产品 DESIGN 审查项
+
+- [ ] 选择正确模板（`design-product.md` / `design-project.md` / `design-sub.md`）
+- [ ] 英文标题（无数字编号）、英文头部字段名；正文及字段解释符合用户偏好语言
+- [ ] `Updated` 为最新日期，`Status` 准确反映当前态（现状文档生效为 `Active`）
+- [ ] 头部 = 强制依赖链接；末尾 `Reference Documents` = 仅参考；二者无重复；所有链接为相对路径且真实存在
+- [ ] 无过程态迁移碎语（`deprecated`、`legacy`、`moved from`、`已废弃`、`历史机制` 等）
+- [ ] 产品 DESIGN（如适用）：紧扣 PRD；`Capability Roadmap` 描述能力方向而非排期；核心子系统列于 `Sibling DESIGNs`
+
+### 项目与子模块现状 DESIGN 必查项（完整清单与四道把控闭环见 `design-project-guide.md`）
+
+- [ ] **现状真实与实测证据**：全部内容为已落地系统事实，无未来计划冒充现状；命令/配置/默认值/限制经代码或运行结果核实，无法实测项显式标注未实测
+- [ ] **并行防冲突与通用骨架**：主 `DESIGN.md` 保持薄地图（含跨模块协作主流程、`Source Carrier` 路径前缀、头部无 `Sub-DESIGNs` 强枚举）；多模块细节按“固定首尾锚点 + 1..N 个领域自由分节”写入 `DESIGN-<module>.md`（带 `Parent: ./DESIGN.md`，零孤立子文档）；未手抄源码文件树、完整 CLI 参数表或全量 API 字段表
+- [ ] **用户优先与五项必填覆盖**：不读代码也能看懂核心能力与限制；关键流程覆全行为主体/触发、组件时序、许可与禁令、副作用/状态所有权及完整失败后果与恢复；含 `## Business Rules and Failure Boundaries`；`Key Decisions` 仅留落地结论与对应 Proposal 链接
+- [ ] **Slop Checklist 通过**：无思考过程泄露、无实现状态标签、无规则堆砌、无滥用加粗、无跨级逐字重复
 
 ## 强制质量门（报告完成前）
 
-运行 `scripts/verify-docset.py <docs-dir> --main DESIGN.md`（或 `PRD.md`）。在报告完成前脚本必须 exit 0。它在真实文件系统上检查：
+先完成上述语义清单，再运行脚本：`python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md`（代码与文档联动交付时加 `--check-sync [--base <git-ref>]`；必须 exit 0 后才可声明完成）。脚本检查磁盘与结构事实：
 
-1. `Sub-DESIGNs` 头部与磁盘上的 `DESIGN-*.md` 文件双向精确匹配
-2. 每个子文档携带指向主文档的 `Parent` 链接
-3. 零绝对路径（`file:///`、`/Users/...`）
-4. 所有相对链接解析到存在的文件
-5. 末尾 `Reference Documents` 章节中无子 DESIGN 或头部文档
-6. 无过程态词汇（已废弃 / 已放弃 / 迁移 / deprecated / legacy）
-7. 每份文档有 `Updated` 日期
-
-任何 FAIL 都意味着更新未完成——修复并重跑到 PASS。完成报告包含扫描结果（PASS/FAIL）。
+1. 扫描磁盘 `DESIGN-*.md` 子文档确认均带有 `Parent: ./DESIGN.md` 指回（全面取消头部 `Sub-DESIGNs` 枚举），且均在主文档正文除 `Reference Documents` 外被链接（零孤立子文档）
+2. 零绝对路径（`file:///`、`/Users/...`、`/Volumes/...`）
+3. 所有相对路径与 Markdown 链接真实存在
+4. 末尾 `Reference Documents` 不重复头部链接或本地子 DESIGN
+5. 零未替换模板占位符与空表格骨架行
+6. 所有 `##` 章节非空，且项目主/生效模块子文档必备 `## Business Rules and Failure Boundaries`
+7. 无过程态禁语，具备 `Updated` 日期、合法英文头部字段与有效 `Status`
+8. 可选 `--check-sync`：按 `Source Carrier` 映射本轮非测试代码改动，要求同步更新所属 `DESIGN-<module>.md`（纯内部重构需显式声明 `--pure-refactor "<原因>"` 留痕交评审复核）
 
 ## 完成后回复
 
-用用户语言回复：文件路径；创建/更新摘要；建议的下一步（产品 DESIGN → `/cupdate-roadmap`；标准项目 DESIGN → `/cupdate-agent-rules`；简化 → 创建 Plan）；验证结果。
+用用户语言汇报：修改文件路径、变更摘要、**真实核实与显式标注的未实测项**、语义审查及 `verify-docset.py` 结果（PASS/FAIL）、并行期发现但未越界修改的写集外文档漂移（若有），以及符合逻辑的下一步建议（例如：产品 DESIGN 影响子系统时检查对应现状 DESIGN 或按需起草 Proposal；项目现状 DESIGN 留下新长期工程规则时运行 `/cupdate-agent-rules`；随代码交付时继续完成验证与提交）。
 
 ## 一份 DESIGN 文档拥有什么
 
-DESIGN 文档回答"这个系统是什么，它的边界在哪里"。其他一切都有别的家。写章节前，对照此表检查：
-
 | 属于 DESIGN | 属于别处 |
 |---|---|
-| 角色、责任、归属边界 | 任务分解 → Plan |
-| 能力范围及其边界 | 交付进度 → `GAPS.md` |
-| 模块架构与载体路径 | 实施步骤 → Plan |
-| 技术选型及其理由 | 代理运行的操作命令 → `AGENTS.md` |
-| 接口契约（路由、schema、协议） | 测试流程 → `AGENTS.md` / 测试文档 |
-| 数据与状态模型，含所有者 | 验收证据 → Plan / 审查记录 |
-| 部署架构（流水线是什么） | 部署 runbook（操作者做什么）→ `AGENTS.md` |
+| 系统/模块定位、能力边界与用户可观察行为 | 未实施的设计演进、方案对比与审批状态 → Proposal（`proposals/proposed/<class>/...`） |
+| 薄主地图、模块拆分与核心协作流 | 历史/已完成方案决策记录与后果 → Proposal（`proposals/implemented/<class>/...`） |
+| 经核实的接口契约、数据/状态所有权、生效业务规则与失败边界 | 复杂任务的拆分、委派与执行编排 → Plan（可选，由 `dev-flow` 管） |
+| 关键落地决策摘要（附 Proposal 链接）与技术选型理由 | Agent 操作命令、门禁检查、测试流程 → `AGENTS.md` / `rules/testing.md` |
+| 部署机制设计（架构组成、状态落点、回滚语义） | 部署操作 Runbook 与分支门禁 → `AGENTS.md` |
 
-部署机制是设计内容：镜像组成、文件组织、配置布局、回滚语义。它们描述系统并留在 DESIGN。代理部署时遵循的*规则*——运行哪个命令、必须先通过什么——是操作规则，属于 `AGENTS.md`。
+## 区分产品意图与项目现状事实
 
-## 区分具体事实与意图
-
-DESIGN 陈述目标系统。其具体事实——路由表、模块路径、契约形状——必须与仓库匹配，因为读者用它们导航真实代码。其意图陈述——产品为了什么、某个界面最终将承载什么——描述方向，可能跑在代码前面。
-
-写作时区分两者。命名不存在路径的路由表是缺陷。描述界面承载团队尚未产出的内容类别的能力描述是意图，按原样保留。
-
-事实与代码不一致时，代码是证据。修复文档以匹配现实；若修复需要产品决策，则报告分歧。两个具体陷阱：
-
-- **特性开关与模块开关。** 文档列出路由 `/blog/*` 而模块开关禁用了 blog，描述的是一个不可达的界面。陈述开关及其门控内容，而不是把被门控的界面当作活跃的呈现。
-- **存在于仓库之外的内容。** 由符号链接、vendored 目录或 submodule 支撑的内容集合，其源头在别处。把它命名为仓库内路径会把读者引到错误的地方。
-
-## 所有者的领域知识是天花板，不是地板
-
-这些规则是地板。文档集也反映所有者如何思考产品，这份理解记录在文档自身之中。写作前读整套：PRD 的意图、产品 DESIGN 的架构、兄弟项目 DESIGN 的契约。分类或边界问题通常已被磁盘上的材料回答。
-
-问所有者一个规则或仓库已经回答的问题，浪费他们的注意力，并发出"文档集没被读过"的信号。只问真正需要他们决策的问题，绝不问第二遍。
+- **项目/子模块现状 DESIGN**：只记代码与运行事实。哪怕某个模块已经规划但尚未开发，也绝不在项目现状 DESIGN 中写成已存在能力；若因特性开关/配置门控导致表面接口不可达，必须写明开关条件，不得将不可达路径呈报为常规生效行为；符号链接或仓外资源须标明实际源头。
+- **产品 DESIGN**：允许在 `Capability Roadmap` 等架构愿景节阐述方向性意图，但列出的现有组件路径、真实边界必须与仓库一致。发现与代码存在方向性分歧时，先核实源码并按对齐纪律报告分歧，不擅自拍板改产品意图。

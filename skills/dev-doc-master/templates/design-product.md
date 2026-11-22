@@ -4,7 +4,6 @@
 > **Updated**: YYYY-MM-DD
 > **Product Intent**: `<prd-path>` — the PRD this DESIGN follows
 > **Sibling DESIGNs**: list the project DESIGNs of this product's core subsystems — their contracts bind this design, so they belong in the header even when they live in another repository
-> **Sub-DESIGNs**: list every `DESIGN-<topic>.md` under this main document
 
 A sub-DESIGN uses `templates/design-sub.md`, which carries `Parent: ./DESIGN.md` plus the same `Parent Architecture` / `Parent Product` lines as its main document.
 
@@ -68,4 +67,4 @@ Phases are cut from this map. Each phase entry keeps only the title, Goal, and p
 
 ## Reference Documents
 
-Reference-only documents: research, external specifications, auxiliary material that informs without binding. Do not repeat the PRD, the sibling DESIGNs, or the sub-DESIGNs listed in the header — a document whose contract this design follows belongs in the header, not here.
+Reference-only documents: research, external specifications, auxiliary material that informs without binding. Do not repeat the PRD or the sibling DESIGNs listed in the header, and never list local `DESIGN-*.md` sub-documents here — a document whose contract this design follows belongs in the header, not here.

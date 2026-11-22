@@ -4,7 +4,9 @@ The authoritative specification for creating and updating a project-level `READM
 
 ## 1. When to Use
 
-Create or update a project's `README.md`. The README is a human-facing project entry document: what the project is, how to install and run it, what it can do, and where durable references live. It is not an Agent rule file, not an implementation checklist, and not a design specification.
+Create or update a project's `README.md` (or a thin consumer `README.md` for an independently published/consumed monorepo package). The README is a human-facing entry document: what the project or package is, when to use it and its key limitations, how to install and run it, what it can do, and where durable references live. It is not an Agent rule file, not an implementation checklist, and not a design specification.
+
+**Internal directory boundary**: Do **not** create `README.md` inside ordinary internal source directories (such as `src/auth/` or `lib/core/`) — module design and behavior contracts live in `docs/DESIGN-<module>.md` (owned by `dev-doc-master`) to prevent competing truth sources. Only independently published or externally consumed monorepo sub-packages (such as `packages/<pkg>/` with their own manifest) may carry a thin consumer `README.md`, linking back to `docs/DESIGN-<module>.md` for architecture and internals.
 
 ## 2. Capability Awareness
 
@@ -29,8 +31,8 @@ Before generating, prefer reading: existing `README.md`, related project docs, p
 
 ## 5. Core Rules
 
-- Write for human readers in a user-friendly tone.
-- Place quick-start and core capabilities first; development commands and reference links later.
+- Write for human readers in a user-friendly tone: open with 3–5 plain-language sentences stating what the project does, who should use it, and the most important boundary or limitation.
+- Place quick-start, core capabilities, and key limitations first; development commands and reference links later.
 - List modules and core entry commands; do not enumerate every subcommand. Point to `--help` for complete usage.
 - Do not dive into internal implementation details or Agent-specific implementation rules.
 - Technology stack and project structure belong in the project spec (e.g. `AGENTS.md`) and design documents when those exist; do not duplicate them in README.
@@ -55,6 +57,10 @@ Before generating, prefer reading: existing `README.md`, related project docs, p
 
 | Module | Entry Commands | Purpose |
 |---|---|---|
+
+## Key Limitations
+
+- <important operational prerequisites, unsupported cases, or scope boundaries readers must know before adopting>
 
 ## Development
 
@@ -97,7 +103,8 @@ Before writing or overwriting `README.md`, present the full optimization plan an
 ## 10. Quality Checklist
 
 - [ ] Target project root explicit or safely inferred
-- [ ] README is project-level, not directory-level
+- [ ] Target is project-level `README.md`, or an independently published/consumed monorepo sub-package `README.md` linking `docs/DESIGN-<module>.md` (never an internal source-directory README competing with `DESIGN-<module>.md`)
+- [ ] Opens with clear human-facing value and covers key limitations/prerequisites without internal implementation narration
 - [ ] Lists modules and core entry commands, not every subcommand
 - [ ] Install / run / development commands verified from project files
 - [ ] Capabilities user-facing

@@ -1,200 +1,130 @@
-# DESIGN Reference — Product / Project DESIGN Authoring
+# DESIGN Reference — Product & Project Present-State DESIGN Authoring
 
-Create or update product DESIGN or project DESIGN. Templates: `templates/design-product.md` (product), `templates/design-project.md` (project).
+Create or update a Product DESIGN (`templates/design-product.md`) or a Project/Module Present-State DESIGN (`templates/design-project.md`, `templates/design-sub.md`). When authoring or updating any project or module present-state DESIGN, always read [`design-project-guide.md`](design-project-guide.md) as well for anti-conflict splitting, fact-checking, dual-scenario sync, and semantic review rules.
 
-## Two Design Flows
+## Positioning of the Two DESIGN Tiers
 
-| Flow | Use Case | Chain |
+| Tier | Role | Templates | References |
+|---|---|---|---|
+| **Product DESIGN** (including Product Sub-DESIGNs) | Cross-project system layering, subsystem boundaries, runtime model, E2E flows, capability roadmap (**allowed and expected to plan ahead of project implementation**) | `templates/design-product.md`, `templates/design-sub.md` (Product Sub-DESIGN mode) | This file (product sections) + `consistency.md` |
+| **Project / Module Present-State DESIGN** | **Shipped, verified manual of the current system**: tells end users and newcomers what the system delivers now, architecture & contracts, active business rules, and complete failure bounds | `templates/design-project.md`, `templates/design-sub.md` (Project Module mode) | This file + [`design-project-guide.md`](design-project-guide.md) |
+
+## Two Workflows
+
+| Flow | Context | Evolution & Sync Loop |
 |---|---|---|
-| Standard | Multi-project product requiring cross-project architecture coordination | PRD → Product DESIGN (architecture + Capability Roadmap) → Project DESIGN → Phase → Plan |
-| Simplified | Standalone project with no associated product | Project DESIGN (with product-level design) → Plan |
+| **Standard (multi-project product)** | PRD → Product DESIGN (layering + `Sibling DESIGNs` + capability map) | Substantial changes go through Proposals (`proposals/proposed/<class>/...`) and, upon delivery, update affected project/module present-state DESIGNs and move the Proposal to `implemented/<class>/` |
+| **Simplified (standalone project)** | Standalone project without product PRD/DESIGN (`Parent Product: N/A`, `Parent Architecture: N/A`) | Maintained via project main/sub present-state DESIGNs; substantial changes go through project `proposals/proposed/<class>/...` and deliver code + tests + module DESIGN + Proposal move to `implemented/`; small fixes follow dual-scenario sync |
 
-In the standard flow, product DESIGN handles architecture contracts and the capability map; project DESIGN handles single-project internal architecture. In the simplified flow, project DESIGN assumes product-level responsibility (Header `Parent Product: N/A`).
+> Note: Project workflows no longer create or update `Phase` documents or `GAPS.md`. Unimplemented capability proposals belong in Proposals.
 
 ## Discussion Focus
 
-- **Product DESIGN**: system layering and subsystem boundaries, runtime model, end-to-end flows, capability roadmap (the capability dimensions and their maturity steps).
-- **Project DESIGN**: project role and boundaries, capability scope, module architecture, technology choices, interface contracts, data model.
-- DESIGN keeps only architecture, boundaries, contracts, runtime model, and the capability map. It does not keep implementation status, delivery progress, acceptance results, or task lists.
+- **Product DESIGN**: system layering and subsystem boundaries, runtime model, end-to-end flows, capability roadmap (capability dimensions and maturity steps — direction, not schedule).
+- **Project / Module Present-State DESIGN**: user-first delivered capabilities and key limits, thin main map, module contracts, tech choices, external contracts (triggers, sequence, side effects, failure bounds), active business rules, and data/state ownership.
+- DESIGNs never contain task checklists, live implementation status flags, or meeting transcripts.
 
-## Capability Roadmap
+## Product DESIGN: Capability Roadmap (Unchanged)
 
-The product DESIGN's `Capability Roadmap` is a capability map, not a time-line of phases. Each row is a capability dimension; the columns are its maturity steps (current shape / next milestone / target shape) with an owning project.
-
-The map describes direction, not dates. It answers "what shape does this capability still grow toward", never "when will it ship". This is what keeps it from drifting away from reality: a capability's direction is fixed by architecture, while a phase schedule guessed months ahead is not.
-
-A phase is cut from this map: a phase is a batch of capability steps that can be verified together. The phase's Goal traces to a row and a target step. The map's `Phase` entries keep only the title, Goal, and phase document link.
-
-When a capability dimension advances or a new one appears, add or update its row. New capability dimensions surface from project designs — a project DESIGN that introduces a new architectural concern registers it here.
+The product DESIGN `Capability Roadmap` is a directional capability map, never a timeline. Rows are capability dimensions and columns are maturity steps with owning projects, describing architectural direction rather than delivery dates. Update rows when capability dimensions evolve; route concrete implementation decisions through Proposals.
 
 ## Document Naming and Splitting
 
-- Main product DESIGN has no suffix: `docs/products/<product-name>/DESIGN.md`.
-- Sub-DESIGNs split by topic use `DESIGN-<topic>.md` (kebab-case), same directory as the main DESIGN. No suffix = main, suffixed = sub.
-- Split when the main DESIGN grows too long (roughly over 500 lines, or a single chapter over roughly 150 lines). Keep a chapter summary and a link to the sub-DESIGN in the main document.
-- The sub-DESIGN header keeps the parent link: `> **Parent**: ./DESIGN.md`. Sub-DESIGNs may split further only when the topic itself exceeds the size guideline.
-- The main document header lists all its sub-DESIGNs (a `Sub-DESIGNs` field). Bidirectional index with sub-DESIGN parent links; must match actual files.
+- Main Product DESIGN has no suffix: `docs/products/<product-name>/DESIGN.md`.
+- Main Project Present-State DESIGN has no suffix (in the project's docs directory, e.g. `docs/DESIGN.md`).
+- Sub-DESIGNs use `DESIGN-<module>.md` (kebab-case) in the same directory as the main DESIGN.
+- **Default per-module splitting for multi-module projects (anti-conflict)**: Whenever a project has distinct modules or independent domains, **keep main `DESIGN.md` thin as a conceptual and module map and push module contracts into `DESIGN-<module>.md` by default** (do not wait for a 500-line threshold). Only small, tightly coupled single-module projects stay a single `DESIGN.md`. Conversely, keep tightly coupled parts of one contract together rather than fragmenting them mechanically (criteria in `design-project-guide.md`).
+- **Match `templates/design-sub.md` mode to its parent tier**: Product Sub-DESIGNs (decomposing a product main `DESIGN.md`) are allowed and expected to plan target product architecture and future capabilities ahead of implementation; Project Module Sub-DESIGNs (decomposing a project main `DESIGN.md`) strictly follow present-state, code-verified rules.
+- **Sub-documents link up; main DESIGNs omit `Sub-DESIGNs` header enumeration**: Every sub-DESIGN carries `> **Parent**: ./DESIGN.md`. **All main `DESIGN.md` headers (Product and Project alike) omit `Sub-DESIGNs` lists** — `DESIGN-*.md` filenames clearly distinguish sub-docs on disk while main docs link as needed from body sections or module maps, eliminating header collisions and pointless index checks (`Sub-DESIGNs` stays in the header vocabulary only to tolerate untouched legacy files).
 
-## Header
+## Header Rules
 
-Header links carry mandatory documents only:
+Header links carry binding dependencies only:
 
-- **Product DESIGN**: `Product Intent` (the PRD this DESIGN follows) + `Sibling DESIGNs` (the project DESIGNs of its core subsystems) + `Sub-DESIGNs` (all `DESIGN-<topic>.md` under it) + `Companion Documents` (BRANDING / API-CONTRACT type truth sources) when they exist.
-- **Project DESIGN**: `Parent Architecture` (the parent product DESIGN) + `Parent Product` (the parent PRD) + `Sub-DESIGNs` when they exist + `Companion Documents` when they exist.
+- **Product DESIGN**: `Product Intent` (followed PRD) + `Sibling DESIGNs` (subsystem project DESIGNs) + `Companion Documents` when present. **Do not enumerate `Sub-DESIGNs`.**
+- **Project Present-State DESIGN**: `Parent Architecture` (`N/A` if standalone) + `Parent Product` (`N/A` if standalone) + `Companion Documents` when present. **Do not enumerate `Sub-DESIGNs`.**
+- **Sub-DESIGN (Product Sub-DESIGN or Project Module Sub-DESIGN)**: `Parent: ./DESIGN.md` + `Parent Architecture` + `Parent Product`.
 
 ## Product DESIGN and Project DESIGNs
 
-A product DESIGN organizes its core subsystems. Each subsystem has its own project DESIGN carrying that subsystem's internal architecture. The two are documents at different levels, and the relationship between them is ownership, not adjacency.
+A product DESIGN coordinates core subsystems whose internals live in their respective project DESIGNs:
 
-- The product DESIGN's `Core Projects` section gives each subsystem its role, boundary, and interaction contract, and links to that subsystem's project DESIGN.
-- Those project DESIGNs belong in the header's `Sibling DESIGNs` field. The product DESIGN depends on their contracts, so a reader of the product architecture must be able to reach them from the header. **A document that states a contract this DESIGN must follow is a sibling — wherever its file lives.**
-- Cross-repository location does not weaken the link. A project DESIGN in another repository is still a sibling when its contract binds this document. Repository boundaries say where files live, not how strongly they bind.
-
-The header is the reader's map of what this design depends on. Moving a binding document to the end section tells the reader it is optional reading, which is the opposite of the truth.
+- The product DESIGN's `Core Projects` section assigns each subsystem's role, boundary, and cross-project interaction contract, linking to each project DESIGN.
+- List those constraining project DESIGNs in the product DESIGN header's `Sibling DESIGNs`, even across repositories — binding contracts belong in the header, not `Reference Documents`.
 
 ## Sibling DESIGNs vs Reference Documents
 
-The distinction is obligation, not proximity:
+Obligation determines placement, not path proximity:
 
-- **Sibling DESIGNs** (header): documents whose contracts this DESIGN must follow. A reader cannot evaluate this design without them.
-- **Reference Documents** (end section): material that informs without binding — research, external specifications, auxiliary notes, third-party design write-ups.
+- **Sibling DESIGNs** (header): upstream/downstream systems whose contracts bind this design.
+- **Reference Documents** (end section): informative background (research notes, external specs, historical snapshots) that does not bind this document.
 
-A document is one or the other, never both. When a document's contract binds this design, it belongs in the header even if it is long, external, in another repository, or written by another team. When it merely gives useful background, it belongs in the end section.
-
-The temptation to treat every related document as "reference" is exactly what this field prevents. `Reference Documents` is not a bucket for documents that seem related; it carries documents a reader would benefit from following but that this design does not depend on.
-
-## Sub-DESIGN Enumeration (mandatory, filesystem-backed)
-
-The `Sub-DESIGNs` header field is a filesystem fact:
-
-1. Run `ls <docs-dir>/DESIGN-*.md` (or `glob`) **before** writing the header.
-2. List exactly those files in the header — one bullet per file, `./DESIGN-<topic>.md` with a short purpose.
-3. Re-run the same listing **after** writing and diff against the header.
-
-A header that misses a real file, or lists a file that does not exist, fails the quality gate. This rule exists because a main DESIGN's reader relies on the header as the complete map of its document tree; a partial or phantom list silently loses or invents architecture documents.
+Never list the same document in both places.
 
 ## Companion Documents in the Header
 
-Documents like `BRANDING.md` (branding truth source) or `API-CONTRACT.md` (API contract) belong to the set but are not `DESIGN-<topic>.md` decompositions. Declare them in a `Companion Documents` header field, or in the document-relationship table at the top of the main document. Never rename them to fit the `DESIGN-*.md` pattern and never fold them into `Sub-DESIGNs`. This keeps the two categories distinct and prevents naming drift.
-
-The reverse error is equally real: a supporting document that in fact carries one of the main DESIGN's own architectural concerns must be recognized as a sub-design, even when it was originally written under a descriptive name like `TESTING.md` or `CAPABILITY-PROTOCOL.md`. Leave it in place and the document tree loses a branch — the file exists, but the main header never points at it. Classification criteria and the rename that follows are in `consistency.md` (Companion Documents vs Sub-DESIGNs).
+Truth sources like `BRANDING.md` or `API-CONTRACT.md` that serve cross-cutting concerns keep their descriptive names and are declared in `Companion Documents`. Supporting files that actually detail an architectural module or subsystem of the main DESIGN are renamed to `DESIGN-<module>.md`, given `Parent: ./DESIGN.md`, and linked from the main body map (`consistency.md` details classification by content).
 
 ## Metadata Field Semantics
 
-- Sub-documents use `Parent` for the project parent: `Parent: ./DESIGN.md`.
-- `Parent Architecture` is reserved for product-level documents above the project DESIGN.
-- `Status` / `Updated` are mandatory on every document; refresh `Updated` on every edit.
-- `Status` is `Draft` / `Proposed` / `Active`. A draft describes a target state still being worked out; a formal document (`Active`) is settled and binding.
-- Only formal documents take part in GAPS analysis. A draft is promoted to `Active` before a project `GAPS.md` measures gaps against it — a gap needs a settled target to mean anything.
-- A design document has no completed state. Implementation progress belongs to Plans and `GAPS.md`; when the design changes, the document is revised in place and stays `Active`.
-- `Sub-DESIGNs` and `Companion Documents` live in the main document header only.
+- Required on every document: `Status` (`Draft` / `Proposed` / `Active`) and `Updated` (`YYYY-MM-DD`, refreshed on every edit).
+- Shipped, verified project/module present-state DESIGNs carry `Status: Active`; `Draft` / `Proposed` applies only to newly drafted docs not yet active. Design docs have no `Completed` status.
+- Sub-documents keep `Parent: ./DESIGN.md` and `Parent Architecture` on separate lines.
 
-## Discussion Completion Standard
+## Update Mode and Sync Flow
 
-The discussion can end and writing begin when: product DESIGN has clear architecture boundaries and current phase goal; project DESIGN (standard) has clear internal decisions; project DESIGN (simplified) can proceed to Plan; remaining key questions are listed and do not block the architecture expression.
-
-## Update Mode
-
-1. Preserve existing paths and titles.
-2. Update the `Updated` date.
-3. Align discussion conclusions with existing content.
-4. Fill in missing sections.
-5. Revise or remove outdated content; delete implementation status and delivery progress.
-6. Mark unresolved items as needing confirmation.
-
-**Document-set consistency**: main update → check sub-DESIGNs for stale contracts; sub-DESIGN update → check the main DESIGN chapter that decomposed into it; any DESIGN update → check product PRD and Phase documents for contradictions. Verify the bidirectional index.
+1. Preserve existing paths and English headings.
+2. Verify actual code, config defaults, and live test/command outputs first (**see `design-project-guide.md`**).
+3. Refresh the `Updated` date.
+4. Update affected sections per the dual-scenario sync rules (skip DESIGN edits on pure internal refactoring; single-module changes touch only `DESIGN-<module>.md`; report out-of-scope drift to the coordinator during parallel work).
+5. Ensure active business rules and complete failure boundaries are present; mark any unverifiable claim explicitly as untested.
 
 ## Quality Checklist
 
-- [ ] Correct template selected: product or project
-- [ ] Document language follows user preference
-- [ ] Header includes current `Updated` date
-- [ ] `Status` is one of `Draft` / `Proposed` / `Active`, and reflects where the design actually stands
-- [ ] Accurate existing content preserved; obsolete content revised/removed
-- [ ] Unconfirmed items marked as needing confirmation
-- [ ] Body uses design language; no template commentary, process explanation, task list, or command transcript
-- [ ] No implementation status, delivery progress, acceptance results, checkbox tasks, or "completed / pending" module status
-- [ ] Product: grounded in the PRD; Capability Roadmap is a capability map (rows are capability dimensions, columns are maturity steps), phase entries keep only title + Goal + link
-- [ ] Project: grounded in parent PRD/DESIGN (or `Parent Product: N/A`); capability scope is target-state only
-- [ ] Header = mandatory links only; Reference Documents = reference-only; no duplication
-- [ ] Whole document set reviewed: sub-DESIGNs, parent DESIGN, PRD, Phase aligned when affected
-- [ ] Bidirectional sub-document index consistent
-- [ ] Every supporting document classified by content: each one carrying a main DESIGN concern is a sub-design, named and enumerated; each one that is a cross-cutting truth source stays a companion
-- [ ] No delegating reference in the main document points at a file that is neither a sub-design nor a declared companion
-- [ ] Product DESIGN: every core subsystem's project DESIGN is listed in `Sibling DESIGNs`, regardless of which repository it lives in
-- [ ] `Reference Documents` carries no document whose contract this design follows
+### Universal and Product DESIGN Checks
+
+- [ ] Correct template chosen (`design-product.md`, `design-project.md`, or `design-sub.md`)
+- [ ] English unnumbered headings and English header field names; body prose and field explanations match user language preference
+- [ ] Current `Updated` date; accurate `Status` (`Active` for live present-state DESIGNs)
+- [ ] Header = mandatory links only; `Reference Documents` = reference-only; zero overlap; all links relative and valid
+- [ ] Zero process-state terms (`deprecated`, `legacy`, `moved from`, `已废弃`, `历史机制`, etc.)
+- [ ] Product DESIGN (when applicable): grounded in PRD; `Capability Roadmap` stays directional rather than dated schedules; core subsystems listed in `Sibling DESIGNs`
+
+### Project & Module Present-State DESIGN Checks (full rubric in `design-project-guide.md`)
+
+- [ ] **Present-state truth & fact-checking**: All claims match shipped code; no unbuilt plans presented as live; commands, defaults, and limits verified against code/execution, with untested items explicitly marked
+- [ ] **Anti-conflict & universal structure**: Main `DESIGN.md` stays a thin map with inter-module collaboration flows, `Source Carrier` path prefixes, and no `Sub-DESIGNs` header enumeration; multi-module details sit in `DESIGN-<module>.md` using fixed entry/exit anchors + flexible `1..N` domain-concept `##` sections (`Parent: ./DESIGN.md`, zero orphan sub-DESIGNs); zero hand-copied source trees, full CLI option tables, or full API field inventories
+- [ ] **User-first & 5-Point Required Coverage**: Understandable without reading code; critical flows cover actor/trigger, component sequence, permissions `must`/`may`/`must not`, side effects/state ownership, and complete failure outcomes & recovery; `## Business Rules and Failure Boundaries` present; `Key Decisions` keeps shipped conclusions + Proposal links only
+- [ ] **Slop Checklist passes**: Zero CoT/session leakage, implementation status labels, rule bloat, bold abuse, or cross-level duplication
 
 ## Mandatory Quality Gate (before reporting complete)
 
-Run `scripts/verify-docset.py <docs-dir> --main DESIGN.md` (or `PRD.md`). The script must exit 0 before the update is reported complete. It checks, on the actual filesystem:
+Complete the semantic checklist above, then run `python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md` (add `--check-sync [--base <git-ref>]` during code+doc delivery; must exit 0 before reporting done). The script verifies on disk:
 
-1. `Sub-DESIGNs` header matches `DESIGN-*.md` files on disk — bidirectional, exact match
-2. Every sub-document carries a `Parent` link to the main document
-3. Zero absolute paths (`file:///`, `/Users/...`)
-4. All relative links resolve to existing files
-5. No sub-DESIGN or header document appears in the end `Reference Documents` section
-6. No process-state vocabulary (已废弃 / 已放弃 / 迁移 / deprecated / legacy)
-7. Every document has an `Updated` date
-
-Any FAIL means the update is incomplete — fix and re-run until PASS. Include the scan result (PASS/FAIL) in the completion report.
+1. Every `DESIGN-*.md` sub-document discovered on disk carries a `Parent: ./DESIGN.md` link (`Sub-DESIGNs` header enumeration is retired) and is linked from the main document body outside `Reference Documents` (zero orphan sub-DESIGNs)
+2. Zero absolute paths (`file:///`, `/Users/...`, `/Volumes/...`)
+3. All relative links resolve to existing files
+4. `Reference Documents` repeats no header links or local sub-DESIGNs
+5. Zero unreplaced template placeholders or empty table skeleton rows
+6. Non-empty `##` sections and mandatory `## Business Rules and Failure Boundaries` on Project main and Active Module DESIGNs
+7. Zero process-state forbidden terms, valid `Updated` date, allowed English header field names, and valid `Status`
+8. Optional `--check-sync`: changed non-test code files under `Source Carrier` paths have synchronized updates in their owning `DESIGN-<module>.md` (or declared `--pure-refactor "<reason>"` for independent review)
 
 ## Response After Completion
 
-Respond in the user's language with: file path; creation/update summary; suggested next step (product DESIGN → `/cupdate-roadmap`; standard project DESIGN → `/cupdate-agent-rules`; simplified → create Plan); verification result.
+Respond in the user's preferred language with: touched file paths; change summary; **verified evidence vs explicitly marked untested items**; semantic review and `verify-docset.py` results (`PASS`/`FAIL`); any out-of-scope drift notices surfaced during parallel execution; and the appropriate next step (for Product DESIGN: align affected subsystem present-state DESIGNs or open Proposals as needed; for Project DESIGN: run `/cupdate-agent-rules` via `space-master` if long-term operational constraints changed, or proceed with commit/delivery).
 
 ## What a DESIGN Document Owns
 
-A DESIGN document answers "what is this system, and what are its boundaries".
-Everything else has another home. Before writing a section, check it against
-this list:
-
 | Belongs in DESIGN | Belongs elsewhere |
 |---|---|
-| Role, responsibility, ownership boundaries | Task breakdown → Plan |
-| Capability scope and its boundaries | Delivery progress → `GAPS.md` |
-| Module architecture and carrier paths | Implementation steps → Plan |
-| Technology choices and rationale | Operating commands an agent runs → `AGENTS.md` |
-| Interface contracts (routes, schemas, protocols) | Test procedure → `AGENTS.md` / test docs |
-| Data and state model, with owners | Acceptance evidence → Plan / review record |
-| Deployment architecture (what the pipeline is) | Deploy runbook (what the operator does) → `AGENTS.md` |
+| System/module positioning, capability bounds, user-observable behavior | Unimplemented decisions, alternatives, approval → Proposal (`proposals/proposed/<class>/...`) |
+| Thin main map, module ownership, core interactions | Shipped decision history & consequences → Proposal (`proposals/implemented/<class>/...`) |
+| Verified interface contracts, state ownership, active business rules, failure bounds | Complex task breakdown, write-set coordination → Plan (optional, via `dev-flow`) |
+| Concise shipped decision summaries (with Proposal links) & tech rationale | Agent commands, gates, test workflows → `AGENTS.md` / `rules/testing.md` |
+| Deployment mechanics (topology, state layout, rollback semantics) | Deploy runbooks and branch gates → `AGENTS.md` |
 
-Deployment mechanics are design content: image composition, file organization,
-configuration layout, rollback semantics. They describe the system and stay in
-the DESIGN. The *rules* an agent follows when deploying — which command to run,
-what must pass first — are operating rules and belong in `AGENTS.md`.
+## Distinguishing Product Intent from Project Present-State Facts
 
-## Distinguishing Concrete Facts from Intent
-
-A DESIGN states the target system. Its concrete facts — route tables, module
-paths, contract shapes — must match the repository, because a reader uses them
-to navigate real code. Its intent statements — what the product is for, what a
-surface will eventually carry — describe direction and may run ahead of the
-code.
-
-Distinguish the two when writing. A route table naming a path that does not
-exist is a defect. A capability description saying a surface carries a category
-of content the team has not produced yet is intent, and stays as written.
-
-When a fact and the code disagree, the code is the evidence. Fix the document
-to match reality, or report the divergence when fixing it would require a
-product decision. Two specific traps:
-
-- **Feature flags and module switches.** A document listing route `/blog/*`
-  while the module switch disables the blog describes a surface that is not
-  reachable. State the switch and what it gates, rather than presenting a
-  gated surface as live.
-- **Content that lives outside the repository.** A content collection backed by
-  a symlink, a vendored directory, or a submodule has its source elsewhere.
-  Naming it as an in-repo path sends the reader to the wrong place.
-
-## The Owner's Domain Knowledge Is a Ceiling, Not a Floor
-
-These rules are the floor. The document set also reflects how the owner thinks
-about the product, and that understanding is recorded across the documents
-themselves. Read the whole set before writing: the PRD's intent, the product
-DESIGN's architecture, the sibling project DESIGNs' contracts. A classification
-or boundary question is usually already answered by the material on disk.
-
-Asking the owner a question that the rules or the repository already answer
-wastes their attention and signals that the document set was not read. Ask only
-what genuinely requires their decision, and never ask twice.
+- **Project / Module Present-State DESIGN**: Records verified code and runtime facts only. Unbuilt modules or planned flags never appear as live capabilities; gated surfaces must state their feature/module switch condition rather than looking unconditionally active; external symlinks or submodules must name their real backing location.
+- **Product DESIGN**: Directional intent belongs in `Capability Roadmap` and architectural vision sections, while concrete repository references must match actual code. Report directional divergences rather than silently inventing product decisions.

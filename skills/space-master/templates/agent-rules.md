@@ -1,6 +1,6 @@
 ---
-name: <Project or Module(dir)> AGENT RULES
-description: <One-line stable description of the current project or directory module responsibility>
+name: <Project Name> AGENT RULES
+description: <One-line stable description of the current project responsibility>
 maintenance: <When this file should change; prohibit one-off tasks, implementation facts and bug records>
 ---
 
@@ -10,21 +10,21 @@ maintenance: <When this file should change; prohibit one-off tasks, implementati
 
 Canonical references:
 
-<!-- List only documents that actually exist and are directly relevant to this scope. Do not write N/A placeholders. -->
+<!-- List only documents that actually exist and are directly relevant to this scope. Do not write N/A placeholders. Active business rules live in DESIGN; never add a standalone BUSINESS_RULES.md entry here (if a legacy one exists, treat it as read-only historical reference). -->
 - PRD: `<path-when-relevant>`
 - DESIGN: `<path-when-relevant>`
-- Business Rules: `<path-when-relevant>`
+- Docs Rules: `./docs/AGENTS.md`
 - Referral Rules: `<path-when-relevant>`
 
 ## Architecture and Directories
 
 <Brief current architecture description; may include a concise runtime flow>
 
-| Directory | Responsibility |
-|---|---|
-| | |
+| Directory | Responsibility | Local Rules |
+|---|---|---|
+| | | `<./subdir/AGENTS.md when present, otherwise —>` |
 
-<!-- The directory table lists only paths that currently exist. Durable target-structure constraints belong in Implementation Rules, not as current directory facts. -->
+<!-- The directory table lists only paths that currently exist. Durable target-structure constraints belong in Implementation Rules, not as current directory facts. Reference subdirectory AGENTS.md files here rather than duplicating their rules. -->
 
 ## Development Commands (build format test)
 
@@ -35,7 +35,7 @@ Canonical references:
 
 ## Quality Gates
 
-<!-- Every gate must be an existing executable command. Do not list a manual review as a quality gate. -->
+<!-- Every gate must be an existing executable command. Do not list a manual review as a quality gate. Wire Doc sync whenever this project maintains docs/DESIGN.md. -->
 
 | Gate | Command | Blocks work when |
 |---|---|---|
@@ -43,9 +43,11 @@ Canonical references:
 | Unit tests | `<command>` | `<failure condition>` |
 | Integration tests | `<command>` | `<failure condition>` |
 | Build / package | `<command>` | `<failure condition>` |
+| Doc sync / consistency | `<doc-check command, e.g. python3 <dev-doc-master>/scripts/verify-docset.py docs --main DESIGN.md --check-sync>` | `<broken links, orphan sub-DESIGNs, placeholders, missing boundaries, or unsynced Source Carrier code changes>` |
 
 ## Implementation Rules
 
+- **Present-state DESIGN sync (unbypassable)**: Read `docs/DESIGN.md` and the owning `docs/DESIGN-<module>.md` before changing module contracts. Whenever observable behavior, public interfaces, config defaults, active business rules, or failure outcomes change, load `dev-doc-master` (and follow `docs/AGENTS.md`) to sync the owning `docs/DESIGN-<module>.md` in the same change and pass the `Doc sync / consistency` gate; skip DESIGN edits on pure internal refactors. During parallel work, edit only authorized module sub-DESIGNs and report cross-module drift to the coordinator instead of touching shared `docs/DESIGN.md`.
 - <module ownership and coding-style rule; name the formatter/linter/typecheck entry when applicable>
 - <canonical error type, stable fields and side-effect uncertainty rule>
 <!-- For CLI/service projects, add concrete rules for success/failure streams, output format, exit codes, log sink, rotated files, recorded fields and forbidden content. For libraries or UI, replace these with the applicable public-contract or user-visible-state rules. -->
@@ -76,6 +78,7 @@ enforces.
 
 ### <Project-specific review checkpoints>
 
+- Verify code ↔ tests ↔ owning `docs/DESIGN-<module>.md` (and `proposals/implemented/` when completing a Proposal) stay synchronized; treat missing DESIGN sync on observable contract changes or false "pure-refactor" claims as a blocker.
 - <repository-specific checks that complement, not replace, CI and tests>
 
 ## User-Supplied Rules

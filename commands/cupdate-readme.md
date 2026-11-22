@@ -4,7 +4,7 @@ description: Create or update project README.md
 
 # Create or Update README
 
-Create or update a project `README.md`.
+Create or update a project `README.md` (or a thin consumer `README.md` for an independently published monorepo sub-package).
 
 **Input**: `$ARGUMENTS`
 
@@ -24,5 +24,5 @@ Examples:
 The authoritative specification lives in the `space-master` skill.
 
 1. Load the `space-master` skill.
-2. Follow the **README Maintenance** reference in `references/readme-maintenance.md` for the full workflow: capability awareness, document paths and naming, purpose, core rules, update mode, confirmation policy, and quality checklist.
+2. Follow the **README Maintenance** reference in `references/readme-maintenance.md` for the full workflow: capability awareness, project vs independently published monorepo sub-package naming boundaries, opening value & key limitations, core rules, update mode, confirmation policy, and quality checklist.
 3. Use the inline template in the README reference.

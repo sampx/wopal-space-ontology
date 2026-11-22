@@ -6,7 +6,28 @@
 
 ## 1. When to Update
 
-只有一次改动完成后留下的长期 Agent 行为边界，代码、测试、配置、既有文档都承载不了时，才更新。**不更新是正常结果**；不要为了走完流程而加规则。
+只有一次改动完成后留下的长期 Agent 行为边界（如构建/测试命令、工程门禁、目录分工或防呆硬边界），代码、测试、配置、既有文档都承载不了时，才触发更新或发起 Rule Audit。**不更新是正常结果**——纯内部改动、局部 bug 修复或未引入新长期约定时不改动 `AGENTS.md`，也绝不为了走完流程而硬加规则。
+
+### Hierarchy and ownership scoping (Space → Project → Docs / Module Directory)
+
+与可能被遗漏调用的技能或条件触发规则不同，**`AGENTS.md` 会在 Agent 读取或编辑对应目录树下任何文件时由 Agent Harness 自动强制注入上下文**，无法绕过、无法忽略。因此，分级 `AGENTS.md` 是将每个项目接通工程门禁、`dev-doc-master` 与 `verify-docset.py --check-sync` 的**不可绕过点火开关**。
+
+`AGENTS.md` 按**空间 → 项目 → 文档/模块子目录**严格分层归属，严禁跨层重复：
+
+- **空间级（根）**：全空间通行的工作区守则、跨仓库安全边界与全局路由规则。
+- **项目级（`<project>/AGENTS.md`）**：该项目的技术栈门禁、构建/测试/日志/错误契约、**`Doc sync / consistency` 文档同步门禁与常驻现状 `DESIGN` 同步硬规则**，以及项目内跨模块共性约束。
+- **项目文档目录（`<project>/docs/AGENTS.md`）**：凡装配了 `dev-doc-master` 且存在 `<project>/docs/` 的项目，**推荐配套一份轻量化护栏卡（25–45 行，上限 80 行）**。只要任何 Agent 进入 `docs/` 目录读写文件即由 Harness 自动注入：强制路由至 `dev-doc-master` / `dev-proposal`，钉死 4 条不可违背红线（现状真实与生效规则归 DESIGN、薄地图防并行与零孤立子文档、通用五要素覆盖与人类可读性红线、实测诚实），挂死真实可执行的 `verify-docset.py` 门禁命令，并承接本项目独有的术语表、读者对象或用户校准文风——绝不把 `dev-doc-master` 整套模板/长指南照抄进来。
+- **模块 / 子目录级（如 `packages/*/AGENTS.md`、`scripts/AGENTS.md`、`src/<complex-module>/AGENTS.md`）**：**只写入该局部目录特有的长期约束与避坑边界（15–45 行，上限 100 行）**，指回父级 `AGENTS.md` 并直接链接所属 `docs/DESIGN-<module>.md`。凡父级 `AGENTS.md` 已经覆盖的规则绝不在子目录重复；**若某子目录没有任何不同于父级的新增长期约束，禁止新建该目录的 `AGENTS.md`（也不创建空壳占位文件）**。
+
+### Template Selection by Tier (Single Sources of Truth)
+
+| 目标层级 | 路径形态 | 选用模板 | 目标篇幅 | 创建与引导规则 |
+|---|---|---|---|---|
+| **项目根** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 80–150 行（上限 300） | 代码项目必备；维护 `docs/DESIGN.md` 时必须接入 `Doc sync` 门禁与现状 `DESIGN` 同步常驻规则；在装配了 `dev-doc-master` 的空间中新建或更新时若 `<project>/docs/` 存在却缺 `<project>/docs/AGENTS.md`，须在同份确认方案中主动建议一并初始化 |
+| **文档目录** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 25–45 行（上限 80） | 装配 `dev-doc-master` 且含 `docs/` 的项目推荐标配；不写 `Code Review Rules` |
+| **模块 / 子目录** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 15–45 行（上限 100） | 仅当 `<dir>` 存在不同于 `<project>/AGENTS.md` 的长期局部约束/陷阱时按需创建；省略项目级通栏章节 |
+
+**按变更路径收集适用规范**：Agent 执行具体改动时，仅按受影响文件路径自底向上收集对应层级（当前目录 → 项目根 → 空间根）的 `AGENTS.md` 与该变更面所需的最小充分验证检查，无需牵扯无关目录规范。
 
 ### Document ownership
 
@@ -36,9 +57,10 @@ AGENTS.md 是 Agent 进入项目后最先读的操作文档。它必须让 Agent
 门禁是 Agent 不用猜、直接能跑的检查。写质量检查前，先把技术栈支持的检查做成可执行脚手架：
 
 1. 按语言和框架选定通行的格式化工具、lint 或静态分析、类型检查、单元运行器、集成运行器。
-2. 接进现有命令面（`package.json`、`Makefile`、构建脚本）。门禁必须可执行。
+2. 接进现有命令面（`package.json`、`Makefile`、构建脚本）。每条机械门禁必须指向真实可执行命令与明确失败条件。
 3. 每条准确命令写进 Quality Gates 表，带上阻断条件和失败时要看的日志或产物。
-4. 能机械判定的一律自动化；人工验证只留给人、外部系统或运行时观察。
+4. **机械脚本的非空范围与正反验证（必做）**：凡新增或修改自定义机械检查/校验脚本（或配置范围匹配规则），必须核实其**扫描目标非空（禁止因路径 glob 错误导致零扫描却返回 exit 0 的假通过）**，并用至少 **1 个应当放行的正例与 1 个应当拦截的反例**证明准入/排除边界真实有效。
+5. **不把语义判断塞进脆弱脚本**：结构是否清晰、新人能否读懂、契约有无逻辑遗漏等需要理解上下文的事项，留给人工或独立语义评审，不在规范中堆砌脆弱的正则文本检查。
 
 AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依赖它的规则。
 
@@ -61,7 +83,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 - 偏好语言是英文：直接更新 `AGENTS.md`。
 - 偏好语言版本照抄英文模板的每个标题；只翻译正文、表格单元格、示例和解释性文字。标题绝不翻译、不改名。
 - 只用 Markdown 标题层级，不加 `## 1.` 这类章节编号。
-- 结构以 `templates/agent-rules.md` 为唯一真相源。
+- 结构按层级取自对应模板（项目根：`templates/agent-rules.md`；文档目录：`templates/agent-rules-docs.md`；模块/子目录：`templates/agent-rules-subdir.md`），它们是唯一真相源。
 
 ## 3. Content Boundary Rules
 
@@ -89,11 +111,11 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 
 **两种失误。** 塞太多：把一次性决策、Bug 经过或 DESIGN 原文搬进来，后来的 Agent 分不清长期规则和历史。砍太狠：因为“DESIGN 也写了”删掉工作约束，Agent 干活时没了规则可依。拿不准就保留精简版。
 
-新增前先合并重复和过期规则。一句能说清就只写一句。链接全用相对路径：这些文件要提交并跨机器共享。Canonical References 只列强制文档（PRD、DESIGN、业务规则）；调研、教程、辅助说明属于参考资料。
+新增前先合并重复和过期规则，且父级已有的约束不重复写入子级。一句能说清就只写一句。链接全用相对路径：这些文件要提交并跨机器共享。Canonical References 只列强制文档（PRD、现状 DESIGN）；若仓库存有历史 `BUSINESS_RULES.md`，仅作只读历史参考（生效业务规则已并入对应 DESIGN）。调研、教程、辅助说明属于参考资料。
 
 ### The Code Review Rules Section
 
-- 代码项目必须包含 `## Code Review Rules`；纯文档目录可省略。
+- 代码项目的根 `AGENTS.md` 必须包含 `## Code Review Rules`；纯文档目录（`docs/`）与继承项目根规范的轻量模块子目录（`templates/agent-rules-subdir.md`）省略此节。
 - 新项目按模板生成；更新时永久保留——绝不删除、改名或翻译标题。
 - 内容只是方向性骨架：项目实际使用的审查流程、缺陷报告边界，以及写在各自项目文件里的特有检查点。
 
@@ -139,13 +161,16 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 1. 给了路径：直接用。
 2. 给了项目名：定位仓库并确认推断路径。
 3. 只有一个匹配：请用户确认。多个：列出候选让用户选。
-4. 项目级：`<project>/AGENTS.md`；目录级：`<target-directory>/AGENTS.md`。
+4. 判定目标层级与对应模板：
+   - 项目根（`<project>/AGENTS.md`）→ `templates/agent-rules.md`（若所在空间装配了 `dev-doc-master` 且 `<project>/docs/` 存在但缺少 `<project>/docs/AGENTS.md`，记入待确认项并在 Step 3 主动提议一并生成）。
+   - 文档目录（`<project>/docs/AGENTS.md`）→ `templates/agent-rules-docs.md`。
+   - 模块 / 子目录（`<project>/<dir>/AGENTS.md`）→ `templates/agent-rules-subdir.md`（必须先确认该目录确实存在父级未覆盖的长期局部约束，否则不新建空壳/重复文件）。
 
 **产出**：目标目录、目标路径、需要确认的假设。
 
 ### Step 2: Collect Context
 
-读目标 `AGENTS.md` 和最近的父级；相关 DESIGN（PRD 仅当存在且未并入 DESIGN；`BUSINESS_RULES.md` 仅当存在）；包管理/构建/测试/类型检查/lint 配置，含门禁命令；负责风格、错误、CLI 输出、日志、fixture 的代码——只取命令和硬约束，不搬源码百科；提供了 `rules-context` 时一并读。然后对每条现有规则执行 Rule Audit。
+读目标 `AGENTS.md` 和最近的父级；相关 DESIGN（PRD 仅当存在且未并入 DESIGN；若存有历史 `BUSINESS_RULES.md` 仅作只读历史参考，不作为新规则来源）；包管理/构建/测试/类型检查/lint 配置（确认机械检查命令及非空覆盖范围）；负责风格、错误、CLI 输出、日志、fixture 的代码——只取命令和硬约束，不搬源码百科；提供了 `rules-context` 时一并读。然后对每条现有规则执行 Rule Audit。
 
 常见位置：
 
@@ -169,7 +194,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 6. 架构/目录方案。
 7. Quality Gates 与开发/测试标准：命令、失败条件、fixture 和 helper、错误处理、CLI 输出、日志。
 8. `rules-context` 合并到哪里。
-9. 可能超过 300 行时的压缩或拆分策略。
+9. 可能超过对应层级上限（项目根 300 行、`docs/` 80 行、模块子目录 100 行）时的压缩或拆分策略。
 10. 确认 `User-Supplied Rules` 不变。
 11. 要丢弃的低信息内容：`N/A` 占位、与 DESIGN/frontmatter/全局规章重复的文字、冗长清单。
 12. 每个结构条目：当前事实、长期目标约束，还是临时方案。
@@ -197,26 +222,26 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 - [ ] 每条现有规则都已对照代码和权威文档审计；结果在方案中展示
 - [ ] frontmatter `name` 与 `description` 存在；正文不重复
 - [ ] `description` 单行、稳定，适合自动发现
-- [ ] 存在时，已考虑目标与父级 `AGENTS.md`
-- [ ] 存在时，已引用 PRD、DESIGN、`BUSINESS_RULES.md`
-- [ ] 不存在的文档没有写成 `N/A` 占位
+- [ ] 存在时，已考虑目标与父级 `AGENTS.md`，且父子之间无重复约束（子目录无独特长期约束则未新建文件）
+- [ ] 存在时，已引用相关 PRD 与现状 DESIGN；存量 `BUSINESS_RULES.md` 仅作只读历史参考，不作为新建规则来源
+- [ ] 没有 `N/A` 占位，不存在的文档未列入
 - [ ] 正文概括长期操作约束；细节链接 DESIGN
 - [ ] 长期操作约束齐全：日志、输出/路由、部署与发布限制、测试与验证、编码纪律
 - [ ] 风格、错误契约、CLI/输出、日志位置、禁止内容都用具体命令、路径、类型或格式写明
-- [ ] Quality Gates 每行都有现存命令和阻断条件；没有任何机械检查留给文字
+- [ ] 目标层级已选用正确模板（`templates/agent-rules.md`、`templates/agent-rules-docs.md` 或 `templates/agent-rules-subdir.md`）并落在对应篇幅上限内（项目根：80–150 / 上限 300；文档目录：25–45 / 上限 80；模块子目录：15–45 / 上限 100）
+- [ ] Quality Gates 每行都有真实可执行命令和阻断条件；维护 `docs/DESIGN.md` 的项目已接入 `Doc sync / consistency` 门禁（`verify-docset.py --check-sync` 或包装命令）及现状 `DESIGN` 同步常驻规则（在装配 `dev-doc-master` 的空间中若缺少 `<project>/docs/AGENTS.md` 已提议同步建档）；新增/修改的机械脚本检查已确认扫描范围非空并通过正反测试；语义检查留给人工/独立评审
 - [ ] 测试命令、分层、fixture、helper、运行器注册都明确
-- [ ] Agent 不用翻源码重新找惯例就能实现；没有不点名的泛泛提醒
+- [ ] Agent 不用翻源码重新找惯例就能实现；按变更路径即可收集最小必要检查，没有不点名的泛泛提醒
 - [ ] README 没有 Agent 规则；DESIGN 没有重复的编码或测试政策
 - [ ] 没有一次性设计决策或单个 Bug 记录
 - [ ] 没有架构图、API 清单、命令清单或目录百科
 - [ ] 架构只列现存路径；目标结构没有当成事实
 - [ ] 项目级文档引用子目录 `AGENTS.md`，不复制细节
-- [ ] 目标 80–150 行，硬上限 300 行
 - [ ] 基本开发和测试命令保留
 - [ ] 规则聚焦实现、测试、验证
 - [ ] 适用时已先生成偏好语言版本
 - [ ] 强制文档是引用而非复制
-- [ ] 没有从 `BUSINESS_RULES.md` 抽取规则写进正文
+- [ ] 生效业务规则留在所属 DESIGN，没有从存量 `BUSINESS_RULES.md` 抽取规则写进正文，也未向独立 `BUSINESS_RULES.md` 新增规则
 - [ ] Testing 章节显式继承空间的 canonical testing/TDD rule；可以写明项目特有的 TDD 行为边界，但不重复通用 RED/GREEN 判定理论；项目特有命令、分层、fixture/helper、runner 注册和宿主/人工验证边界继续写清楚
 - [ ] 偏好语言版本的标题与英文模板一致
 - [ ] `User-Supplied Rules` 未变：无增、无改、无删、无重排，原始规范迁移除外

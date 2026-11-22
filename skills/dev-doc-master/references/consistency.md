@@ -1,261 +1,163 @@
 # Document-Set Consistency — Universal Rules
 
-These rules apply to every document in the product documentation set: PRD, DESIGN (main and sub), Phase, and AGENTS.md. They exist so the document set stays coherent, avoids duplicated or contradictory claims, and keeps the maintenance cost low.
+These rules apply to every document in the product and project documentation set: PRDs, Product DESIGNs, and Present-State Project/Module DESIGNs, along with their boundaries against Proposals and `AGENTS.md`. They keep every fact single-owned, verifiable, low-conflict, and readable at low maintenance cost.
 
 ## No Chapter Numbering
 
-Headings express structure through Markdown heading levels, not numbers. Write `## Capability Scope`, never `## 1. Capability Scope`. Chapter numbers force renumbering on every insert, move, or deletion; heading levels survive structural edits. Applies to every generated or updated document.
+Headings express structure through Markdown heading levels, not numbers. Write `## Capability Scope`, never `## 1. Capability Scope`. Chapter numbers force renumbering on every edit; plain heading levels survive structural changes.
 
-## Target-State Writing
+## Present-State Accuracy (Project/Sub-DESIGN) and Forbidden Process Narration
 
-Documents describe the target state only — what the system is, what exists, who owns it, what responsibility it carries. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", "migration", or "historical" notes. When a capability is owned elsewhere, state the ownership, not the move. A reader of a document learns the current structure and responsibilities, never the history of how it got there.
+**Project and module DESIGNs are present-state documents**: they describe only shipped, verifiable capabilities, interface contracts, active business rules, and failure boundaries actually running in code. Unimplemented proposals, planned APIs, and future goals belong in **Proposals**, never disguised as live behavior inside a project DESIGN.
+
+**Product PRDs and Product DESIGNs** carry product intent, system layering, and capability maps, where directional goals are permitted while concrete paths and component claims must match repository reality.
+
+All design documents **forbid process-state narration**: no `deprecated`, `legacy`, `moved from X`, `old path`, `migration`, `no longer`, `已废弃`, `已放弃`, `不再执行`, or `历史机制`. When ownership lives elsewhere, state current ownership directly without migration history.
 
 ## Writing Style
 
-Target-state content is only half the job; how it reads is the other half. These rules apply to every sentence in every document of the set.
+Accurate facts are half the job; human clarity is the other half. Apply these rules to every sentence in the set.
 
 ### Natural Language
 
-Write like a human explaining something clearly to a colleague. Read the sentence aloud — if it sounds like a machine produced it, rewrite it. Prefer plain verbs and concrete nouns over nominalizations and stacked qualifiers.
+Write like an engineer clearly explaining the system to a colleague taking it over. Read sentences aloud — if they sound template-assembled or robotic, rewrite them using plain verbs and concrete nouns.
 
 ### One Idea Per Sentence
 
-Keep sentences short and carry one thought each. When a sentence contains two independent claims, split it. Long compound sentences hide which part is the commitment and which is decoration.
+Keep sentences focused on one primary claim. Split compound sentences that bury contract conditions or caveats.
 
-### Affirmative Over Negative
+### Affirmative and Ownership Clarity Over Vague Exclusion
 
-State what a component does, what it owns, and who is responsible. Instead of "X does not handle Y" or "Y is not supported", write "Y is owned by X" or "Y belongs to a later phase". The reader should learn the structure, not reconstruct it from a list of absences.
-
-### Ownership Over Exclusion
-
-Draw boundaries through ownership rather than exclusion. "X is responsible for A; Y owns B" reads better than "X does not do B, and Y is not involved in A". Every boundary statement names the owner of each side.
+State what a component does, owns, and delivers before stating exceptions. Phrase boundaries by naming both sides' owners (for example, `"X handles request routing; Y owns session persistence"`) rather than vague lists of absences. However, always state mandatory negative guards (`must not`), preconditions, and complete failure consequences explicitly so affirmative phrasing never hides failure guarantees.
 
 ## Relative Links Only
 
-All document links are relative to the repository root or the document's directory. Absolute paths (e.g. `/Users/...`, `file:///...`) are forbidden because these documents are committed to git and shared across machines — an absolute path works only on the machine that wrote it. Use `./DESIGN.md`, `../DESIGN.md`, or `docs/products/<name>/DESIGN.md` style relative paths consistently within a document.
+All links are relative to the repository root or the document directory (such as `./DESIGN-auth.md` or `../proposals/implemented/architecture/2026-11-20-oauth.md`). Absolute paths (`/Users/...`, `/Volumes/...`, `file:///...`) are forbidden so committed docs remain valid across machines.
 
 ## Header = Mandatory, End = Reference
 
-Every document has two link zones with distinct obligations:
+Every document separates two link zones with distinct obligations:
 
-- **Header** (metadata block after the title): carries only **mandatory** documents — the parent document and sibling documents that this document must follow. Examples: a PRD's `Related DESIGN`, a sub-DESIGN's `Parent: ./DESIGN.md`, a Phase's `Product PRD` + `Product DESIGN`, a product DESIGN's `Sibling DESIGNs`.
-- **End** (`Reference Documents`): carries **reference-only** documents — material that informs the document without binding it. The narrower name matters: it tells an author that a document belongs here only when a reader would genuinely benefit from following it, not merely because it is adjacent.
+- **Header** (metadata block below the title): carries only **mandatory** binding dependencies — parent or constraining sibling documents (such as PRD `Related DESIGN`, sub-DESIGN `Parent: ./DESIGN.md`, project DESIGN `Parent Architecture` / `Parent Product`, or product DESIGN `Sibling DESIGNs`).
+- **End** (`## Reference Documents`): carries **reference-only** material that informs without binding.
 
-A document is either a mandatory header link or a reference end link, never both. Never list a header document again in the end section, and never promote a reference document into the header as if it were binding.
+A document never appears in both the header and `## Reference Documents`.
 
 ### The Obligation Test
 
-When a document's placement is unclear, ask whether the reader must follow it to evaluate this document.
+When placement is unclear, ask whether a reader must follow that document to evaluate this one:
 
-- **Must follow it** → header. The document states a contract, constraint, or architecture this one is bound by. Long file paths, another repository, another team's ownership, and a different naming convention do not weaken the obligation.
-- **Would benefit from it** → end section. The document supplies background, precedent, or external context that this one does not depend on.
-
-The common failure is drift toward the end section: an author sees a document that feels "external" (it lives in another repository, or it was written before this one) and files it as reference. That silently demotes a binding contract to optional reading. The header is the reader's map of dependencies — a dependency filed as reference is a dependency the reader will miss.
+- **Must follow it** → Header (cross-repo paths or different naming do not weaken binding obligation).
+- **Would benefit from background** → `## Reference Documents`.
 
 ## Language
 
-Headings and header field names are English in every document, regardless of the document's language. The quality-gate script matches these literally, and a stable heading vocabulary keeps documents comparable across projects.
+Section headings and header field names stay **English** in every document regardless of body language (`## Module Architecture`, `> **Status**:`). Tooling matches these tokens literally and a shared heading vocabulary keeps documents comparable across projects.
 
-Body text and header field values follow the document's language. A Chinese document reads Chinese in the body and in field explanations; its headings stay English.
+Body text and header field explanations follow the user's preferred language.
 
-## Gap Detail Has One Home
+## Anti-Conflict Architecture and Single Ownership
 
-Gap detail lives in the project `GAPS.md` and nowhere else. A Phase document lists the gaps its scope closes by identifier, title, priority, and design pointer — it does not restate Current / Target / Exit. Duplicated gap descriptions drift apart, and the reader then cannot tell which copy is authoritative.
+Multi-agent parallel execution collides on centralized indexes and shared monolith docs. Prevent conflicts structurally with five rules:
 
-The Phase document carries only what no single gap can carry: phase-level Completion Criteria, scope grouping, capability rows advanced, inherent capability-level ordering between scope areas, and residual risks. Concrete Plan state and Plan-level execution DAGs are owned by Plans and the Space Active Plan Graph respectively, never by the Phase.
-
-## Process Documents vs Design Documents
-
-The document set contains two kinds of documents, and they relate to the design differently:
-
-- **Design documents** (PRD, DESIGN, Phase) *inherit*: they declare the parent documents they must follow, and their header carries those mandatory parents.
-- **Process documents** (GAPS) *measure divergence from*: they name the design they track, without becoming part of its lineage.
-
-The distinction matters for the header. A design document uses lineage fields (`Parent Architecture`, `Parent Product`, `Product Intent`). A process document uses `Design Source` — it points at the design it measures, and it does not claim to follow an architecture contract. Writing `Parent Architecture` on a GAPS document misstates the relationship and implies an obligation the document does not carry.
-
-Because a gap measures the distance between a settled target and the current reality, `Design Source` points at a formal document. A draft is promoted to `Active` before it is analysed; see the document lifecycle section.
-
-Process documents also carry a lifecycle note. A GAPS document states that it is removed once its gaps close, because a reader who mistakes it for permanent documentation will maintain it as such and let stale entries accumulate.
-
-## Main Document Lists Its Sub-Documents
-
-A suffix-free main document is the single entry point to its document tree. Its header must enumerate every `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-document under it (a `Sub-DESIGNs` / `Sub-PRDs` field). Each sub-document header points back via `Parent: ./DESIGN.md`. This bidirectional index must match the actual files on disk — when a sub-document is added or removed, both sides are updated. Sub-documents listed in the header are structure declarations, not references, so they never appear in the end section.
-
-## Sub-DESIGN Enumeration Is a Filesystem Fact
-
-The header's sub-document list is a filesystem fact, not a summary. Before writing the header, list every `DESIGN-<topic>.md` in the same directory with `ls`. The header must enumerate exactly those files — nothing more, nothing less. After writing, re-run the same listing and diff against the header. A header that misses a file breaks the bidirectional index; a header that lists a nonexistent file is a dead link. This check is part of the mandatory quality gate.
+1. **One owner per fact**: Explain each contract once in its owning document; never copy-paste blocks across main DESIGN, sub-DESIGN, Proposal, and `AGENTS.md`.
+2. **Thin main `DESIGN.md` map + default per-module sub-DESIGNs**: Multi-module projects keep main `DESIGN.md` thin (positioning, capability overview, core cross-module flows, and `## Module Architecture` map) and split module internals, contracts, active business rules, and failure bounds into `DESIGN-<module>.md` by default (without waiting for 500 lines). Only tightly coupled small single-module projects remain a single `DESIGN.md`.
+3. **Retire `Sub-DESIGNs` header enumeration from all main DESIGNs**: Main `DESIGN.md` headers (for both Product and Project DESIGNs) do not enumerate `DESIGN-*.md` files; readers discover them by filename (`DESIGN-*.md`) and body links/maps while each sub-document links back via `Parent: ./DESIGN.md`. Parallel edits to distinct sub-documents never contend on the main header.
+4. **Single-module isolation and write-set discipline**: Routine single-module changes and bug fixes do not touch main `DESIGN.md`. During parallel work, edit only sub-DESIGNs inside your authorized write set; **report out-of-scope drift to the coordinator and never cross write-set boundaries to edit shared docs**.
+5. **Never copy-paste volatile code inventories**: Never transcribe source file trees, full CLI option tables, or exhaustive API field lists; describe contract boundaries and link to source files.
 
 ## Companion Documents vs Sub-DESIGNs
 
-A documentation set contains two distinct kinds of supporting files:
+Classify supporting documents by **architectural role**, not by initial filename:
 
-- **Sub-DESIGNs** (`DESIGN-<topic>.md`): architecture documents that decompose a main DESIGN chapter. They follow the naming convention, carry a `Parent` link, and are enumerated in the main header's `Sub-DESIGNs` field.
-- **Companion documents** (e.g. `BRANDING.md`, `API-CONTRACT.md`): single-source-of-truth documents that belong to the set but are not architecture decompositions. They do not use the `DESIGN-<topic>.md` naming pattern, do not carry a `Parent` link, and are declared in the main header's `Companion Documents` field or in the document-relationship table.
+- **Sub-DESIGNs** (`DESIGN-<module>.md` or `DESIGN-<topic>.md`): documents decomposing an independent module or architectural concern of the main DESIGN. They carry `Parent: ./DESIGN.md`, are linked from the main document's map or section, and never appear in `## Reference Documents`.
+- **Companion documents** (such as `BRANDING.md` or `API-CONTRACT.md`): cross-cutting single-source-of-truth references that are not module decompositions. Keep their filenames and declare them in the main header's `Companion Documents` field or relationship table.
 
-Both directions of misclassification are errors. Promoting a companion document into the sub-design enumeration invents a structure that does not exist. Leaving a real sub-design under an ad-hoc name hides a branch of the document tree from every reader who trusts the main header as the map — the document exists, but nothing points at it.
+If an ad-hoc document (such as `AUTH-PROTOCOL.md`) actually owns a module or architectural subsystem's contract, rename it to `DESIGN-<module>.md`, add `Parent: ./DESIGN.md`, and link it from the main module map.
 
-### Classification Is by Content, Not by Name
+## Document Lifecycle: Draft and Active
 
-A file's name records how it was first created, not what it became. Classify by asking what the document does:
-
-1. **Does the main DESIGN treat it as an elaboration of one of its own sections?** The decisive signal is a delegating reference in the main document — a sentence of the form "the full protocol lives in X", "details are in X", "the release contract is in X". If the main document hands part of its own architecture to another file, that file is a sub-design, whatever it is called.
-2. **Is it the sole authoritative source for one architectural concern** (a contract, a protocol, a layering model, a subsystem) rather than a cross-cutting reference table (brand constants, business rule numbering)? The former is a sub-design; the latter is a companion.
-
-Size corroborates the answer. A supporting document that approaches the main DESIGN's own length, or that would exceed the chapter split guideline (`design.md`, roughly 150 lines) on its own, is carrying architecture — it belongs in the sub-design enumeration.
-
-A classified sub-design is renamed to `DESIGN-<topic>.md`, given `Parent: ./DESIGN.md`, and enumerated in the main header. The rename is part of the classification, not a separate cosmetic step: the naming convention is how a reader recognizes the document's role at a glance.
-
-## Document Lifecycle: Draft and Formal
-
-Every design document is either a **draft** or a **formal** document. The distinction is not a matter of taste; it decides whether the document can be measured against reality.
-
-| Status | Class | Meaning |
+| Status | Meaning | Notes |
 |---|---|---|
-| `Draft` | draft | the design is still being worked out; its target state may change |
-| `Proposed` | draft | the design is written but not yet settled |
-| `Active` | formal | the design is settled and binding |
+| `Draft` | Draft | Newly authored or incomplete doc awaiting verification and review |
+| `Proposed` | Proposed | Drafted and awaiting confirmation before taking effect |
+| `Active` | Active | Verified current contract in effect (normal state for present-state DESIGNs) |
 
-**Only formal documents take part in GAPS analysis.** A draft describes a target state that is still moving. Measuring implementation against it produces gaps that the next revision invalidates, so the tracker fills with noise and the team learns to ignore it. The rule follows directly from what a gap means: a gap is the distance between a settled target and the current reality, and a draft has no settled target to measure.
-
-**A draft becomes formal before its gaps are analysed.** Moving a document from `Draft` or `Proposed` to `Active` states that its target shape is settled — the design decisions are made, the boundaries are drawn, the contracts are defined. Only then does the project `GAPS.md` list gaps against it.
-
-`Design Source` in a `GAPS.md` therefore points at a formal document. When the source design is still a draft, analysis waits for the promotion rather than tracking a moving target.
-
-A design document has no completed state. A design states what the system is; implementation progress belongs to Plans and `GAPS.md`. When the design changes, the document is revised in place and stays `Active`. The design's own status describes whether its target shape is settled, never how much of it has been built.
+Design documents have no `Completed` status: implementation status lives in Proposals and optional Plans. Present-state DESIGNs update in place as the system evolves and stay `Active`.
 
 ## Header Field Set
 
-Every document header uses fields drawn from one fixed vocabulary. Field names are English, always, and a document uses only the fields that apply to it — but it never invents a field name outside this set.
+Header field names come from this fixed English vocabulary (never invent ad-hoc fields):
 
 | Field | Applies to | Meaning |
 |---|---|---|
-| `Status` | every document | lifecycle status: `Draft`, `Proposed`, `Active` |
-| `Updated` | every document | last update date, `YYYY-MM-DD`, refreshed on every edit |
-| `Parent Architecture` | project DESIGN, sub-DESIGN | the architecture document this one follows; `N/A` at the top of a product |
-| `Parent Product` | project DESIGN, sub-DESIGN | the product PRD this one follows; `N/A` when none |
-| `Parent` | sub-document (PRD / DESIGN / Phase) | the direct parent document in its own tree, e.g. `./DESIGN.md` |
-| `Product Intent` | product DESIGN | the PRD this DESIGN follows |
-| `Sibling DESIGNs` | product DESIGN | the project DESIGNs of this product's core subsystems; their contracts bind this design |
-| `Sub-DESIGNs` | main DESIGN | exact enumeration of every `DESIGN-<topic>.md` under it |
-| `Sub-PRDs` | main PRD | exact enumeration of every `PRD-<topic>.md` under it |
-| `Companion Documents` | main DESIGN / PRD | companion truth sources (BRANDING, API-CONTRACT) |
-| `Design Source` | GAPS | the formal design document this gap tracker measures against |
-| `Product PRD` | Phase | the PRD this Phase follows |
-| `Product DESIGN` | Phase | the DESIGN contract this Phase follows |
-| `Phase ID` | Phase | the phase identifier |
-| `Product` | Phase | the product this phase belongs to |
-| `Scope` | any document | one line narrowing what the document covers, when the title alone is ambiguous |
-| `Companion` | GAPS | one line describing what the document tracks |
+| `Status` | every document | Lifecycle state: `Draft`, `Proposed`, `Active` |
+| `Updated` | every document | Last verified edit date, `YYYY-MM-DD`, refreshed on edit |
+| `Parent Architecture` | project DESIGN, sub-DESIGN | Product DESIGN this follows; `N/A` for standalone projects |
+| `Parent Product` | project DESIGN, sub-DESIGN | Product PRD this follows; `N/A` when none |
+| `Parent` | sub-document (sub-PRD / sub-DESIGN) | Direct parent in the same tree, e.g. `./DESIGN.md` |
+| `Product Intent` | product DESIGN | PRD followed by the product DESIGN |
+| `Sibling DESIGNs` | product DESIGN | Core subsystem project DESIGNs constraining the product architecture |
+| `Sub-DESIGNs` | Legacy compatibility | Retained in vocabulary solely to tolerate untouched legacy docs without unknown-field errors; omitted from all Product and Project main DESIGN headers |
+| `Sub-PRDs` | main PRD | Enumeration of `PRD-<topic>.md` files when split |
+| `Companion Documents` | main DESIGN / PRD | Cross-cutting companion truth sources (`BRANDING.md`, `API-CONTRACT.md`) |
+| `Scope` | any document | One line narrowing scope when the title alone is ambiguous |
 
-Two rules follow from this table:
+Rules:
 
-- A document does not use a field that does not apply to it. A Phase document has no `Sub-DESIGNs`; a GAPS document has no `Parent Product`.
-- A document does not invent a field. If a fact does not fit the vocabulary, it belongs in the body, not in the header.
-
-`Parent` and `Parent Architecture` are separate obligations and may both appear: `Parent` points at the immediate document in the current tree (`./DESIGN.md`), `Parent Architecture` points at the product-level architecture above the whole project. They are never merged into one line.
-
-## Metadata Field Semantics
-
-Header metadata fields have fixed meanings:
-
-| Field | Where | Meaning |
-|---|---|---|
-| `Status` | all | document lifecycle status (`Draft` / `Proposed` / `Active`) |
-| `Updated` | all | last update date, YYYY-MM-DD, refreshed on every edit |
-| `Parent` | sub-documents | the direct parent document, `./DESIGN.md` for project sub-docs |
-| `Parent Architecture` | sub-documents | product-level architecture document this doc must follow, when it exists |
-| `Sub-DESIGNs` | main documents | exact enumeration of all `DESIGN-<topic>.md` under it |
-| `Companion Documents` | main documents | companion truth-source documents (BRANDING, API-CONTRACT) |
-| `Reference Documents` | end section | reference-only material, never in the header |
-
-A sub-document header uses `Parent` for its project parent, not `Parent Architecture`. `Parent Architecture` is reserved for product-level documents above the project DESIGN. When both exist, they are separate lines with distinct targets.
+- Never include fields inapplicable to the document type.
+- Keep `Parent` (`./DESIGN.md`) and `Parent Architecture` on separate lines.
 
 ## Mandatory Quality Gate
 
-Every document-set update ends with an automated scan that must pass before the work is reported complete:
+Complete both semantic review and deterministic checks before marking work done:
 
-1. Enumerate `DESIGN-*.md` on disk and diff against the main header's `Sub-DESIGNs` — bidirectional, exact match.
-2. Verify every sub-document header has `Parent: ./DESIGN.md`.
-3. Scan for absolute paths (`file:///`, `/Users/...`) — zero tolerance.
-4. Verify relative links resolve to existing files — both Markdown link targets and backticked `./`- or `../`-prefixed paths in header fields.
-5. Confirm the end section (`Reference Documents`) contains no sub-DESIGNs and no header documents.
-6. Scan for process-state vocabulary (已废弃, 已放弃, 迁移, 不再执行, 历史机制, deprecated, legacy, moved from).
-7. Confirm every touched document has a refreshed `Updated` date.
-8. For process documents (`GAPS.md`): confirm the header uses `Design Source` rather than a lineage field, and that header and end links are disjoint.
+1. **Semantic Review (required)**: Apply clarity checks, the **5-Point Required Coverage Checklist**, and the **Slop Checklist** in `references/design-project-guide.md` across all docs; apply **"already shipped and code/run-verified"** (Newcomer present-state & live Evidence Review) specifically to **Project and Module Present-State DESIGNs**, keeping Product PRDs and Product DESIGNs (including Product Sub-DESIGNs) free to plan ahead of implementation.
+2. **Deterministic Gate (required)**: Run `python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md` (add `--check-sync [--base <git-ref>]` during code+doc delivery; or `--main PRD.md` for PRDs) and verify:
+   - Sub-documents (`DESIGN-*.md`) discovered on disk each carry `Parent: ./DESIGN.md` (`Sub-DESIGNs` header enumeration is retired; untouched legacy docs carrying that field remain tolerated) and are linked from the main document body outside `Reference Documents` (zero orphan sub-DESIGNs)
+   - Zero absolute paths (`/Users/...`, `/Volumes/...`, `file:///...`)
+   - Relative Markdown links and header `./` or `../` backticked paths resolve to existing files
+   - `## Reference Documents` does not repeat header links or local sub-DESIGNs
+   - Zero unreplaced template placeholders or empty table skeleton rows
+   - Non-empty `##` sections and mandatory `## Business Rules and Failure Boundaries` on Project main and Active Module DESIGNs
+   - Zero process-state forbidden terms (`deprecated`, `moved from`, `no longer`, `已废弃`, `已放弃`, `不再执行`, `历史机制`, etc.), valid `Updated` date, allowed English header field names, and valid `Status` (`Draft` / `Proposed` / `Active`)
+   - Optional `--check-sync`: maps touched non-test code paths via `Source Carrier` in `## Module Architecture` and requires synchronized updates in owning `DESIGN-<module>.md` unless `--pure-refactor "<reason>"` is explicitly declared for reviewer inspection
 
-Run `scripts/verify-docset.py <docs-dir>` where available; otherwise run the equivalent grep checks by hand. The scan result is part of the completion report.
+## Document-Set Consistency and Change Flow
 
-## Document-Set Consistency on Every Update
+Check affected documents when editing, strictly respecting parallel write-set boundaries:
 
-Updating one document is never isolated. A change to any document can invalidate claims in its parents, children, or siblings. Before finalizing any update:
-
-1. Identify the affected set: parents (what this document follows), children (sub-documents), and siblings (documents sharing the same parent or describing the same phase/project).
-2. Check each affected document for stale claims that contradict the change; revise or remove them when evidence is clear.
-3. Align the bidirectional index and header links.
-4. Align Phase Goals with the DESIGN Capability Roadmap; align DESIGN architecture with the PRD vision.
-
-The completion response must state which related documents were checked, which were aligned, and which still need a follow-up update.
-
-## Change Flow Per Document Type
-
-| Document changed | Must check |
-|---|---|
-| PRD | DESIGN (product + project), Phase documents, sub-PRDs |
-| Main DESIGN | Sub-DESIGNs, product PRD, Phase documents |
-| Sub-DESIGN | Main DESIGN chapter that decomposed into it, PRD, Phase |
-| Phase / Roadmap | PRD, product DESIGN, project DESIGNs, sub-DESIGNs |
-| AGENTS.md | Project DESIGN, PRD, actual code |
+| Change Made | Check for Alignment | Boundary Note |
+|---|---|---|
+| PRD | Product DESIGN, affected project DESIGN boundaries | Unbuilt capabilities go to Proposals, not present-state DESIGN |
+| Product DESIGN | Affected subsystem present-state DESIGNs (drift check or Proposal trigger) | Preserve product architecture and capability-map conventions |
+| Code / Feature / Bug Fix | Affected `DESIGN-<module>.md` (+ thin main `DESIGN.md` only if boundaries change) + Proposal | Pure internal refactor skips DESIGN; report out-of-scope drift to coordinator |
+| Project main `DESIGN.md` | Affected `DESIGN-<module>.md`, parent architecture boundaries | Keep main doc a thin map; push details to sub-DESIGNs |
+| Module `DESIGN-<module>.md` | Corresponding row in main `DESIGN.md` module map | Update main map only if module ownership/existence changed |
+| `AGENTS.md` | Owning project/module DESIGN and actual build/test commands | Long-term operational rule edits go through `space-master` |
 
 ## Document Roles: What Belongs Where
 
-Every fact in a project has exactly one home. When an author is unsure which
-document should carry something, the answer follows from the document's role,
-not from where the content currently sits or how big the file is.
+Every fact has one authoritative home:
 
-| Document | Carries | Does not carry |
+| Artifact | Owns | Does Not Own |
 |---|---|---|
-| PRD | Product intent, user problems, value proposition, scope | Architecture, module layout, technology choices |
-| DESIGN (product) | System layering, subsystem boundaries, runtime model, end-to-end flows, capability roadmap | Per-project internals, deployment mechanics, implementation status |
-| DESIGN (project) | Project role and boundaries, capability scope, module architecture, technology choices, interface contracts, data and state model | Another project's internals, delivery progress, task lists |
-| DESIGN (sub) | One architectural concern delegated by the main DESIGN — a contract, a protocol, a layering model, a subsystem | Concerns the main DESIGN keeps; cross-cutting reference tables |
-| Phase / Roadmap | Phase goal, scope grouping, gaps closed by id, phase-level completion criteria, capability-level ordering, residual risks | Gap detail (`GAPS.md`), implementation steps/state (Plans), Plan-level execution relationships (Active Plan Graph) |
-| AGENTS.md | Rules an agent follows while working: commands, conventions, boundaries, verification requirements | Architecture narrative, contract definitions, design rationale |
+| **PRD** | Product intent, user problem, value proposition, product scope | Internal architecture, module layout, tech choices, test scripts |
+| **Proposal** (`proposals/{proposed,implemented,rejected,archived}/{class}/...`) | Design rationale, alternatives considered, unbuilt proposal specs (`proposed/`), shipped decision & consequences (`implemented/`), guardrail rejections (`rejected/`) | Current system manual; task-by-task execution tracking |
+| **Product DESIGN** | System layering, subsystem boundaries, runtime model, E2E flows, capability roadmap | Per-project internals, delivery tracking |
+| **Project / Sub DESIGN** (present-state) | **Shipped, verified** capabilities (user-first), module collaboration, contracts & state ownership, **active business rules**, complete failure bounds | Unbuilt plans, reasoning logs, hand-copied source trees / parameter tables |
+| **Plan** (optional, complex work) | Complex multi-module/multi-project task breakdown, parallel write sets, orchestration | Architecture approval (Proposal) or permanent system manual (DESIGN) |
+| **AGENTS.md** | Agent commands, gates, conventions, verification rules (via `space-master`) | Architecture narrative, business-rule prose, proposal deliberation |
 
-Two consequences follow.
+**Legacy compatibility note**: Projects no longer create standalone `BUSINESS_RULES.md` (nor `Phase` or `GAPS.md` trackers); active business rules and failure bounds belong inside the owning main/sub DESIGN, while rule changes under consideration belong in Proposals. Existing `BUSINESS_RULES.md` files stay read-only historical references and receive no new rules or updates.
 
-**Design content belongs in design documents; operating rules belong in the
-project spec.** A deployment mechanism — the image layout, the file
-organization, the rollback procedure — is design content and lives in the
-project DESIGN (or its distribution sub-DESIGN). The rule that an agent must
-run the build gate before deploying is a working rule and lives in `AGENTS.md`.
-The same fact often has both faces: the DESIGN states what the deploy pipeline
-*is*, and `AGENTS.md` states what an agent must *do* about it. Write both, each
-in its own home, rather than duplicating one into the other.
-
-**A document is classified by what it does, never by how it was named.**
-Renaming is part of classification, not a separate cosmetic step: a supporting
-document that turns out to carry one of the main DESIGN's own concerns is
-renamed to `DESIGN-<topic>.md`, given a `Parent` link, and enumerated in the
-main header. A document originally written under an ad-hoc name is still a
-sub-design if it carries architecture.
+**Split the two faces of operational mechanisms cleanly**: *What* a deploy/build pipeline is (topology, state locations, rollback semantics) belongs in DESIGN; *what commands/gates* an agent must run belong in `AGENTS.md`. Cross-link instead of copying.
 
 ## Scope Discipline for an Alignment Pass
 
-An alignment pass brings a document set into conformity with these rules. It is
-not a rewrite of the product.
+Fix rule-governed defects without inventing product policy:
 
-- **Fix what the rules govern.** Metadata vocabulary, classification, link
-  integrity, chapter numbering, target-state language, and document-set
-  consistency.
-- **Do not invent decisions.** Where the documents describe a product state
-  that has not been settled, record what the documents say and let the owner
-  settle it. An alignment pass that quietly picks a new paradigm has exceeded
-  its mandate.
-- **Resolve ambiguity from the code and the sibling documents first.** A
-  question answerable by reading the repository — which routes are gated, where
-  content actually lives, what a script's output path is — is answered by
-  reading, not by asking. Reserve questions for decisions only the owner can
-  make.
-- **Report the drift you find rather than silently normalizing it.** When the
-  documents and the code disagree about something the alignment pass should not
-  decide alone, fix what is clearly stale and report the rest.
+- **Fix rule-governed issues**: header field vocabulary, relative links, absolute path removal, process-state wording, thinning oversized main maps, removing AI slop and unverified claims.
+- **Never invent unsettled product decisions**: record ambiguity for the user/coordinator rather than guessing paradigms.
+- **Verify from source and execution first**: read code and run checks to resolve factual ambiguity before asking questions.
+- **Report out-of-scope drift instead of crossing write sets**: fix files inside your scope and surface out-of-scope drift to the coordinator.

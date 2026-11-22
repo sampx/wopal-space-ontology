@@ -1,7 +1,15 @@
 ---
 name: space-master
 description: >
-  Root WopalSpace specification and workflow router. MUST load when intent is ambiguous or the correct workflow/skill is unclear. Use for space init/status, structure and directory layout, runtime configuration, assembly, authoring project/directory AGENTS.md or project README.md, skill installation/scanning/removal, and capability-authoring guidance. For ontology repository updates, sync, capability discovery, contribution PRs, or evolution, load ontology-evolution directly; loading both is unnecessary. Routes development, skill authoring, and delegation to dev-flow, skill-creator, and agents-collab respectively.
+  WopalSpace governance and setup skill for space init/layout/config,
+  authoring or auditing project/directory AGENTS.md and project README.md,
+  and installing/scanning/removing external skills. Use when asked to manage
+  space layout or config, run /cupdate-agent-rules or /cupdate-readme, audit
+  AGENTS.md quality gates, install/remove skills, or clarify unclear space
+  routing. Do not use for authoring PRDs or present-state DESIGNs (use
+  dev-doc-master), coding or post-implementation reviews (use df-implement /
+  df-implement-review), Plan orchestration (use dev-flow), or ontology repo
+  sync and evolutions (load ontology-evolution directly).
 ---
 
 # space-master
@@ -57,23 +65,28 @@ It is the single specification point for commands, status, channels/upload gates
 
 ## AGENTS.md Maintenance
 
-When creating or updating a project-level or directory-level `AGENTS.md`, work by these rules:
+Because agent harnesses automatically inject `AGENTS.md` whenever an agent reads or edits files in that directory tree, tiered `AGENTS.md` files are the **unbypassable ignition switch** for engineering gates and documentation governance. When creating or updating project-, docs-, or directory-level `AGENTS.md`, work by these rules:
 
-1. **Audit existing rules first**: before updating an existing `AGENTS.md`, audit every current rule (per the Rule Audit criteria in the reference):
-   - **Delete**: the referenced code no longer exists / structure or CI guarantees it / it is a design detail with no actionable constraint (a long-lived *working constraint* stays summarized even when DESIGN documents the topic) / pure implementation fact
+1. **Scope by hierarchy, pick the tier template, and audit rules first**: place each rule at the narrowest appropriate level (**space → project → docs / module directory**) with zero cross-tier duplication, selecting the matching template:
+   - **Project root (`<project>/AGENTS.md`)** → `templates/agent-rules.md` (wires `Doc sync / consistency` gate & standing present-state `DESIGN` sync rule when `docs/DESIGN.md` exists; when `<project>/docs/` exists in a space assembling `dev-doc-master` and lacks `<project>/docs/AGENTS.md`, proactively propose bootstrapping it in the same confirmation plan)
+   - **Docs directory (`<project>/docs/AGENTS.md`)** → `templates/agent-rules-docs.md` (thin 25–45 line harness guardrail card routing to `dev-doc-master` / `dev-proposal`, enforcing present-state, anti-conflict, readability, and fact-check honesty redlines plus the exact `verify-docset.py` gate, and project-local glossary/style conventions; never copies full `dev-doc-master` guides)
+   - **Module / subdirectory (`<project>/<dir>/AGENTS.md`)** → `templates/agent-rules-subdir.md` (15–45 lines, created **only** when the directory adds durable local constraints beyond its parent; links parent `AGENTS.md` and owning `docs/DESIGN-<module>.md`)
+   Audit every existing rule before editing (criteria in reference Rule Audit):
+   - **Delete**: referenced code no longer exists / structure or CI guarantees it / pure design detail with no actionable constraint (a long-lived *working constraint* stays summarized even when DESIGN documents the topic) / pure implementation fact
    - **Keep**: safety boundaries (deletion scope, single credential write path), behavior constraints, long-lived working constraints (logging, output/routing, deployment/release limits, testing and verification, coding discipline), the `Code Review Rules` section (heading kept verbatim, content audited normally), User-Supplied Rules
-   - **Fix**: directory descriptions outdated, conflicts with a newer design mechanism, language versions drifted
-2. **Establish quality gates first**: before writing rules, wire the stack's standard formatter, linter/static analysis, type checker, unit runner and integration runner into executable project commands; the rulebook names those commands and failure conditions instead of asking agents to judge manually
-3. **Plan before writing**: present the audit classification (keep / delete / fix with reasons) plus the proposed change list, and wait for user confirmation
-4. **Review version first, formal version second**: update `AGENTS.<locale>.md` first, keeping every heading identical to the English template and translating only the body; after approval, update the formal English `AGENTS.md`
-5. **Code Review Rules section**: code projects' `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories may omit it). The section carries a direction-level skeleton only: a reference to the review process the project uses, the defect-report boundary, and project-specific checkpoints. The reusable template must not carry any single project's concrete rules
-6. Not updating is the default and legitimate outcome — update only when code, tests, config, and existing docs cannot carry the boundary
+   - **Fix**: directory descriptions outdated, conflicts with a newer authoritative DESIGN, language versions drifted
+2. **Establish executable quality gates with non-empty & +/- evidence**: wire standard formatter, linter/static analysis, type checker, unit runner, integration runner, and (when `docs/DESIGN.md` exists) `Doc sync / consistency` (`verify-docset.py --check-sync` or wrapper) into real project commands with clear failure conditions; when adding or updating a mechanical gate/script, prove it **covers a non-empty real target set and verify at least 1 positive (pass) and 1 negative (fail) case** (preventing silent zero-match passes); leave semantic judgment to independent review rather than fragile regex checks
+3. **Collect applicable rules by change path**: when acting on a change, gather constraints bottom-up along affected paths and run the minimal sufficient checks; update `AGENTS.md` only when long-lived engineering commands, gates, or hard boundaries change (existing `BUSINESS_RULES.md` files stay read-only historical reference; active rules live in DESIGN)
+4. **Plan before writing**: present the audit classification (keep / delete / fix with reasons) plus the proposed change list, and wait for user confirmation
+5. **Review version first, formal version second**: update `AGENTS.<locale>.md` first, keeping every heading identical to the English template and translating only the body; after approval, update the formal English `AGENTS.md`
+6. **Code Review Rules section**: code projects' root `AGENTS.md` must include a `## Code Review Rules` section — new projects generate it per the template, updates preserve it verbatim (never delete, rename, or translate the heading; documentation-only directories and lightweight module subdirectories inheriting from project root omit it). The section carries a direction-level skeleton only: a reference to the review process the project uses, the defect-report boundary, and project-specific checkpoints. The reusable template must not carry any single project's concrete rules
+7. Not updating is the default and legitimate outcome — update only when code, tests, config, and existing docs cannot carry the boundary
 
 **Full specification**: `references/agents-md-maintenance.md`.
 
 ## README Maintenance
 
-When creating or updating a project-level `README.md`, work by these rules:
+When creating or updating a project-level `README.md` (or a thin consumer `README.md` for an independently published monorepo package — never for ordinary internal source directories whose contracts live in `docs/DESIGN-<module>.md`), work by these rules:
 
 1. **Capability awareness first**: read `.wopal-space/space-meta.json` for the space `type` and the installed skills (`capabilities.skills`); when the metadata is missing, probe the filesystem (does `docs/`, `DESIGN.md`, or `AGENTS.md` exist?). Document-set alignment runs only when the space assembles the relevant documentation-set skills — when it does not, skip alignment and never assume.
 2. **Plan before writing**: present the full optimization plan (target file path, one-sentence project description, module / core command overview, sections to add/modify/remove, canonical documents to reference) and wait for explicit user confirmation

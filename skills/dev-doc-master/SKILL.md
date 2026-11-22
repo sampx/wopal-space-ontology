@@ -1,92 +1,66 @@
 ---
 name: dev-doc-master
 description: >
-  Author and maintain the product documentation set — PRD, DESIGN
-  (main and sub), Phase/Roadmap, BUSINESS_RULES, and GAPS — and
-  keep the set consistent with the repository. Use when the user asks to
-  create, update, split, or align any of these documents, or when
-  document-set consistency needs checking (header vs reference links,
-  bidirectional sub-document index, cross-document alignment), for example
-  "write a PRD", "update the design doc", "split this design", "create a
-  phase doc", "business rules", or any /cupdate-* request. Do not use for
-  writing development Plans (use dev-flow), for reviewing implementation
-  code (use df-implement-review), or for creating or updating a project
-  README (use space-master).
+  Author and audit documentation contracts — product PRDs, product DESIGNs,
+  and present-state project/module DESIGNs (DESIGN.md, DESIGN-<module>.md).
+  Use when asked to create, update, module-split, or check consistency of a
+  PRD or DESIGN, sync a project DESIGN with verified code, or run
+  /cupdate-prd and /cupdate-design. Do not use for /cupdate-agent-rules,
+  /cupdate-readme, or AGENTS.md/README governance (use space-master),
+  development Plans (use dev-flow), coding tasks (use df-implement), or
+  independent proposal/code reviews (use df-proposal-review or
+  df-implement-review).
 ---
 
 # dev-doc-master — Development Documentation Master
 
-Authoring and maintenance workflow for the product documentation set: PRD, DESIGN (main + sub), Phase/Roadmap, and BUSINESS_RULES. This skill owns the rules and templates; the `/cupdate-*` commands are thin entries that route here. Project README authoring lives in the `space-master` skill.
+Cross-project documentation standard and authoring base covering product PRDs, product DESIGNs, and project/module **present-state DESIGNs** (main `DESIGN.md` + `DESIGN-<module>.md`). `/cupdate-prd` and `/cupdate-design` are thin entry commands that route here; `AGENTS.md` and project `README.md` maintenance lives in `space-master`.
 
 ## When to Use
 
-- Create or update a product PRD, product DESIGN, project DESIGN, Phase document, roadmap, or project BUSINESS_RULES.
-- Split an oversized main document into topic sub-documents.
-- Align a document set after a change (PRD ↔ DESIGN ↔ Phase ↔ BUSINESS_RULES ↔ AGENTS.md).
-- Record or update project gaps between design target state and implementation (`GAPS.md`).
+- Create or update a product PRD or product DESIGN.
+- Author, synchronize, or module-split a project/module present-state DESIGN (making delivered capabilities, active business rules, and failure boundaries clear to readers).
+- Run semantic review (newcomer test, evidence check, Slop Checklist) and deterministic consistency validation on a documentation set.
+
+> Unimplemented design proposals, alternatives considered, and approval states belong in **Proposals** (`proposals/{proposed,implemented,rejected,archived}/{class}/yyyy-mm-dd-<slug>.md`), never written ahead of code into project present-state DESIGNs.
 
 ## Document Set and Routing
 
 | Document | Command | Reference | Template |
 |---|---|---|---|
 | Product PRD | `/cupdate-prd` | `references/prd.md` | `templates/prd.md` |
-| Product / Project DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` / `templates/design-project.md` |
-| Sub-DESIGN | (via `/cupdate-design`) | `references/design.md` | `templates/design-sub.md` |
-| Phase | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
-| Project GAPS | (no command) | `references/gaps.md` | `templates/gaps.md` |
-| Project BUSINESS_RULES | `/cupdate-br` | `references/business-rules.md` | `templates/business-rules.md` |
-| AGENTS.md | `/cupdate-agent-rules` | space-master skill | space-master skill templates |
+| Product DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` |
+| Project Present-State DESIGN | `/cupdate-design` | `references/design.md`, `references/design-project-guide.md` | `templates/design-project.md` |
+| Module / Sub Present-State DESIGN | (via `/cupdate-design`) | `references/design.md`, `references/design-project-guide.md` | `templates/design-sub.md` |
+| AGENTS.md / README | `/cupdate-agent-rules` / `/cupdate-readme` | `space-master` skill | `space-master` templates |
 
-Load the matching reference file before writing. All references share the common rules in `references/consistency.md` — read it once per session.
+Read `references/consistency.md` before writing any document, and load the matching reference for the document type. When authoring or updating any project or module present-state DESIGN, always load `references/design-project-guide.md`.
 
-## Universal Rules (applied to every document in the set)
+## Core Principles (full rules in `references/consistency.md` and `references/design-project-guide.md`)
 
-Read `references/consistency.md` for the full text. In short:
+- **Present-State Accuracy (Project/Sub-DESIGN) vs Product Intent (PRD/Product DESIGN)**: Project and module DESIGNs describe **only shipped, verified behavior, constraints, and active business rules** actually running in code — never unbuilt blueprints or task lists. Product PRDs and Product DESIGNs preserve their architecture and capability-map rules. All DESIGNs forbid process-state narration (`deprecated`, `legacy`, `moved from`, `no longer`, `已废弃`, `历史机制`).
+- **Anti-Conflict Structure for Multi-Agent Parallelism**:
+  1. Keep main `DESIGN.md` thin as a project positioning, core flow, and module map — never pile module internals into it;
+  2. Split multi-module or multi-domain projects into `DESIGN-<module>.md` **by default** (do not wait for a 500-line threshold); keep tightly coupled small single-module projects in a single `DESIGN.md`;
+  3. **Omit `Sub-DESIGNs` header enumeration from main DESIGNs** (both Product and Project main DESIGNs stay free of header `Sub-DESIGNs` lists — sub-documents identify themselves by `DESIGN-*.md` filename and `Parent: ./DESIGN.md`, while main docs link from body sections/maps), eliminating header collisions;
+  4. Routine single-module work and bug fixes do not touch main `DESIGN.md`; during parallel work, edit only the sub-DESIGN inside your authorized write set, **report out-of-scope drift to the coordinator, and never cross write-set boundaries to edit shared docs**.
+- **Never Copy-Paste Volatile Code Inventories**: Never transcribe full source trees, complete CLI option tables, or full API field inventories into DESIGNs; express complete behavior contracts satisfying the 5-Point Required Coverage Checklist (actor/trigger, sequence, permissions `must`/`may`/`must not`, state side effects, full failure outcomes & recovery) inside universal fixed entry/exit anchors + flexible `1..N` domain-concept sections, and link to `Source Carrier` paths.
+- **Business Rules and Key Decisions Placement**: Do not create separate `BUSINESS_RULES.md` files (legacy ones remain read-only historical references); active business rules and failure boundaries live directly inside `## Business Rules and Failure Boundaries` (required on active Project main and module sub-DESIGNs). `## Key Decisions` keeps concise shipped conclusions plus links to `proposals/implemented/<class>/...` (or `proposals/archived/<class>/...` for sealed snapshots).
+- **Evidence-Backed Fact-Checking and Honesty**: Verify commands, config keys, defaults, routes, errors, and limits against real code, tests, or live execution before asserting them; explicitly mark unverified claims as untested with the condition required to verify them.
+- **English Headings + User-Preferred Body Language**: Keep Markdown headings (unnumbered, e.g., `## Module Architecture`) and header field names English across all docs so tooling and cross-project reads stay consistent; write body prose and field explanations in the user's preferred language. Use relative links only; put binding parents/siblings in the header and reference-only links in `## Reference Documents` with zero duplication.
 
-- **No chapter numbering**: headings use Markdown heading levels only. No `## 1.` prefixes.
-- **Relative links only**: all document links are relative to the repository root or the document's directory. Absolute paths are forbidden (docs are committed to git and shared).
-- **Header = mandatory, end = reference**: header links carry only the documents this document must follow (parent, siblings). The end section carries reference-only material. A document is never listed twice — an entry in both zones makes the obligation unreadable.
-- **Main document lists sub-documents**: a suffix-free main document header enumerates its `DESIGN-<topic>.md` / `PRD-<topic>.md` sub-documents; each sub-document header points back via `Parent: ./DESIGN.md`. Bidirectional index must match actual files.
-- **Document-set consistency**: updating one document is never isolated. Review the whole set (PRD, DESIGN main/sub, Phase, AGENTS.md) and align every document affected by the change. Report the affected set in the completion response.
-- **Target-state writing**: documents describe the target state only — what the system is, what exists, who owns it. Process-state descriptions are forbidden: no "deprecated", "legacy", "moved from X", "old path", or "migration" notes. When a capability is owned elsewhere, state the ownership, not the move.
-- **Gap detail has one home**: gap detail lives in the project `GAPS.md`. A Phase document lists the gaps its scope closes by identifier, title, priority, and design pointer — it never restates Current / Target / Exit.
-- **A gap is a design statement, an issue is a code defect**: a gap records an unimplemented design contract, a design change the code has not followed, or an experimental design area awaiting convergence. A satisfied contract with a bug is an issue, not a gap. Every gap belongs to exactly one project — work spanning projects is split so each half is closable on its own. Method: `references/gaps.md` (What Counts as a Gap).
-- **A Phase document carries no capability-roadmap trace**: the Goal states the capability the phase delivers, in product language. Where each capability dimension stands is answered by the Capability Roadmap in the product DESIGN. A trace duplicated into the phase document costs maintenance and drifts from the map it copies.
-- **Gaps are found by bounded enumeration**: when a design has been reworked, anchor the search on the pivot commit's design diff and verify each change theme against the implementation with `file:line` evidence. Reconcile findings against existing gaps' full `Exit` lists before minting a new identifier. Method: `references/gaps.md` (Gap Discovery).
-- **Writing style**: natural language that reads like a human wrote it; one idea per sentence; affirmative over negative; ownership over exclusion. State what a component does and owns rather than listing what it does not do.
+## Naming and Splitting Rules
 
-## Language
-
-The skill's own references and templates are written in English, and section headings stay English in the produced documents. Two reasons: the quality-gate script matches headings literally, and a stable heading set keeps documents comparable across projects and languages.
-
-Document body text follows the user's preferred language. When the user writes Chinese, the body is Chinese; when English, English.
-
-Header **field names** stay English so the quality-gate script can parse them. Header **field values** follow the document language, so a reader gets a natural explanation rather than a bilingual mix:
-
-```
-> **Design Source**: `./DESIGN.md`（差距对照的设计真相源）
-> **Companion**: 追踪本项目的目标态差距，逐项解决后关闭。
-```
-
-This split means a document's structure is language-independent — a reader or a script finds the same headings and fields everywhere — while its content reads naturally to its audience. Headings stay English for the same reason as field names: the gate script matches them literally, and a stable heading set keeps documents comparable across projects.
-
-## Naming Conventions
-
-- Main PRD: `PRD.md` (no suffix). Main DESIGN: `DESIGN.md` (no suffix).
-- Sub-documents: `PRD-<topic>.md`, `DESIGN-<topic>.md` (kebab-case), same directory as main. No suffix = main, suffixed = sub.
-- Split threshold: roughly 500 lines per main document, or 150 lines per chapter.
-- A supporting document is classified by content, not by its current name. One that carries a main DESIGN concern is a sub-design and is renamed to match; one that is a cross-cutting truth source stays a companion. See `references/consistency.md` (Companion Documents vs Sub-DESIGNs) for the criteria.
-- See `references/consistency.md` and the design reference for the full splitting rules.
+- Main documents have no suffix: `PRD.md`, `DESIGN.md`. Sub-documents use `PRD-<topic>.md` and `DESIGN-<module>.md` (kebab-case, same directory as main).
+- Split by **independent module or domain ownership**, defaulting to module sub-DESIGNs in multi-module projects to support parallel work; do not mechanically slice tightly coupled contracts into fragmented hops.
+- Cross-cutting truth sources (`BRANDING.md`, `API-CONTRACT.md`) stay companion documents declared in `Companion Documents`, classified by role rather than historical filename.
 
 ## Workflow
 
-1. **Route**: identify the document type from the command or user request; load the matching reference.
-2. **Gather context**: read the existing target document, its parent/sibling documents, and the actual code (for updates). Never invent facts.
-3. **Decide, don't ask**: resolve every question the rules or the repository can answer by reading. `references/consistency.md` defines which document carries which kind of fact; the code is the evidence for concrete facts. Discuss with the user only what genuinely requires their decision — a product intent that is not settled, a scope call, or a direction change. Present that decision, not a survey of the options you could have resolved yourself.
-4. **Write**: produce the document from the template, applying the universal rules.
-5. **Verify**: run the quality checklist in the reference, then run the **mandatory quality gate**: `scripts/verify-docset.py <docs-dir> --main DESIGN.md`. The script scans the actual filesystem for sub-design enumeration, parent links, absolute paths, broken links, end-section duplication, process-state vocabulary, and missing dates. It must exit 0 before the update is reported complete. Check document-set consistency and the bidirectional index.
-6. **Report**: file path, change summary, quality-gate result (PASS/FAIL), and the whole affected document set (checked / aligned / needs follow-up).
-
-## Document-Set Consistency (always)
-
-Updating a PRD affects DESIGN and Phase. Updating a main DESIGN affects sub-DESIGNs. Updating a Phase affects PRD and DESIGNs. The completion response must state which related documents were checked, aligned, or still need a follow-up update.
+1. **Route**: Identify the document type and load `references/consistency.md` plus the matching guide.
+2. **Gather & Verify Facts**: Read the target doc, related docs, and **actual source code/tests**; run relevant commands or tests to verify observable claims; ask the user only for genuine product decisions, never for facts readable from the repo.
+3. **Author or Synchronize**: Follow the template and dual-scenario sync rules (update in the same delivery as Proposals/features, or update only the affected `DESIGN-<module>.md` on visible bug fixes; skip DESIGN edits on pure internal refactoring; respect parallel write-set boundaries).
+4. **Semantic Review & Mechanical Gate**:
+   - Run the **Unified Semantic Review Checklist** and **Four-Stage Quality Inspection Loop** in `references/design-project-guide.md` (clarity and the **Slop Checklist** apply to every doc; **"already shipped and code-verified"** constrains only **Project and Module Present-State DESIGNs**, leaving Product PRDs and Product DESIGNs free to plan ahead of implementation);
+   - Run the deterministic script `python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md` (add `--check-sync [--base <git-ref>]` during code+doc delivery to verify orphan sub-DESIGNs, template placeholders, mandatory boundaries, and `Source Carrier` code-to-DESIGN sync; exit 0 required before reporting done).
+5. **Report**: List modified paths, change summary, verified facts vs explicitly marked untested items, gate results (`PASS`/`FAIL`), affected document-set checks, and any out-of-scope drift notices for the coordinator.

@@ -1,86 +1,62 @@
 ---
 name: dev-doc-master
 description: |
-  编写与维护产品文档集——PRD、DESIGN（主文档与子文档）、阶段/Roadmap、BUSINESS_RULES、GAPS——并保持文档集与仓库实际一致。
+  编写与审查产品文档集——产品 PRD、产品 DESIGN，以及项目/模块现状 DESIGN（DESIGN.md、DESIGN-<module>.md）。
 
-  使用场景：用户要求创建、更新、拆分或对齐其中任何文档，或需要检查文档集一致性（头部链接 vs 末尾引用、子文档双向索引、跨文档对齐），例如"写方案文档"、"更新设计文档"、"拆分设计文档"、"创建阶段文档"、"业务规则"、"差距文档"，或任何 /cupdate-* 命令。
+  使用场景：用户要求编写、更新、按模块拆分或一致性校验 PRD、产品 DESIGN、项目/模块现状 DESIGN，依据真实代码同步项目 DESIGN，或执行 /cupdate-prd、/cupdate-design 时。
 
-  不适用：编写开发 Plan（用 dev-flow）、审查实施代码（用 df-implement-review）、创建或更新项目 README（用 space-master）。
+  不适用：/cupdate-agent-rules、/cupdate-readme 或 AGENTS.md/项目 README 治理（用 space-master）、编写开发 Plan 或 Task 编排（用 dev-flow）、编码实施（用 df-implement）、或独立方案/代码评审（用 df-proposal-review / df-implement-review）。
 ---
 
 # dev-doc-master — 开发文档规范与维护
 
-产品文档集的编写与维护工作流：PRD、DESIGN（主 + 子）、阶段/Roadmap、BUSINESS_RULES。本技能拥有规则与模板；`/cupdate-*` 命令是薄入口，全部路由到这里。项目 README 编制归 space-master 技能。
+面向多项目空间的跨项目文档规范与写作底座，覆盖产品 PRD、产品 DESIGN，以及项目/子模块**现状 DESIGN**（主 `DESIGN.md` + `DESIGN-<module>.md`）。`/cupdate-prd` 与 `/cupdate-design` 为薄入口，均路由至此技能；`AGENTS.md` 与项目 `README.md` 编制归 `space-master`。
 
 ## 使用时机
 
-- 创建或更新产品 PRD、产品 DESIGN、项目 DESIGN、阶段文档、roadmap 或项目 BUSINESS_RULES。
-- 把过大的主文档按主题拆分为子文档。
-- 变更后对齐文档集（PRD ↔ DESIGN ↔ Phase ↔ BUSINESS_RULES ↔ AGENTS.md）。
-- 记录或更新设计目标态与实现之间的项目差距（`GAPS.md`）。
+- 创建或更新产品 PRD、产品 DESIGN。
+- 编写、同步或按模块拆分项目与子模块现状 DESIGN（将已落地系统行为、生效业务规则与失败边界写给读者）。
+- 对现有文档集执行语义审查（新人可读性、实测取证、Slop Checklist）与结构一致性检查。
+
+> 未实施的需求演进、架构提案、替代方案对比与批准状态归 **Proposal**（`proposals/{proposed,implemented,rejected,archived}/{class}/yyyy-mm-dd-<slug>.md`），不预写进项目现状 DESIGN。
 
 ## 文档集与路由
 
 | 文档 | 命令 | 参考 | 模板 |
 |---|---|---|---|
 | 产品 PRD | `/cupdate-prd` | `references/prd.md` | `templates/prd.md` |
-| 产品 / 项目 DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` / `templates/design-project.md` |
-| 子 DESIGN | （经由 `/cupdate-design`） | `references/design.md` | `templates/design-sub.md` |
-| 阶段 | `/cupdate-roadmap` | `references/phase.md` | `templates/phase.md` |
-| 项目 GAPS | （无命令） | `references/gaps.md` | `templates/gaps.md` |
-| 项目 BUSINESS_RULES | `/cupdate-br` | `references/business-rules.md` | `templates/business-rules.md` |
-| AGENTS.md | `/cupdate-agent-rules` | space-master 技能 | space-master 技能模板 |
+| 产品 DESIGN | `/cupdate-design` | `references/design.md` | `templates/design-product.md` |
+| 项目主现状 DESIGN | `/cupdate-design` | `references/design.md`、`references/design-project-guide.md` | `templates/design-project.md` |
+| 模块/子现状 DESIGN | （经由 `/cupdate-design`） | `references/design.md`、`references/design-project-guide.md` | `templates/design-sub.md` |
+| AGENTS.md / README | `/cupdate-agent-rules` / `/cupdate-readme` | `space-master` 技能 | `space-master` 模板 |
 
-写文档前先加载对应的参考文件。所有参考共享 `references/consistency.md` 中的通用规则——每个会话读一次。
+动笔前先读 `references/consistency.md` 通用规则，并按文档类型加载对应参考；写或更新项目/子模块现状 DESIGN 时务必加载 `references/design-project-guide.md`。
 
-## 通用规则（应用于文档集中每一份文档）
+## 核心规则要点（完整规范见 `references/consistency.md` 与 `references/design-project-guide.md`）
 
-完整正文见 `references/consistency.md`。要点：
+- **现状准确（项目/子 DESIGN）vs 产品意图（PRD/产品 DESIGN）**：项目与子模块 DESIGN 只陈述**已落地、经核实存在且真实运行**的行为、约束与生效业务规则，不预写未交付蓝图或进度表；产品 PRD 与产品 DESIGN 保留原有架构与能力路线规范。两者均禁止过程态迁移碎语（`deprecated`/`legacy`/`moved from`/`已废弃`/`历史机制`）。
+- **防多 Agent 并行冲突结构**：
+  1. 主 `DESIGN.md` 压薄为项目定位、核心流转与模块地图，模块内部细节不堆在主文档；
+  2. 多模块或有独立职责域的项目**默认按模块拆出 `DESIGN-<module>.md`**（不等到 500 行才拆）；紧耦合单模块小项目保留单份 `DESIGN.md`；
+  3. **全面取消主文档头部 `Sub-DESIGNs` 强枚举**（无论产品 DESIGN 还是项目主 DESIGN，均靠文件名 `DESIGN-*.md` 与子文档头部 `Parent: ./DESIGN.md` 识别，主文档在正文对应章节/地图链接），消除并发碰撞；
+  4. 日常单模块开发与修 Bug 不改主 `DESIGN.md`；多 Agent 并行期只改授权写集内所属子文档，发现主文档或他人模块漂移**只上报主控，严禁越界修改共享文档**。
+- **不手抄易变代码清单**：严禁手抄完整源码文件树、全量 CLI 参数表或 API 字段清单；按通用“固定首尾锚点 + 1..N 个领域自由分节”写出满足五项必填覆盖要素的完整行为契约（行为主体/触发、时序、必须/可能/禁止、状态副作用、完整失败后果与恢复），并在主地图标注 `Source Carrier` 源码路径前缀。
+- **业务规则与关键决策归属**：项目不再新建独立 `BUSINESS_RULES.md`（存量仅作只读参考）；生效业务规则与失败边界直接写入 `## Business Rules and Failure Boundaries`（项目主/生效模块子文档强制要求）；`## Key Decisions` 仅保留已落地结论摘要及指向对应 `proposals/implemented/<class>/...`（或引用历史快照时 `proposals/archived/<class>/...`）的链接。
+- **实测取证与诚实边界**：记录的命令、配置、默认值、路由、错误码与限制必须由实际代码、测试或亲手运行结果核实；无法实测之处必须**显式标注未实测及验证条件**，绝不伪造已通过结论。
+- **英文标题 + 用户偏好语言正文**：所有章节标题（无数字编号，如 `## Module Architecture`）与头部字段名保持英文以便脚本解析与跨项目对比；正文及头部字段值解释跟随用户偏好语言。只使用相对链接，头部放必须遵循的依赖、末尾 `## Reference Documents` 放仅参考材料，互不重复。
 
-- **不编号章节**：标题只用 Markdown 标题层级，不加 `## 1.` 前缀。
-- **只用相对链接**：所有文档链接相对于仓库根或文档所在目录。禁止绝对路径（文档提交进 git 并共享）。
-- **头部 = 必须，末尾 = 参考**：头部链接只放本文档必须遵循的文档（父文档、兄弟文档）。末尾章节放仅参考的材料。一份文档绝不出现两次——同时出现在两个区域会让义务无法解读。
-- **主文档罗列子文档**：无后缀主文档头部枚举其全部 `DESIGN-<topic>.md` / `PRD-<topic>.md` 子文档；每个子文档头部通过 `Parent: ./DESIGN.md` 指回。双向索引必须与实际文件一致。
-- **文档集一致性**：更新一份文档绝不是孤立的。审查整个文档集（PRD、DESIGN 主/子、Phase、AGENTS.md），对齐每个受影响的文档。完成回复中报告受影响的文档集。
-- **目标态写作**：文档只描述目标态——系统是什么、存在什么、谁拥有它。禁止过程态描述：不写 "deprecated"、"legacy"、"moved from X"、"old path"、"migration" 之类的说明。能力归他处所有时，陈述归属，而非迁移。
-- **差距明细只有一个家**：差距明细存在于项目 `GAPS.md`。阶段文档只按标识、标题、优先级、设计指针列出其范围关闭的差距——绝不复述 Current / Target / Exit。
-- **差距是设计陈述，Issue 是代码缺陷**：差距记录未实现的设计契约、代码未跟随的设计变更、或等待收敛的实验性设计领域。契约已满足但存在 bug 是 Issue，不是差距。每个差距恰好属于一个项目——跨项目工作被拆分，使每一半都能独立关闭。方法见 `references/gaps.md`（What Counts as a Gap）。
-- **阶段文档不携带能力路线追踪**：Goal 用产品语言陈述阶段交付的能力。每个能力维度站在哪里由产品 DESIGN 中的 Capability Roadmap 回答。复制到阶段文档的追踪需要维护成本，并会偏离它所复制的图。
-- **差距通过有界枚举发现**：设计被重做时，以转折提交的设计 diff 为锚点搜索，并用 `file:line` 证据逐项对照实现验证每个变更主题。在铸造新标识前，对照既有差距的完整 `Exit` 清单核对发现。方法见 `references/gaps.md`（Gap Discovery）。
-- **写作风格**：读起来像人写的自然语言；一句只表达一个想法；肯定优于否定；归属优于排除。陈述组件做什么、拥有什么，而不是罗列它不做什么。
+## 命名与拆分准则
 
-## 语言
-
-技能自身的参考与模板用英文书写，产出文档的章节标题保持英文。两个原因：质量门脚本按字面匹配标题，且稳定的标题集使文档跨项目、跨语言可比。
-
-文档正文跟随用户偏好语言。用户写中文时正文是中文；写英文时正文是英文。
-
-头部**字段名**保持英文以便质量门脚本解析。头部**字段值**跟随文档语言，读者得到自然的说明而非中英混杂：
-
-```
-> **Design Source**: `./DESIGN.md`（差距对照的设计真相源）
-> **Companion**: 追踪本项目的目标态差距，逐项解决后关闭。
-```
-
-这个拆分意味着文档结构是语言无关的——读者或脚本到处都能找到相同的标题与字段——而内容对受众自然可读。标题保持英文的原因与字段名相同：门禁脚本按字面匹配它们，且稳定的标题集让文档跨项目可比。
-
-## 命名约定
-
-- 主 PRD：`PRD.md`（无后缀）。主 DESIGN：`DESIGN.md`（无后缀）。
-- 子文档：`PRD-<topic>.md`、`DESIGN-<topic>.md`（kebab-case），与主文档同目录。无后缀 = 主，带后缀 = 子。
-- 拆分阈值：主文档约 500 行，或单个章节约 150 行。
-- 支持性文档按内容分类，而非按当前文件名。承载主 DESIGN 关注点的就是子设计，需重命名以匹配；跨切面真相源保持伴随文档。判据见 `references/consistency.md`（Companion Documents vs Sub-DESIGNs）。
-- 完整拆分规则见 `references/consistency.md` 与 design 参考。
+- 主文档无后缀：`PRD.md`、`DESIGN.md`；子文档：`PRD-<topic>.md`、`DESIGN-<module>.md`（kebab-case，与主文档同目录）。
+- 拆分以**独立模块或独立职责所有权**为准，多模块项目默认拆分以支持并发分工；单模块紧耦合规则保持在同一文档内，不为了凑字数机械切碎。
+- 跨切面参考真相源（如 `BRANDING.md`、`API-CONTRACT.md`）作为伴随文档在主文档头部 `Companion Documents` 声明，按内容而非按原文件名区分归属。
 
 ## 工作流
 
-1. **路由**：从命令或用户请求识别文档类型；加载匹配的参考。
-2. **收集上下文**：阅读既有目标文档、其父/兄弟文档，以及实际代码（更新时）。绝不编造事实。
-3. **决策，而非反问**：凡规则或仓库能回答的问题，通过阅读解决。`references/consistency.md` 定义哪类事实由哪份文档承载；代码是具体事实的证据。只与用户讨论真正需要其决策的事——未定案的产品意图、边界取舍、方向变更。给出决策，而非你本可以自己解决的一串选项。
-4. **写作**：按模板产出文档，应用通用规则。
-5. **验证**：运行参考中的质量清单，然后运行**强制质量门**：`scripts/verify-docset.py <docs-dir> --main DESIGN.md`。脚本在真实文件系统上扫描子设计枚举、父链接、绝对路径、坏链、末尾章节重复、过程态词汇、缺失日期。在把更新报告为完成前必须 exit 0。检查文档集一致性与双向索引。
-6. **报告**：文件路径、变更摘要、质量门结果（PASS/FAIL）、整个受影响文档集（已检查 / 已对齐 / 需跟进）。
-
-## 文档集一致性（始终）
-
-更新 PRD 影响 DESIGN 与 Phase。更新主 DESIGN 影响子 DESIGN。更新 Phase 影响 PRD 与 DESIGN。完成回复必须说明哪些关联文档被检查、被对齐、或仍需跟进更新。
+1. **路由判断**：识别文档类型（PRD / 产品 DESIGN / 项目主现状 DESIGN / 模块子现状 DESIGN），加载 `references/consistency.md` 及对应指南。
+2. **采集并核实事实**：阅读现有目标文档、上下游关联文档与**真实代码/测试**；对关键命令与行为做实际验证取证；只把需要产品拍板的模糊点交用户决策，可从代码读出的问题不反问。
+3. **撰写或同步更新**：按对应模板与规则编写，遵守双场景同步纪律（随 Proposal 落地同批同步，或无 Proposal 修对外可见缺陷时同步所属模块子文档；纯内部重构不动文档；并行期严禁越界修改写集外文档）。
+4. **语义审查与机械门禁**：
+   - 运行 `references/design-project-guide.md` 的**统一语义审查清单**与**四道质量把控闭环**（其中文风清晰与 **Slop Checklist** 适用于全部文档；**“已交付并经代码/运行实测核实”仅约束项目与模块现状 DESIGN**，不限制产品 PRD 与产品 DESIGN 提前规划目标架构）；
+   - 运行确定性检查门禁：`python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md`（代码与文档联动交付时加 `--check-sync [--base <git-ref>]` 检查孤立子文档、模板占位符、必填边界与 `Source Carrier` 代码同步，无脚本环境时按规则逐项检查），必须 exit 0 后才可声明完成。
+5. **汇报结果**：输出变动文件路径、变更摘要、真实核实与未实测项、门禁结果（PASS/FAIL）、关联文档集检查情况，以及若存在的写集外文档漂移上报。
