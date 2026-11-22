@@ -106,10 +106,22 @@ def _iter_lines_with_fence_state(text):
         yield idx, line, (fence_char is not None)
 
 
-def _split_non_ref_text(text):
-    """Return text before ## Reference Documents / ## 参考文档 (ignoring fenced blocks)."""
+def _split_non_ref_text(text, *, skip_header=False):
+    """Return text before ## Reference Documents / ## 参考文档 (ignoring fenced blocks).
+
+    `skip_header=True` drops everything before the first level-2 heading. Header
+    fields bind documents through lineage (`Parent`, `Parent Architecture`) and
+    must never satisfy the body-reachability rule: a sub-document that is only
+    named in the main header is an orphan, and counting the header as body would
+    hide exactly that defect.
+    """
     kept = []
+    seen_h2 = False
     for _, line, in_fence in _iter_lines_with_fence_state(text):
+        if not in_fence and _H2_RE.match(line):
+            seen_h2 = True
+        if skip_header and not (seen_h2 or in_fence):
+            continue
         if not in_fence and line.strip() in ("## Reference Documents", "## 参考文档"):
             break
         kept.append(line)
@@ -261,12 +273,18 @@ def check_end_section(doc_dir, main_name, sub_files, report):
 
 
 def check_sub_body_reachability(doc_dir, main_name, sub_files, report):
-    """Every sub-document on disk must be linked from the main document outside Reference Documents."""
+    """Every sub-document on disk must be linked from the main document body.
+
+    The body is the text between the first level-2 heading and `## Reference
+    Documents`. The header is excluded on purpose: header fields carry lineage
+    only, so a sub-document named solely in the header is an orphan even though
+    its name appears in the file.
+    """
     main_path = Path(doc_dir) / main_name
     if not main_path.exists() or not sub_files:
         return
 
-    non_ref = _split_non_ref_text(main_path.read_text(encoding="utf-8"))
+    non_ref = _split_non_ref_text(main_path.read_text(encoding="utf-8"), skip_header=True)
     md_link_re = re.compile(r"\]\(([^)#\s]+?)(?:#[^)]*)?\)")
     referenced = set()
     for _, line, in_fence in _iter_lines_with_fence_state(non_ref):

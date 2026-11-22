@@ -14,12 +14,12 @@
 
 ## Scope Assessment
 
-- **Complexity**: High — 同一复杂 `dev-flow` 技能需要同时改造 Plan/Task 拆分 SOP、Graph 规则和实际 CLI 来源/授权/兼容逻辑；涉及大量脚本和回归测试，必须在一份提案内按行为拆成可独立验证的 Task。
-- **Confidence**: High（旧 Plan/Graph 合同、CLI、模板和测试现状已核对）；Medium（历史无来源 Plan 的可信识别、direct 路由与多 Plan 一致性需实施阶段实际验证）。
+- **Complexity**: High — 同一复杂 `dev-flow` 技能需要同时完成可选规划 SOP、防共享 Delivery 死锁的 Graph 规则、Proposal 来源授权、消除重复设计审批与逐 Plan 重复验收的 CLI 精简，以及旧 Phase 前置清理与全量回归测试；拆为 7 个高内聚、可独立验证的 Task 在一轮内收口。
+- **Confidence**: High — 已实查 `workflow.py`、`validation.py`、`submit.py`、`approve.py`、`complete.py`、`verify.py`、`integrate.py`、`active-plan-graph.md` 与 `templates/plan.md` 的真实实现和调用链。
 
 ## Goal
 
-在**同一份子提案**中完整改造 `dev-flow`：明确 `dev-flow` 作为站在 Proposal/Issue 与实施之间的**可选编排层**（简单有界任务直接实施、复杂任务才启用 Plan），确立如何从 Issue/获批 Proposal 合理拆分 Plan 和 Task、如何委派并行（含代码与分片 `DESIGN-*.md` 的并行写集防冲突检查）及建立 Plan Graph；并将这些规则落实到来源授权、direct/多 Plan、创建/审批/交付 CLI 与历史兼容，同时将 `.wopal/rules/coding-workflow.md` 收口为完整目标态。**新 SOP 与真实命令机制一次性验收，不再单独创建拆分 SOP 提案**；保留现有 Plan 状态机，后续再考虑状态和重复审批精简。
+在**同一份子提案**中将 `dev-flow` 精准收口为位于 Proposal/Issue 与实施之间的**可选实施规划与任务组织层**：**保留并做强详细 Plan/Task 编写与 Git 工作树安全底座，彻底砍掉与 Proposal 重复的二次设计审批和逐 Plan 重复验收流程（不另造新状态机）**，根除共享 Delivery 与 Graph 依赖死锁，落地不强绑 GitHub Issue 的 Proposal 来源授权门禁并同轮移除旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置，核对 `.wopal/rules/coding-workflow.md` 最终目标态，并同交付收口本体现状设计文档 `.wopal/docs/DESIGN-coding-workflow.md` 与 `.wopal/docs/DESIGN-capabilities.md`。
 
 ## Technical Context
 
@@ -28,30 +28,41 @@
 产品总提案：`docs/products/wopal-space/proposals/development-governance-proposal.md`，本文件是实施子提案 **4**，也是本轮唯一对 `dev-flow` 复杂脚本进行修改的提案。
 
 前置成果：
-- `enhance-doc-contracts`：已交付瘦身后的文档能力底座 `dev-doc-master`（现状 DESIGN、薄主地图 + 按模块分片、去掉主文档头部 `Sub-DESIGNs` 强枚举、实测取证与 Slop Checklist）、`space-master` 维护 SOP 及 `.wopal/rules/coding-workflow.md` 初版；本提案不得恢复目标态 DESIGN/Phase/GAPS 的新流程前置。
-- `enhance-dev-proposal`：业务 Proposal/Delivery 的决定和授权边界、`df-proposal-review` 的实施前方案审查，以及 `coding-workflow.md` 第二阶段更新。
-- `enhance-implement-sync`：`df-implement` 按需调用 `dev-doc-master`/`space-master` 完成代码、测试与所属模块现状 DESIGN 同步（含并行不越界纪律）、`df-implement-review` 的独立实施审查，以及 `coding-workflow.md` 第三阶段更新。
-- 产品总提案对 PRD/Proposal/可选 `dev-flow`/DESIGN 的职责定义是设计依据，前置子提案已落实文档、提案与实施同步合同；本提案收口 `dev-flow` 并完成 `.wopal/rules/coding-workflow.md` 的最终目标态。
+- 子提案 1（已归档：`.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`）：已交付文档底座 `dev-doc-master`（现状 DESIGN、薄主地图 + 按模块分片、去掉所有主文档头部 `Sub-DESIGNs` 强枚举、实测取证、`verify-docset.py` 12 项门禁含 `--check-sync`）、`space-master` 三级 `AGENTS.md` SOP 及最终目标态的 `.wopal/rules/coding-workflow.md`（及中文审核版）。
+- 子提案 2（`.wopal/docs/evolutions/enhance-dev-proposal.md`）：交付业务 Proposal 技能 `dev-proposal`（含完整状态机、用户显式选择 `Delivery: direct | plan`、已实施提案再变更分流）、轻量静态校验器 `verify-proposals.py`、`df-proposal-review`（含实施方案质检不触发二次设计审批规则），以及本体现状子设计初版 `.wopal/docs/DESIGN-coding-workflow.md`。
+- 子提案 3（`.wopal/docs/evolutions/enhance-implement-sync.md`）：交付独立于 Plan 状态机的 `df-implement`（按需调底座、覆盖整次交付基线 `--base` 的 `verify-docset.py --check-sync` 与 `verify-proposals.py`、并行写集防越界与必填 `DESIGN Sync` 块）及 `df-implement-review`（完整基线对抗式审查与影响分级严重度）。
 
-现行 `dev-flow/SKILL.md`、`references/plan-guide.md` 和 `templates/plan.md` 定义 Plan/Task/委派及目标态 DESIGN/Phase 前置；`references/active-plan-graph.md` 定义跨 Plan nodes、edges、groups。CLI 从 `scripts/flow.sh` 进入 `flow.py`，实际命令在 `scripts/commands/`，状态机位于 `scripts/workflow.py`，校验入口位于 `scripts/validation.py` 等。现有流程为 planning → reviewing → executing → verifying → done，归档另有命令；`approve --confirm` 同时承担用户确认及 Git 工作树初始化；这些底层状态和交付行为本轮保留。
+**真实代码现状与去重依据**：
+- 现有 `dev-flow/scripts/workflow.py:30-47` 定义 `planning → reviewing → executing → verifying → done`，其中 `VALID_TRANSITIONS`（第 44 行）已原生支持 `(STATUS_PLANNING, STATUS_EXECUTING)` 直通边。
+- 现有 `dev-flow` 在“无 Proposal 时代”兼任了设计审批（`submit` + `approve --confirm`）与逐 Plan 验收（`verify --confirm`）；引入业务 Proposal 后，设计决定、授权范围与最终完成状态已唯一归属 Proposal，若继续保留二次设计审批与逐 Plan 重复验收，一份 Proposal 拆 3 个 Plan 会触发多轮无意义重复审批和重复验收。
+- 现有 `dev-flow/SKILL.md:143,155-171,256` 与 `scripts/commands/integrate.py:140-268` 已具备**共享 Delivery**（`Delivery: <owner-plan>` + `--existing-worktree` + 统一 `integrate`）底座，且 `_validate_delivery_contract`（`integrate.py:258-259`）要求共享 Delivery 的全部成员处于 `verifying` 才能一起集成；同时 `references/active-plan-graph.md:62` 要求 Graph `edge from → to` 的上游先到 `done` 才能启动下游——**如果同一共享 Delivery 内给两个 Plan 画 `edge`，必然发生死锁**。
+- 现有 `templates/plan.md:7-11` 与 `scripts/validation.py:93-110`（`check_product_phase`）仍强制检查成对的 `Product`/`Phase` 字段且无 `Source` 字段，需要在本轮为新来源链路移除旧前置，同时保留进行中旧 Plan 的最低必要兼容。
 
 ### Research Findings
 
-- **Plan 拆分边界**：单个 Plan 一个 Target Project、一个可独立验证的结果；同一批准的 Proposal 可以 direct 或拆成 0..N 个 Plan，不按文件数、目录数、Agent 数机械拆分。批准范围要检查完整覆盖、责任重叠及有无无效先后关系。
-- **Task/委派边界**：Task 是有行为结果、输入、前置、必要 Interface/Constraints、可复现 Verify 的实施单元。并行须检查共享写集、稳定接口契约、隔离环境、验证资源、提交所有权及依赖；仅“不改同一文件”不足以判定可并行。
-- **Graph 事实归属**：当前 `.wopal-space/plans/active-graph.json` 由控制 Agent 在 submit/archive 等生命周期点维护，edge from→to 表示前置 Plan 到 done 才能开始后继 Plan；group 仅为共同目标分组，不是依赖或状态真相源。禁止环、自边、重边、缺节点引用和状态复制。
-- **来源与兼容**：旧 CLI 可从 Issue 或无 Issue 的 Active DESIGN 创建 Plan。新 Plan 必有唯一主要 Source（Issue 或 Proposal），获批范围与 Delivery 需真实核验；历史无 Source Plan 仍可续办，绝不能靠用户可伪造的日期字段区别旧新文件。
-- **同轮替换**：本提案必须在 `dev-flow` 自身真正删除新来源路径对旧 Phase/GAPS/目标态 DESIGN 的错误前置，并建立 Source/approve/Graph 的真实检查。文档生产技能的旧命令属于 `dev-doc-master`，由其对应提案自己一次性替换。
-- **质量与未来方向**：SOP 正反例、CLI 成功/拒绝/失败无副作用测试及三种 worktree 模式均应实际验证；不另建 Scheduler、任务数据库或重复的 Plan Graph 状态。
-- **DSH 的适用边界**：DSH 的文档层级、单一事实归属和审查事实依据可借鉴；Plan Graph、Agent 并行和本空间审批/Git 门禁为 WopalSpace 自主设计，不能声称是 DSH 的既有能力。
+- **各类事实的唯一归属（零职责重叠）**：
+  - 设计决定、授权范围、`Delivery: direct | plan` 选择与设计全部实现的最终状态 → **Proposal**（无 Proposal 时为明确授权的 **Issue**）；
+  - 可选详细 Plan/Task 编排、内部 Task 进度、跨 Delivery 依赖、Git 工作树与共享 Delivery 安全操作 → **可选 `dev-flow`**；
+  - 代码、测试、现状 DESIGN/Proposal/AGENTS 同步与完整基线机械门禁 → **`df-implement`**（按需调底座）；
+  - 独立实施评审 → **`df-implement-review`**；
+  - 用户验证与正式 Git 集成 → **按 Delivery 统一验证一次并一次性放行集成**。
+- **是否启用 Plan 由用户显式决定**：模型强弱是主观且快速变化的判断，技能中**绝不编写让 Agent 主观判定模型强弱的规则**；用户在批准 Proposal（`Delivery: direct | plan`）或派发 Issue 时显式选择是否走 Plan（Agent 仅基于跨项目、多任务并行隔离等客观事实提供简短建议）。
+- **规划能力不削弱，流程管理做减法**：完整保留 `Behavior`、`Pre-read`、`Interface`、`Constraints`、`Verify`、`Done` 等详细 Plan/Task 编写能力（按任务需要填写详细程度，不抄 Proposal 设计长文，也不强行精简执行所需细节）；砍掉与 Proposal 重复的二次设计审批、逐 Plan 重复验收与旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置，**不另造第三套新状态机**，复用既有 Git 工作树创建、回滚、脏树拦截、共享 Delivery 统一 `integrate` 与安全 `archive` 清理能力。
+- **共享 Delivery 防死锁铁律**：同一 Git 仓库同一 Proposal 中存在先后顺序的工作，归入**同一个 Plan 中的顺序 Task**；彼此独立的多个 Plan 共享 1 个工作树和共享 `Delivery`，按 Delivery 统一验证一次并一次性 `integrate` 主分支，**严禁在同一共享 Delivery 成员之间画 Graph `edge`**；只有**跨不同 Delivery（如跨仓库或独立分批合入主分支）的真实先后依赖**才画 Graph `edge`。不同 Git 仓库不声称具备单次 Git 原子提交能力。
+- **轻量历史兼容与未来通用性**：只对当前活跃目录中**进行中的旧 Plan** 保留最低必要续办兼容（兼容已有 `Product`/`Phase` 与 `Design Source`），已完成历史 Plan 不强制迁移，**不建设永久 Source 追溯、历史索引或复杂身份数据库**。新 Proposal 来源不强绑 GitHub Issue 或标准项目路径布局，为将来统一 `ontology-evolution` 留出干净通用接口（本轮不修改 `ontology-evolution` 状态机及其稀疏 Git 逻辑）。
 
 **References**:
-- `.wopal/skills/dev-flow/{SKILL.md,SKILL.zh-CN.md,AGENTS.md,templates/plan.md}`
+- `.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`
+- `.wopal/docs/evolutions/{enhance-dev-proposal.md,enhance-implement-sync.md}`
+- `.wopal/docs/{DESIGN.md,DESIGN-capabilities.md,DESIGN-coding-workflow.md}`（`DESIGN-coding-workflow.md` 由子提案 2 落地后存在）
+- `.wopal/skills/dev-flow/{SKILL.md,SKILL.zh-CN.md,AGENTS.md,AGENTS.zh-CN.md,templates/plan.md}`
 - `.wopal/skills/dev-flow/references/{plan-guide.md,plan-guide.zh-CN.md,active-plan-graph.md,active-plan-graph.zh-CN.md,commands.md,issue-guide.md}`
 - `.wopal/skills/dev-flow/scripts/{flow.sh,flow.py,workflow.py,validation.py,plan.py}`
 - `.wopal/skills/dev-flow/scripts/commands/{plan.py,submit.py,approve.py,complete.py,verify.py,integrate.py,archive.py}`
 - `.wopal/skills/dev-flow/tests/python/`
-- `.wopal/docs/evolutions/{enhance-doc-contracts.md,enhance-dev-proposal.md,enhance-implement-sync.md}`
+- `.wopal/skills/dev-doc-master/{SKILL.md,references/design-project-guide.md,scripts/verify-docset.py}`
+- `.wopal/rules/{coding-workflow.md,testing.md}`
+- `docs/products/wopal-space/proposals/development-governance-proposal.md`
 - `docs/products/wopal-space/proposals/plan-orchestration-scheduler-proposal.md`（远期方向，不作为当前授权）
 - `labs/ref-repos/deepseek-harness/docs/AGENTS.md`
 - `labs/ref-repos/deepseek-harness/.agents/skills/dsh-doc-writing/references/structure-hierarchy.md`
@@ -59,120 +70,122 @@
 
 ### Key Decisions
 
-- D-01：`dev-flow` 与 Plan 是**位于 Proposal/Issue 与实施之间的可选编排层**。低风险、有界且可直接验收的已批准 Proposal 或明确 Issue 走 direct 直达 `df-implement`；跨项目、多个独立交付、复杂迁移、依赖较多或需要委派并行时才启用 `dev-flow` 拆 Plan，不因有 Proposal 就机械要求 Plan。
-- D-02：新 Plan 只有一个主要 Source：Issue #N 或 Proposal PATH（规范路径为 `docs/products/<product>/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 或 `projects/<project>/docs/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`，实施期间稳定停留 `proposed/<class>/` 防断链，兼容存量前格式路径；`archived/` / `rejected/` 提案严禁作为新 Plan 来源）；关联 Issue 只是追踪，DESIGN/PRD/无来源文本都不能成为新增 Plan 的实施授权。
-- D-03：重要设计改变须先审查获批 Proposal，既有决定内的缺陷或明确工作走 Issue；Plan 不能扩大批准范围，冲突时停止并交用户决策。
-- D-04：Proposal→Plan 的 SOP：确认批准范围→识别独立可验收成果→按 Target Project 划分 Plan→检查覆盖/重复→记录真实跨 Plan 依赖。一个 Plan 只服务一个目标项目。
-- D-05：Plan→Task 的 SOP：行为成果、Pre-read、必要 Interface/Constraints、Verify、Done 证据和依赖必须清楚；既反对按文件机械碎片化，也反对不可独立验证的超大 Task。
-- D-06：Agent 委派按能力、风险与权限匹配；主控保有 Task 复核、证据、提交和 Plan 状态所有权；并行检查的共享写集同时覆盖**代码文件与 `DESIGN-*.md` 文档**：按 `enhance-doc-contracts` 确立的薄主 `DESIGN.md` + 模块子文档分片（无头部 `Sub-DESIGNs` 枚举），并行 Task 各自仅修改所属模块的 `DESIGN-<module>.md`，若确需更新主 `DESIGN.md` 地图则由主控在集成汇总阶段收口，严禁并行分支同时编辑主 `DESIGN.md`；任何契约、写集、依赖、隔离、验证或提交不安全时一律串行。
-- D-07：跨 Plan 依赖只归 Active Graph；Plan 管内部 Task 顺序/委派，Graph 只存节点/边/组，不复制 Plan 状态；groups 不能推导依赖。原 Graph schema 保留。
-- D-08：现有 Plan 状态（planning、reviewing、executing、verifying、done）以及 submit/approve/complete/verify/integrate/archive 与第二次用户批准本轮保留；未来状态机或重复审批精简另行立项。
-- D-09：只有获批 Proposal 且 Delivery 与执行路径相符才允许实施；未批准/被拒/越界不得借 Plan 或 direct 路线绕过授权。
-- D-10：direct 和 Plan 交付都要求真实代码、测试、受影响 DESIGN 同步、独立评审和必要用户验证；部分 Plan done/archive 不自动把整个 Proposal 迁入 `implemented/<class>/` 或标记 `implemented`。
-- D-11：**同一次 dev-flow 改造**同时删除新来源链路错误的旧 DESIGN/Phase/GAPS 前置并接入 Source/批准检查，不能留待文档清理或再做一次 CLI 提案。
-- D-12：Graph 维护须与真实生命周期操作一致，Graph 更新失败或出现不可信状态，应暂停后续执行、调查并修复；不能伪造原命令已回滚。
-- D-13：历史无来源 Plan 保留可续办，新无来源 Plan 必拒绝；身份依赖可信记录/受控基线，不能仅按用户可修改的日期或文本判定，无法可靠判断须停止并上报。
-- D-14：不建设 Scheduler、cron、任务运行队列、重复状态表或额外 Graph；Plan/Task/Graph 规则可为远期自动化复用。
-- D-15：只修改 `dev-flow` 直接关联 Skill、命令、模板、参考和测试；文档技能的 Phase/GAPS/BR 生产端由 `enhance-doc-contracts` 负责，不得将本技能自己的旧校验清理推给后续。
-- D-16：本子提案一次审批、八个可验证 Task、一次最终交付；先研究并建立拆分/并行/Graph 的准确标准，再将其落实到 CLI/安全兼容测试。
-- D-17：本次重构必须同步精炼 `dev-flow/SKILL.md` 的 `description`，明确 **`dev-flow` 作为可选编排层负责 Issue/Proposal→direct/Plan 判定、Plan/Task/Graph 编排、批准与生命周期管理**；单纯写业务 Proposal、直接编码实施、只读方案/代码评审、PRD/DESIGN 内容维护不应被笼统“development”抢占。同时将 `.wopal/rules/coding-workflow.md`（及中文审核版）更新收口为完整目标态，把 `dev-flow` 的可选位置和全链路调用图固定下来。需与 `dev-proposal`、`df-implement`、`df-proposal-review`、`df-implement-review`、`dev-doc-master` 做边界正反验证，保留旧 Plan 维护的正常触发。
+- D-01：**定位与启用决策**：`dev-flow` 是位于 Proposal/Issue 与实施之间的**可选实施规划与任务组织层**。走 `direct`（跳过 `dev-flow`，由 `df-implement` 默认调用 `git-worktrees` 创建隔离工作树实施，不默认直改主分支）还是走 `plan`（启用 `dev-flow` 编排 Plan/Task 并由 `dev-flow` 统一管理隔离工作树与共享 Delivery，避免与 `df-implement` 重复建工作树），**由用户在批准 Proposal（`Delivery: direct | plan`）或派发 Issue 时显式决定**（Agent 仅基于跨项目、并行隔离等客观事实提简短建议，绝不凭主观判断模型强弱替用户决策）。
+- D-02：**唯一主要来源与严格禁令（不强绑 GitHub Issue）**：新 Plan 必须有唯一主要 `Source`：`Issue #N` 或业务 Proposal 路径（规范路径为 `docs/products/<product>/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 或 `projects/<project>/docs/proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`，兼容前格式存量位置；实施期间稳定留在 `proposed/<class>/` 防断链）。**`implemented/`、`rejected/`、`archived/` 提案均严禁作为新 Plan 来源**（对已实施提案发起设计调整或优化必须先新建 `proposed/` 提案并获批）；DESIGN/PRD/无来源文本不能成为新增 Plan 的实施授权。Proposal 来源不强绑 GitHub Issue，为将来本体进化复用保留通用路径。
+- D-03：**保留详细 Plan/Task 编写能力，不抄 Proposal 设计**：完整保留 `Behavior`、`Pre-read`、`Interface`、`Constraints`、`Verify`、`Done` 等已有写作能力；按实际任务需要填写详细程度（既不抄 Proposal 设计长文，也不削弱稳定执行所需的具体上下文）。单个 Plan 服务一个 Target Project，覆盖范围须与授权一致，严禁扩界。
+- D-04：**消除重复设计审批（B-01 上半段，不另造新状态机）**：基于真实 CLI 调用链（`workflow.py:44` 已支持 `planning → executing` 直通）逐项审查 `submit` / `approve`：当 Plan 来源于已批准且 `Delivery: plan` 的 Proposal 且未超出批准范围时，Plan 在 `planning` 阶段完成机械校验（`plan check`）与必要实施方案质检（`df-proposal-review`，只核查任务衔接与不超范围）后，**免除向用户请求第二次设计审批**，直接复用既有工作树创建、共享 Delivery 初始化与失败回滚引擎安全进入 `executing`。仅当 Plan 超出 Proposal 批准范围、改变重要设计决定，或来源为无 Proposal 的独立需求/用户要求先过目时，才停等用户确认。
+- D-05：**消除逐 Plan 重复验收与破除半成品合入（B-01 下半段）**：同一 Git 仓库内，同一 Proposal 拆出的多个彼此独立的 Plan 复用现有 `dev-flow` 共享 `Delivery`（`Delivery: <owner-plan>`）与 `--existing-worktree`，共用 1 个实施工作树和工作分支；全部成员完成内部 `complete` 门禁进入 `verifying` 后，**按 Delivery 只请用户统一验收 1 次**，经用户一次确认即执行统一 `integrate` 合入主分支，并完成成员 Plan 的 `done` 标记与安全 `archive` 清理（不另建新交付机制；跨不同 Git 仓库不声称具备单次 Git 原子提交能力）。单个 Plan 完成不自动把 Proposal 迁入 `implemented/`；全部批准范围交付完成时才由同交付收口迁入 `implemented/` 并完成对被替代老提案的互链/清理。
+- D-06：**彻底破除共享 Delivery + Graph 死锁（B-02）**：
+  - 同一 Delivery 内存在先后顺序的工作 → **写成同一个 Plan 中的顺序 Task**；
+  - 同一共享 Delivery 内的多个独立 Plan → 仅以 `groups` 与共享 `Delivery` 组织，**严禁在同共享 Delivery 成员间画 Graph `edge`**；
+  - 只有**跨不同 Delivery（如跨仓库或独立分批合入主分支）的真实先后依赖**，才在 `active-graph.json` 中画 `edge`（`from → to` 表示上游 Delivery 已完成 `done`）；Graph 不复制 Plan 状态，`groups` 不推导依赖，原 schema 保留，不建设 Scheduler。
+- D-07：**并行写集防冲突与不另造文档状态机**：并行检查同时覆盖代码与 `DESIGN-*.md`（并行 Task 各自仅改所属 `DESIGN-<module>.md`，共享主 `DESIGN.md` 由主控在集成时收口）。Plan 只提供 Task 对应关系，**不在 `dev-flow` 内另造第二套文档同步或 Proposal 状态机**；主控验收交接时强制检查 `df-implement` 返回的非空 `DESIGN Sync` 证据块，并在整次交付收口时核验覆盖整次交付基线（`--base <Delivery Base Commit>`）的 `verify-docset.py --check-sync` 与 `verify-proposals.py` 结果。
+- D-08：**同轮清理旧前置 + 轻量历史兼容**：本轮在 `dev-flow` 自身同一次改造中彻底移除新来源链路的旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置（含解除 `validation.py:check_product_phase` 对新 Plan 的强制成对约束）；同步更新模块长期工程规范 `.wopal/skills/dev-flow/AGENTS.md` 与 `AGENTS.zh-CN.md`（将 `State Machine` / `plan check` 中已退场的强制 `Product`/`Phase` 配对规则替换为新 `Source` 契约、去重后的 `planning → executing` 流程与进行中旧 Plan 最低兼容）；仅对当前活跃目录中**进行中的旧 Plan** 保留最低必要续办兼容（兼容旧 `Product`/`Phase` 与 `Design Source`），已完成历史 Plan 不强制迁移，**不建设永久 Source 追溯、历史索引或复杂身份数据库**。
+- D-09：**规则核对、触发收敛与本体现状设计同交付收口**：依 `skill-creator` 精炼 `dev-flow` 中英 `description` 并完成 10+10 触发验证；核对 `.wopal/rules/coding-workflow.md`（及中文审核版）保持最终目标态一致；同交付收口更新 `.wopal/docs/DESIGN-coding-workflow.md`（完整落地本轮全部 4 个子提案的现状架构、状态机与衔接契约）及 `.wopal/docs/DESIGN-capabilities.md`（同步更新 `Skill System` 中过时的 `dev-flow` 描述），通过 `verify-docset.py` 校验。本提案 Tasks 1–6 可在子提案 2 合入后与子提案 3 并行编码与测试，但 **Task 7 的最终共享文档收口（`.wopal/docs/DESIGN-coding-workflow.md`、`.wopal/docs/DESIGN-capabilities.md` 及最终 `.wopal/rules/coding-workflow.md` 核对）与最终合入必须在子提案 3 合入 `space/<name>` 并对齐最新基线后执行**，避免共享文档冲突并保证文档如实记录全部 4 份已落地子提案的现状。
 
 ### Key Interfaces
 
-- Authoring 产物：Source、Target Project、Plan 拆分及完整覆盖理由、Task 行为/Verify/依赖、委派/并行决策；只链接 Proposal 中的设计理由，不复制设计文本。
-- `flow.sh plan new ISSUE_NUMBER --project PROJECT ...` 保留 Issue 路线；新增 Proposal 来源参数（flag/argparse/调用兼容形状由 Task 5 对真实脚本取证后定案），不得用 `Issue: N/A` 伪造授权。
-- `flow.sh plan check/submit/approve --confirm`：对新来源、目标项目、Proposal approved/Delivery、实施范围执行相应检查；非法输入不得造成半写入；历史 Plan 经可靠识别后走既有兼容机制。
-- `flow.sh complete/verify --confirm/integrate/archive`：保留既有 Git/worktree/commit subject/PR、验收与归档行为；不可由单个 Plan 的 done 自动推算 Proposal implemented。
-- Active Plan Graph 保持 `nodes/edges/groups`、edge from→to 上游 done 的原有语义；Graph 不记录重复的 Plan 状态；Task 依赖留在 Plan。
-- 新 Issue/Proposal 路径不以前置目标态 DESIGN/Phase/GAPS 作为合法开工条件；历史 Plan 的已有字段仍可读取和验证。
+- Authoring 产物：`Source`（`Issue #N` 或 `proposed/<class>/...` Proposal 路径）、`Target Project`、`Delivery`（同仓库多 Plan 共享同一 `<owner-plan>`）、按需详细的 Task（`Behavior`/`Pre-read`/`Interface`/`Constraints`/`Verify`/`Done`）、并行写集边界与主控 `DESIGN Sync` 交接检查；只链接 Proposal 设计决定，不复制设计文本。
+- `flow.sh plan new`：保留 `ISSUE_NUMBER --project PROJECT` 路线；新增 Proposal 来源参数（不强绑 GitHub Issue，具体 CLI flag 由 Task 1/4 对真实脚本取证定案），拒绝无来源新 Plan（不得用 `Issue: N/A` 伪造授权）。
+- `flow.sh plan check` / 启动执行入口（基于 Task 1 对 `submit`/`approve` 的实证裁决）：
+  - 对新 Proposal 来源复用/对齐 `dev-proposal` 规则校验 `proposed/<class>/`、`Status: approved`、`Delivery: plan` 与目标项目，拒绝无来源、未批准、`Delivery: direct`、`implemented/`、`rejected/`、`archived/` 或越界，失败零半写入；
+  - 对已批准且未超范围的 Proposal 来源，支持经 `planning → executing` 直接安全初始化工作树与共享 Delivery 元信息，**免除重复向用户要设计批准**（保留完整脏树检查、worktree 创建与失败回滚）；对无 Proposal 授权或超范围场景保留用户显式确认门禁；
+  - 对新来源链路不再强求 `Product`/`Phase` 成对字段或前置目标态 DESIGN；对进行中旧 Plan 保留最低兼容。
+- `flow.sh complete` / 统一 `integrate` / `verify` / `archive`：保留既有 3 种 worktree 模式（`normal`/`--no-worktree`/`--existing-worktree`）、`Commit Subject`、PR/本地集成与安全清理；共享 Delivery 成员全部进入 `verifying` 后按 Delivery 统一验证一次，经用户一次确认完成统一 `integrate` 及成员收尾/归档；单 Plan 完成不自动把 Proposal 迁入 `implemented/`。
+- Active Plan Graph（`.wopal-space/plans/active-graph.json`）：保持 `nodes`/`edges`/`groups` 原 schema，新增规则校验/SOP 明确禁止同共享 Delivery 成员间建立 `edge`，`edge` 仅用于跨不同 Delivery 的真实依赖。
 
 ## In Scope
 
-- 一次性建立 Plan 必要性、Proposal/Issue→Plan、Plan→Task、委派、并行和 Graph 依赖 SOP，并落实到 Skill、Plan Guide、模板与真实正反案例。
-- Issue/Proposal 双来源、direct/多 Plan、创建/提交/批准、Graph 规则、历史 Plan 兼容和实际 CLI/集成测试。
-- 同轮移除 dev-flow 自身的新来源路径对旧 DESIGN/Phase/GAPS 的前置依赖，维护中英参考及现有质量/正式交付行为。
-- 同步将 `.wopal/rules/coding-workflow.md`（及中文审核版）收口为最终目标态（完整展示 Proposal/Issue → 可选 `dev-flow` → `df-implement` → `df-implement-review` 及对 `dev-doc-master`/`space-master`/`rules/testing.md` 底座的按需调用）。
-- 精炼 `dev-flow` 中英技能的触发描述，用真实任务场景验证必须加载和必须由相邻技能处理的排除边界，避免遗漏合法生命周期请求。
-- 保留历史 Plan 六阶段、工作树/Git 模式、独立评审和必要用户授权。
+- **`dev-flow`（修改技能 — 明确优化项）**：
+  - 确立可选实施规划与任务组织定位，明确 `direct` vs `plan` 由用户显式选择（不让 Agent 猜模型强弱）；
+  - 保留并打磨详细 Plan/Task 编写规范、多 Plan 范围覆盖检查、代码与 `DESIGN-*.md` 并行写集防冲突 SOP、主控 `DESIGN Sync` + 覆盖整次交付 `--base` 门禁验收；
+  - 落地不强绑 GitHub Issue 的 Proposal 来源参数与授权门禁（拒绝无来源、未批准、`Delivery: direct`、`implemented/`、`rejected/`、`archived/`）；
+  - 落实同仓库多 Plan 复用既有共享 `Delivery` 与 `--existing-worktree` 统一验证并一次性集成主分支；落实“同 Delivery 先后工作归入同 Plan 顺序 Task、跨 Delivery 才画 Graph `edge`”破除死锁；
+  - 同轮移除新来源链路的旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置（含解除 `validation.py:check_product_phase` 强制约束），同步更新 `.wopal/skills/dev-flow/{AGENTS.md,AGENTS.zh-CN.md}` 长期工程规范以与新 `Source` 契约及进行中旧 Plan 最低兼容一致；
+  - 核对 `.wopal/rules/coding-workflow.md`（最终目标态）与 `dev-flow` 中英 `description` 10+10 触发收敛；同交付收口本体现状设计 `.wopal/docs/DESIGN-coding-workflow.md` 与 `.wopal/docs/DESIGN-capabilities.md`（最终共享文档收口须在子提案 3 合入最新基线后执行）。
+- **`dev-flow`（修改技能 — 明确精简项）**：
+  - **砍掉重复审批**：对已批准且不超范围的 Proposal 来源，跳过与 Proposal 重复的第二次设计审批（复用 `planning → executing` 与既有 Git 工作树安全初始化）；
+  - **砍掉逐 Plan 重复用户验收**：同一共享 Delivery 的多个 Plan 合并为按 Delivery 统一找用户验证一次并一次性集成收尾；
+  - **不另造新状态机 / 不另造文档状态机**：不发明第三套 Plan 状态机，不在 Plan 中维护另一套 DESIGN 或 Proposal 状态；
+  - **不做过度历史兼容工程**：已完成历史 Plan 不强制迁移，不建永久 Source 追溯、历史索引或复杂身份数据库；
+  - **不造调度器**：不建设 Scheduler、cron、任务队列或新 Graph schema。
 
 ## Out of Scope
 
-- 本轮不重写 Plan 状态机、不删除第二次 Plan approve、不大规模迁移历史 Plan、Git 工作树/PR 集成机制或旧仓库记录。
-- 不增加 Scheduler、cron、Task 执行数据库或第二张 Plan Graph，不变更 Graph schema。
-- 不修改 ontology-evolution、`wopal-cli`、真实业务代码/业务 DESIGN、现行 Plan 或实际 active-graph.json。
-- 不在本技能修改 `dev-doc-master` 的 `cupdate-roadmap/cupdate-br` 或旧文档模板；这些应由文档技能在其完整子提案中同轮去旧和加新。
+- 不另造全新替代状态的第三套 Plan 状态机，不重写已验证可靠的底层 Git worktree/rollback/PR/squash 引擎。
+- 不建设 Scheduler、cron、任务执行数据库或第二张 Plan Graph，不变更 Graph schema。
+- 不修改 `ontology-evolution` 状态机与稀疏 Git 逻辑、不修改 `wopal-cli`、不修改真实业务代码/业务 DESIGN、现行业务 Plan 或实际 `active-graph.json`。
+- 不修改 `dev-doc-master`、`dev-proposal`、`df-implement`、`df-implement-review` 的核心规范（分别归属子提案 1、2、3）。
 
 ## Affected Files
 
 | Component | Files | Operation | Role |
 |---|---|---|---|
-| Plan/Task SOP | `.wopal/skills/dev-flow/{SKILL.md,SKILL.zh-CN.md,templates/plan.md,references/plan-guide*.md}` 与必要新增参考 | 修改 | Plan 必要性、拆分、委派并行 |
-| Graph | `.wopal/skills/dev-flow/references/active-plan-graph*.md` 与隔离 fixtures | 修改/新增 | 依赖、分组和一致性规范 |
-| CLI 来源与审批 | `.wopal/skills/dev-flow/scripts/{flow.sh,flow.py,plan.py,validation.py,workflow.py}` 及 `scripts/commands/{plan,submit,approve}.py` | 修改 | Source/批准/旧规则退场 |
-| 交付兼容 | `scripts/commands/{complete,verify,integrate,archive}.py` 等直接影响模块 | 必要修复/回归 | 保留 Git/Plan 交付 |
-| 空间调用规则 | `.wopal/rules/coding-workflow.md`、`.wopal/docs/LANG/zh-CN/rules/coding-workflow.md` | 修改 | 收口最终目标态技能协作图与可选 `dev-flow` 定位 |
-| 测试 | `.wopal/skills/dev-flow/tests/python/{unit,integration}/` 与隔离 Git/Graph fixtures | 新增/修改 | SOP 与真实 CLI 正负验证 |
+| Plan/Task SOP | `.wopal/skills/dev-flow/{SKILL.md,SKILL.zh-CN.md,AGENTS.md,AGENTS.zh-CN.md,templates/plan.md,references/plan-guide.md,references/plan-guide.zh-CN.md,references/commands.md}` | modify | 可选编排定位、去重审批与按 Delivery 统一验收 SOP、详细 Plan/Task 规范、并行写集防冲突，以及同步模块 `AGENTS.md` 长期工程规范（新 `Source` 契约与旧 Plan 最低兼容） |
+| Graph 规范 | `.wopal/skills/dev-flow/references/{active-plan-graph.md,active-plan-graph.zh-CN.md}` | modify | 跨 Delivery 依赖边界与严禁同共享 Delivery 成员画 `edge` 防死锁规则 |
+| CLI 精简与来源门禁 | `.wopal/skills/dev-flow/scripts/{flow.sh,flow.py,plan.py,validation.py,workflow.py}` 及 `scripts/commands/{plan,submit,approve,complete,verify,integrate,archive}.py` | modify | Proposal/Issue `Source`、不强绑 Issue、已批准 Proposal 去重开工、按 Delivery 统一验证收口、旧 `Phase` 前置退场与进行中旧 Plan 最低兼容 |
+| 空间调用规则 | `.wopal/rules/coding-workflow.md`, `.wopal/docs/LANG/zh-CN/rules/coding-workflow.md` | modify (verify / align as needed) | 核对并保持最终目标态与落地 `dev-flow` 契约完全一致 |
+| 本体现状设计 | `.wopal/docs/DESIGN-coding-workflow.md`, `.wopal/docs/DESIGN-capabilities.md` | modify | 同交付收口全套研发治理技能现状设计、完整状态机与 `Skill System` 准确现状 |
+| 自动化测试 | `.wopal/skills/dev-flow/tests/python/{unit,integration}/` 与隔离 Git/Graph fixtures | create / modify | 去重审批、防死锁、多来源授权、共享 Delivery 统一集成与历史兼容回归 |
 
 ## Assembly Intent
 
 | Ref | Scope | 理由 |
-|---|---|
+|---|---|---|
 
 ## Acceptance Criteria
 
 ### Agent Verification
 
-1. [ ] 对简单、有界的批准 Proposal/Issue 能合理选择 direct；跨项目或多个独立交付的 Proposal 可拆合理 Plan，各有明确目标项目和验收边界，批准范围无重复/遗漏。
-2. [ ] Task 按可独立验收的行为拆分，包含 Pre-read、必要接口/约束、依赖、Verify、Done 证据；无意义碎片化、巨型任务、伪依赖与扩范围被明确指出。
-3. [ ] Agent 能力与风险匹配；Task 并行候选同时检查代码与 `DESIGN-*.md` 的共享写集、契约、依赖、隔离、测试资源与提交所有权，确保并行分支只写各自模块子 DESIGN、共享主 `DESIGN.md` 由主控收口，危险并行改为串行或重新拆分。
-4. [ ] Graph 的合法 DAG 与分组通过；环、自边、重边、缺节点引用、把 groups 当 edges 或复制状态的负例被指出；schema 与历史文件不变。
-5. [ ] 新 Issue 与获批 Proposal（`proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 及前格式兼容）来源的 Plan 可由真实 CLI 创建、提交、批准；无来源、错误项目、未批准/被拒/`archived/`/越界来源被拒，失败不半写入。
-6. [ ] 旧无 Source/Issue: N/A 的 Plan 可靠识别并继续生命周期；新无来源 Plan 不能伪装历史文件绕过授权，身份有可信依据和真实回归。
-7. [ ] 获批 Proposal 可以 direct 或关联不同 Target Project 的多个 Plan（实施期稳定留在 `proposed/<class>/`）；部分交付不自动迁入 `implemented/` 或变 implemented，真实跨 Plan 依赖与来源不失真。
-8. [ ] 新 Plan 的创建、提交、批准/正式实施在本轮同时去掉旧 Phase/GAPS/目标态 DESIGN 前置并增加来源授权校验，不遗留半完成的旧入口。
-9. [ ] 旧 Plan 生命周期、normal/no-worktree/existing-worktree、commit subject、Git/PR 集成、用户验收和归档行为在测试中不退化，实际业务文件与 Graph 无改写。
-10. [ ] 新 direct/Plan 路线与代码、测试、所属模块现状 DESIGN、独立评审和用户验证相符；非法扩范围被阻止，中英文规则、`.wopal/rules/coding-workflow.md`（完整目标态）与实际命令一致。
-11. [ ] SOP 与 CLI 的所有关键条件均有实际正负案例或独立语义审查，不新增 Scheduler/第二份状态或进度台账。
-12. [ ] `dev-flow` 的 `description` 简洁准确地覆盖 Issue/Proposal→direct/Plan 组织、Plan/Task/Graph 编排、批准和生命周期管理，排除纯业务 Proposal 写作、编码实施、独立方案/代码评审及 DESIGN 写作；至少 10 个应触发和 10 个不应触发的近邻请求得到验证，旧 Plan 生命周期的合法加载不退化。记录改前/改后、误触发/漏触发和实际测试能力的限制，中英语义一致。
+1. [ ] `direct` 与 `plan` 路径由用户显式选择（技能中不含主观评判模型强弱逻辑）；已批准 Proposal 或明确 Issue 可走 `direct` 跳过 `dev-flow`（由 `df-implement` 默认调用 `git-worktrees` 创建隔离工作树实施，不默认直改主分支），或由 `dev-flow` 拆出覆盖批准范围、无遗漏/无扩界的 1..N 个 Plan（每个 Plan 归属唯一 Target Project，并由 `dev-flow` 统一管理工作树），且保留详细 Plan/Task 写作能力（按需填写，不抄 Proposal 设计长文）。
+2. [ ] Task 按可独立验收的行为拆分，完整保留 `Behavior`、`Pre-read`、`Interface`、`Constraints`、`Verify`、`Done` 等字段能力；同一 Delivery 内存在先后顺序的工作归入同一 Plan 的顺序 Task；无意义碎片化、巨型任务与越权扩范围被明确指出。
+3. [ ] 并行检查同时覆盖代码与 `DESIGN-*.md` 共享写集、接口契约、隔离环境与提交所有权（并行分支只写各自模块 `DESIGN-<module>.md`，共享主 `DESIGN.md` 由主控集成收口）；Plan 不另造文档同步状态机，主控拒收缺 `DESIGN Sync` 的汇报并在交付收口时核验覆盖整次交付 `--base` 的 `verify-docset.py --check-sync`（及必要时 `verify-proposals.py`）。
+4. [ ] Graph 仅记录跨不同 Delivery 的真实先后依赖；合法 DAG 与分组通过，**同一共享 Delivery 成员之间画 `edge`**（防死锁）、环、自边、重边、缺节点引用、把 `groups` 当 `edges` 或复制状态的负例均被明确拦截；原 Graph schema 与真实 `active-graph.json` 不变。
+5. [ ] 新 Issue 与获批 Proposal（`proposals/proposed/<class>/yyyy-mm-dd-<slug>.md` 且 `Status: approved`、`Delivery: plan`，兼容前格式存量位置且不强绑 GitHub Issue）均可由真实 CLI 创建与校验；无来源、错误项目、未批准、`Delivery: direct`、`implemented/`、`rejected/`、`archived/` 或越界来源均被拒绝且零半写入；新来源链路在本轮同步移除旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置（含 `validation.py:check_product_phase` 对新 Plan 不再阻塞）。
+6. [ ] **消除重复设计审批**：当 Plan 来源于已批准且 `Delivery: plan` 的 Proposal 且未超出批准范围时，通过内部质检后可通过 `planning → executing` 安全初始化工作树与共享 Delivery 元信息直接开工，**无需用户再次批准设计**；当 Plan 超出批准范围、改动设计决定或无 Proposal 授权时，CLI/流程仍停等用户确认；未另造第三套新状态机。
+7. [ ] **消除逐 Plan 重复验收与防半成品合主分支**：同一 Git 仓库同一 Proposal 拆出的多个彼此独立 Plan 复用既有共享 `Delivery` 与 `--existing-worktree` 共用工作树；全部成员到 `verifying` 后按 Delivery 统一验证一次，经用户一次确认完成一次性 `integrate` 主分支及成员收尾/安全 `archive`（不同 Git 仓库不声称单次 Git 原子提交）；单个 Plan 完成不自动把 Proposal 迁入 `implemented/`。
+8. [ ] 当前进行中的旧无来源 Plan（含旧 `Product`/`Phase` 与 `Design Source`）保留最低必要续办兼容，不建设复杂历史身份库；现有 `normal`/`--no-worktree`/`--existing-worktree`、commit subject、Git/PR 集成与安全清理在回归测试中不退化；真实业务文件无改写。
+9. [ ] 端到端集成验证覆盖 `direct` 与详细 Plan 双路径、无重复审批、共享 Delivery 无死锁统一集成、同交付收口后的本体现状设计 `.wopal/docs/DESIGN-coding-workflow.md` 与 `.wopal/docs/DESIGN-capabilities.md`（均通过 `verify-docset.py` 校验）、最终目标态 `.wopal/rules/coding-workflow.md`（中英一致），以及 `.wopal/skills/dev-flow/{AGENTS.md,AGENTS.zh-CN.md}` 已同步为新 `Source` 契约、去重流程与进行中旧 Plan 最低兼容（不再把旧 `Product`/`Phase` 配对写成新 Plan 强制规则，中英一致）。
+10. [ ] `dev-flow` 中英 `description` 简洁准确覆盖可选实施规划、Plan/Task/Graph 编排与工作树/共享 Delivery 生命周期，排除纯业务 Proposal 写作、直接编码实施、独立方案/代码评审及 DESIGN 写作；完成至少 10 个应触发 + 10 个不应触发的近邻请求验证，记录改前/改后与验证限制，中英语义一致。
 
 ### Source Principles → Tasks → Verification
 
-| 已核实的来源 | 在 dev-flow 中采取的具体实践 | Task 与 AC |
+| 已核实的来源 | 在 `dev-flow` 中采取的具体实践 | Task 与 AC |
 |---|---|---|
-| DSH `docs/AGENTS.md`、`dsh-doc-writing/references/structure-hierarchy.md` | 一项事实只有一个归属；紧密关联规则保持在一起，不为拆分而碎片化 | Tasks 1–4；AC#1、2、4 |
-| DSH `dsh-code-review/SKILL.md` | 依据真实 diff/调用链和已执行检查进行审核，代码与文档说明在同一交付中一致 | Tasks 5–8；AC#5、8、9、10 |
-| WopalSpace `dev-flow/references/plan-guide.md`、`templates/plan.md` | Task 是可单独验证的行为单元，主控保留委派/提交/复验所有权 | Tasks 2、3；AC#1、2、3 |
-| WopalSpace `dev-flow/references/active-plan-graph.md` | Graph 唯一记录跨 Plan 依赖；groups 不推导 edges，并行需要稳定契约/隔离条件 | Tasks 3、4、7；AC#3、4、7 |
-| WopalSpace `dev-flow/scripts/flow.py`、`workflow.py`、`commands/` | 来源、审批、Git/工作树的实际成功/拒绝和失败无副作用行为可重复验证 | Tasks 5–8；AC#5、6、8、9 |
+| DSH `docs/AGENTS.md`、`dsh-doc-writing/references/structure-hierarchy.md` | 一类事实唯一归属（授权归 Proposal、编排归可选 Plan、现状归 DESIGN）；已实施提案不可作为新 Plan 来源，须新建 `proposed/` 提案 | Tasks 1–2、4–5；AC#1、2、5 |
+| DSH `dsh-code-review/SKILL.md` | 依据真实 diff/调用链和完整基线检查收口交付，代码与现状设计同交付一致 | Tasks 6–7；AC#3、9 |
+| WopalSpace `dev-flow/references/plan-guide.md`、`templates/plan.md` | 保留详细 Task 编写能力与主控复验/提交所有权，消除与 Proposal 重复的设计审批与逐 Plan 验收 | Tasks 1–2、5–6；AC#1、2、6、7 |
+| WopalSpace `dev-flow/references/active-plan-graph.md` & `integrate.py` | 共享 Delivery 成员严禁互相画 Graph `edge`（同 Delivery 先后工作进同 Plan 顺序 Task）；`edge` 仅用于跨不同 Delivery 依赖 | Tasks 1、3、6；AC#4、7 |
+| WopalSpace `dev-flow/scripts/{flow,workflow,validation}.py`、`commands/` | 复用既有 `planning → executing` 与工作树/回滚/共享 Delivery 安全底座做精准减法，不另造新状态机 | Tasks 1、4–7；AC#5、6、7、8 |
 
-**DSH 没有 Plan Graph、Agent 并行、用户审批和 Git 状态机的现成实现**；后者是 WopalSpace 的自主设计，不能把 DSH 文档当作实施授权或代替测试结果。
+**DSH 没有 Plan Graph、Agent 并行、共享 Delivery 与 Git worktree 编排实现**；后者是 WopalSpace 的自主设计，不能把 DSH 文档当作实施授权或代替测试结果。
 
 ### User Validation
 
-#### Scenario 1: 验收拆分策略与真实授权执行
-- Goal: 用户一次性检查“合理 Plan/Task 拆分→委派与并行判断→CLI 安全执行→独立验证”是否形成完整机制。
-- Environment: 本提案隔离工作树与虚构 Issue、approved Proposal、两个目标项目、临时 Git/Graph fixtures。
-- Precondition: 八个 Task 均验证并独立评审通过，已进入 validating。
-- Launch command: `wopal space evo switch enhance-dev-flow-proposal`（切换后**重启 ellamaka** 以加载更新后的技能、脚本与最终版空间调用规则）
+#### Scenario 1: 验收可选编排、零重复审批与共享 Delivery 无死锁执行
+- Goal: 用户一次性验证“批 Proposal 后直接开工不重复审批 → 详细 Plan/Task 编排 → 同仓库多 Plan 共享工作树统一验收集成 → 本体现状设计同步落地”整套闭环。
+- Environment: 本提案隔离工作树与虚构 Issue、已批准 Proposal、已 `implemented/` 老提案、同仓多 Plan 与跨仓多 Plan 隔离 Git/Graph fixtures。
+- Precondition: 全部 7 个 Task 验证并独立评审通过，进入 validating（并与子提案 1–3 一并开展全链路整体验收）。
+- Launch command: `wopal space evo switch enhance-dev-flow-proposal`（切换后**重启 ellamaka** 以加载更新后的技能、脚本与现状设计）
 - User Actions:
-  1. 检查简单 direct、跨项目多 Plan、Task 粒度、安全/不安全并行的样例。
-  2. 检查两种来源 CLI、Graph 依赖、未批准 Proposal/新无来源 Plan 的拒绝和历史 Plan 回归。
-  3. 检查部分 Plan done 不等于 Proposal implemented，实际业务资料无变更。
-- Pass criteria: 拆分边界与委派决定合理，CLI/Graph/正式交付安全且可重现，旧行为不退化。
-- Failure feedback: 指出具体错误拆分、输入、结果、状态或日志。
+  1. 查看同仓库同一 Proposal 的顺序任务（单 Plan 顺序 Task）与多独立 Plan（共享 Delivery + 无内部 Graph 边 + 统一验收一次）样例。
+  2. 验证已批准 Proposal 启动 Plan 不触发二次设计审批、超范围时触发停等确认，以及未批准/`implemented/`/`archived/` Proposal 被 CLI 拒绝。
+  3. 审阅最终收口的本体现状设计 `.wopal/docs/DESIGN-coding-workflow.md`，确认整套技能架构、状态机与衔接契约清晰可读且与真实实现一致。
+- Pass criteria: 全程最多 2 次用户拍板（批 Proposal + 统一验收集成）、零死锁、详细 Plan 编写能力完整、旧 Git 安全能力不退化、本体现状设计准确可读。
+- Failure feedback: 指出重复审批点、死锁路径、命令错误或现状设计失真位置。
 - [ ] The user has validated the behavior above and confirmed the result.
 
 ## Implementation
 
-### Task 1: 从真实 Plan/Graph 合同反推拆分边界
+### Task 1: 取证现有 `dev-flow` CLI 调用链，定案流程去重边界与状态/命令精简清单
 
-**Verification Intent**: AC#4、AC#5、AC#6、AC#9、AC#11
-**Behavior**: 明确 Plan 现有一个项目、Graph 唯一依赖、旧模板/CLI 必需字段、现有状态/Git 门禁和历史兼容边界。
-**Pre-read**: 当前 dev-flow CLI 真实调用链、dev-flow SKILL、plan-guide、active-plan-graph、templates/plan.md、AGENTS.md、现有 Plan 检查测试。
-**Design**: 记录真实消费者、来源约束和格式边界，明确本提案的 SOP、模板、脚本及测试分别在哪个后续 Task 修改；不得把同一 dev-flow 改造留给另一份提案。
-**TDD**: false — 合同与风险取证。
-**Changes**: SOP 的兼容清单和范围边界。
-**Verify**: 旧 Plan/Graph 的已有测试和参考示例无变化。
+**Verification Intent**: AC#4、AC#5、AC#6、AC#7、AC#8
+**Behavior**: 基于真实源码定案：① 现有 `submit`/`approve`/`complete`/`verify`/`integrate`/`archive` 中哪些 Git 安全与工程操作保留、哪些重复人工审批与逐 Plan 验收步骤对已批准 Proposal 免除（复用 `workflow.py:44` `planning → executing` 直通边与既有共享 Delivery，不另造新状态机）；② `validation.py:check_product_phase` 与 `templates/plan.md` 的新 `Source` 字段切换方案与进行中旧 Plan 最低兼容判定（不建复杂历史身份库）；③ 共享 Delivery 与 Graph 的防死锁契约边界。
+**Pre-read**: `.wopal/skills/dev-flow/{SKILL.md,templates/plan.md,AGENTS.md}`、`references/{plan-guide.md,active-plan-graph.md,commands.md}`、`scripts/{flow.py,workflow.py,validation.py,plan.py}`、`scripts/commands/{plan,submit,approve,complete,verify,integrate,archive}.py` 及现有 `tests/python/`。
+**Design**: 产出可核对的“命令/状态调用与去重映射表”和最小改动方案，明确后续 Task 2–7 各自边界；确保全部底层 Git 安全护栏（脏树检查、worktree 创建与回滚、squash integrate、安全 archive）完整保留。
+**TDD**: false — 源码调用链取证与去重架构定案。
+**Changes**: 确认并记录到 `dev-flow` 内部参考/设计边界，不提前破坏现有测试。
+**Verify**: 运行现有 `dev-flow` `pytest` 基线确认当前全部通过；对照源码逐条核验去重清单无遗漏消费者。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -180,15 +193,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 2: Issue/Proposal→Plan 划分 SOP 与范围覆盖检查
+### Task 2: 重构 Plan/Task Authoring SOP（用户显式选路径、保留详细 Task 与并行写集防冲突）
 
-**Verification Intent**: AC#1、AC#2
-**Behavior**: 对明确 Issue 或已批准 Proposal 判定 direct/plan，按独立可交付成果/目标项目分出合理 Plan，覆盖每项批准范围，不发明第二套业务决定。
-**Pre-read**: Task 1、已交付的业务 Proposal 合同、Plan Authoring Guide、项目/产品结构映射。
-**Design**: SOP 顺序固定：确认授权与目标→识别具体结果→判定独立交付边界→划分 Target Project→覆盖/重复审查→标明跨 Plan 依赖；拒绝按人头/文件数机械拆分。
-**TDD**: false — 深度语义案例与独立 Proposal 评审验证。
-**Changes**: plan-guide 与必要新 reference、隔离正反案例。
-**Verify**: 同一 Proposal 的 direct、1 Plan、跨项目多 Plan、错误漏项等案例均能给出有根据的结论。
+**Verification Intent**: AC#1、AC#2、AC#3
+**Behavior**: 清晰写明 `direct` vs `plan` 由用户在批准 Proposal 或派发 Issue 时显式决定（绝不含主观判断模型强弱逻辑）；完整保留详细 Plan/Task 编写字段（`Behavior`/`Pre-read`/`Interface`/`Constraints`/`Verify`/`Done`），按任务需要填写而不抄 Proposal 设计长文；同一 Delivery 内有先后顺序的工作写进同一 Plan 顺序 Task；并行检查同时覆盖代码与 `DESIGN-*.md` 写集（并行分支只改所属模块子 DESIGN，主 `DESIGN.md` 由主控收口）；Plan 不另造文档同步状态机，主控交接验收要求非空 `DESIGN Sync` 证据块并核验覆盖整次交付 `--base` 的 `verify-docset.py --check-sync`。
+**Pre-read**: Task 1、已交付的 `dev-doc-master`（`references/design-project-guide.md`）、`dev-proposal`、`df-implement` handoff 规范、现有 `dev-flow/references/plan-guide*.md` 与 `templates/plan.md`。
+**Design**: 更新 `dev-flow/references/plan-guide.md`、`plan-guide.zh-CN.md` 与 `templates/plan.md`（新增 `Source` 字段、允许新 Plan 省略旧 `Phase`），用正反例明确合理拆分、详细 Task 写法、安全/危险并行与缺 `DESIGN Sync` 拒收。
+**TDD**: false — Authoring SOP、模板与正反隔离演练案例验证。
+**Changes**: `.wopal/skills/dev-flow/{templates/plan.md,references/plan-guide.md,references/plan-guide.zh-CN.md}`。
+**Verify**: 用同仓顺序工作（单 Plan 顺序 Task）、同仓多独立 Plan（共享 Delivery）、跨仓多 Plan、危险并行（撞共享主 `DESIGN.md`）与缺 `DESIGN Sync` 拒收案例逐一演练核查，确保旧模板仍兼容现有 CLI。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -196,15 +209,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 3: Plan→Task 及委派/并行 SOP（含 DESIGN 写集防冲突）
+### Task 3: 重构 Active Plan Graph 规则并根除共享 Delivery 死锁（B-02）
 
-**Verification Intent**: AC#2、AC#3
-**Behavior**: 每 Task 有可验证成果、输入/前置、必要契约与交接记录，能够依据能力和安全条件委派；代码或 `DESIGN-*.md` 共享路径碰撞、需要并发改共享主 `DESIGN.md` 以及不稳定接口不被误判为可并行。
-**Pre-read**: Tasks 1–2、已交付的 `dev-doc-master` 防并行分片规则、`df-implement` handoff 与并行不越界纪律、旧 Task/Delegation Strategy 模板、已有 Git worktree/提交安全规则。
-**Design**: 任务粒度由可独立验收的行为而不是文件行数决定；对并行实施增加“契约、写集（含代码与模块子 DESIGN）、环境、验证、提交”五方面检查：并行 Task 各自只更新所属 `DESIGN-<module>.md`，共享主 `DESIGN.md` 地图变动留给主控在集成时收口，冲突时选择串行或先隔离。
-**TDD**: false — SOP 与隔离调度演练。
-**Changes**: plan-guide、模板兼容性扩展、委派示例与正反 fixtures。
-**Verify**: 多 Agent 并行可行（互不相交的代码+模块子 DESIGN）与不可行（共享主 `DESIGN.md` 或重叠写集）案例均能复现理由，旧模板仍被真实 CLI 接受。
+**Verification Intent**: AC#4
+**Behavior**: 明确 `active-graph.json` 仅表达**跨不同 Delivery（如跨仓库或独立分批合入主分支）的真实先后依赖**；**严禁在同一共享 Delivery 成员之间画 `edge`**（同 Delivery 内先后工作归入同一 Plan 的顺序 Task）；合法 DAG 与 `groups` 分组通过，共享 Delivery 内部画边、环、自边、重边、缺节点、把 `groups` 当 `edges` 或复制状态均被检测拦截；保持原 Graph schema，不建设 Scheduler。
+**Pre-read**: Tasks 1–2、`.wopal/skills/dev-flow/references/active-plan-graph*.md`、`scripts/commands/integrate.py`、现有 Graph fixtures。
+**Design**: 同步更新中英版 `active-plan-graph*.md`（同时清除第 13、20 行已退场的 `Phase document` / `Phase Related Plans` 残留引用），并在测试中提供覆盖共享 Delivery 禁边与 DAG 非法反例的确定性校验用例。
+**TDD**: true — 编写隔离 Graph fixtures 自动化测试覆盖合法跨 Delivery DAG、共享 Delivery 成员互画 `edge` 死锁反例、环、自边、重边、缺节点与非法分组（RED → GREEN）。
+**Changes**: `.wopal/skills/dev-flow/references/{active-plan-graph.md,active-plan-graph.zh-CN.md}` 及隔离 Graph 校验测试与 fixtures。
+**Verify**: 运行 Graph 正反自动化测试全部通过；确认真实 `.wopal-space/plans/active-graph.json` 未被改动。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -212,15 +225,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 4: Graph 组织规则与多 Plan 模拟
+### Task 4: CLI 落地 `Source` 契约、解除旧 `Phase` 前置与进行中旧 Plan 最低兼容
 
-**Verification Intent**: AC#1、AC#3、AC#4、AC#11
-**Behavior**: 同一来源的多个 Plan 可用 Graph 分组和 edge 表示正确先后；无关任务不造伪依赖；非法环/引用被发现。
-**Pre-read**: Tasks 1–3、active-plan-graph、现有测试/fixtures、Plan 状态机。
-**Design**: 对 Graph 只设跨 Plan 顺序与组织，不复制 Plan 状态；允许并行根；不得提前实现 Scheduler 或修改真实 Graph；原状态约束保持。
-**TDD**: true — 可机械验证的 Graph 反例用已有 JSON fixture 检查路径或测试工具覆盖，不增加与未来实现耦合的新运行字段。
-**Changes**: Graph 参考及真实适用的测试 fixtures；仅必要修改 dev-flow SKILL 发现入口。
-**Verify**: 使用隔离样例检验合法 DAG、环、自边、重复边、缺节点、非法成员，并运行 Plan 旧回归。
+**Verification Intent**: AC#5、AC#8
+**Behavior**: `flow.sh plan new` 保留 Issue 路线并新增不强绑 GitHub Issue 的 Proposal 来源参数；新无来源 Plan（含用 `Issue: N/A` 伪造授权）被明确拒绝且零半写入；新来源 Plan 不再受旧 `Product`/`Phase` 成对检查（`validation.py:check_product_phase`）或目标态 DESIGN 前置阻塞；当前活跃目录中**进行中的旧无来源 Plan**（含旧 `Product`/`Phase`）保留最低必要续办兼容，不建设复杂历史身份数据库。
+**Pre-read**: Task 1–3、`scripts/{flow.sh,flow.py,plan.py,validation.py}`、`scripts/commands/plan.py`、`tests/python/`。
+**Design**: 在 `plan new` 与 `validation.py` 落地 `Source` 字段读写与校验，解除新来源链路的 `check_product_phase` 强制要求（仅对含旧 `Product`/`Phase` 的进行中历史 Plan 保持兼容读取），保证所有拒绝路径在首次写入前失败。
+**TDD**: true — 覆盖合法 Issue 创建、合法 Proposal 创建（无 GitHub Issue）、新无来源拒绝、新 Plan 省略 `Product`/`Phase` 放行、以及进行中旧 Plan 续办兼容的 RED → GREEN 自动化测试。
+**Changes**: `.wopal/skills/dev-flow/scripts/{flow.sh,flow.py,plan.py,validation.py}`、`scripts/commands/plan.py` 与 `tests/python/`。
+**Verify**: 在隔离 Git fixtures 上跑通全部新增与原有 unit/integration 测试，确认失败无副作用。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -228,15 +241,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 5: 查明创建/校验路径与历史 Plan 兼容判定
+### Task 5: CLI 落地 Proposal 授权门禁与已批准 Proposal 去重开工流程（B-01 上半段）
 
-**Verification Intent**: AC#5、AC#6、AC#9
-**Behavior**: 明确 Issue/no-Issue 创建入口、字段/命名/状态检查位置和旧无 Source Plan 的识别方式，任何新 Plan 都不可伪装成旧文件。
-**Pre-read**: Tasks 1–4 的 SOP/Graph 合同、scripts/flow.{sh,py}、commands/{plan,submit,approve}.py、plan.py、validation.py、workflow.py、Plan 目录与 tests/python 的现有行为测试。
-**Design**: 先对真实调用链制作输入→状态改变表；对存量 Plan 来源判定必须有可信依据（如既有被跟踪的记录/显式切换基线），不可仅依赖可伪造日期；若现场没有安全的兼容依据，停止并返回用户确定最小迁移/例外策略。
-**TDD**: true — 新无来源拒绝与旧存量可续办的对照 RED。
-**Changes**: 入口/校验模块及必要测试 fixtures 的最小改动；确定具体新 Proposal CLI flag。
-**Verify**: 在隔离 Git fixtures 上分别执行合法创建/无来源创建/旧存量 submit/approve 的真实命令，确认失败无副作用。
+**Verification Intent**: AC#5、AC#6
+**Behavior**: 对 `Source: Proposal` 复用/对齐 `dev-proposal` 规则校验其位于 `proposed/<class>/`（或前格式存量位置）、`Status: approved` 且 `Delivery: plan`；未批准、`Delivery: direct`、`implemented/`、`rejected/`、`archived/`、错误目标项目或越界均被拒绝且零半写入。**消除二次设计审批**：对于来源为已批准 Proposal 且未超出批准范围的 Plan，完成内部质检后可通过 `planning → executing` 复用现有 worktree 创建、共享 Delivery 初始化与回滚安全机制直接开工，不再要求用户重复批准设计；仅当超范围或无 Proposal 授权（如独立 Issue 或用户显式要求）时仍停等用户确认；不另造新状态机。
+**Pre-read**: Task 1、Task 4、`dev-proposal/{SKILL.md,scripts/verify-proposals.py}`、`scripts/{workflow.py,commands/submit.py,commands/approve.py}`。
+**Design**: 依据 Task 1 定案精简 `submit`/`approve` 对已批准 Proposal 的重复人工审批门槛，保留全部 Git 脏树拦截、worktree/branch 创建、共享 Delivery 字段校验与失败回滚保护，确保无任何静默绕过授权路径。
+**TDD**: true — 覆盖未批准/`Delivery: direct`/`implemented/`/`rejected/`/`archived/`/越界拒绝、已批准 Proposal 免二次审批安全建工作树开工、超范围拦截、以及失败零半写入的 RED → GREEN 自动化测试。
+**Changes**: `.wopal/skills/dev-flow/scripts/{workflow.py,validation.py,commands/submit.py,commands/approve.py}` 与 `tests/python/`。
+**Verify**: 在隔离 Git fixtures 运行正负 CLI 测试，核实免二次审批开工路径安全建出工作树且全部拒绝路径无半写入残留。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -244,15 +257,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 6: Proposal 来源与批准门禁
+### Task 6: CLI 与 SOP 落地同仓库共享 Delivery 统一验证/集成与多 Plan 衔接（B-01 下半段 + B-02）
 
-**Verification Intent**: AC#5、AC#7、AC#8
-**Behavior**: 新 Source: Proposal 的 Plan 可草拟；只有真实 `approved` 且处于 `proposed/<class>/`（或前格式存量位置）并授权 `Delivery: plan` 的 Proposal 可推进执行；被拒/未批准/`archived/`/路径错误不越权。
-**Pre-read**: Task 5、enhance-dev-proposal 的模板/校验器、Plan 元数据与 Project Path 检查、既有同步 Issue 逻辑。
-**Design**: 新 Source 指唯一批准文件，Issue 只作关联；审批时校验用户授权已存在且 Plan 在批准范围内；既有第二次 approve --confirm 暂时保留，禁止通过 flag 误触发既有 Git/工作树副作用。
-**TDD**: true — 未批准/拒绝/越界/错误目录和正确 approved 样例。
-**Changes**: plan new、submit/approve 来源处理、模板、tests。
-**Verify**: 对新 Source 的实际 CLI 入口跑正负案例，确认状态和 Git 均无半执行。
+**Verification Intent**: AC#1、AC#4、AC#7
+**Behavior**: 同一 Git 仓库同一 Proposal 拆出的多个彼此独立 Plan 复用既有共享 `Delivery` 与 `--existing-worktree` 共用工作树与工作分支；各自完成 `complete` 进入 `verifying` 后，**按 Delivery 只请用户统一验收 1 次**，用户一次确认即可完成一次性 `integrate` 合入主分支及所有成员 Plan 的 `done` 标记与安全 `archive` 清理（不再逐 Plan 分别找用户验收）；不同 Git 仓库不声称单次 Git 原子提交；任何单个 Plan 完成不自动把 Proposal 迁入 `implemented/`（也不提前改写被替代老提案）。
+**Pre-read**: Tasks 1–5、`scripts/commands/{complete,verify,integrate,archive}.py`、`dev-flow/SKILL.md` 共享 Delivery 章节。
+**Design**: 复用现有 `integrate.py` 的共享 Delivery 发现与成员校验逻辑，打通“按 Delivery 统一验证一次 → 统一集成 → 成员统一收尾与最后安全清理工作树”，同时校验共享 Delivery 成员不在 Graph 中互画死锁边，不另建新交付机制。
+**TDD**: true — 隔离模拟同仓库 2 个独立 Plan 共享 Delivery 统一验收与一次性集成、单成员未就绪拦截、跨两仓库独立 Delivery 衔接、以及部分 Plan 完成不自动改 Proposal `implemented` 的 RED → GREEN 测试。
+**Changes**: `.wopal/skills/dev-flow/scripts/commands/{complete,verify,integrate,archive}.py`（最小必要调整）、`references/commands.md` 与 `tests/python/`。
+**Verify**: 运行隔离多 Plan 集成测试，验证主分支不会出现半成品中间提交、工作树安全清理且无成员状态错位。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -260,31 +273,15 @@ Files touched: (实施后填写)
 
 ---
 
-### Task 7: direct 与多 Plan/Graph 衔接
+### Task 7: 全量回归、最终态规则核对、`dev-flow` 触发收敛与本体现状设计同交付收口
 
-**Verification Intent**: AC#1、AC#4、AC#7、AC#8
-**Behavior**: 已获授权的简单 Proposal 无 Plan 直接执行；复杂 Proposal 生成经 Tasks 2–4 的 SOP 确认的多个 Plan，Graph 只有真实依赖且无环；任何一个 Plan 完成不自动改变 Proposal 决定状态；新来源链路不再强求目标态 DESIGN/Phase/GAPS 前置条件。
-**Pre-read**: Tasks 1–6、active-plan-graph、旧 Task/委派与 Graph 生命周期钩子。
-**Design**: 复用现有 Graph 文件的 nodes/edges/groups 与控制 Agent 手工维护纪律；不新增 Graph Scheduler 或复制进度；新来源使用真实 Source 与批准决定，不能被旧 Phase/GAPS/目标态 DESIGN 检查反向阻断。Graph 更新失败按既有规则立即阻止后续审批并修复一致性。
-**TDD**: true — 来源/多 Plan/合法/非法 Graph 及部分交付正负案例。
-**Changes**: dev-flow SOP 使用点、必要检查与测试、参考文档。
-**Verify**: 隔离模拟 direct、两项目 Plan、Plan 部分 done 与来源回溯；Graph 无效场景不能开工。
-**Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
-
----
-
-### Task 8: 既有交付兼容、收口 `coding-workflow.md` 与新流程端到端验证
-
-**Verification Intent**: AC#1–12
-**Behavior**: 新路线符合代码/测试/所属模块现状 DESIGN 同步和独立评审；旧 status、批准、complete/verify/integrate/archive 与 3 种 Git 交付模式仍可靠；`.wopal/rules/coding-workflow.md`（及中文审核版）收口为完整目标态，清楚表达 `dev-flow` 的可选中间层位置与全部技能协作边界。
-**Pre-read**: Tasks 1–7、`skill-creator` 技能、`.wopal/rules/coding-workflow.md`（及中文审核版）、commands/{complete,verify,integrate,archive}.py、工作树/commit subject 相关测试、`enhance-implement-sync` 与 `enhance-dev-proposal` 中已更新的评审合同。
-**Design**: 对真实命令做正负集成检查；不修改历史文件，必须在此 Task 确认 `dev-flow` 新来源链路已移除 Phase/GAPS/目标态 DESIGN 的旧前置检查；验收记录及 Git 必须核对真实落点；最终更新 `coding-workflow.md` 去除过渡期限制提示。
-**TDD**: true — 新来源和旧交付状态的端到端回归。
-**Changes**: 最小必要的脚本/参考/模板修正、tests/python fixtures、中英技能，以及 `.wopal/rules/coding-workflow.md` 与 `.wopal/docs/LANG/zh-CN/rules/coding-workflow.md`。
-**Verify**: 运行 `dev-flow` 全量相关 pytest/实际 `flow.sh` 模拟命令，检查真实目录白名单、状态机、正式交付和未审批拒绝；核对 `coding-workflow.md` 中英一致且准确反映完整目标态；对照 `skill-creator` 的 description 规范测试 `dev-flow` 10+10 近邻触发场景（与 Proposal 写作、直接实施、两类评审及文档维护交叉比较），记录描述改前/改后和重测结论。
+**Verification Intent**: AC#1–10
+**Behavior**: 现有 `normal`/`--no-worktree`/`--existing-worktree`、commit subject、PR/本地集成、安全清理与进行中旧 Plan 兼容全部不退化；`direct` 与详细 Plan 双路径端到端满足测试、覆盖整次交付 `--base` 的 `verify-docset.py --check-sync`、`verify-proposals.py` 与独立评审；核对并同步 `.wopal/skills/dev-flow/{AGENTS.md,AGENTS.zh-CN.md}`（将 `State Machine` / `plan check` 长期规范更新为新 `Source` 契约、去重后的 `planning → executing` 流程与进行中旧 Plan 最低兼容，移除对新 Plan 的强制 `Product`/`Phase` 配对条款，中英一致）；`.wopal/rules/coding-workflow.md`（及中文审核版）保持最终目标态一致；**本 Task 的最终共享文档收口须在子提案 3（`enhance-implement-sync`）实际合入 `space/<name>` 并对齐最新基线后执行**，同交付收口本体现状设计文档 `.wopal/docs/DESIGN-coding-workflow.md`（完整记录本轮已落地的全部 4 个子提案现状、完整状态机与跨技能衔接契约）及 `.wopal/docs/DESIGN-capabilities.md`（同步更新 `Skill System` 中过时的 `dev-flow` 描述）；`dev-flow` 中英 `description` 完成 10+10 近邻触发收敛。
+**Pre-read**: Tasks 1–6、子提案 3 合入 `space/<name>` 后的最新基线文档、`skill-creator` 技能、`.wopal/skills/dev-flow/{AGENTS.md,AGENTS.zh-CN.md}`、`.wopal/rules/coding-workflow.md`（及中文审核版）、`.wopal/docs/{DESIGN.md,DESIGN-capabilities.md,DESIGN-coding-workflow.md}`、`dev-doc-master/scripts/verify-docset.py`。
+**Design**: 收口 `dev-flow/{SKILL.md,SKILL.zh-CN.md,AGENTS.md,AGENTS.zh-CN.md}` 写清最终状态流转与可选编排职责（清除旧 `Phase`/`GAPS`/目标态 `DESIGN` 前置残留，同步清理 `AGENTS*.md` 中过时的 `Product`/`Phase` 强制配对表述），对齐子提案 3 合入后的最新基线并核对 `coding-workflow.md` 中英最终目标态，按 `dev-doc-master` 现状设计规范更新本体 `.wopal/docs/DESIGN-coding-workflow.md` 与 `DESIGN-capabilities.md` 并运行 `verify-docset.py` 校验通过。
+**TDD**: true — 新来源、去重审批、共享 Delivery 统一集成与旧交付模式的端到端回归测试。
+**Changes**: `.wopal/skills/dev-flow/{SKILL.md,SKILL.zh-CN.md,AGENTS.md,AGENTS.zh-CN.md}`、最小必要脚本/测试收口、`tests/python/`、`.wopal/docs/{DESIGN-coding-workflow.md,DESIGN-capabilities.md}`，以及按需微调 `.wopal/rules/coding-workflow.md` 与 `.wopal/docs/LANG/zh-CN/rules/coding-workflow.md`。
+**Verify**: 运行 `dev-flow` 全量 `pytest` 与真实 `flow.sh` 模拟命令全部通过；运行 `python3 .wopal/skills/dev-doc-master/scripts/verify-docset.py .wopal/docs --main DESIGN.md` 核验本体设计文档（确认已完整覆盖全部 4 份已落地子提案、无未落地虚构内容且链接完整）；核对 `.wopal/skills/dev-flow/{AGENTS.md,AGENTS.zh-CN.md}` 与 `.wopal/rules/coding-workflow.md`（及中文版）中英一致且均无对新 Plan 强制 `Product`/`Phase` 配对的过时条款；依 `skill-creator` 完成 `dev-flow` 10+10 近邻触发测试（与 `dev-proposal`、`df-implement`、`df-proposal-review`、`df-implement-review`、`dev-doc-master` 交叉对照），记录改前/改后与验证限制。
 **Done**:
 Task output: (实施后填写)
 Files touched: (实施后填写)
@@ -294,17 +291,16 @@ Files touched: (实施后填写)
 
 | Wave | Task | Executor | Depends on | Why delegated |
 |---|---|---|---|---|
-| 1 | Task 1 | Wopal 主控 | enhance-doc-contracts、enhance-dev-proposal、enhance-implement-sync | 取证已交付文档合同和 Plan/Graph/CLI 当前契约 |
-| 2 | Task 2 | Wopal 主控 | Task 1 | Plan 合理划分与范围覆盖 |
-| 3 | Task 3 | Wopal 主控 | Task 2 | Task 粒度、委派与并行 |
-| 4 | Task 4 | Wopal 主控 | Task 3 | Graph 依赖及正负模拟 |
-| 5 | Task 5 | Wopal 主控 | Task 1、4 | 新旧来源身份与安全基线 |
-| 6 | Task 6 | Wopal 主控 | Task 5 | Proposal 来源/批准门禁 |
-| 7 | Task 7 | Wopal 主控 | Task 4、6 | direct、多 Plan 与 Graph 衔接 |
-| 8 | Task 8 | Wopal 主控 | Tasks 1–7 | 实际 CLI 与正式交付回归 |
+| 1 | Task 1 | Wopal 主控 | enhance-doc-contracts、enhance-dev-proposal | 源码调用链取证与去重边界定案 |
+| 2 | Task 2 | Wopal 主控 | Task 1 | 可选规划 SOP、详细 Plan/Task 规范与并行防冲突 |
+| 3 | Task 3 | Wopal 主控 | Task 2 | 跨 Delivery Graph 规则与共享 Delivery 防死锁 |
+| 4 | Task 4 | Wopal 主控 | Task 1、3 | 不强绑 Issue 的 `Source` 契约、解除旧 `Phase` 前置与最低历史兼容 |
+| 5 | Task 5 | Wopal 主控 | Task 4 | Proposal 授权门禁与已批准 Proposal 去重开工流程 |
+| 6 | Task 6 | Wopal 主控 | Task 3、5 | 同仓库共享 Delivery 统一验证/集成与多 Plan 衔接 |
+| 7 | Task 7 | Wopal 主控 | Tasks 1–6、`enhance-implement-sync` 已合入最新基线 | 全量回归、模块 `AGENTS*.md`/最终态规则核对、触发收敛与本体现状设计同交付收口 |
 
-**同一份提案、八个 Task、一次用户批准与最终验收。** 由 Wopal 主控逐 Task 亲自实施、实际验证并回填提交，不委派 Fae、不调用 Rook；全部 Task 实施完成后由用户安排其他 Agent 加载 `df-implement-review` 执行独立只读评审。用户仍独立批准、验证与授权正式集成。
+**同一份提案、七个高内聚 Task、一次用户批准与最终验收。** 由 Wopal 主控逐 Task 亲自实施、实际验证并回填提交，不委派 Fae、不调用 Rook；全部 Task 实施完成后由用户安排其他 Agent 加载 `df-implement-review` 执行独立只读评审。用户仍独立批准、验证与授权正式集成。
 
 ## Delivery
 
-此子提案保持 draft，不继承产品总提案的实施授权，获批前不修改技能代码。**本提案在同一轮内完成 dev-flow 的 SOP、Task 委派并行、Graph、真实 CLI 与旧前置规则退出**；不能再把 SOP 或相关旧校验留给下一份实施提案。其他 Skill 所属的 Phase/GAPS/BR 文档生产入口已由前置 `enhance-doc-contracts` 完成退场。Plan 状态机精简、第二次审批去重和自动 Scheduler 不属于本轮。
+此子提案保持 `Stage: draft`，不继承产品总提案的实施授权，获批后依本体进化命令以 `isolated` 隔离模式独立交付：Tasks 1–6 可在子提案 2 合入后与子提案 3 安全并行开发（各自写集物理不重叠），**但本提案 Task 7 的最终共享文档收口与最终合入必须在子提案 3（`enhance-implement-sync`）实际合入 `space/<name>` 并对齐最新基线后执行**。**本提案在同一轮内完成 `dev-flow` 的可选编排 SOP、去重审批与按 Delivery 统一验收、Graph 防死锁、真实 CLI 改造、旧前置退出、`AGENTS*.md` 同步及本体现状设计文档收口**；不另造第三套状态机，不建设自动 Scheduler，本轮不修改 `ontology-evolution`。
