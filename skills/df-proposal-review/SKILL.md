@@ -63,6 +63,8 @@ An **Execution dependency** (for example, a real Linux host needed at a final re
 
 Before emitting a Blocker / Warning, be able to complete this sentence: **“If followed as written, when {concrete trigger} happens, {concrete failure/rework/verification hole} results.”** If you cannot, do not use Blocker / Warning.
 
+**Cost-benefit gate:** For each candidate finding, weigh how likely the problem is, its concrete user impact, and the development, testing, ongoing maintenance, and user review costs of fixing it. Prefer existing skill rules, agent judgment, and normal review; inability to prove a rule with 100% automated enforcement is not itself a defect. If a new mechanism's actual benefit does not clearly outweigh those costs, do not report it as a Blocker, Warning, or Info. When a fix is justified, recommend the smallest effective change.
+
 ## How to work: read once, three lists, then verify
 
 Efficiency is part of review quality — a review that burns time returns noise. Work in two passes.
