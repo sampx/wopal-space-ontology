@@ -70,6 +70,7 @@ ontology 由装配定义与六类能力资产构成。模块细节分见各子�
 | 插件体系   | wopal-plugin 与 TUI 品牌插件                       | `plugins/<name>/`   | `./DESIGN-wopal-plugin.md` |
 | 辅助脚本   | ontology 维护与开发辅助                            | `scripts/`          | `./DESIGN-capabilities.md` |
 | 进化闭环   | 能力演化、同步与防污染审查                         | 跨模块              | `./DESIGN-evolution.md`    |
+| 开发工作流 | 决定记录、实施前评审与文档底座的协作契约           | 跨模块              | `./DESIGN-coding-workflow.md` |
 
 装配定义与能力资产是两个层级的语义：装配定义回答「空间该长什么样、该装什么能力」，能力资产是「可被装配的武器本身」。装配定义本身不作为能力资产被装配单声明；其内容作为始终装配清单成员无条件物化进空间（清单与机制见 `./DESIGN-assembly.md` 的 Sparse Materialization Mechanics）。
 

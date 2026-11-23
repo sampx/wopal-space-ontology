@@ -5,11 +5,11 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-11-20
-- **Stage**: draft
-- **Mode**: (none)
-- **Worktree**: (none)
-- **Branch**: (none)
-- **Base Commit**: (none)
+- **Stage**: archived
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-enhance-dev-proposal
+- **Branch**: ontology-enhance-dev-proposal
+- **Base Commit**: c5ea6ccaf0d4deb932c89888b4de039d712863a4
 - **Final Commit**: (none)
 
 ## Scope Assessment
@@ -120,13 +120,13 @@
 
 ### Agent Verification
 
-1. [ ] 新重大设计从旧决定/当前事实检索后进入 `proposed/<class>/yyyy-mm-dd-<slug>.md`；常规 Bug 不被错误要求建立 Proposal；提案阶段与实施后骨架均遵循 DSH 结构与 `dev-doc-master` 写作标准。
-2. [ ] 产品与项目 `proposals/{proposed,implemented,rejected,archived}/{feature,bug-fix,simplification,architecture,process,testing}/yyyy-mm-dd-<slug>.md` 结构可创建且可检索；单数 `proposal/` 目录、未知分类目录、集中 `INDEX.md`、路径与 `Status`/骨架静态失配、`archived/` 缺少 `Archived: YYYY-MM-DD` 或非 `implemented` 状态、以及当前提案树内的相对断链均被 `verify-proposals.py` 拒绝并给出可复现的修复指引（不建历史数据库、冻结哈希清单或跨仓库扫描）。
-3. [ ] 未批准、被否决（留存 `rejected/` vs 删除）、部分实施（仍留 `proposed/`）、全部交付迁入 `implemented/` 并切换 `Decision`/`Consequences`、**已实施提案后续变更三类分流（纯事实原地改 / 设计调整与优化新建 `proposed/` 提案并同交付双向互链、严禁退回 `implemented/` 或未落地前改老提案 / 完全替代吸收删除或归档冻结）**、`archived/` 永久冻结与范围变更等规则与正负例准确（静态路径/状态/骨架/授权字段由 `verify-proposals.py` 校验，跨提交回退与归档内容篡改由 Agent 规则与评审把关）；未获用户授权不得跳跃到 `approved`/`implemented`，格式检验不能伪造审批。
-4. [ ] `Delivery: direct` 和 `plan` 都可记录实际证据；Plan 的 done/archive 不会使 Proposal 自动 `implemented`；在 `dev-flow` 改造前不会启动尚未支持的实施入口。
-5. [ ] 技能、薄命令、模板、校验器、`.wopal/assembly/archetypes/coding.yaml` 挂载与最终目标态 `.wopal/rules/coding-workflow.md` 中英文语义一致（无过渡期文案残留）；`Assembly Intent` 声明正确且全树装配检查通过；同交付产出的本体现状设计 `.wopal/docs/DESIGN-coding-workflow.md`（仅记载已落地的子提案 1+2 真实能力）与 `.wopal/docs/DESIGN.md` 地图链接通过 `verify-docset.py` 校验；真实业务文件没有被改写。
-6. [ ] `df-proposal-review` 能指出遗漏替代方案、缺少可验证结果、决策边界不清、违规原地改写 `implemented/` 决策（未新建替代提案或未说明替代边界）、将局部交付冒充全部实施等问题；正确业务 Proposal 通过，旧 Plan、本体进化提案与校准后的 Document mode（与子提案 1 现状 DESIGN 规则一致）审查行为准确无回退。
-7. [ ] `dev-proposal` 和 `df-proposal-review` 的中英 `description` 简洁、职责/阶段清楚；每个技能完成 **10 个应触发 + 10 个不应触发** 的实际近邻请求检查，覆盖 Proposal 写作/演进分流 vs 独立评审、普通 Issue/Bug、Plan 审查、本体进化提案和实施后代码评审。记录改前/改后 `description`、误触发/漏触发与修订结果；无真实触发运行时明确标注未自动验证。
+1. [x] 新重大设计从旧决定/当前事实检索后进入 `proposed/<class>/yyyy-mm-dd-<slug>.md`；常规 Bug 不被错误要求建立 Proposal；提案阶段与实施后骨架均遵循 DSH 结构与 `dev-doc-master` 写作标准。
+2. [x] 产品与项目 `proposals/{proposed,implemented,rejected,archived}/{feature,bug-fix,simplification,architecture,process,testing}/yyyy-mm-dd-<slug>.md` 结构可创建且可检索；单数 `proposal/` 目录、未知分类目录、集中 `INDEX.md`、路径与 `Status`/骨架静态失配、`archived/` 缺少 `Archived: YYYY-MM-DD` 或非 `implemented` 状态、以及当前提案树内的相对断链均被 `verify-proposals.py` 拒绝并给出可复现的修复指引（不建历史数据库、冻结哈希清单或跨仓库扫描）。
+3. [x] 未批准、被否决（留存 `rejected/` vs 删除）、部分实施（仍留 `proposed/`）、全部交付迁入 `implemented/` 并切换 `Decision`/`Consequences`、**已实施提案后续变更三类分流（纯事实原地改 / 设计调整与优化新建 `proposed/` 提案并同交付双向互链、严禁退回 `implemented/` 或未落地前改老提案 / 完全替代吸收删除或归档冻结）**、`archived/` 永久冻结与范围变更等规则与正负例准确（静态路径/状态/骨架/授权字段由 `verify-proposals.py` 校验，跨提交回退与归档内容篡改由 Agent 规则与评审把关）；未获用户授权不得跳跃到 `approved`/`implemented`，格式检验不能伪造审批。
+4. [x] `Delivery: direct` 和 `plan` 都可记录实际证据；Plan 的 done/archive 不会使 Proposal 自动 `implemented`；在 `dev-flow` 改造前不会启动尚未支持的实施入口。
+5. [x] 技能、薄命令、模板、校验器、`.wopal/assembly/archetypes/coding.yaml` 挂载与最终目标态 `.wopal/rules/coding-workflow.md` 中英文语义一致（无过渡期文案残留）；`Assembly Intent` 声明正确且全树装配检查通过；同交付产出的本体现状设计 `.wopal/docs/DESIGN-coding-workflow.md`（仅记载已落地的子提案 1+2 真实能力）与 `.wopal/docs/DESIGN.md` 地图链接通过 `verify-docset.py` 校验；真实业务文件没有被改写。
+6. [x] `df-proposal-review` 能指出遗漏替代方案、缺少可验证结果、决策边界不清、违规原地改写 `implemented/` 决策（未新建替代提案或未说明替代边界）、将局部交付冒充全部实施等问题；正确业务 Proposal 通过，旧 Plan、本体进化提案与校准后的 Document mode（与子提案 1 现状 DESIGN 规则一致）审查行为准确无回退。
+7. [x] `dev-proposal` 和 `df-proposal-review` 的中英 `description` 简洁、职责/阶段清楚；每个技能完成 **10 个应触发 + 10 个不应触发** 的实际近邻请求检查，覆盖 Proposal 写作/演进分流 vs 独立评审、普通 Issue/Bug、Plan 审查、本体进化提案和实施后代码评审。记录改前/改后 `description`、误触发/漏触发与修订结果；无真实触发运行时明确标注未自动验证。
 
 ### DSH Principles → Tasks → Verification
 
@@ -165,9 +165,9 @@
 **Changes**: `.wopal/skills/dev-proposal/{SKILL.md,SKILL.zh-CN.md,references/*,templates/*}`，定义路径、分类、骨架与再变更分流契约。
 **Verify**: 创建合法样例（product/project、`proposed`/`approved`/`implemented`/`archived` 及部分替代双向互链）与非法反例（单数目录、未知分类、混留计划期标题、直接把 `implemented/` 改回 `proposed/`），对照契约逐项审核；同时确定 `dev-proposal` `description` 的必加载/不适用意图及与相邻技能的区分，不靠关键词堆砌。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 新增 `dev-proposal` 技能与配套参考/模板（先中文审核版 `SKILL.zh-CN.md`、`references/*.zh-CN.md`、`templates/*.zh-CN.md`，再同步英文正式版）。技能明文固化：完整生命周期状态机（`proposed → approved → implemented → archived`，`rejected` 旁路，`archived/` 无 `implemented` 层）、`{lifecycle}/{class}/yyyy-mm-dd-<slug>.md` 两轴布局与六类闭集、禁用单数 `proposal/`／集中 `INDEX.md`／`.i18n.yaml` 配对、存量前格式只读兼容；`approved` 留在 `proposed/` 防断链、不引入 `implementing`/`verifying`/`done`、部分交付不迁移、Plan 完成不自动 `implemented`；用户显式决定 `Delivery: direct | plan` 且 `direct` 默认由 `df-implement` 配 `git-worktrees` 隔离实施，严禁 Agent 主观评判模型强弱代选；已实施提案再变更三类分流（纯事实原地同步／设计调整与优化必须新建 `proposed/` 并禁止退回 `implemented/` 或未全交付前改老提案、全交付双向互链／完全替代吸收删除或归档冻结，`archived/` 永久只读）；`proposed` 未来时与 `implemented` 现在时双骨架模板，正文写作标准直接引用 `dev-doc-master` 不抄写；诚实边界声明不假装调用尚不存在的 Proposal→Plan CLI。验证：契约审计 31 条全部 PASS（含中英双份与通用性检查，技能资产不含空间名/项目路径/本地语言标签），非法反例 12 条逐条映射到对应拒绝条款、合法样例 5 条（`approved` 三字段、部分替代互链、`implemented` 现在时骨架、`archived` 冻结元信息、`rejected` 状态行理由）全部 PASS，模板英文章节标题在中文审核版中保留且正文节数一致。
+Files touched: `skills/dev-proposal/SKILL.md`（create）、`skills/dev-proposal/SKILL.zh-CN.md`（create）、`skills/dev-proposal/references/lifecycle.md`（create）、`skills/dev-proposal/references/lifecycle.zh-CN.md`（create）、`skills/dev-proposal/references/evolution-triage.md`（create）、`skills/dev-proposal/references/evolution-triage.zh-CN.md`（create）、`skills/dev-proposal/templates/proposal-proposed.md`（create）、`skills/dev-proposal/templates/proposal-proposed.zh-CN.md`（create）、`skills/dev-proposal/templates/proposal-implemented.md`（create）、`skills/dev-proposal/templates/proposal-implemented.zh-CN.md`（create）
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -181,9 +181,10 @@ Files touched: (实施后填写)
 **Changes**: `.wopal/skills/dev-proposal/scripts/verify-proposals.py`、演进/状态/归档参考细化与隔离自动化测试 fixtures。
 **Verify**: 在隔离临时目录运行自动化测试套件与 `python3 scripts/verify-proposals.py` 覆盖全部正负例，确认通过且无真实仓库写入。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: TDD 落地纯 Python 标准库静态校验器 `scripts/verify-proposals.py`（argparse/json/re/sys/pathlib，无第三方依赖、无 subprocess、无 hashlib、不读 `.git`）与隔离回归套件 `scripts/test_verify_proposals.py`。RED 先行：47 条用例在实现缺失时全部失败（`can't open file ... verify-proposals.py` + 31 errors/14 failures），实现后 47/47 ok。覆盖面：目录与六类闭集、单数 `proposal/`、集中 `INDEX.md`、`archived/implemented/` 深层、文件名日期前缀、路径↔`Status` 双向失配、`rejected` 缺一行理由、`approved` 三字段（`Approved`/`Authorized scope`/`Delivery`）与 `direct|plan` 闭集、`archived/` 必填 `Archived: YYYY-MM-DD` 且必须 `Status: implemented`、`implemented/` 四个计划期标题禁用、`proposed`/`implemented`/`rejected` 骨架必填、相对断链与绝对路径、前格式存量只读兼容（默认跳过、`--strict` 变失败）、缺失根目录不崩栈。判别力用 4 个变异体验证：关闭状态/路径校验、关闭禁用标题校验、跳过授权校验、把全部文件当 legacy——分别被 4/5/4/25 条用例击杀。另补 `--link-scope <dir>`（可重复）把引用 Proposal 的外部文档纳入扫描，让「更名/删除后入链断链」在调用方被发现；隔离实测迁移链 `proposed → implemented → archived` 与重命名后未修链（FAIL）/修链后（PASS）/归档后出链失效仍 PASS 全部符合契约。脚本明确不含历史数据库、冻结哈希清单、Git 历史回退比对与跨仓库全量扫描。
+Files touched: `skills/dev-proposal/scripts/verify-proposals.py`（create）、`skills/dev-proposal/scripts/test_verify_proposals.py`（create）、`skills/dev-proposal/references/lifecycle.md`（modify）、`skills/dev-proposal/references/lifecycle.zh-CN.md`（modify）
+Review fix: 独立实施后评审（BLOCKER 4 / WARNING 5 / INFO 2）已全部处置。校验器补齐状态行唯一性、`Class`/`Created` 必填、`Approved` 真实日期与批准人、`Archived` 紧贴 `Status: implemented`、父目录入口下并存的单数 `proposal/`、文件名与 `Created` 日历合法性、`/home/` 与 `/root/` 绝对路径，并让根目录游离 Markdown 显式报跳过而非静默忽略；29 个问题码全部有 `FIX_HINTS` 且各有能独立失败的用例。用例 47 → 77（RED 先行 14 条失败 → GREEN 77 通过），7 个变异体全部被击杀。评审建议中 slug 词数与章节顺序两项经判断属写作约定而非结构不变量，未纳入机械校验（已在 `lifecycle.md` 写明该边界）。第二轮复审追加：`/home/`、`/root/` 定向识别曾误伤 `https://example.com/home/...` 等合法外链，已改为按命中位置判断——落在 URL 区间内的绝对路径片段不算本地路径，URL 之外的真实本地路径仍照常拦截；用例 83 条，4 个变异体（含「豁免过宽」方向）全部被击杀。
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -197,9 +198,10 @@ Files touched: (实施后填写)
 **Changes**: `.wopal/commands/cupdate-proposal.md`、`.wopal/docs/LANG/zh-CN/commands/cupdate-proposal.md`、`.wopal/assembly/archetypes/coding.yaml`、按需微调 `.wopal/rules/coding-workflow.md` 及 `.wopal/docs/LANG/zh-CN/rules/coding-workflow.md`、以及相关测试。
 **Verify**: 在隔离产品/项目样本运行新建（`proposed/<class>/`）、审核、目录迁移（`proposed/` → `implemented/` → `archived/` + 入链修复）、更名/删除断链检测与非法输入模拟；验证命令路由与全树装配引用解析；核对 `coding-workflow.md` 中英一致且零过渡期文案；针对 `dev-proposal` 完成 10+10 正反触发测试和描述收敛，不能误入独立只读评审流程。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 新增薄命令 `commands/cupdate-proposal.md`（`description` 46 字符 ≤ 50，四步：加载契约 → 定归属与起点 → 执行 → 校验，只路由 `dev-proposal`，不复制生命周期算法）及中文审核版 `docs/LANG/zh-CN/commands/cupdate-proposal.md`（`description` 20 字符，步骤与要点数一致）。`assembly/archetypes/coding.yaml` 挂载 `skill:dev-proposal` 与 `command:cupdate-proposal.md`；全树装配引用解析实测 47 项引用（4 agents / 15 skills / 6 rules / 19 commands / 2 plugins）全部 OK，0 unresolved。核对 `rules/coding-workflow.md` 及中文审核版：已处于子提案 1 落盘的最终目标态，过渡期文案扫描（尚未/暂未/过渡/temporary/not yet/TODO 等）零命中，故本轮不改其内容；EN/ZH 结构对账（frontmatter keywords 20 项完全一致、`trigger` 同为 `model_decision`、H2 3 / H3 2、路由表 9 行、跨层硬约束 1-2-3）全部 PASS，且规则中提到的 `dev-proposal`、`cupdate-proposal`、`df-proposal-review` 等名称与实际落地的 skill/command 一一对应。`dev-proposal` 保持诚实边界：正文明确「在 `dev-flow` 支持前不要假装或自动调用不存在的 Proposal→Plan 命令」，中英一致；引用到的 `dev-flow`、`df-implement`、`git-worktrees`、`df-proposal-review`、`dev-doc-master` 均为已存在技能。依 `skill-creator` 完成 `dev-proposal` 10+10 近邻触发验证：10 条应触发（写提案/记录批准与 Delivery/迁移 implemented/归档清理/已实施提案调整分流）全部正确归入 `dev-proposal`，10 条不应触发分别正确落到 `df-proposal-review`（独立评审）、`df-implement-review`（实施后评审）、`dev-doc-master`（PRD、DESIGN 拆分）、`dev-flow`（Plan 拆解）、`space-master`（AGENTS.md）、`ontology-evolution`（本体进化）或无人认领（一次性脚本、普通 Bug 修复），0 误触发 0 漏触发；`description` 的排除子句逐项覆盖普通 Bug、独立评审、PRD/DESIGN、本体提案与 Plan 编排五类近邻，未堆砌关键词。验证限制：当前环境无法对真实模型做运行时注入触发，故采用确定性路由核对（收集全仓已挂载技能 `description` + 逐条标注期望归属）替代，真实触发仍需重启 ellamaka 后人工抽检。
+Files touched: `commands/cupdate-proposal.md`（create）、`docs/LANG/zh-CN/commands/cupdate-proposal.md`（create）、`assembly/archetypes/coding.yaml`（modify）
+Review fix: `rules/coding-workflow.md` 与中文审核版的路由表补一句：已批准 Proposal 中记录的 `Delivery` 选择优先于「简单有界任务直接 `df-implement`」的经验判断（W-01）；中英同步，未加入过渡期文案，装配引用复检 46 项全部可解析。
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -220,9 +222,11 @@ Files touched: (实施后填写)
 **Verify**: 分别盲审正确与缺陷业务 Proposal（含“违规原地篡改已实施提案”反例）、一份历史 Plan、一份旧本体提案与一份无 `Sub-DESIGNs` 头部的多模块现状 DESIGN；报告须指出明确问题和证据，不改变既有结构与复审目标；运行 `verify-docset.py` 核验本体设计文档（确认无未落地能力冒充现状）；针对 `df-proposal-review` 完成 10+10 正反触发测试，涵盖写作/演进分流、实施后代码评审和旧审查正例，记录改前/改后 `description` 与结果。
 
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: 升级 `df-proposal-review`（SKILL.md / SKILL.zh-CN.md / references/review-rubric.md / references/review-rubric.zh-CN.md 四份同批同步，中英 H2+H3 数分别为 36/36 与 44/44，完全对齐）。新增**业务 Proposal 只读审查模式**（P1 决策是否真的定下来——含批准链与"格式有效≠授权"；P2 事实核实；P3 备选方案真实性 + 替代/演进合规台账，明确拦截原地改写 `implemented/`、退回 `proposed/`、未全交付先改老记录、完全替代后新老并存等四类 Blocker；P4 可证伪性含部分交付不得冒充全部；P5 精简），并单列「审阅由已批准 Proposal 派生的 Plan」小节：只核查范围忠实度、覆盖完整、顺序交接，明确不做第二次设计审批，内部手法差异不算 finding。**完整保留** `Cost-benefit gate`（投入产出门槛）与 `Review-scope gate`（评审范围门槛）原文，保留 Plan 模式 Q1–Q4、Document 模式 D1–D4、报告结构、PASS/REVISE/BLOCK 三裁决与 2 轮收敛目标（技能目录仍无脚本层，不新造语义关键字门禁）。校准 Document 模式两处过时表述：删除 `bidirectional index`（主 DESIGN 头部 `Sub-DESIGNs` 强枚举），改为"子文档靠 `DESIGN-*.md` 文件名 + `Parent` 链接发现、主文档正文链下来、无头部索引是正确的"，并明确把"头部没列子文档"判为误报方向；把笼统 `target-state writing` 拆成按文档类型分别判定（项目/模块现状 DESIGN 只写已交付现实、禁历史叙述；产品 PRD/产品 DESIGN 允许前瞻，仅过程叙事与虚假上线声明算问题）。四份文件 `bidirectional index`/`双向索引`/`target-state writing`/`目标态写作` 残留计数全部为 0。
+验证：① 盲审 5 份隔离样例（主控亲自只读评审，未委派 Fae、未调用 Rook，遵守本提案 Delegation Strategy）：`good` 脚本 PASS → 语义 PASS；`missing-alternatives`（把备选章节改名）脚本 FAIL(SKELETON_MISSING_SECTION) → 语义 REVISE；`no-boundary`（唯一 AC 为"更干净更好维护"且无边界）脚本 PASS → 语义 BLOCK；`tampered`（原地把 `implemented/` 的 Decision 改成新行为、仍是 `Status: implemented`）脚本 PASS → 语义 BLOCK（P3 反例命中）；`overclaim`（已迁 `implemented/` 且写"Two of five consumers migrated ... The approved scope is complete"）脚本 PASS → 语义 BLOCK（P4 命中）。其中三份脚本全 PASS 而语义均有实质缺陷，实证了"格式门禁 ≠ 设计合格"的分工必要性，也证明升级后的技能可在无脚本线索时识别"违规原地篡改"与"部分冒充全部"。② 旧域无回退：一份历史 Plan（`Status: executing`、两个 Task、AC 引用）按 Q1–Q4 仍可正常评审；本体进化提案的 Q4 能力门禁原文保留；一份**无 `Sub-DESIGNs` 头部**的多模块现状 DESIGN 通过 `verify-docset.py`（PASS），并按校准后 D1 四项检查（无头部枚举、子文档 `Parent` 回链、正文模块地图可达、地图不在 Reference Documents）全部 PASS——同一份文档在旧 `bidirectional index` 文本下会被误报为"缺头部索引"，据此确认误报已消除。③ 同交付产出本体现状设计 `docs/DESIGN-coding-workflow.md`（Status: Active、7 个 H2、含 `## Business Rules and Failure Boundaries`、无 `Sub-DESIGNs` 头部），只在隔离工作树内新落地的子提案 1+2 真实能力（`dev-doc-master` / `dev-proposal` / `verify-proposals.py` 22 个问题码分 5 组 / `verify-docset.py` 12 项检查 / `df-proposal-review` 三模式 / `rules/coding-workflow.md` 路由 / archetype 挂载），未写入任何子提案 3/4 能力；在 `docs/DESIGN.md` 的 `## Module Architecture` 表格新增一行挂链。文档集门禁：因隔离 worktree 的 sparse 范围不含 `../../docs/products/` 与 `../../projects/`，直接在隔离树跑会产出 19 条 isolation-artifact 链接失败，故按空间真实层级搭镜像（`.wopal/docs` + 符号链接 `docs/products`、`projects/ellamaka`、`projects/wopal-cli`）分别跑基线（改动前 HEAD 的 `docs/`）与本次改动，逐行 diff 结果**零新增失败**（唯一差异是 `DESIGN.md:244 → 245` 的行号位移，由新增表格行引起）；新增的 `DESIGN-coding-workflow.md` 未出现在任何 FAIL 行中。既有失败均为改动前已存在（6 份 DESIGN 缺 `## Business Rules and Failure Boundaries`、`DESIGN-distribution.md` 正文未挂链、`DESIGN-plan-orchestration.md` 目标文件在空间中本就不存在），按"不新增 warning、不替存量债买单"处理，未顺手改动无关文档。④ 事实核查：文档中"22 个问题码""47 条用例""12 项检查（11 项固定 + 第 12 项 `--check-sync` 可选）""description 46 字符""archetype 两处挂载"逐项对回源码/装配单确认；引用的 24 个路径中 6 个为预期例外（2 个稀疏范围外、1 个是被禁示例 `INDEX.md`、3 个脚本按技能前缀引用且实际存在），自身相对链接 0 断链。⑤ 按 `skill-creator` 完成 `df-proposal-review` 10+10 近邻触发验证：10 条应触发（评审 proposal / Plan / 进化提案 / DESIGN / 子 DESIGN / 已批准提案的替代合规 / 可证伪性检查）全部正确归入，10 条不应触发分别落到 `df-implement`（照提案写代码）、`dev-proposal`（新建提案、生命周期迁移）、`df-implement-review`（实施后评审、PR 回归）、`space-master`（README）、`skill-creator`（改 description）、或无人认领（Bug 排查、修断链、跑测试），0 误触发 0 漏触发；`description` 改前为"Review a proposal before execution. Use when the user asks to review, check, or verify a Plan, evolution proposal, or design document (PRD, DESIGN)…"（未覆盖业务 Proposal、未排除作者职责与实施后评审），改后补上 business/project Proposal 并显式排除 `dev-proposal`/`ontology-evolution` 作者职责与 `df-implement-review` 代码评审。验证限制：当前环境无法对真实模型做运行时注入触发，采用确定性路由核对（收集仓内已挂载技能 `description` + 逐条标注期望归属）替代，真实触发需重启 ellamaka 后人工抽检；盲审由主控在同一上下文内完成，独立性弱于外部评审者，最终独立评审仍按提案安排由加载 `df-implement-review` 的其他 Agent 执行。
+Files touched: `skills/df-proposal-review/SKILL.md`（modify）、`skills/df-proposal-review/SKILL.zh-CN.md`（modify）、`skills/df-proposal-review/references/review-rubric.md`（modify）、`skills/df-proposal-review/references/review-rubric.zh-CN.md`（modify）、`docs/DESIGN-coding-workflow.md`（create）、`docs/DESIGN.md`（modify）
+Review fix: 中文 `review-rubric.zh-CN.md` 的 D2 表格里混入了 6 行业务 Proposal / Plan 派生案例（英文对应行本就在「校准演练」表），已搬回同位置，现中英 D2 均为 5 行、校准演练均为 29 行，结构对等；`docs/DESIGN-coding-workflow.md` 校正为 29 个问题码分五组 + 1 个用法错误码 `ROOT_MISSING`，并补充根目录游离 Markdown 的 `outside-lifecycle-layout` 跳过规则与 77 条用例口径。
+- [x] The implementation agent has completed all development and verification steps above.
 
 ## Delegation Strategy
 

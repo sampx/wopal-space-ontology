@@ -1,14 +1,19 @@
 ---
 name: df-proposal-review
 description: >
-  Review a proposal before execution. Use when the user asks to review, check, or verify a Plan, evolution proposal, or design document (PRD, DESIGN), e.g. "review this plan", "check proposal", "review design doc".
+  Independently review a proposal before execution, read-only. Use when the
+  user asks to review, check, or verify a Plan, an ontology evolution proposal,
+  a business/project Proposal, or a design document (PRD, DESIGN), e.g.
+  "review this plan", "check proposal", "review design doc". Do not use to
+  author or maintain proposals (use dev-proposal or ontology-evolution) or to
+  review finished code (use df-implement-review).
 ---
 
 # df-proposal-review — Proposal Review
 
 **You judge one thing: if someone follows this proposal as written, will the work succeed, deliver the goal, and do it the lean way?**
 
-Three artifacts share this skill because they are the same act at different sizes: a design document proposes what to build, a Plan proposes how to execute it, an evolution proposal proposes how to change a capability. All three are read before work starts, and all three die the same death — executed literally, they fail or over-deliver.
+Four artifacts share this skill because they are the same act at different sizes: a design document proposes what to build, a Plan proposes how to execute it, an evolution proposal proposes how to change a capability, and a business Proposal proposes which decision to make. All four are read before work starts, and all four die the same death — taken literally, they fail or over-deliver.
 
 **Review substance before mechanics.** For a DESIGN, first decide whether its goal, behavior, boundaries and ownership are correct, complete and implementable against the real call paths. For a design-backed Plan, first trace **each new or changed DESIGN contract → implementation Task → observable acceptance**, including real entry points, failure paths and preserved behavior. Only after closing that loop check task ordering, repository facts, commands and formatting. A correct-looking checklist cannot compensate for a missing design decision or undelivered behavior. Report consequential architecture/coverage findings before minor verification hygiene.
 
@@ -18,14 +23,17 @@ Decide once, from the artifact itself:
 
 - **Plan mode** — the artifact schedules work: tasks, dependencies, acceptance criteria. This covers dev-flow Plans and ontology evolution proposals.
 - **Document mode** — the artifact states intent: goals, boundaries, requirements, architecture. No tasks yet. This covers PRDs, DESIGNs, sub-DESIGNs, and any design doc.
+- **Business Proposal mode** — the artifact records a decision awaiting approval: a problem, a chosen path, the alternatives, acceptance criteria, risks. This covers business/project Proposals living under `proposals/{lifecycle}/{class}/`.
 
 If the artifact has both faces (a design doc with a task list), run both modes.
+
+The three modes are not interchangeable. A business Proposal is not a Plan with fewer tasks: it carries a decision the user must own. Reviewing it as a Plan produces "missing task" findings that do not exist, and reviewing a Plan as a Proposal re-opens a decision the user already closed.
 
 When asked to review a DESIGN **and** the Plan derived from it, review the DESIGN in Document mode first, then review Plan coverage of that design in Plan mode. Treat the working tree's current DESIGN content as the authority, even when uncommitted; do not drift into reviewing an older integration-branch version.
 
 ## What the script owns
 
-In Plan mode, `flow.sh plan check` already gates form: field presence, placeholder text, TDD↔Behavior pairing, checkbox shape, AC command presence, status validity. An evolution proposal has its own gate: `wopal space evo check`. Re-checking any of that is waste and produces noise. Your scope is what a regex cannot compute — whether the parts fit together, fit reality, and add up to the goal.
+In Plan mode, `flow.sh plan check` already gates form: field presence, placeholder text, TDD↔Behavior pairing, checkbox shape, AC command presence, status validity. An evolution proposal has its own gate: `wopal space evo check`. A business Proposal has `dev-proposal/scripts/verify-proposals.py`, which owns the layout, the lifecycle skeleton, the approval fields and the link graph. Re-checking any of that is waste and produces noise. Your scope is what a regex cannot compute — whether the parts fit together, fit reality, and add up to the goal.
 
 A design-backed implementation Plan must not include Tasks to author, revise, approve or validate its controlling DESIGN. Design readiness and document quality gates precede the Plan; the Plan delivers implementation behavior. If such work appears in a Task or a feature AC, flag the misplaced ownership and check whether real implementation coverage was displaced. Do not focus the review on whether the document-check command happens to pass; that does not prove the implementation goal.
 
@@ -74,10 +82,10 @@ Efficiency is part of review quality — a review that burns time returns noise.
 **Pass 1 — establish the goal and design-to-delivery map.** For DESIGN, write down the intended behavior, scope, ownership and actual code entry paths. For Plan, extract the new/changed clauses from its cited Active DESIGN and map each to its Task, AC and affected public/runtime path. Missing links here are the first findings. Then read the artifact once with line numbers and fill three verification lists:
 
 1. **Facts** — every concrete claim about the repo, the system, or other documents: counts, paths, line ranges, doc sections, IDs, commands, flags.
-2. **Symbols** — every code-like name in backticks (Plan mode) or every named component/capability (Document mode), with where it is created and where it is used.
+2. **Symbols** — every code-like name in backticks (Plan mode), every named component/capability (Document mode), or every named decision, default, boundary, and supersession target (Business Proposal mode), with where it is created and where it is used.
 3. **Files** — every path mentioned anywhere, and where it was mentioned.
 
-**Pass 2 — resolve coverage and design risks before checking the lists.** Document mode: D3/D1, then D2/D4; verify actual call paths and sibling contracts. Plan mode: Q3/Q1, then Q2/Q4; Q3 requires the cited DESIGN and the real implementation paths, not merely the Plan's own claims. Batch factual checks only after the behavioral trace. Do not re-read the artifact between checks — each return costs more than it saves.
+**Pass 2 — resolve coverage and design risks before checking the lists.** Document mode: D3/D1, then D2/D4; verify actual call paths and sibling contracts. Plan mode: Q3/Q1, then Q2/Q4; Q3 requires the cited DESIGN and the real implementation paths, not merely the Plan's own claims. Business Proposal mode: P1/P3, then P2/P4/P5; P1 requires the approval trail, and P3 requires the pre-existing `implemented/` records the proposal touches. Batch factual checks only after the behavioral trace. Do not re-read the artifact between checks — each return costs more than it saves.
 
 Verify, don't survey: `test -e` for paths, `sed -n 'Np'` for line anchors, `rg -n` for sections and symbols. Never read a whole design doc to confirm one section. A normal proposal settles in roughly 15–25 commands.
 
@@ -156,6 +164,90 @@ Severity — Q4 never blocks: speculative abstraction, reinvented infrastructure
 
 For ontology evolution proposals, add one gate on top of Q1–Q4: the landed result must satisfy the platform's own capability standards — frontmatter `name` + `description`, triggering conditions in the description, body = workflow + output + notes, long content offloaded to `references/`, no invented structure. A proposal whose deliverable violates them → **WARNING**.
 
+The same capability gate applies when a business Proposal's deliverable includes a skill, rule, or command: the artifact it promises must obey those standards. This gate checks the proposal's stated deliverable; the implementation review re-checks the landed files.
+
+## Business Proposal mode: the five questions
+
+The decision is the product here, not the prose. Start from P1 and P4: an unowned decision or an unexamined alternative invalidates everything below it.
+
+| | Question | Catches |
+|---|---|---|
+| P1 | Is the decision actually decided? | a proposal that describes a direction without committing to it, boundaries the user never set, scope that drifted after approval |
+| P2 | Do the stated facts hold? | wrong paths, a "current behavior" claim the code contradicts, numbers nobody counted |
+| P3 | Are the alternatives real? | straw alternatives invented to make the chosen path look inevitable, a genuine contender missing |
+| P4 | Can it be falsified? | acceptance criteria that pass either way, "improve" with no observable outcome, risks listed but never bounded |
+| P5 | Is this the lean decision? | machinery the problem does not need, a proposal whose only content is a task list |
+
+### P1 — Is the decision actually decided?
+
+Find the sentence where a choice is made. If a reader finishes `## Proposal`/`## Decision` and still cannot state what was chosen and what was excluded, the decision is not made — it is described.
+
+Check the boundary in the same pass:
+
+- A decided proposal says what it will **not** do. If the boundary is blank, the implementer invents one.
+- `Status: approved` must trace to a real user approval and a stated `Authorized scope`. A formatted approval block is authorization **evidence**, not authorization: if the scope reads "everything" or restates the title, treat the scope as unstated and say so. The verifier can confirm shape; only the conversation confirms the grant.
+- After approval, any new decision or material scope change needs fresh confirmation. A proposal whose approved scope quietly grew is unapproved at the new size.
+
+Severity: no decidable decision, or an approved scope that actually authorizes nothing → **BLOCKER**. Missing boundary on a load-bearing area → **WARNING**.
+
+### P2 — Do the stated facts hold?
+
+Same probe as Q2/D2. The authority is the repository, not the prose. Settle each concrete claim mechanically and state the content snapshot you checked.
+
+Severity: a false premise the decision leans on → **BLOCKER**. Stale claim with no effect on the decision → **WARNING**. Cosmetic drift → **INFO**.
+
+### P3 — Are the alternatives real?
+
+`## Alternatives considered` exists so a rejected path is not re-proposed next month. Read each entry against this test: **would a reasonable author have genuinely weighed this, and does the stated reason actually defeat it?**
+
+- An alternative dismissed because it "adds complexity", with no statement of what breaks or what it costs → not a real rejection.
+- A missing alternative that a peer document, a sibling implementation, or the user already raised → the comparison is incomplete.
+- An alternative resurrected from an earlier proposal without saying why the earlier verdict no longer holds → the triage is missing.
+
+**Supersession compliance is checked here, not in a separate pass.** For a decision that touches an existing `implemented/` record:
+
+| The proposal does this | Verdict |
+|---|---|
+| Changes a default, boundary, or decision, and states which earlier decisions it supersedes and which stay valid | fine — partial supersession, correctly declared |
+| Changes an `implemented/` decision in place without a new proposal | **BLOCKER** — silent rewrite of a historical decision |
+| Moves a former `implemented/` proposal back to `proposed/` for re-approval | **BLOCKER** — the closed transaction record disappears |
+| Claims to replace an earlier decision but edits the old record before the new scope is fully delivered | **BLOCKER** — readers see an unshipped change presented as fact |
+| Fully replaces an earlier decision and leaves the old record active and contradictory | **BLOCKER** — two claims in force, no way to choose |
+| Fully replaces it, and the delivery absorbs the old rationale or archives the old record | fine |
+| Syncs only paths, names, or implementation detail, decision unchanged | fine — fact-only sync is the required behavior |
+
+Severity for the rest: a rejected alternative that does not actually lose, or a genuinely missing contender → **WARNING**. A cosmetic wording gap → **INFO**.
+
+### P4 — Can it be falsified?
+
+For each acceptance criterion: **if the delivered work were wrong, would this catch it?** A criterion that restates the goal, or that no plausible implementation could fail, is decoration.
+
+- `## Risks` must bound each risk, not merely name it. "Performance might degrade" with no threshold and no observation method is a sentence, not a risk.
+- The decision must name the observable outcome that would show it was the wrong call. Without that, nobody can revisit it later.
+- When the proposal claims partial delivery, check the claim against the evidence: a proposal resting in `proposed/` with `Status: approved` is legitimately partial, and saying so is not a defect. A proposal that presents a partial scope as complete is.
+
+Severity: acceptance criteria that cannot fail, or a complete-delivery claim the evidence contradicts → **BLOCKER**. Unbounded risk, no revisit signal → **WARNING**.
+
+### P5 — Is this the lean decision?
+
+Climb the same ladder as Q4, applied to the decision rather than the task list:
+
+1. Does the decision need to be made at all — is the current behavior actually a problem?
+2. Is the answer already settled by an existing `implemented/` record or an active rule? Cite it.
+3. Is a smaller decision enough — a default change instead of a new subsystem?
+4. Does it clean up what it replaces — the old decision, its record, its links?
+
+Severity: same cap as Q4. Options that duplicate a settled decision → **WARNING** (fix is to cite the existing record). A shorter statement of the same decision → **INFO**. Nothing to cut → `Lean already`.
+
+### Reviewing the Plan derived from an approved Proposal
+
+This is the most common mis-scope, so it is stated plainly: **reviewing a Plan that an approved Proposal authorized is not a second design approval.**
+
+- The design decision is closed. Do not re-open it, re-rank the alternatives, or ask whether the user should have chosen differently.
+- Check only: does each Task deliver a slice of the approved scope, is any Task outside that scope, does the Plan's own ordering and definition-of-done hold, and would executing it actually produce the accepted outcome.
+- A Task that exceeds the authorized scope → **BLOCKER** (it is unapproved work). A Task that under-delivers the scope while claiming completion → **BLOCKER**. A Task that merely uses a different internal approach than the Proposal sketched → not a finding, as long as the approved behavior and boundary hold.
+- If the Plan reveals that the approved scope cannot be delivered as stated, that is a **Requirement Question** for the user — not a licence to redesign the Proposal during review.
+
 ## Document mode: the four questions
 
 Document mode has no tasks to schedule, so the questions reshape. Q4 keeps its name and its severity cap.
@@ -171,13 +263,22 @@ Document mode has no tasks to schedule, so the questions reshape. Q4 keeps its n
 
 ### D1 — Does the document cohere?
 
-Contradictions between sections; terms used before they are defined or used two ways; components or states whose ownership is unstated. Also structure conformance: when the document belongs to the `dev-doc-master` set, its structural rules (header zones, bidirectional index, naming) are governed by `dev-doc-master/references/consistency.md` — and the mechanical part of that is already scanned by its quality gate script (`scripts/verify-docset.py`). Run it when available; spend your review on what the script cannot see.
+Contradictions between sections; terms used before they are defined or used two ways; components or states whose ownership is unstated. Also structure conformance: when the document belongs to the `dev-doc-master` set, its structural rules (header zones, naming, sub-DESIGN discovery) are governed by `dev-doc-master/references/consistency.md` — and the mechanical part is already scanned by its quality gate script (`scripts/verify-docset.py`). Run it when available; spend your review on what the script cannot see.
+
+Do **not** expect or require a `Sub-DESIGNs` enumeration in a main DESIGN header. Sub-documents identify themselves by `DESIGN-*.md` filename and a `Parent` link, and the main document links them from its body — typically the `## Module Architecture` map. A main DESIGN with no header index is correct, not incomplete; a sub-document that is only reachable from the header is the defect (the script reports it as an orphan).
 
 Severity: internal contradiction on a core statement → **BLOCKER**; undefined term with real ambiguity, missing ownership for a component the doc introduces → **WARNING**.
 
 ### D2 — Are its statements about reality true?
 
-Same mechanical probe as Q2: every claim about the code, the system, or another document gets settled against reality. Sibling-document conflicts follow the authority rule from Q2. Documents in the `dev-doc-master` set also describe **current design only, not change history** — "deprecated", "legacy", "moved from", "migration" narration is a finding, because a reader needs to understand how the system works now, not its history.
+Same mechanical probe as Q2: every claim about the code, the system, or another document gets settled against reality. Sibling-document conflicts follow the authority rule from Q2.
+
+History narration is judged per document kind, because the `dev-doc-master` set draws the line in two places:
+
+- **Project and module present-state DESIGNs** (`DESIGN.md`, `DESIGN-<module>.md`) describe **shipped, verified reality only**. "deprecated", "legacy", "moved from", "no longer", "已废弃" narration is a finding here, and so is any unbuilt proposal content presented as a live capability. The reader needs to know how the system works now.
+- **Product PRDs and product DESIGNs** own product intent and may plan ahead of implementation. Forward-looking content is legitimate; what remains a finding is *process narration* — how the plan changed, what was tried and dropped — and any claim that something already ships when it does not.
+
+Applying the present-state rule to a product DESIGN, or tolerating history narration in a module DESIGN, is a mis-scoped finding. Name the document kind in the finding.
 
 Severity: claim the code contradicts on a critical path → **BLOCKER**; stale claim with no effect on decisions → **WARNING**; minor wording or line-number drift → **INFO**.
 
@@ -220,13 +321,13 @@ BLOCK  — at least one Blocker
 
 `Unverified` never changes the verdict.
 
-At review start, build one todo item per question and mark them off as you go. All four must be attempted before any verdict. Out of budget, do not fake completion: emit the report with an explicit `UNCOVERED CHECKS` section naming what was not done and why.
+At review start, build one todo item per question and mark them off as you go. All questions for the chosen mode must be attempted before any verdict. Out of budget, do not fake completion: emit the report with an explicit `UNCOVERED CHECKS` section naming what was not done and why.
 
 ```markdown
 # Proposal Review — {proposal name}
 
 ## Summary
-- Review type: Proposal (Plan mode | Document mode)
+- Review type: Proposal (Plan mode | Document mode | Business Proposal mode)
 - Verdict: PASS | REVISE | BLOCK
 - Readout: Implementable | Plan / validation revision needed | Design change needed
 - Counts: Blocker N / Warning N / Info N / Unverified N

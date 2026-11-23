@@ -2,7 +2,7 @@
 
 Detail behind the questions, per mode. Load this when a question needs its full method, the command cookbook, or a worked example.
 
-**Purpose reminder**: this review answers "will this work if executed or adopted as written". Form is owned elsewhere — `flow.sh plan check` for dev-flow Plans, `wopal space evo check` for evolution proposals, `scripts/verify-docset.py` for the doc-master document set.
+**Purpose reminder**: this review answers "will this work if executed or adopted as written". Form is owned elsewhere — `flow.sh plan check` for dev-flow Plans, `wopal space evo check` for evolution proposals, `dev-proposal/scripts/verify-proposals.py` for business Proposals, `scripts/verify-docset.py` for the doc-master document set.
 
 Contents:
 1. [Reading the artifact](#1-reading-the-artifact)
@@ -10,9 +10,10 @@ Contents:
 3. [Plan mode — Q2](#3-plan-mode--q2-are-its-statements-about-the-repo-true)
 4. [Plan mode — Q3](#4-plan-mode--q3-will-executing-it-deliver-the-goal)
 5. [Plan mode — Q4 Lean](#5-plan-mode--q4-lean)
-6. [Document mode — D1–D4](#6-document-mode--d1d4)
-7. [Severity calibration](#7-severity-calibration)
-8. [Worked examples](#8-worked-examples)
+6. [Business Proposal mode — P1–P5](#6-business-proposal-mode--p1p5)
+7. [Document mode — D1–D4](#7-document-mode--d1d4)
+8. [Severity calibration](#8-severity-calibration)
+9. [Worked examples](#9-worked-examples)
 
 ---
 
@@ -187,7 +188,78 @@ Violation → WARNING. This gate checks the *proposal's stated deliverable*; the
 
 ---
 
-## 6. Document mode — D1–D4
+## 6. Business Proposal mode — P1–P5
+
+A business Proposal records a decision, so the review is about the decision's soundness, not its prose. Read the proposal once, then read the `implemented/` records it touches before forming any verdict: a supersession claim can only be judged against the record being superseded.
+
+### 6.1 P1 — Is the decision actually decided?
+
+Locate the sentence that chooses. Then test it two ways:
+
+1. **State the choice from memory.** Close the proposal. Can you say what was chosen and what was excluded? If not, the reader will invent the answer during implementation.
+2. **Test the boundary.** Does the proposal say what it will not do? An empty boundary is not a scope; it is a blank cheque.
+
+Approval trail:
+
+| Signal | Reading |
+|---|---|
+| `Status: approved`, plus `Approved` with a date and a person | plausible authorization; still confirm the conversation, never the file alone |
+| `Authorized scope` names concrete inclusions **and** exclusions | usable scope |
+| `Authorized scope` says "everything", repeats the title, or names a topic with no edge | scope absent → WARNING, or BLOCKER when a Task depends on the missing edge |
+| Scope grew after approval with no fresh confirmation | unapproved at the new size → BLOCKER |
+| `Status: approved` with no approval block | the verifier catches the shape; report it as unauthorized content, not a formatting nit |
+
+**Do not accept a valid format as proof of approval.** The verifier checks that the fields exist and read correctly. Only the conversation establishes that a human granted them. When the review has no access to that conversation, say so under `Unverified` rather than assuming either way.
+
+### 6.2 P2 — Do the stated facts hold?
+
+Same command cookbook and revision discipline as §3. A proposal usually makes fewer, heavier claims than a Plan: file paths, current defaults, error strings, counts, and "today the system does X". Each one is a premise for the decision, so a false one is expensive.
+
+### 6.3 P3 — Are the alternatives real?
+
+For each alternative, ask whether a reasonable author would genuinely have weighed it, and whether the stated reason actually defeats it. Then check the supersession ledger:
+
+| Situation | Verdict |
+|---|---|
+| New proposal changes a default/boundary/decision and names the superseded and surviving parts of the older `implemented/` record, with a relative link | fine |
+| `implemented/` decision edited in place, no new proposal | BLOCKER — a historical decision was rewritten |
+| Former `implemented/` proposal moved back to `proposed/` | BLOCKER — the transaction record is gone |
+| Old `implemented/` record edited before the new scope is fully delivered | BLOCKER — unshipped change presented as current fact |
+| Full replacement with the old record left active and contradictory | BLOCKER |
+| Full replacement with the old rationale absorbed, or the old record archived | fine |
+| Paths, names, or implementation details synced, decision unchanged | fine — required behavior |
+
+The mechanical part (does the file's `Status` match its directory, is the skeleton right, do links resolve) belongs to `verify-proposals.py`. Do not repeat it; use its output as the starting fact base.
+
+### 6.4 P4 — Can it be falsified?
+
+Apply the "if it were broken, would this catch it" test to every acceptance criterion. Then check the risk section: a named risk with no bound and no observation method cannot be managed, and a decision with no revisit signal cannot be corrected later.
+
+Partial-delivery discipline: a proposal in `proposed/` with `Status: approved` is legitimately partial. The finding is the opposite — claiming the approved scope is complete when the evidence shows a subset, or presenting a partial scope in the wording of full delivery.
+
+### 6.5 P5 — Is this the lean decision?
+
+Same ladder as §5, applied to the decision:
+
+1. Does the decision need to exist — is current behavior actually a problem?
+2. Is it already settled by an `implemented/` record or an active rule? Name the file.
+3. Is a smaller decision enough?
+4. Does it clean up the decision it replaces?
+
+### 6.6 Reviewing the Plan derived from an approved Proposal
+
+The decision is closed; this review is about execution. Check:
+
+- **Scope fidelity** — every Task maps to a slice of the authorized scope, and no Task exceeds it.
+- **Coverage** — every part of the authorized scope has a Task; nothing is quietly dropped.
+- **Ordering and handoff** — normal Plan-mode Q1/Q3 concerns, unchanged.
+- **No second approval** — a Task that merely chooses a different internal approach, uses another library, or splits the work differently is not a finding, as long as the approved behavior and boundary hold.
+
+A Task outside the approved scope → BLOCKER (unapproved work). A silently dropped part of the scope, presented as complete → BLOCKER. If the Plan shows the approved scope cannot be delivered as written, raise a Requirement Question for the user; do not redesign during review.
+
+---
+
+## 7. Document mode — D1–D4
 
 No tasks to schedule, so the questions reshape. Q4's name and severity cap carry over.
 
@@ -195,7 +267,9 @@ No tasks to schedule, so the questions reshape. Q4's name and severity cap carry
 
 Read for: contradictions between sections; terms used before definition or used two ways; components, states, or contracts the document introduces without an owner; sections that depend on context the document never provides.
 
-**Structure conformance**: when the document belongs to the `dev-doc-master` set, structural rules (header zones, bidirectional index, naming, field vocabulary) are governed by `dev-doc-master/references/consistency.md`. The mechanical part is already scanned by its quality gate (`scripts/verify-docset.py`) — run it when available and spend your review on what the script cannot see: whether the *content* honors the structure (a header pointing at a document that no longer governs this one, a companion misclassified as a sub-design).
+**Structure conformance**: when the document belongs to the `dev-doc-master` set, structural rules (header zones, naming, field vocabulary, sub-DESIGN discovery) are governed by `dev-doc-master/references/consistency.md`. The mechanical part is already scanned by its quality gate (`scripts/verify-docset.py`) — run it when available and spend your review on what the script cannot see: whether the *content* honors the structure (a link pointing at a document that no longer governs this one, a companion misclassified as a sub-design).
+
+**No header sub-DESIGN index.** Main DESIGNs — product and project alike — deliberately omit a `Sub-DESIGNs` enumeration. Sub-documents are discovered by `DESIGN-*.md` filename plus their `Parent` header link, and the main document links them from its body, usually the `## Module Architecture` map. Reporting "the main DESIGN header lists no sub-DESIGNs" is a false positive. The real defect is the opposite: a sub-DESIGN reachable only from the header, which `verify-docset.py` reports as an orphan.
 
 | Condition | Severity |
 |---|---|
@@ -209,7 +283,10 @@ Read for: contradictions between sections; terms used before definition or used 
 Same mechanical probes as Q2 (command cookbook, revision discipline, anchor drift). Additional checks in document mode:
 
 - **Sibling-document conflicts**: two documents describing the same system differently. Apply the authority rule from 3.3 first; a silent divergence is a finding.
-- **Target-state writing** (doc-master set): "deprecated", "legacy", "moved from", "migration" narration is a finding — the reader learns the current structure, not the history.
+- **Present-state vs product intent** (doc-master set): the line depends on the document kind.
+  - *Project and module present-state DESIGNs* (`DESIGN.md`, `DESIGN-<module>.md`) describe shipped, verified reality. "deprecated", "legacy", "moved from", "no longer", "已废弃" narration is a finding, and so is unbuilt proposal content presented as a live capability.
+  - *Product PRDs and product DESIGNs* own product intent and may plan ahead of implementation. Forward-looking content is legitimate. What remains a finding is process narration — how the plan changed, what was tried and dropped — and any claim that something ships when it does not.
+  - Name the document kind in the finding. Applying the present-state rule to a product DESIGN, or tolerating history narration in a module DESIGN, is a mis-scoped finding.
 
 | Condition | Severity |
 |---|---|
@@ -255,13 +332,13 @@ Severity: a paragraph a reader must decode twice → **WARNING**; isolated awkwa
 
 ---
 
-## 7. Severity calibration
+## 8. Severity calibration
 
 Four classes, defined by what the reader should do:
 
 | Class | Meaning | Test to apply |
 |---|---|---|
-| **BLOCKER** | Executing or adopting as written will fail, violate a contract, or under-deliver the goal | "If this ships, is it broken or dishonest?" |
+| **BLOCKER** | Executing or adopting as written will fail, violate a contract, under-deliver the goal, or silently rewrite a closed decision | "If this ships, is it broken or dishonest?" |
 | **WARNING** | Execution succeeds but the artifact is unsafe, bloated, ambiguous, or unverified where it should be verified | "Will this cost rework, bloat, or hide a gap?" |
 | **INFO** | Improvement worth knowing, no action required | "Would a reasonable author shrug?" |
 | **Unverified** | Claim could not be settled from the workspace | "Could I not check this?" |
@@ -288,7 +365,16 @@ Deliberately absent: **size/count thresholds**. Task count, file count, wave cou
 | Plan adds a new utility module duplicating `src/lib/hash.ts:12` | WARNING (Q4 — rung 2) |
 | Plan creates `AbstractStore` with a single `FileStore` implementation | WARNING (Q4 — rung 1) |
 | Design doc's §2 says the scheduler owns retries; §5 hand-wires a retry loop in the worker | BLOCKER (D1 — load-bearing contradiction) |
-| Design doc narrates "the old monolith path is deprecated" | WARNING (D2 — target-state violation) |
+| Module DESIGN narrates "the old monolith path is deprecated" | WARNING (D2 — present-state violation) |
+| Product DESIGN describes a planned capability as future work, clearly marked as not yet shipped | no finding (product intent) |
+| Main DESIGN has no `Sub-DESIGNs` header, sub-DESIGNs link back via `Parent` and are reachable from the module map | no finding (correct structure) |
+| Sub-DESIGN exists on disk but only the header names it | WARNING (D1 — orphan) |
+| Business Proposal changes a shipped default and opens a new `proposed/` record naming the superseded decision | no finding (correct partial supersession) |
+| Business Proposal edits an `implemented/` record in place to change a default | BLOCKER (P3 — decision rewritten) |
+| Business Proposal claims the approved scope is complete while a Task-level AC shows a subset | BLOCKER (P4 — partial presented as complete) |
+| Plan derived from an approved Proposal splits work differently than the Proposal sketched, same behavior and boundary | no finding (no second design approval) |
+| Plan derived from an approved Proposal includes a Task outside the authorized scope | BLOCKER (scope exceedance) |
+| Business Proposal has `Status: approved` and a well-formed approval block; the conversation granting it was not available to the reviewer | `Unverified`, not a finding |
 | Design doc's goal is "improve developer experience" with no observable outcome | BLOCKER (D3 — undecidable goal) |
 | Proposal deliverable is a skill whose body buries triggering conditions in section 4 | WARNING (capability gate) |
 | Proposal body uses "leverage synergistic alignment layers" | WARNING (style gate) |
@@ -296,7 +382,7 @@ Deliberately absent: **size/count thresholds**. Task count, file count, wave cou
 
 ---
 
-## 8. Worked examples
+## 9. Worked examples
 
 ### Example A — Symbol with no producer (Q1, Plan mode)
 
@@ -353,7 +439,39 @@ impact: "every implementation choice can claim success; the goal cannot fail, so
 fix: "state the outcome the change produces, e.g. 'first-run setup completes in under one minute with zero manual edits'"
 ```
 
-### Example E — Correctly NOT reporting a finding
+### Example E — Silent rewrite of a shipped decision (P3, Business Proposal mode)
+
+A proposal sits in `proposed/architecture/` with `Status: proposed`. It changes the loader's default-merge behaviour. Reading it, you notice the linked `implemented/architecture/2026-10-02-single-loader.md` has been edited in place: its `## Decision` now describes the new merge ownership, while its `Status` still reads `implemented` and its date is unchanged.
+
+```yaml
+check: P3_supersession
+severity: blocker
+location: "{proposal}.md:{line of the change}"
+reality: "implemented/architecture/2026-10-02-single-loader.md:{line}: the Decision text is the new behaviour, but the file is still Status: implemented and predates the proposal"
+impact: "a reader of the implemented record believes the new behaviour already shipped; the historical decision is unrecoverable from the record"
+fix: "revert the in-place edit; state the supersession in the new proposed/ record, and cross-link both ways when the new scope is fully delivered"
+```
+
+### Example F — Partial delivery presented as complete (P4)
+
+A proposal's `## Risks` says two of five consumer modules will be migrated first. Its `## Proposal` says "all consumers read the schema defaults". The `## Consequences`/delivery evidence lists only two modules migrated.
+
+```yaml
+check: P4_falsifiability
+severity: blocker
+location: "{proposal}.md:{line of the full-scope claim}"
+reality: "{proposal}.md:{line of the risks note}; delivery evidence names two of five modules"
+impact: "if moved to implemented/ on this evidence, the record claims a migration that did not happen; downstream readers trust a false premise"
+fix: "keep it in proposed/ with Status: approved until every consumer is migrated, or narrow the proposal's stated scope with user confirmation"
+```
+
+### Example G — Correctly NOT reporting a finding (Plan derived from an approved Proposal)
+
+An approved Proposal authorizes "scheduled CSV export for two reporting tables, `Delivery: plan`". The derived Plan splits the work into four Tasks, uses a different scheduler library than the Proposal sketched, and adds a lock file the Proposal never mentioned.
+
+**Correct handling**: no finding on the library choice (internal approach) and no finding on the lock file (it protects the approved behaviour). The review checks only that every Task stays inside the two-table scope and that the scope is fully covered. Emit `PASS` with `Positive Findings` noting both checks.
+
+### Example H — Correctly NOT reporting a finding (size and dependency admission)
 
 Six tasks, 11 Affected Files rows, four waves; a `D-10` states "single-Plan delivery, not split by task count; tasks are mutually dependent; context budget is managed per task". The Plan also adds a new dependency, with a paragraph naming the stdlib options it considered and why each falls short.
 

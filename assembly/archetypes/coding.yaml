@@ -23,6 +23,7 @@ skills:
   - df-implement
   - df-implement-review
   - dev-doc-master
+  - dev-proposal
   - git-worktrees
   - skill-creator
   - agent-browser
@@ -47,6 +48,7 @@ commands:
   - help.md
   - cupdate-prd.md
   - cupdate-design.md
+  - cupdate-proposal.md
   - cupdate-readme.md
   - cupdate-agent-rules.md
   - evaluate-skill.md
