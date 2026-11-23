@@ -25,7 +25,7 @@
 
 ### Architecture Context
 
-产品总提案：`docs/products/wopal-space/proposals/development-governance-proposal.md`，**子提案 3**；前置已归档的子提案 1（`.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`）与子提案 2（`.wopal/docs/evolutions/enhance-dev-proposal.md`）。子提案 1 已交付瘦身后的唯一文档能力底座 `dev-doc-master`（项目/模块现状 DESIGN、防并行分片、去掉所有主文档头部 `Sub-DESIGNs` 强枚举、实测取证、`verify-docset.py` 12 项门禁含 `--check-sync` 与四道质量把控闭环、Slop Checklist 审查清单）、`space-master` 三级 `AGENTS.md` 维护 SOP，以及最终目标态的 `.wopal/rules/coding-workflow.md`（及中文审核版）；子提案 2 将交付业务 Proposal 技能 `dev-proposal` 与校验器 `verify-proposals.py`（含已实施提案再变更分流与双向互链/清理规则）。本提案直接建立流程层对能力底座与机械门禁的按需调用契约，实现代码、测试、现状 DESIGN 与 Proposal 生命周期在同一次交付中同步闭环，绝不重复抄写 `dev-doc-master`、`dev-proposal` 或 `space-master` 的细则。
+产品总提案：`docs/products/wopal-space/proposals/development-governance-proposal.md`，**子提案 3**；前置已归档的子提案 1（`.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`）与子提案 2（`.wopal/docs/evolutions/archived/20261123-enhance-dev-proposal.md`）。子提案 1 已交付瘦身后的唯一文档能力底座 `dev-doc-master`（项目/模块现状 DESIGN、防并行分片、去掉所有主文档头部 `Sub-DESIGNs` 强枚举、实测取证、`verify-docset.py` 12 项门禁含 `--check-sync` 与四道质量把控闭环、Slop Checklist 审查清单）、`space-master` 三级 `AGENTS.md` 维护 SOP，以及最终目标态的 `.wopal/rules/coding-workflow.md`（及中文审核版）；子提案 2 将交付业务 Proposal 技能 `dev-proposal` 与校验器 `verify-proposals.py`（含已实施提案再变更分流与双向互链/清理规则）。本提案直接建立流程层对能力底座与机械门禁的按需调用契约，实现代码、测试、现状 DESIGN 与 Proposal 生命周期在同一次交付中同步闭环，绝不重复抄写 `dev-doc-master`、`dev-proposal` 或 `space-master` 的细则。
 
 当前 `.wopal/skills/df-implement/SKILL.md:13` 仍把 Active DESIGN 当作未实现目标（`DESIGN defines the target`），现行 `dev-flow/SKILL.md` 又限制实施期更新 DESIGN。新契约下，项目/模块 DESIGN 只写已交付现状，因此实施者在代码真正改变对外行为、公共接口、生效业务规则、默认值或失败边界后，**按需加载 `dev-doc-master`** 同步所属模块的 `DESIGN-<module>.md` 并于交付出口运行 `verify-docset.py --check-sync`（纯内部重构不动文档但须显式给 `--pure-refactor` 理由供评审审计）；涉及业务 Proposal 全交付迁入 `implemented/`、部分替代双向互链、完全替代清理或事实同步时，**按需加载 `dev-proposal`** 并运行 `verify-proposals.py`；留下新的长期工程约束时，**按需加载 `space-master`** 审计或更新对应层级的 `AGENTS.md`；测试继续遵循常驻规则 `rules/testing.md`。`df-implement-review` 在保留既有 Q1–Q4、只读原则与报告结构的基础上，接通四道质量闭环的第 4 道对抗式审查（实际 `git diff` ↔ 所属模块 DESIGN / Proposal 双向实证核验，**直接参照 `dev-doc-master` 审查清单与 Slop Checklist**）。正式 `dev-flow` CLI 切换由子提案 4（`enhance-dev-flow-proposal`）完成，本提案保持旧 Plan 兼容且核对 `.wopal/rules/coding-workflow.md` 最终目标态契约一致。
 
@@ -40,7 +40,7 @@
 
 **References**:
 - `.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`
-- `.wopal/docs/evolutions/enhance-dev-proposal.md`
+- `.wopal/docs/evolutions/archived/20261123-enhance-dev-proposal.md`
 - `.wopal/skills/df-implement/{SKILL.md,SKILL.zh-CN.md}`
 - `.wopal/skills/df-implement-review/{SKILL.md,SKILL.zh-CN.md,references/review-rubric.md,references/review-rubric.zh-CN.md}`
 - `.wopal/skills/git-worktrees/SKILL.md`

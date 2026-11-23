@@ -29,7 +29,7 @@
 
 前置成果：
 - 子提案 1（已归档：`.wopal/docs/evolutions/archived/20261122-enhance-doc-contracts.md`）：已交付文档底座 `dev-doc-master`（现状 DESIGN、薄主地图 + 按模块分片、去掉所有主文档头部 `Sub-DESIGNs` 强枚举、实测取证、`verify-docset.py` 12 项门禁含 `--check-sync`）、`space-master` 三级 `AGENTS.md` SOP 及最终目标态的 `.wopal/rules/coding-workflow.md`（及中文审核版）。
-- 子提案 2（`.wopal/docs/evolutions/enhance-dev-proposal.md`）：交付业务 Proposal 技能 `dev-proposal`（含完整状态机、用户显式选择 `Delivery: direct | plan`、已实施提案再变更分流）、轻量静态校验器 `verify-proposals.py`、`df-proposal-review`（含实施方案质检不触发二次设计审批规则），以及本体现状子设计初版 `.wopal/docs/DESIGN-coding-workflow.md`。
+- 子提案 2（`.wopal/docs/evolutions/archived/20261123-enhance-dev-proposal.md`）：交付业务 Proposal 技能 `dev-proposal`（含完整状态机、用户显式选择 `Delivery: direct | plan`、已实施提案再变更分流）、轻量静态校验器 `verify-proposals.py`、`df-proposal-review`（含实施方案质检不触发二次设计审批规则），以及本体现状子设计初版 `.wopal/docs/DESIGN-coding-workflow.md`。
 - 子提案 3（`.wopal/docs/evolutions/enhance-implement-sync.md`）：交付独立于 Plan 状态机的 `df-implement`（按需调底座、覆盖整次交付基线 `--base` 的 `verify-docset.py --check-sync` 与 `verify-proposals.py`、并行写集防越界与必填 `DESIGN Sync` 块）及 `df-implement-review`（完整基线对抗式审查与影响分级严重度）。
 
 **真实代码现状与去重依据**：
