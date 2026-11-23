@@ -24,6 +24,10 @@ keeps no script layer of its own.
 | `templates/proposal.md` | The proposal skeleton with authoring comments; the single source of the proposal format |
 | `references/` | Command reference, capability-routing guidance, and background |
 
+Capability delivery: `wopal space sync --confirm` before `wopal space capability add`,
+then verify worktree bits are `H`. A consistent sparse index does not prove the asset
+is mounted. See `references/maintenance.md`.
+
 Sparse state is normally written **only** through the `wopal space` command
 family. In the space sparse worktree, direct `git add -A` or broad checkout /
 sparse rewrites can desynchronize the range and index. The only compatibility

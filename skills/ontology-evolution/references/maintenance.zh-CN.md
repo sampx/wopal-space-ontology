@@ -42,6 +42,14 @@
 
 目标契约下，`space capability add` 遇到当前 Space worktree 中完整、但能力池尚无的新能力时，会先安全纳管该资产，再完成用户选择的类型默认或空间本地装配。**在 CLI 自动纳管尚未实现的版本中，维护者应手工完成等价动作：先扩宽 sparse 范围并把完整资产提交到注册 Space 分支，再更新 archetype 或空间 `include`。**
 
+## 把新能力交付进空间
+
+1. 资产提交到注册 Space 分支（提案先 `integrate --confirm`）。
+2. `wopal space sync --confirm`。能力池按 `local main` 解析，顺序不可颠倒。
+3. 对每个新资产执行 `wopal space capability add <kind>:<ref>`，技能、命令、规则同样处理。
+4. 验证：`git -C <space>/.wopal ls-files -v <path>` 全部为 `H`；`wopal space capability list --json` 的 `location` 存在。
+5. `archive` 会把提案改名为 `archived/YYYYMMDD-<name>.md`。同一改动内修复指向旧路径的入链；承载他人未提交工作的文件只上报、不修改。
+
 ## 未跟踪工作区保护
 
 未跟踪文件不是一种能力状态，也不会自动登记。sync、重物化或 sparse range 变化在触及这些路径前必须检测碰撞并停止，不能覆盖或删除。决定保留的完整能力进入 Space 分支；其他临时文件继续作为普通 working-tree 内容，直到用户移动或删除。

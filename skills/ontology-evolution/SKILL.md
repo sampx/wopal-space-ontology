@@ -189,7 +189,7 @@ Before landing, read [`references/landing.md`](references/landing.md). For concr
 
 This skill also owns the maintenance entrypoint for ontology / space status, synchronization, capability assembly, and upstream contribution.
 
-- For `space status/sync`, `ontology status/sync`, capability add/remove, or untracked-path protection, read [`references/maintenance.md`](references/maintenance.md).
+- For `space status/sync`, `ontology status/sync`, capability add/remove, untracked-path protection, or delivering a new capability into a space, read [`references/maintenance.md`](references/maintenance.md).
 - Before creating, revising, retrying, or closing an upstream PR, also read [`references/contribution.md`](references/contribution.md).
 - Synchronization authorization does not authorize PR publication, merge, or deletion; each remains a separate user decision.
 - A merged contribution with a retained contribution worktree or branch is unfinished closeout work: surface the residue in the same interaction and obtain the user's cleanup decision before concluding. If the current instruction already authorizes cleanup for that PR, proceed without asking again; ordinary sync still never implies deletion.

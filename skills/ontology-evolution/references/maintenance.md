@@ -42,6 +42,14 @@ Capability content and assembly scope are separate facts. A formal new capabilit
 
 Under the target contract, `space capability add` can adopt a complete new capability that already exists in the current Space worktree, then perform the requested type-default or space-local assembly. **Until the CLI version in use supports that automatic adoption, perform the equivalent maintenance manually: widen sparse safely, commit the complete asset to the registered Space branch, then update the archetype or Space `include`.**
 
+## Delivering a new capability into a space
+
+1. Land the asset on the registered Space branch (`integrate --confirm` first for a proposal).
+2. `wopal space sync --confirm`. The pool resolves from `local main`; this order is not optional.
+3. `wopal space capability add <kind>:<ref>` for every new asset — skills, commands, and rules alike.
+4. Verify: `git -C <space>/.wopal ls-files -v <path>` all `H`; `wopal space capability list --json` `location` exists.
+5. `archive` renames the proposal to `archived/YYYYMMDD-<name>.md`. Repair inbound links to the old path in the same change; report, do not edit, files holding someone else's uncommitted work.
+
 ## Untracked working-tree protection
 
 Untracked files are not a capability state and are never auto-registered. Before sync, rematerialization, or sparse-range changes touch their paths, the operation must detect the collision and stop rather than overwrite or delete them. A complete capability that should be kept is adopted into the Space branch; other transient files remain ordinary working-tree content until the user moves or deletes them.
