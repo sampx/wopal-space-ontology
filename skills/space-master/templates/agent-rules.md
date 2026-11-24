@@ -1,7 +1,7 @@
 ---
 name: <Project Name> AGENT RULES
 description: <One-line stable description of the current project responsibility>
-maintenance: <When this file should change; prohibit one-off tasks, implementation facts and bug records>
+maintenance: <When this file should change; prohibit one-off tasks, implementation facts and bug records. Maintaining this file must follow the agent-rules maintenance specification in space-master>
 ---
 
 # Agent Development Rules
