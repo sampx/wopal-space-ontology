@@ -250,6 +250,37 @@ describe("wopal_task_reply", () => {
     expect(task.pendingQuestionID).toBeUndefined()
   })
 
+  it("uses the host transport and Authorization when falling back to HTTP, keeping the task waiting on failure", async () => {
+    const mockClient = createMockClient();
+    mockClient.question = {} as never;
+    const task = createWaitingTask({ pendingQuestionID: "question-req-789" });
+    const transport = vi.fn()
+      .mockResolvedValueOnce(new Response("no", { status: 401 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const manager = {
+      ...createMockTaskManager(task, mockClient, undefined, new URL("http://127.0.0.1:8123")),
+      getServerFetch: () => transport,
+      getServerHeaders: () => ({ Authorization: "Basic test" }),
+    };
+    const execute = getExecute(createWopalReplyTool(manager as never));
+
+    const first = await execute({ task_id: task.id, message: "ok" }, { sessionID: parentSessionID });
+    expect(first).toContain("question.reply fallback failed: 401");
+    expect(task.pendingQuestionID).toBe("question-req-789");
+    expect(task.status).toBe("waiting");
+
+    const second = await execute({ task_id: task.id, message: "ok" }, { sessionID: parentSessionID });
+    expect(second).toContain("Reply sent to task");
+    expect(task.pendingQuestionID).toBeUndefined();
+    expect(transport).toHaveBeenCalledTimes(2);
+    for (const [url, init] of transport.mock.calls) {
+      expect(url).toBe("http://127.0.0.1:8123/question/question-req-789/reply");
+      expect(init.method).toBe("POST");
+      expect(init.headers.Authorization).toBe("Basic test");
+      expect(JSON.parse(init.body)).toEqual({ answers: [["ok"]] });
+    }
+  });
+
   it("task with pendingQuestionID but no v2 client: returns error", async () => {
     const mockClient = createMockClient()
     mockClient.question = {} as never

@@ -232,9 +232,8 @@ const openCodeRulesPlugin = async (
     "Resources resolved",
   );
 
-  // Extract the internal fetch from v1 client (which uses Server.Default().fetch
-  // to route requests to the in-process Hono server, bypassing real HTTP).
-  // We must pass it to v2 client so question.reply reaches the Question service.
+  // The host supplies the transport for both embedded and listening modes.
+  // The client config path supports engines that have not delivered serverFetch.
   const client = pluginInput.client as unknown as
     | {
         _client?: {
@@ -246,13 +245,18 @@ const openCodeRulesPlugin = async (
       }
     | undefined;
   const clientConfig = client?._client?.getConfig?.();
-  const internalFetch = clientConfig?.fetch ?? globalThis.fetch;
+  const rawInput = pluginInput as unknown as Record<string, unknown>;
+  const internalFetch =
+    (typeof rawInput.serverFetch === "function"
+      ? (rawInput.serverFetch as typeof globalThis.fetch)
+      : undefined) ??
+    clientConfig?.fetch ??
+    globalThis.fetch;
 
   // Derive authorization headers for the v2 client.
   // 1. Direct host delivery via `pluginInput.serverHeaders` (ellamaka engine with serverHeaders support).
   // 2. Fallback to v1 client config headers (`Authorization` header passed during engine startup).
   // Without this, v2 client requests on an authenticated sidecar fail with 401.
-  const rawInput = pluginInput as unknown as Record<string, unknown>;
   const directServerHeaders =
     rawInput.serverHeaders && typeof rawInput.serverHeaders === "object"
       ? (rawInput.serverHeaders as Record<string, string>)
@@ -296,6 +300,8 @@ const openCodeRulesPlugin = async (
     sessionStore,
     loggers.task,
     skillOverlay,
+    internalFetch,
+    effectiveHeaders,
   );
 
   // Create MonitorEngine and register strategies

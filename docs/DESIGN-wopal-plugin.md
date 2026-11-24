@@ -1,7 +1,7 @@
 # DESIGN — wopal-plugin Overall Design
 
 > **Status**: Active
-> **Updated**: 2026-10-10
+> **Updated**: 2026-11-23
 > **Parent**: `./DESIGN.md`（ontology overall design: Plugin System and Configuration sections）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -54,13 +54,16 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 插件依赖少量通用 fork 扩展；这些扩展由引擎提供，且不得携带 Wopal 专属领域类型：
 
 - `PluginInput.wopalSpaceRoot`：`PluginInput` 契约本身已声明 `wopalSpaceRoot?` 字段（`@wopal/ellamaka-plugin` 导出），插件入口直接读取，无需本地交叉类型断言。字段存在表示 WopalSpace instance，缺省表示非 WopalSpace。空间根是规则发现、配置加载、记忆存储的路径基座。
+- `PluginInput.serverFetch`：插件优先使用宿主提供的可选请求函数创建 v2 SDK client；TUI 内嵌模式由它直接访问进程内 API，serve 和 Desktop sidecar 则由宿主绑定真实监听地址。插件使用 `serverUrl` 作为 SDK base URL，并附加 `serverHeaders` 提供的认证头；不能自行假定后台位于固定端口。没有此字段的宿主由原有 client 的请求配置提供兼容传输。
+
+Skill overlay 的 SDK 请求失败时，插件使用返回的 HTTP status 和请求 URL 补全异常信息；内部逐层转发异常只记录 DEBUG，Skill catalog 注入的最终失败入口记录单条 WARN，并跳过本轮动态目录注入，不修改已保留的消息历史。`wopal_skill_grant` 等独立工具入口仍由各自的调用者报告失败。
 - `chat.params.systemMetadata`（`SystemPromptMetadata`）：引擎在 `session/prompt.ts` 构造 `{ version: 1, sections }`，经 `chat.params` hook 传入。插件在 `system-transform.ts` 捕获该元数据，写入 `systemMetadataMap`，供 `context_manage` 的会话转储与上下文格式化消费。`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 类型从 `@wopal/ellamaka-plugin` 导入，运行时值来自引擎注入。
 - `experimental.chat.messages.transform`：引擎在每个正常 model step 的 retained history 确定后调用既有消息 transform。wopal-plugin 只在数组尾部追加当前请求需要的 transient synthetic context，不回写历史、不修改 system prompt；动态 Skill catalog 使用这条现有链路。
 - `experimental.permission.rules`：可选的通用 runtime permission overlay hook。引擎在一次 `ctx.ask()` 求值前传入 `{ sessionID, agent, permission, patterns }`，插件可向 `output.rules` 追加临时 permission rules；引擎按 `agent.permission → session.permission → plugin runtime rules` 的顺序合并后交给现有 Permission evaluator。该 hook 不写 `session.permission`、不进入 project-wide approved pool、不会改变 Permission Service 的持久状态。wopal-plugin 本轮仅在 `permission === "skill"` 时使用它，使 Session Skill Overlay 中已激活的 Skill 可以通过原生 `skill(name)` 加载。
 
 ### 依赖声明
 
-插件声明 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk` 为直接依赖，版本跟随产品主版本（纯 `x.y.z`，如 `2.0.5`）。声明后：
+插件将 `@wopal/ellamaka-plugin` 与 `@wopal/ellamaka-sdk` 声明为精确版本的直接依赖，两者使用与当前引擎兼容的正式发布版本。npm SDK 契约版本独立于 CLI/Desktop 产品版本。声明后：
 
 - 契约层类型（`SystemPromptMetadata` / `SystemPromptSection` / `SystemPromptSectionKind` 等）与 `tool` 等辅助 API 全部从 `@wopal/ellamaka-plugin` 导入，仓库内零手抄 fork 类型
 - SDK 消费点（`createOpencodeClient` 的 `/v2` client、`Model` 类型等）从 `@wopal/ellamaka-sdk` 导入，与上游 `@opencode-ai/sdk` 彻底脱钩
@@ -70,7 +73,7 @@ wopal-plugin 消费 ellamaka fork 的插件契约层扩展，这些扩展经 npm
 
 ### 与 fork 扩展的关系边界
 
-插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前 wopal-plugin 的消费面是 `wopalSpaceRoot`、`systemMetadata`、既有 `experimental.chat.messages.transform` 与新增 `experimental.permission.rules`；`tool.provider` 与 `ToolContext.extra` 归属 Ellamaka 内部 dsh-adapter（见 `../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter`）。`experimental.permission.rules` 是 additive optional hook：旧插件运行在新引擎上无行为变化；依赖该 hook 的新版 wopal-plugin 需要与提供该契约的 Ellamaka 主版本配套分发。
+插件的依赖面与 fork 契约层严格一致：声明什么扩展，就只消费哪些字段。未使用的扩展不进入插件的编译面与运行面。当前 wopal-plugin 的消费面是 `wopalSpaceRoot`、`serverFetch`、`systemMetadata`、既有 `experimental.chat.messages.transform` 与 `experimental.permission.rules`；`tool.provider` 与 `ToolContext.extra` 归属 Ellamaka 内部 dsh-adapter（见 `../../projects/ellamaka/docs/DESIGN-ellamaka-tools.md#internal-adapter`）。`experimental.permission.rules` 是 additive optional hook：旧插件运行在新引擎上无行为变化；依赖该 hook 的新版 wopal-plugin 需要与提供该契约的 Ellamaka 主版本配套分发。
 
 ## Module Architecture
 

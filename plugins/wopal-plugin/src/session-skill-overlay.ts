@@ -81,8 +81,14 @@ function formatUnknownError(error: unknown): string {
 function unwrapData<T>(result: unknown, operation: string): T {
   if (isRecord(result)) {
     if (result.error !== undefined && result.error !== null) {
+      const response = result.response;
+      const request = result.request;
+      const status =
+        response instanceof Response ? `status=${response.status}` : undefined;
+      const url = request instanceof Request ? `url=${request.url}` : undefined;
+      const diagnostics = [status, url].filter(Boolean).join(" ");
       throw new Error(
-        `${operation} failed: ${formatUnknownError(result.error)}`,
+        `${operation} failed${diagnostics ? ` (${diagnostics})` : ""}: ${formatUnknownError(result.error)}`,
       );
     }
     if ("data" in result) {
@@ -143,7 +149,7 @@ export class SessionSkillOverlay {
       };
       return discovered.map((skill) => ({ ...skill }));
     } catch (err) {
-      this.logger.warn({ err }, "Skill pool discovery failed");
+      this.logger.debug({ err }, "Skill pool discovery failed");
       throw err;
     }
   }
@@ -154,7 +160,7 @@ export class SessionSkillOverlay {
       if (cached) return mergeEffective(cached);
       return mergeEffective(await this.hydrate(sessionID));
     } catch (err) {
-      this.logger.warn(
+      this.logger.debug(
         { err, session_id: sessionID },
         "Skill overlay read failed",
       );
@@ -170,7 +176,7 @@ export class SessionSkillOverlay {
       const active = new Set(effective);
       return pool.filter((skill) => active.has(skill.name));
     } catch (err) {
-      this.logger.warn(
+      this.logger.debug(
         { err, session_id: sessionID },
         "Skill overlay descriptor lookup failed",
       );
@@ -185,7 +191,7 @@ export class SessionSkillOverlay {
       this.cache(sessionID, state);
       return state;
     } catch (err) {
-      this.logger.warn(
+      this.logger.debug(
         { err, session_id: sessionID },
         "Skill overlay hydration failed",
       );

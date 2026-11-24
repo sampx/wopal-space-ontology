@@ -59,14 +59,13 @@ describe("v2 client serverHeaders delivery", () => {
     });
 
     const mockInput = {
-      client: {
-        _client: { getConfig: () => ({ fetch: internalFetch }) },
-      },
+      client: {},
       project: {},
       directory: testDir,
       worktree: testDir,
       $: {},
       serverUrl: new URL("http://localhost:3000"),
+      serverFetch: internalFetch,
       serverHeaders: { Authorization: "Basic dGVzdDpzZWNyZXQ=" },
     } as never;
 
@@ -130,14 +129,13 @@ describe("v2 client serverHeaders delivery", () => {
     });
 
     const mockInput = {
-      client: {
-        _client: { getConfig: () => ({ fetch: internalFetch }) },
-      },
+      client: {},
       project: {},
       directory: testDir,
       worktree: testDir,
       $: {},
       serverUrl: new URL("http://localhost:3000"),
+      serverFetch: internalFetch,
     } as never;
 
     const { default: pluginDef } = await import("./index.js");

@@ -60,15 +60,12 @@ async function replyQuestion(task: WopalTask, manager: SimpleTaskManager, client
     throw new Error("question.reply is unavailable")
   }
 
-  const client = manager.getClient() as Record<string, unknown> | undefined
-  const internalClient = client?._client as { getConfig?: () => { fetch?: typeof globalThis.fetch } } | undefined
-  const internalFetch = internalClient?.getConfig?.()?.fetch ?? globalThis.fetch
-
   const url = new URL(`/question/${requestID}/reply`, serverUrl)
-  const response = await internalFetch(url.toString(), {
+  const response = await (manager.getServerFetch() ?? globalThis.fetch)(url.toString(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...manager.getServerHeaders(),
     },
     body: JSON.stringify({
       answers: [[message]],

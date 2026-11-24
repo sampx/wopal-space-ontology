@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSessionStore } from "../session-store.js";
 import { injectSkillCatalog } from "./skill-catalog-injector.js";
+import { SessionSkillOverlay } from "../session-skill-overlay.js";
 import type { MessageWithInfo } from "./message-context.js";
 
 function baseMessages(sessionID = "ses_main"): MessageWithInfo[] {
@@ -19,6 +20,45 @@ function baseMessages(sessionID = "ses_main"): MessageWithInfo[] {
 }
 
 describe("injectSkillCatalog", () => {
+  it("reports one warning with HTTP status and URL for a failed overlay request", async () => {
+    const logger = { warn: vi.fn(), debug: vi.fn() };
+    const request = new Request(
+      "http://opencode.internal/session/ses_main?directory=%2Fworkspace",
+    );
+    const client = {
+      session: {
+        get: vi.fn(async () => ({
+          error: {},
+          request,
+          response: new Response("", { status: 401 }),
+        })),
+      },
+    };
+    const store = createSessionStore();
+    const overlay = new SessionSkillOverlay(
+      client as never,
+      store,
+      "/workspace",
+      logger as never,
+    );
+    const messages = baseMessages();
+
+    await injectSkillCatalog(
+      { skillOverlay: overlay, sessionStore: store, logger: logger as never },
+      "ses_main",
+      messages,
+    );
+
+    expect(messages).toHaveLength(2);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.debug).toHaveBeenCalledTimes(3);
+    const error = logger.warn.mock.calls[0]?.[0]?.err as Error;
+    expect(error.message).toContain("status=401");
+    expect(error.message).toContain(
+      "url=http://opencode.internal/session/ses_main",
+    );
+  });
+
   it("appends one transient tail snapshot without mutating retained history", async () => {
     const messages = baseMessages();
     const retained = structuredClone(messages);

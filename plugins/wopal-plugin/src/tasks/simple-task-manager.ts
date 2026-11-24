@@ -51,6 +51,8 @@ export class SimpleTaskManager {
   private client: OpenCodeClient;
   private v2Client: OpenCodeClient;
   private serverUrl?: URL;
+  private serverFetch: typeof globalThis.fetch | undefined;
+  private serverHeaders: Record<string, string> | undefined;
   private directory: string;
   private debugLog: LoggerInstance;
   private sessionStore: SessionStore;
@@ -70,6 +72,8 @@ export class SimpleTaskManager {
     sessionStore?: SessionStore,
     debugLog?: LoggerInstance,
     skillOverlay?: SessionSkillOverlay,
+    serverFetch?: typeof globalThis.fetch,
+    serverHeaders?: Record<string, string>,
   ) {
     this.client = client;
     this.v2Client = v2Client;
@@ -77,6 +81,8 @@ export class SimpleTaskManager {
     if (serverUrl !== undefined) {
       this.serverUrl = serverUrl;
     }
+    this.serverFetch = serverFetch;
+    this.serverHeaders = serverHeaders;
     this.sessionStore = sessionStore ?? globalSessionStore;
     this.debugLog = debugLog ?? taskLogger;
     this.skillOverlay =
@@ -119,6 +125,14 @@ export class SimpleTaskManager {
 
   getServerUrl(): URL | undefined {
     return this.serverUrl;
+  }
+
+  getServerFetch(): typeof globalThis.fetch | undefined {
+    return this.serverFetch;
+  }
+
+  getServerHeaders(): Record<string, string> | undefined {
+    return this.serverHeaders;
   }
 
   dispose(): void {
