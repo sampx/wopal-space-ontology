@@ -1,7 +1,11 @@
 ---
 name: df-implement-review
 description: >
-  评审已实现的代码变更，或对项目进行技术债审计。触发场景包括：用户要求审查代码改动、commit、PR 或交付结果（如"审查代码"、"看看改得对不对"、"review my PR"），或要求分析技术债、排查无用代码与过度设计（如"审计代码库"、"清理死代码"）。
+  实施后的独立只读评审：对照设计核查已交付的完整 git diff（覆盖整次交付基线，含多提交），
+  双向核验代码↔测试↔所属模块 DESIGN↔Proposal 生命周期同步，或对整个项目做技术债审计。
+  触发场景：用户要求审查代码改动、commit、PR、实施结果或交付质量（如"审查这次交付"、
+  "看看改得对不对"、"review my PR"），或要求分析技术债、排查死代码与过度设计。
+  实施前的方案/提案/Plan 评审走 df-proposal-review，不归本技能管。
 ---
 
 # df-implement-review — 代码与项目审查
@@ -45,7 +49,36 @@ description: >
 
 如果指令没给任何范围说明，默认只审当前项目工作区里未提交的改动，并在报告开头写明。
 
-指令可能附带的参数：`review_type: implementation`、`project_path`、`change_scope: working_tree`、`commit: <hash>`、`commit_range: <A>..<B>`、`background`、Plan 或提案路径、`design_docs: <path>`、`business_logic_review: requested`。
+指令可能附带的参数：`review_type: implementation`、`project_path`、`change_scope: working_tree`、`commit: <hash>`、`commit_range: <A>..<B>`、`background`、Plan 或提案路径、`design_docs: <path>`、`business_logic_review: requested`、`delivery_base: <git-ref>`。
+
+## 评审范围必须覆盖整次交付基线
+
+交付评审与变更评审的默认 diff 范围是**覆盖整次交付的完整变更**，不是最后一个提交。多提交交付最常见的翻车形态是：早期提交改了对外行为但漏更 DESIGN，最后一次提交干净——只审 `HEAD~1..HEAD` 就会把漏同步放过去。所以：
+
+- 指令给出 `delivery_base: <git-ref>`（`git-worktrees` 隔离分支起点或 `Delivery Base Commit`）时，读 `git diff <delivery_base>...HEAD` 作为完整评审范围，并在报告的 `Reviewed:` 里写明这个基线。
+- 指令没给基线但交付在独立分支或多提交上时，先向主控者要 `delivery_base`，不要自行挑一段范围。
+- 只有单次未提交的工作区改动才可以直接用 `git diff`。
+
+这个范围与实施交付出口 `verify-docset.py --check-sync --base <delivery-base>` 检查的范围完全一致——评审者与门禁看的是同一份完整 diff，两者结论才可对账。
+
+## 对抗式双向核验：授权 ↔ 代码 ↔ DESIGN ↔ Proposal
+
+在四问题之外，交付评审还要走两条双向证据链：
+
+**链 1：授权来源 → 实际代码。** 打开授权来源（批准的 Proposal 及其 `Authorized scope`、Issue 描述、Plan 任务定义），逐项对照实际 diff：批准范围内的每一项都交付了吗？diff 里有没有超出批准范围的夹带改动？范围排除项被越过了吗？
+
+**链 2：实际代码 → 所属模块 DESIGN 与 Proposal。** 对完整基线 diff 里的每处对外可见行为、公开接口、生效业务规则、默认值、失败边界变化，核实所属模块 `DESIGN-<module>.md` 在同一交付里同步更新，且写的内容与代码真实行为一致（不虚构、不写未来功能）。实施报告的 `DESIGN Sync` 块不是免检通行证——块里的门禁结论、`--pure-refactor` 理由、同步文档清单都要实际打开核对。
+
+**Proposal 生命周期核查**（涉及业务 Proposal 的交付）：批准范围全交付且有用户验收证据才允许迁入 `implemented/`，部分交付留在 `proposed/` 的 `Status: approved`；部分替代的全交付里新旧双向互链齐全；完全替代当场吸收删除或迁入 `archived/` 冻结；把 `implemented/` 回退成 `proposed/`、未全交付就提前改老提案、或改动 `archived/` 任何内容，都按 Blocker 处理。
+
+## 文档质量审查直接用 `dev-doc-master` 清单
+
+核验同步后的模块 DESIGN 时，语义质量标准直接参照 `dev-doc-master`（`references/design-project-guide.md`），不要另造一套：
+
+- **5 项必填覆盖要素**：行为者与触发前提、组件协作与顺序、权限与义务（must/may/must not）、副作用与状态写入、完整失败后果与恢复；
+- **新人测试**：只读主 DESIGN 与所属模块 DESIGN（不看代码）能否答出能力、职责划分、生效业务规则与失败后果；
+- **证据审查**：文档里的命令、默认值、路径、失败模式是否与真实代码和实跑结果对得上，未验证的是否如实标注；
+- **Slop Checklist**：AI 思考过程泄漏、过程态叙述（`deprecated`/`used to`/`已废弃`）、规则膨胀、加粗滥用、跨层复制、段落墙与空洞黑话，五类全查。
 
 ## 自动工具查过的事别重复干
 
@@ -168,6 +201,26 @@ description: >
 
 `Serious Logic Risks` 只服务一种情况：有 `文件:行号` 证据、后果不可逆或严重（误删数据、破坏状态、伤害用户），**并且与设计某条明确条款冲突**。这个门槛比 Q3 更严：后果要严重，而且设计没接受过它。设计明确接受过的严重后果，走 `Design Feedback`，不走这里。
 
+## 严重度按真实影响分级
+
+Blocker / Warning / Info 的唯一判据是**真实影响**，配合投入产出门槛，避免一刀切制造低价值阻塞噪音：
+
+**Blocker**——真正导致交付不完整或事实失真的违约：
+
+- 声称的功能是空壳、未接通，或核心交付物缺失；
+- 旧行为在具体场景下被改坏（Q2 有实际调用方破裂）；
+- 公开接口、配置、失败边界变动却漏更所属模块 DESIGN；
+- 借虚假 `--pure-refactor` 理由搪塞实际对外行为变化；
+- 并行任务越界修改共享主 `DESIGN.md` 或他人模块文档；
+- 未全交付就提前迁入 `implemented/` 或提前篡改老提案；
+- 违规把 `implemented/` 回退为 `proposed/`，或改动冻结的 `archived/`。
+
+**Warning**——不影响核心正确性、但需要修正的偏差：轻微的说明与代码事实不符、局部补链遗漏、本次 diff 留下的孤儿代码。修起来代价小、不修会积累成误读的，落在这里。
+
+**Info**——措辞瑕疵、无维护后果的风格问题、评审员记录性质的观察。
+
+拿不准往哪档放时，问一句：这个问题会让用户拿到错误的事实、坏掉的功能，或被伪造的门禁结论骗过吗？会——升 Blocker；只是要多花一点修正成本——Warning；都不涉及——Info 或不报。
+
 ## 评审效率——目标 2 轮内收敛
 
 力求在**两轮内**（初审 + 一次复审）收敛评审：
@@ -196,7 +249,7 @@ BLOCK  — 至少 1 个 Blocker
 - Review type: Implementation（交付评审 | 变更评审 | 全仓瘦身审查）
 - Verdict: PASS | REVISE | BLOCK
 - Counts: Blocker N / Warning N / Info N / Design-feedback N / Needs-human N
-- Reviewed: {Plan 路径 / commit / commit range / working tree}
+- Reviewed: {delivery_base: <git-ref>...HEAD（完整交付基线）/ Plan 路径 / commit / commit range / working tree}
 - Design basis: {Plan 任务 / DESIGN.md 条款 / AGENTS.md 规则 / 已记录的决定 | 未找到}
 - Lean count: {仅全仓瘦身审查：net: -N lines, -M dependencies possible | Lean already}
 
@@ -227,7 +280,7 @@ BLOCK  — 至少 1 个 Blocker
 - {事项} — 为什么必须靠人工操作或肉眼确认
 
 ## Positive Findings
-- {已核实通过的要点：写明是怎么核实的}
+- {已核实通过的要点：写明是怎么核实的；对抗式核验要写明两条证据链的结论}
 
 ## UNCOVERED STEPS
 {仅当有步骤未能完成时如实说明}

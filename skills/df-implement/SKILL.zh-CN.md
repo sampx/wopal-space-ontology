@@ -1,15 +1,79 @@
 ---
 name: df-implement
 description: >
-  编写或修改代码与测试，用来落地已确定的需求、已批准的 Plan 任务、现行设计或修复 bug。
-  直接动手开发或被委派开发时均使用本技能。
+  编写或修改代码与测试，把已批准的 Proposal（direct 交付）、明确 Issue 或已批准 Plan 任务落地为真实交付，
+  并在同一交付内同步所属模块现状 DESIGN、业务 Proposal 与机械门禁证据。动手写代码、修 bug、补测试、
+  在隔离工作树实施，或作为被委派的实施 Agent 时加载本技能。实施前设计方案评审不归本技能管。
 ---
 
 # df-implement — 编码实施规范
 
-你现在承担的是**编码实施工作**。目标是在既有设计和任务边界内，用最精简、可靠、可验证的代码改动完成交付。
+你现在承担的是**编码实施工作**。目标是在既有设计和任务边界内，用最精简、可靠、可验证的代码改动完成交付，并让代码、测试与所属模块现状 DESIGN 在同一交付里保持一致。
 
-项目/阶段任务遵循：**DESIGN 定目标，已批准的 Plan 定本次范围，编码负责把事做成。**
+## 授权输入来源
+
+本技能接受以下三种授权来源之一，不绑定任何 Plan 状态机：
+
+| 来源 | 你拿到的输入 | 范围授权 |
+|---|---|---|
+| 已批准 Proposal（`Delivery: direct`） | 提案路径、`Status: approved` 及其记录的 `Authorized scope` | 提案中批准的授权范围 |
+| 明确 Issue | 既定设计内缺陷/任务的 Issue 描述 | Issue 描述本身 |
+| Plan Task（可选） | 已批准 Plan 中的任务及其 `Design Source`、AC 与约束 | Plan 任务定义 |
+
+按你实际持有的授权路由——提案记录的 metadata、Issue 原文或 Plan 任务定义，绝不按文档名或文件名猜来源。如果说不清这次改动由哪个授权覆盖，先停下来问主控者，再动手写代码。
+
+**进行中的旧 Plan** 保持原有合同：DESIGN 定目标，已批准的 Plan 定本次范围，编码负责把事做成。不得按新的现状文档规范追溯改写旧 Plan 或其任务；只有 Plan 本身已经要求时，才对它套用新的同步纪律。
+
+## direct 模式先建隔离工作树
+
+以已批准 Proposal（`Delivery: direct`）或独立 Issue 实施时，**先加载 `git-worktrees` 技能创建独立工作树和功能分支，再开始写代码**。严禁默认直接在主（集成）分支上实施——隔离能把半成品挡在主分支之外，也让并行 Agent 互不干扰。
+
+只有两种情况免建新工作树：
+
+1. 用户明确要求在主/当前分支上直接修改；
+2. 主控者（如 `dev-flow`）已经创建并指派了隔离工作树——直接复用，不要重复套娃再建一层。
+
+隔离分支起点就是整次交付的基线；在报告中记为 `<delivery-base>`，交给交付门禁和实施评审使用。
+
+## 交付时同步所属模块现状 DESIGN
+
+项目/模块现状 DESIGN（`DESIGN.md` / `DESIGN-<module>.md`）只写代码里已真实交付的行为。因此当本次改动改变对外可见行为、公开接口、生效业务规则、默认值或失败边界，或发现现有 DESIGN 写错时，**按需加载 `dev-doc-master`** 同步所属模块的 `DESIGN-<module>.md`，让文档在同一次交付里跟上代码；不写未来才交付的功能。纯内部重构不改对外行为，不动 DESIGN。
+
+**并行写集纪律**：并行任务或分支中，只能修改授权写集内所属模块的 `DESIGN-<module>.md`；严禁越界修改共享主 `DESIGN.md` 或他人模块的文档。在实施中发现写集之外的文档过时或写错时，不要动手改——写进交付报告的 `DESIGN Sync` 块上报主控者处理。
+
+## 交付出口的机械门禁
+
+交付收尾前，按真实改动跑对应校验器，并把真实输出写进 `DESIGN Sync` 块：
+
+**文档门禁** — 当项目文档目录存在且受 `dev-doc-master` 治理时，从**项目工作树根目录**运行：
+
+```bash
+python3 <skill-dir>/dev-doc-master/scripts/verify-docset.py <docs-dir> --main DESIGN.md --check-sync --base <delivery-base>
+```
+
+`<skill-dir>` 是技能实际安装的技能目录（随空间装配解析），`<docs-dir>` 是项目文档目录相对项目根的路径——两者都必须能解析，不要照抄示例路径。
+
+- 整次交付跨多个提交或落在独立工作分支上时，**必须传 `--base` 指向覆盖整次交付的 Git 基线**（`git-worktrees` 隔离分支起点或 `Delivery Base Commit`）。省略 `--base` 时脚本只检查最近一次提交，会放过早期提交的漏同步——这正是多提交交付最常见的翻车点。仅单次未提交的工作树改动可以省略 `--base`。
+- `--check-sync` 是文档门禁的开关，任何受治理的交付（含纯内部重构）都必须带上它：`--pure-refactor` 只在 `--check-sync` 开启时才被校验器识别，单独传它等于没跑门禁。纯内部重构不改文档时，运行 `--check-sync --base <delivery-base> --pure-refactor "<reason>"`——门禁照常执行，`--pure-refactor` 只为代码变更免除 DESIGN 同步要求并留下理由供评审审计。拿它搪塞实际改了对外行为的交付会被评审按违约处理。
+- 不修改 `verify-docset.py` 本身，也不另造替代工具；校验失败就回去补文档，不是改脚本来让检查变绿。
+
+**Proposal 门禁** — 涉及业务 Proposal 生命周期时，**按需加载 `dev-proposal`** 并运行：
+
+```bash
+python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...
+```
+
+`<skill-dir>` 解析方式同上；`<proposals-root>` 是该业务实际的 proposals 根目录（如产品级 `docs/products/<product>/proposals/` 或项目级 `projects/<project>/docs/proposals/`），不要想当然指向别处。迁移、删除或重命名 Proposal 导致外部文档可能断链时，按实际引用范围给 `--link-scope` 传入相关 docs 目录（可重复传入）。
+
+**Proposal 生命周期同步规则**（细节以 `dev-proposal` 技能为准，这里只列实施者的动作边界）：
+
+- **批准范围全部交付且用户验收通过后**，才在同一交付里把 Proposal 从 `proposals/proposed/<class>/` 迁入 `implemented/<class>/`，并改写为现在时 `## Decision` / `## Consequences`（清除计划期标题）。部分交付必须留在 `Status: approved`，不得冒充全交付。
+- **部分替代**已有 `implemented/` 提案：全范围交付时在同一提交里补齐新旧双向互链；未全范围交付前严禁提前修改老提案。
+- **完全替代**已有 `implemented/` 提案：全范围交付时当场吸收老提案的独特理由/备选/代价/验证方法并修好入链，然后删除老文件，或把它迁入 `archived/<class>/`（插入 `Archived: YYYY-MM-DD`）永久冻结。
+- 普通代码改动造成路径/符号/默认值漂移但原决定未变时，同一交付里原地同步受影响 `implemented/` 提案中的事实引用。
+- **严禁**把 `implemented/` 回退成 `proposed/`，严禁解冻或修改 `archived/`。这些动作只能由新提案走正式流程完成。
+
+**AGENTS 维护** — 本次交付留下新的长期工程约束（操作命令、验证入口、目录纪律）时，**按需加载 `space-master`** 审计或更新对应层级的 `AGENTS.md`；一次性实现细节不要写进去。测试遵循常驻的 `rules/testing.md`，不在本技能内另立测试规则。
 
 ## 先读后写
 
@@ -17,6 +81,7 @@ description: >
 
 - 当前任务要求和验收标准；
 - Task 的 `Design Source`（如有），并确认引用的 DESIGN 状态为 `Status: Active`；
+- direct Proposal 或 Issue：提案的 `Authorized scope` 及其引用的 DESIGN 与约束；
 - Task 的 `Pre-read`、`Interface`、`Constraints`（如有）；
 - 相关调用链和调用方；
 - 当前目录及上级 `AGENTS.md`。
@@ -66,7 +131,7 @@ description: >
 
 ### 发现冲突立即停止
 
-如果 `Design Source` 指向的 DESIGN 不是 `Active`，或者 Plan、Active DESIGN 与实际代码互相矛盾，不要现场改设计，也不要擅自改 Plan 去迁就代码。
+如果 `Design Source` 指向的 DESIGN 不是 `Active`，或者授权来源（Proposal/Issue/Plan）、Active DESIGN 与实际代码互相矛盾，不要现场改设计，也不要擅自改 Plan、Proposal 或设计文档去迁就代码。授权范围缺失或本次改动需要越过批准边界时，同样停下来交回决策，不要自行扩张或填补。
 
 带着冲突的 Plan 条目、设计依据和 `file:line` 代码位置停下来，把决策交回**主控者（delegator）**：
 
@@ -83,7 +148,7 @@ Impact: <为什么当前任务无法继续>
 Awaiting: <需要主控者拍板的决定>
 ```
 
-是否修改已批准的 Plan 或 DESIGN，不属于实施阶段的自主权限。
+是否修改已批准的 Plan、Proposal 或 DESIGN，不属于实施阶段的自主权限。提案的 `Authorized scope`、计划期标题与批准决定在实施期间一律只读。
 
 ## 测试驱动（TDD）
 
@@ -99,7 +164,7 @@ TDD 只在它真能帮着把行为定清楚时才用，不要因为“改了代�
 - 不改变外部行为的纯重构，以“现有测试保持全绿”为准；如果老代码原本没测试保护，先补上锁定现有行为的测试再动手重构，不要硬造假失败。
 - 改配置、构建/CI、元数据、依赖、移动/重命名文件、清理 import、调 UI 样式、探索性验证或简单接线，通常不需要 TDD，但仍要有匹配风险的实测验证。
 
-在 dev-flow Plan 中，实施/验证时敲定相关 AC 的真实可执行命令，放在完成报告里交回主控者；实施者不直接改 Plan 文件。
+在 dev-flow Plan 中，实施/验证时敲定相关 AC 的真实可执行命令，放在完成报告里交回主控者；实施者不直接改 Plan 文件。direct/Issue 路线的验证命令与结果一并写进报告的 `DESIGN Sync` 块（见后文），主控者按此复核。
 
 ## 修 Bug 要修根因
 
@@ -140,6 +205,7 @@ Bug 报告通常只描述了表面现象。先顺着调用链查清所有调用�
 Done: <完成了什么>
 Touched: <实际修改的文件>
 Verified: <真实执行的命令> → <真实输出结果>
+DESIGN Sync: <必填，见下方规则>
 AC Commands: <相关 AC 对应的真实命令>       # 仅 dev-flow Plan Task 填写
 Skipped: <明确跳过没做的内容及原因>        # 仅有时填写
 Notes/deviations: <边界情况或偏离说明>      # 仅有时填写
@@ -147,6 +213,19 @@ Notes/deviations: <边界情况或偏离说明>      # 仅有时填写
 
 不准用“应该没问题”“测试都绿了”代替具体命令和输出。失败了就如实报失败。
 
+**`DESIGN Sync` 是必填块**，主控者拿它复核交付收口；缺块或空块的报告按未完成退回。块内按实际改动填写，每行都要有真实证据：
+
+```text
+DESIGN Sync:
+  Worktree: <所用工作树与分支；direct 默认隔离树，Plan 委派写主控指派的树>
+  Delivery base: <覆盖整次交付的基线（隔离分支起点或 Delivery Base Commit）；单次未提交改动写 working tree>
+  Gates: <verify-docset.py --check-sync --base <base> 的实跑结论（纯重构加 --pure-refactor 理由）；涉 Proposal 加 verify-proposals.py 实跑结论>
+  Docs synced: <更新的所属模块 DESIGN-<module>.md 与对应代码事实；纯内部重构写 none（理由已随 --pure-refactor 记在 Gates）>
+  Drift report: <写集外发现的文档漂移，只上报不改；无则写 none>
+```
+
+三种典型填法：`direct` 隔离交付填工作树、分支起点基线与两个门禁实跑输出；Plan Task 填主控指派的工作树与 Task 范围（AC Commands 仍按 Plan 要求单列）；STOP 冲突时块内只写冲突证据与等待的决策，不填门禁结论。旧 Plan 任务的记录落点仍归 Plan 本身，本块不改写 Plan Done 的所有权。
+
 ## 不属于实施阶段的决定
 
-在本技能下，不要自行拍板产品需求、扩大既定范围、改写已批准的 Plan/DESIGN，或自己给自己下最终审查通过结论。被委派执行时，也不要自行 git commit 或改写 Plan 状态；把代码和验证证据交回主控者即可。
+在本技能下，不要自行拍板产品需求、扩大既定范围、改写已批准的 Plan/DESIGN/Proposal，或自己给自己下最终审查通过结论。被委派执行时，也不要自行 git commit 或改写 Plan 状态；把代码和验证证据交回主控者即可。委派实施的 Agent 只提交代码、测试、授权写集内的文档改动和验证证据，不做审批、不自签 Task 完成、不写 Plan Done 记录——记录由主控者核验后统一写回。

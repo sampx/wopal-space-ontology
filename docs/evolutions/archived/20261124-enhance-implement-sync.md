@@ -5,11 +5,11 @@
 - **Type**: enhance
 - **Project Path**: .wopal
 - **Created**: 2026-11-20
-- **Stage**: draft
-- **Mode**: (none)
-- **Worktree**: (none)
-- **Branch**: (none)
-- **Base Commit**: (none)
+- **Stage**: archived
+- **Mode**: isolated
+- **Worktree**: .worktrees/ontology-enhance-implement-sync
+- **Branch**: ontology-enhance-implement-sync
+- **Base Commit**: 049e6e6785051aa87ea5825649960ca4c6b0dbf2
 - **Final Commit**: (none)
 
 ## Scope Assessment
@@ -115,12 +115,12 @@
 
 ### Agent Verification
 
-1. [ ] 对已授权 `direct`、Issue 和 Plan 样例，实施者在 `direct` 模式下默认先调用 `git-worktrees` 创建隔离工作树与分支后再实施（严禁默认直改主分支；Plan 委派已有主控工作树时不重复建），实现公开行为后按需加载 `dev-doc-master` 同步所属模块子 DESIGN 并在交付出口以分支起点或 `Delivery Base Commit` 为 `--base` 跑通 `verify-docset.py --check-sync`（跨多提交/独立分支交付必须传入覆盖整次交付的 `--base <delivery-base>`，隔离多提交反例能拦住早期提交漏同步；纯内部重构不动文档但显式提供 `--pure-refactor` 理由）；涉及业务 Proposal 时按需加载 `dev-proposal` 并跑通 `verify-proposals.py`：全范围交付迁入 `implemented/<class>/` 并改写 `Decision`/`Consequences`，部分替代同交付补双向互链（未全交付前不提前改老提案），完全替代当场合并删除或迁入 `archived/<class>/`，纯路径/默认漂移原地同步 `implemented/` 事实（严禁回退 `implemented/` 或改动 `archived/`）；并行任务发现写集外漂移仅在 `DESIGN Sync` 上报主控而不越界修改共享主 `DESIGN.md`；有新长期工程约束时按需调用 `space-master`；不写未来未交付功能。
-2. [ ] 对越权设计变化、缺失批准范围、接口冲突等负例，实施者 STOP 并报告，不擅自篡改 Proposal/Plan。
-3. [ ] 沿用现有 `df-implement` 报告字段并附必填 `DESIGN Sync` 证据块（含所用工作树/分支、`--base` 基线与实跑输出）的委派汇报能被控制者复核；实施者不会自己批准 Task、改 Done 或提交正式交付；两项技能均不绑定或新增 Plan 状态机。
-4. [ ] 进行中的旧版 Plan 继续保留最低必要兼容流程，不被新文档规范追溯强制修改；没有真实业务文件变更。
-5. [ ] `df-implement-review` 能基于覆盖整次交付的完整 `git diff`（含多提交早期漏同步反例），参照 `dev-doc-master` 审查清单（5 项必填覆盖要素、新人测试、证据审查与 Slop Checklist）以代码/测试/文档实证准确区分严重度（缺实现、旧行为回归、公开契约变动漏更 DESIGN 或虚假 `--pure-refactor`、并行越界改共享主文档、未落地提前改老提案、违规回退 `implemented/` 或改 `archived/` 判 Blocker；轻微说明偏差或局部补链遗漏按影响判 Warning/Info）；合法实现可通过，原有 Q1–Q4、只读原则、2 轮收敛目标与报告结构保持；`.wopal/rules/coding-workflow.md` 中英版本保持最终目标态且 `.wopal/docs/DESIGN-coding-workflow.md` 同步更新并通过 `verify-docset.py`。
-6. [ ] `df-implement`、`df-implement-review` 两项中英 `description` 精准简洁、触发语义一致；每项均通过 10 个应触发 + 10 个不应触发的实际近邻场景，覆盖编码实施、实施后 diff 评审、实施前方案评审、纯文档维护以及 `dev-flow` 的 Plan 管理。记录改前/改后、误选/漏选及修复复验，没有真实加载评估时明确标注未自动验证。
+1. [x] 对已授权 `direct`、Issue 和 Plan 样例，实施者在 `direct` 模式下默认先调用 `git-worktrees` 创建隔离工作树与分支后再实施（严禁默认直改主分支；Plan 委派已有主控工作树时不重复建），实现公开行为后按需加载 `dev-doc-master` 同步所属模块子 DESIGN 并在交付出口以分支起点或 `Delivery Base Commit` 为 `--base` 跑通 `verify-docset.py --check-sync`（跨多提交/独立分支交付必须传入覆盖整次交付的 `--base <delivery-base>`，隔离多提交反例能拦住早期提交漏同步；纯内部重构不动文档但显式提供 `--pure-refactor` 理由）；涉及业务 Proposal 时按需加载 `dev-proposal` 并跑通 `verify-proposals.py`：全范围交付迁入 `implemented/<class>/` 并改写 `Decision`/`Consequences`，部分替代同交付补双向互链（未全交付前不提前改老提案），完全替代当场合并删除或迁入 `archived/<class>/`，纯路径/默认漂移原地同步 `implemented/` 事实（严禁回退 `implemented/` 或改动 `archived/`）；并行任务发现写集外漂移仅在 `DESIGN Sync` 上报主控而不越界修改共享主 `DESIGN.md`；有新长期工程约束时按需调用 `space-master`；不写未来未交付功能。
+2. [x] 对越权设计变化、缺失批准范围、接口冲突等负例，实施者 STOP 并报告，不擅自篡改 Proposal/Plan。
+3. [x] 沿用现有 `df-implement` 报告字段并附必填 `DESIGN Sync` 证据块（含所用工作树/分支、`--base` 基线与实跑输出）的委派汇报能被控制者复核；实施者不会自己批准 Task、改 Done 或提交正式交付；两项技能均不绑定或新增 Plan 状态机。
+4. [x] 进行中的旧版 Plan 继续保留最低必要兼容流程，不被新文档规范追溯强制修改；没有真实业务文件变更。
+5. [x] `df-implement-review` 能基于覆盖整次交付的完整 `git diff`（含多提交早期漏同步反例），参照 `dev-doc-master` 审查清单（5 项必填覆盖要素、新人测试、证据审查与 Slop Checklist）以代码/测试/文档实证准确区分严重度（缺实现、旧行为回归、公开契约变动漏更 DESIGN 或虚假 `--pure-refactor`、并行越界改共享主文档、未落地提前改老提案、违规回退 `implemented/` 或改 `archived/` 判 Blocker；轻微说明偏差或局部补链遗漏按影响判 Warning/Info）；合法实现可通过，原有 Q1–Q4、只读原则、2 轮收敛目标与报告结构保持；`.wopal/rules/coding-workflow.md` 中英版本保持最终目标态且 `.wopal/docs/DESIGN-coding-workflow.md` 同步更新并通过 `verify-docset.py`。
+6. [x] `df-implement`、`df-implement-review` 两项中英 `description` 精准简洁、触发语义一致；每项均通过 10 个应触发 + 10 个不应触发的实际近邻场景，覆盖编码实施、实施后 diff 评审、实施前方案评审、纯文档维护以及 `dev-flow` 的 Plan 管理。记录改前/改后、误选/漏选及修复复验，没有真实加载评估时明确标注未自动验证。
 
 ### DSH Principles → Tasks → Verification
 
@@ -159,9 +159,10 @@
 **Changes**: `.wopal/skills/df-implement/{SKILL.md,SKILL.zh-CN.md}` 的前置输入、`git-worktrees` 默认隔离约定、授权边界与旧 Plan 兼容规则。
 **Verify**: 对进行中旧 Plan、新 Proposal `direct`（含自动建隔离 worktree 正例与禁止默认直改主分支校验）/ Issue / Plan Task（不重复套娃建 worktree）示例分别验证授权路由、STOP 触发条件与旧约束保持。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: Renamed the source-neutral "DESIGN defines the target" premise into a three-source authorization table (approved Proposal `Delivery: direct` / explicit Issue / optional Plan Task) with routing by actually-held authorization metadata (proposal `Authorized scope`, issue text, Plan task definition), no Plan state-machine binding. Added the `direct` isolation entry: `git-worktrees` worktree + feature branch created before any code, main-branch direct coding forbidden by default, two explicit reuse exemptions (user request, controller-assigned worktree), and `<delivery-base>` = isolation branch start. Preserved the legacy in-flight Plan contract verbatim (no retroactive sync discipline). Extended STOP to cover authorization-source conflicts, missing scope, and boundary-crossing changes; proposal scope/planning headings/approval decisions are read-only during implementation; delegated agents never self-approve, never sign Task completion, never write Plan Done. Report routing for direct/Issue verification evidence now points to the `DESIGN Sync` block.
+Files touched: `.wopal/skills/df-implement/SKILL.zh-CN.md`, `.wopal/skills/df-implement/SKILL.md`
+Verify evidence: fixtures in `.wopal-space/.tmp/eis-task1/` — repo-a (approved direct Proposal: isolation worktree created on `feature/widget-theming`, main received zero commits, delivery-base recorded), repo-c (controller-assigned worktree reused, worktree count unchanged at 2), repo-b (legacy Plan contract preserved verbatim), repo-a scope text (layout excluded → crossing STOPs), repo-d (no source → unauthorized STOP). 6/6 PASS.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -175,9 +176,11 @@ Files touched: (实施后填写)
 **Changes**: `.wopal/skills/df-implement/{SKILL.md,SKILL.zh-CN.md}` 的同步纪律与完整基线出口门禁（先中文审核版后同步英文正式版）。
 **Verify**: 在 `.wopal-space/.tmp/` 用虚构多模块多提交仓库实跑 `git-worktrees` 隔离工作流、`verify-docset.py --check-sync --base <delivery-base>` 与 `verify-proposals.py <proposals-root>`（迁移/删除时增加对应的 `--link-scope <docs-dir>`），验证 `direct` 隔离实施、多提交早期漏同步精准拦截、正常同步放行、纯内部重构 `--pure-refactor`、未获用户验收不得迁入 `implemented/`、部分替代同交付互链、跨目录引用断链、并行越界拦截、虚构能力与遗漏失败边界等场景，验完清理临时文件。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: Added three sections to both SKILL files: "Sync the owning module DESIGN at delivery" (trigger conditions = externally visible behavior/interface/business rule/default/failure-boundary change or wrong existing DESIGN; on-demand `dev-doc-master` load; parallel write-set discipline — only authorized `DESIGN-<module>.md`, out-of-set drift reported in `DESIGN Sync` never edited), "Mechanical gates at the delivery exit" (doc gate `verify-docset.py --check-sync --base <delivery-base>` with the multi-commit/standalone-branch mandatory-`--base` rule and the clean-tree `HEAD~1..HEAD` escape shape named explicitly; `--pure-refactor "<reason>"` auditable path; no script modification; Proposal gate `verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...` with real `<proposals-root>` resolution; five lifecycle rules — migrate only after full delivery + user acceptance, partial-supersession bidirectional links in same commit, full-replacement absorb-and-delete or archive-freeze, fact-drift in-place sync, never demote `implemented/` or touch `archived/`), and "AGENTS maintenance" (on-demand `space-master`, testing stays with `rules/testing.md`). Both versions are semantically aligned (38 lines added each).
+Files touched: `.wopal/skills/df-implement/SKILL.zh-CN.md`, `.wopal/skills/df-implement/SKILL.md`
+Verify evidence: fixtures in `.wopal-space/.tmp/eis-task2/` — (A) compliant multi-commit delivery + full `--base` → PASS with Source-Carrier doc mapping; (B) same repo without `--base` → doc-sync skipped, proving `--base` is what covers the delivery; (E) early commit changed public behavior without doc sync, last commit clean, WITH `--base` → FAIL caught; (F) identical delivery WITHOUT `--base` → PASS-through escape (the exact AC#1 negative); (G) pure internal refactor with `--pure-refactor "<reason>"` → WARN + exit PASS; (H) same change without reason → FAIL; (I/J) premature old-proposal move → broken-link FAIL via `--link-scope docs`; (K6) full delivery migrated + bidirectional links + archived freeze (`Archived:` line directly below `Status`) → PASS; (L) cross-directory dangling link → 2 broken links detected; (N/P) parallel write-set: unauthorized `DESIGN.md` edit visible in diff for DESIGN Sync reporting, own-module sync passes; (Q) process-state narration ("deprecated") in module DESIGN → mechanical FAIL. 11/11 scenarios as expected. Temp fixtures remain for independent review and will be cleaned before closeout.
+Rework (review round 1, B-01 + W-01): the gate contract text was corrected in both languages — `--check-sync` is now stated as mandatory for every governed delivery (including pure refactors), with `--pure-refactor "<reason>"` only attached ON TOP of `--check-sync` as an auditable exemption from the DESIGN-sync requirement (the checker recognizes `--pure-refactor` only when `--check-sync` is on, so the original "don't run the sync check, just pass --pure-refactor" wording enabled skipping the gate entirely). Both gate commands now state their working directory (project worktree root) and resolve the script via `<skill-dir>` (actual installed skill directory) instead of brittle relative paths. `DESIGN Sync` Gates/Docs-synced template rows updated to match. `DESIGN-coding-workflow.md` gate bullet aligned. Fixtures in `.wopal-space/.tmp/fix-verify/` — (R1) `--pure-refactor` without `--check-sync` → no doc-sync lines run (the bypass shape B-01 identified, now forbidden by contract text); (R2) `--check-sync --base --pure-refactor` on an honest rename → gate runs, WARN + exit PASS; (R4) `--check-sync --base` without reason on an unsynced behavior change → FAIL. Checker behavior unchanged; only the contract text and run-directory guidance were corrected.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -191,9 +194,10 @@ Files touched: (实施后填写)
 **Changes**: `.wopal/skills/df-implement/{SKILL.md,SKILL.zh-CN.md}` 的 handoff/report 与中英 `description`。
 **Verify**: 模拟 `direct`、Plan、STOP 三种返回，检查实现者不能自签验收且缺 `DESIGN Sync` 时主控可明确拦截；依 `skill-creator` 精炼 `df-implement` 中英 `description`，完成 10+10 近邻正反触发测试，不能把普通 Plan 编排/只读评审/纯文档维护误判为实施。
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: Added the required `DESIGN Sync` evidence block into the existing report template in both SKILL files — original six fields (`Done`/`Touched`/`Verified`/`AC Commands`/`Skipped`/`Notes/deviations`) kept verbatim, no renames; the block has five sub-fields (Worktree / Delivery base / Gates / Docs synced / Drift report), every line requiring real evidence, a missing or empty block returns the report as incomplete, and three typical fills are spelled out (direct isolated delivery, Plan Task with controller-assigned worktree, STOP conflict with no gate results). Record ownership for legacy Plan Done explicitly unchanged. The full 10+10 trigger-scenario evaluation for the description is executed centrally in the AC#6 phase and recorded there (both descriptions were already tightened in Task 1-2 without body details; no further frontmatter change needed in this task).
+Files touched: `.wopal/skills/df-implement/SKILL.zh-CN.md`, `.wopal/skills/df-implement/SKILL.md`
+Verify evidence: fixtures in `.wopal-space/.tmp/eis-task3/` — report-direct / report-plan / report-stop each carry all five `DESIGN Sync` sub-fields (3/3 PASS); report-bad without the block is detectable → controller rejection contract holds; the six original report fields remain present in the EN skill (6 occurrences, no renames). Implementer self-approval remains barred by the Task 1 "Decisions outside implementation" text; STOP sample routes no gate results.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ---
 
@@ -214,9 +218,10 @@ Files touched: (实施后填写)
 **Verify**: 在隔离样例上对真实一致、未实现关键行为、多提交中早期提交改了公开行为却漏更 DESIGN、公开行为变动借虚假 `--pure-refactor` 搪塞、并行越界改共享主文档、未全交付提前改老提案/回退 `implemented/`、轻微说明偏差（应定 Warning/Info 而非 Blocker）、遗漏错误边界、只有文件名清单与思考过程泄露样例分别独立盲审出报告；检查只读、进行中旧 Plan 审查、2 轮收敛目标不变、`coding-workflow.md` 中英最终目标态一致且 `.wopal/docs/DESIGN-coding-workflow.md` 通过 `verify-docset.py`；依 `skill-creator` 精炼 `df-implement-review` 中英 `description`，完成 10+10 近邻正反触发验证，不能因出现“review”就抢占方案评审。
 
 **Done**:
-Task output: (实施后填写)
-Files touched: (实施后填写)
-- [ ] The implementation agent has completed all development and verification steps above.
+Task output: `df-implement-review` upgraded additively in both languages: (1) "The review scope covers the whole delivery baseline" — `delivery_base: <git-ref>` input field, `git diff <delivery_base>...HEAD` as the default full scope, ask-the-controller rule, and the early-miss failure shape named; (2) "Adversarial two-way verification" — Chain 1 (authorization → code: full delivery, no carry-over, exclusions respected) and Chain 2 (code → DESIGN/Proposal: same-window sync, factual accuracy, `DESIGN Sync` claims verified not trusted, `--pure-refactor` honesty), plus Proposal lifecycle verification with premature-move/demotion/archive-tampering as Blockers; (3) doc-quality review explicitly bound to `dev-doc-master`'s 5-point coverage, Newcomer Test, Evidence Review, and Slop Checklist — no second standard; (4) "Severity calibrates to real impact" — concrete Blocker list (missing deliverable, broken caller, contract change without DESIGN sync, fake `--pure-refactor`, write-set crossing, premature migration, demotion/archive tampering), Warning/Info calibrated by real impact; (5) report `Reviewed:` field now records the delivery baseline. Rubric gained §11 (baseline-scope procedure, Chain-1/Chain-2 checklists, Proposal lifecycle checklist, sync-failure severity table) plus an early-miss row in §9; zh rubric mirrors all of it. Q1–Q4, read-only principle, 2-round convergence, verdict rules, and report structure preserved verbatim (all original headings verified present). Both `description` frontmatters refined per D-07 with explicit pre/post boundaries ("pre-implementation design review belongs to df-proposal-review, not here"). D-08: `coding-workflow.md` (en+zh) rows for `df-implement`/`df-implement-review` now carry the direct→git-worktrees default isolation and full-baseline gate contract — final-state wording, no transitional text. D-09: `.wopal/docs/DESIGN-coding-workflow.md` expanded to five owned skills with the landed df-implement/df-implement-review contracts (authorized inputs, isolation entry, delivery gates, required `DESIGN Sync`, adversarial review scope, severity calibration), Source Carrier list updated, Reference Documents rows added.
+Files touched: `.wopal/skills/df-implement-review/SKILL.zh-CN.md`, `.wopal/skills/df-implement-review/SKILL.md`, `.wopal/skills/df-implement-review/references/review-rubric.zh-CN.md`, `.wopal/skills/df-implement-review/references/review-rubric.md`, `.wopal/skills/df-implement/SKILL.zh-CN.md` (description + intro), `.wopal/skills/df-implement/SKILL.md` (description + intro), `.wopal/rules/coding-workflow.md`, `.wopal/docs/LANG/zh-CN/rules/coding-workflow.md`, `.wopal/docs/DESIGN-coding-workflow.md`
+Verify evidence: `verify-docset.py` on `docs/` with delivery base `049e6e6` — failure set before vs after is byte-identical (29 pre-existing cross-repo/boundary debts, zero introduced; the two DESIGN-coding-workflow parent links resolve at space root and pre-exist at base); doc-sync OK on this docs-only delivery. Review-contract walk-through over the eis-task2 fixtures (`review-verdict-matrix.md` in `.wopal-space/.tmp/eis-task4/`): compliant delivery → PASS; early-miss multi-commit → BLOCK only under full-baseline scope; fake `--pure-refactor` → BLOCKER; shared-DESIGN write-set crossing → BLOCKER; premature old-proposal edit → BLOCKER; compliant migration → PASS; wording imprecision → INFO. Structure preservation verified: all original zh/en section headings + read-only + 2-round texts present. AC#6 trigger matrices: 10 should-trigger + 10 should-not per skill recorded in `.wopal-space/.tmp/trigger-eval-*.md`, judged against the actual description text as the triggering surface; **no live skill-loader evaluation was executable in this environment — this is a text-contract evaluation, explicitly marked as such per AC#6**.
+- [x] The implementation agent has completed all development and verification steps above.
 
 ## Delegation Strategy
 

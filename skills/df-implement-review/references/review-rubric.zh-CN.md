@@ -13,6 +13,7 @@
 8. [能力资产规范检查（进化提案）](#8-能力资产规范检查进化提案)
 9. [严重度判定参考](#9-严重度判定参考)
 10. [评审实例](#10-评审实例)
+11. [完整交付基线范围与对抗式 DESIGN/Proposal 核查](#11-完整交付基线范围与对抗式-designproposal-核查)
 
 ---
 
@@ -350,6 +351,7 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 | 代码实现了一种设计文档明确接受的取舍（如固定的短缓存窗口、顺序执行、轮询），且没有违背任何设计条款 | 不报——设计已拍板 |
 | 代码用了一种评审员不喜欢的写法，但设计既没规定也没禁止 | 不报（最多 Info，且通常只在报告外记下） |
 | 改了文档里明确描述的接口参数或行为，但 diff 里没改文档 | WARNING（Q4 文档未同步） |
+| 多提交交付中早期提交改了公开契约，所属 DESIGN 整个交付窗口未动，最后一次提交干净 | BLOCKER（只有对着完整交付基线 diff 才能发现的漏同步） |
 | 文档与设计条款互相矛盾（同一篇文档里两种说法） | WARNING（Q4 文档未同步） |
 | 本次改动新增的 `retry.ts` 与项目已有的 `src/lib/http.ts:88` 退避重试逻辑重复 | WARNING（Q4 重复造轮子） |
 | Diff 把命令从调 `lib/doctor.ts` 改成调 `lib/inspect.ts`，导致 `lib/doctor.ts` 和 `tests/lib/doctor.test.ts` 在生产代码中变成 0 引用 | WARNING（Q4 `delete:` 本次改动留下的孤儿代码与测试） |
@@ -453,3 +455,56 @@ await deleteAllUserContent(userId)
 只有在满足两个条件时才放进 `Serious Logic Risks (Discuss with User)`：操作不可逆、影响极大；**并且**与设计文档某条明确条款冲突（例如设计要求软删除并保留 7 天，代码直接硬删）。
 
 如果设计要求就是硬删除，这不是风险，是照做。此时若评审员认为设计错了，写一条 `Design Feedback` 说明"硬删不可逆，建议改为软删除 + 保留期"，让用户先改设计，而不是在实施评审里拦下这次交付。
+
+## 11. 完整交付基线范围与对抗式 DESIGN/Proposal 核查
+
+### 先确定完整交付 diff
+
+```bash
+# 有交付基线时（多提交或独立分支交付必须用这个）：
+git diff --name-status <delivery_base>...HEAD
+# 仅单次未提交的工作区改动才可以直接用：
+git diff --name-status
+```
+
+要专门搜的"早期漏同步"形态：用 `git log --oneline <delivery_base>..HEAD` 列出每个碰了非测试代码的提交，核对所属 `DESIGN-<module>.md` 是否在**同一交付窗口内**被改过。某模块的代码在早期提交变了、但它的 DESIGN 文档在 `<delivery_base>` 之后没有任何提交碰过——这正是 `--check-sync --base` 会拦的漏同步，即使最后一个提交是干净的也要报。
+
+### 对抗式核查清单——授权 → 代码（链 1）
+
+| 核查点 | 方法 |
+|---|---|
+| 批准范围内每一项都交付 | 把 `Authorized scope` / Issue 条目 / Plan 任务逐条映射到 diff 代码块；映射不到的就是 Q1 缺交付 |
+| 没有超出批准范围的夹带 | `git diff --name-status <base>...HEAD` 对照声明的文件与行为范围；未声明的文件改动或行为变化都是问题 |
+| 明确排除项未被越过 | 提案的排除清单（如"不含布局改动"）被任何一个代码块越过 → Q1 范围违约 |
+
+### 对抗式核查清单——代码 → DESIGN/Proposal（链 2）
+
+| 核查点 | 方法 |
+|---|---|
+| 每处契约变化都有所属 DESIGN 同步 | 对每个变化的导出/默认值/失败边界，`rg '<符号或行为>' docs/`，确认所属 `DESIGN-<module>.md` 的 diff 里有对应更新 |
+| DESIGN 语句与真实行为一致 | 把更新后的 DESIGN 文本对着代码块读；虚构行为或写了未来功能 → BLOCKER（事实失真） |
+| `DESIGN Sync` 块里的声明要实测 | 复跑或抽查声称的门禁（`verify-docset.py --check-sync --base`）；声称 PASS 却复现不出来 → 伪造门禁结论 → BLOCKER |
+| `--pure-refactor` 理由诚实 | 对声称纯重构的文件 diff 检查有无对外可见变化（导出面、默认值、错误契约）；藏着行为变化的 → BLOCKER |
+| 并行写集未越界 | 确认 diff 只碰授权写集内的 `DESIGN-<module>.md`；模块实施者改了共享主 `DESIGN.md` → BLOCKER（违反成文写集规则） |
+
+### Proposal 生命周期核查清单
+
+| 核查点 | 方法 |
+|---|---|
+| 全交付且有用户验收才迁移 | `proposals/implemented/` 里出现该提案的前提是 diff 覆盖全部 `Authorized scope` 且记录带用户验收证据；部分交付躺在 `implemented/` → BLOCKER |
+| 部分替代双向互链 | 全交付时新提案写明替代了老决策的哪些部分、老记录链回新提案；全交付时缺任一方向 → WARNING |
+| 完全替代当场处置 | 老记录被吸收删除或迁入 `archived/<class>/`（带 `Archived: YYYY-MM-DD`）且发生在同一交付；都没做 → WARNING |
+| 全交付前老提案不被触碰 | `git diff <base>...HEAD -- <老提案路径>` 在全交付前必须为空；提前被改 → BLOCKER（提前篡改） |
+| 不回退、不解冻 | 任何 `implemented/` → `proposed/` 的回退，或 `archived/` 下任何内容改动 → BLOCKER |
+
+### 同步失败的严重度标尺
+
+| 情形 | 判定 |
+|---|---|
+| 早期提交改了公开行为，所属 DESIGN 在整个交付窗口内未更新 | BLOCKER（事实失真，只有对着完整交付基线 diff 才看得见） |
+| 真实的纯内部重构，带 `--pure-refactor` 理由，无可见契约变化 | 不报——核实理由诚实即可 |
+| 声称 `--pure-refactor`，但 diff 改了导出、默认值或错误契约 | BLOCKER（伪造门禁结论） |
+| 并行实施者改了共享主 `DESIGN.md` | BLOCKER（越界） |
+| 范围只交付了一部分就迁入 `implemented/` | BLOCKER（冒充全交付） |
+| 全交付时部分替代的双向互链缺一边 | WARNING（可修复缺口，核心决定未变） |
+| 同步后的 DESIGN 措辞略欠精确但事实正确 | INFO |

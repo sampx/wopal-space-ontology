@@ -1,7 +1,14 @@
 ---
 name: df-implement-review
 description: >
-  Review delivered code changes against design, or audit a project for technical debt. Use when the user asks to review code changes, a commit, PR, or finished implementation, or asks to audit a repo and find dead code or bloat.
+  Independent read-only post-implementation review: verify the delivered full
+  git diff against design (covering the whole delivery baseline, including
+  multi-commit deliveries), two-way check code↔tests↔owning module
+  DESIGN↔Proposal lifecycle sync, or audit a whole project for technical
+  debt. Use when the user asks to review code changes, a commit, a PR, a
+  finished implementation, or delivery quality, or to audit a repo and find
+  dead code or bloat. Pre-implementation proposal/plan review belongs to
+  df-proposal-review, not here.
 ---
 
 # df-implement-review — Implementation Review
@@ -45,7 +52,36 @@ If you cannot find any design document, Plan, or recorded decision for the touch
 
 If the prompt omits context entirely, review only the working-tree changes under the stated project path and say so in the report.
 
-Input fields the prompt may carry: `review_type: implementation`, `project_path`, `change_scope: working_tree`, `commit: <hash>`, `commit_range: <A>..<B>`, `background`, Plan or proposal path, `design_docs: <path>`, `business_logic_review: requested`.
+Input fields the prompt may carry: `review_type: implementation`, `project_path`, `change_scope: working_tree`, `commit: <hash>`, `commit_range: <A>..<B>`, `background`, Plan or proposal path, `design_docs: <path>`, `business_logic_review: requested`, `delivery_base: <git-ref>`.
+
+## The review scope covers the whole delivery baseline
+
+For delivery and change reviews the default diff scope is **the complete delivery**, not the last commit. The most common failure shape of multi-commit deliveries: an early commit changed external behavior without updating its DESIGN, and the final commit is clean — reviewing only `HEAD~1..HEAD` waves the miss through. Therefore:
+
+- When the prompt gives `delivery_base: <git-ref>` (the `git-worktrees` isolation branch start or the `Delivery Base Commit`), read `git diff <delivery_base>...HEAD` as the full review scope and name that baseline in the report's `Reviewed:` field.
+- When no baseline is given but the delivery spans multiple commits or a standalone branch, ask the controller for `delivery_base` first; do not pick a range on your own.
+- Only a single uncommitted working-tree change may use plain `git diff` directly.
+
+This scope is identical to what the delivery-exit gate `verify-docset.py --check-sync --base <delivery-base>` checks — the reviewer and the gate read the same complete diff, so their verdicts can be reconciled.
+
+## Adversarial two-way verification: authorization ↔ code ↔ DESIGN ↔ Proposal
+
+Beyond the four questions, a delivery review runs two bidirectional evidence chains:
+
+**Chain 1: authorization → actual code.** Open the authorizing source (the approved Proposal's `Authorized scope`, the Issue text, or the Plan task definition) and check it line by line against the actual diff: is every item inside the approved scope delivered? Does the diff carry changes beyond the approved scope? Did anything cross an explicit exclusion?
+
+**Chain 2: actual code → owning module DESIGN and Proposal.** For every externally visible behavior, public interface, effective business rule, default, or failure-boundary change in the full-baseline diff, verify the owning module's `DESIGN-<module>.md` was updated in the same delivery and describes what the code actually does — no invented behavior, no future features. The implementation report's `DESIGN Sync` block is not a pass-through token — open and verify its gate results, its `--pure-refactor` reason, and its synced-doc claims.
+
+**Proposal lifecycle verification** (when the delivery touches a business Proposal): migration into `implemented/` is allowed only after the approved scope is fully delivered with user-acceptance evidence; a partial delivery stays in `proposed/` at `Status: approved`. At full-scope partial supersession, bidirectional cross-links must be complete. Full replacement absorbs-and-deletes or archive-freezes in the same delivery. Demoting `implemented/` back to `proposed/`, modifying the old proposal before full delivery, or touching anything in `archived/` is a **Blocker**.
+
+## Documentation quality review uses the `dev-doc-master` checklists
+
+When verifying the synced module DESIGNs, the semantic quality standards come directly from `dev-doc-master` (`references/design-project-guide.md`) — do not build a second set:
+
+- **5-point required coverage**: actor and trigger preconditions, component collaboration and ordered sequence, permissions and obligations (`must`/`may`/`must not`), side effects and state writes, complete failure outcomes and recovery;
+- **Newcomer test**: reading only the main DESIGN and the owning module DESIGN (no code), can a newcomer state the capabilities, responsibility split, active business rules, and failure consequences;
+- **Evidence review**: do documented commands, defaults, paths, and failure modes match real code and real runs, with unverified claims labeled as such;
+- **Slop Checklist**: CoT/conversation leakage, process-state narration (`deprecated`/`used to`/`已废弃`), rule bloat, bold abuse, cross-level duplication, paragraph walls and abstract buzzword filler — check all five.
 
 ## What the mechanical gates own
 
@@ -168,6 +204,26 @@ Rules that keep this from becoming a second review:
 
 `Serious Logic Risks` exists for exactly one case: a concrete `file:line` scenario of irreversible destruction, major data corruption, or user harm **that also contradicts an explicit design clause**. This is a stricter bar than Q3's — the harm is severe, and the design did not accept it. A severe outcome the design explicitly accepted belongs in `Design Feedback`, not here.
 
+## Severity calibrates to real impact
+
+The only measure for Blocker / Warning / Info is **real impact**, applied with a cost-benefit threshold — never one-size-fits-all blocking that drowns the report in noise:
+
+**Blocker** — a contract violation that makes the delivery incomplete or factually false:
+
+- a claimed behavior is a stub, unwired, or a core deliverable is missing;
+- previously working behavior broke in a concrete scenario (Q2 with an actual broken caller);
+- an externally visible interface, config, or failure boundary changed but the owning module DESIGN was not updated;
+- a false `--pure-refactor` reason covering up a real external behavior change;
+- a parallel task crossing the write set into the shared main `DESIGN.md` or another agent's module doc;
+- migrating into `implemented/` or editing the old proposal before full delivery;
+- demoting `implemented/` back to `proposed/`, or modifying anything in frozen `archived/`.
+
+**Warning** — a fixable deviation that does not touch core correctness: a minor statement that contradicts code facts, a missed local link repair, orphans this diff created. Small to fix, accumulates into misreading if ignored.
+
+**Info** — wording flaws, style without maintenance consequences, observations.
+
+When unsure, ask: would a user get a wrong fact, a broken feature, or be fooled by a faked gate result? Yes — Blocker. Only a small correction cost — Warning. Neither — Info or drop it.
+
 ## Review efficiency — target 2 rounds per change
 
 Aim to converge review within **two rounds** (initial review + one re-review):
@@ -196,7 +252,7 @@ BLOCK  — at least one Blocker
 - Review type: Implementation (Delivery | Change | Repo audit)
 - Verdict: PASS | REVISE | BLOCK
 - Counts: Blocker N / Warning N / Info N / Design-feedback N / Needs-human N
-- Reviewed: {Plan path / commit / commit range / working tree}
+- Reviewed: {delivery_base: <git-ref>...HEAD (full delivery baseline) / Plan path / commit / commit range / working tree}
 - Design basis: {Plan task / DESIGN.md section / AGENTS.md rule / recorded decision | none found}
 - Lean count: {repo audit only: net: -N lines, -M dependencies possible | Lean already}
 
@@ -227,7 +283,7 @@ BLOCK  — at least one Blocker
 - {item} — why only human observation can settle it
 
 ## Positive Findings
-- {verified item: state how it was verified}
+- {verified item: state how it was verified; for adversarial verification, state both evidence-chain conclusions}
 
 ## UNCOVERED STEPS
 {only when steps could not be completed}
@@ -249,4 +305,4 @@ A `PASS` requires the `Positive Findings` section to state what was checked and 
 
 Load the rubric when a question needs its detailed method, a pattern catalogue, or a worked example:
 
-- `references/review-rubric.md` — phase-1 list building, stub patterns with probes, Q2 contract-surface procedure, Q3 defect catalogue, Q4 orphan tags with the probe bundle, severity calibration, worked examples
+- `references/review-rubric.md` — phase-1 list building, stub patterns with probes, Q2 contract-surface procedure, Q3 defect catalogue, Q4 orphan tags with the probe bundle, delivery-baseline scope procedure, adversarial DESIGN/Proposal verification checklists, severity calibration, worked examples

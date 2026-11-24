@@ -77,8 +77,8 @@ PRD（产品目标，dev-doc-master）
 | 创建、维护或审查业务/产品 Proposal 生命周期（`proposals/{proposed,implemented,rejected,archived}/{class}/`） | `dev-proposal`（`/cupdate-proposal`） | 管重大设计决策、备选方案、用户批准与 `Delivery: direct \| plan`；普通缺陷走 Issue；不替代现状 DESIGN 或 Plan |
 | 独立方案 / Proposal / Plan 评审 | `df-proposal-review` | 实施前只读审查问题、备选方案、边界与可验收性，不代替作者改写或代用户批准 |
 | 复杂任务的开发编排、direct vs Plan 判定、Plan/Task 拆分、并行写集协调与 Plan Graph | `dev-flow` | **可选中间层**：仅跨项目、多独立交付或需并行委派时启用；简单有界任务直接 `df-implement`；但已批准 Proposal 中记录的 `Delivery` 选择优先于该经验判断；不替代 Proposal 审批，不自造文档规范 |
-| 具体代码实现、单元测试与交付同步 | `df-implement` + `rules/testing.md` | 不擅自篡改批准的设计边界；对外行为/边界变化时按需调 `dev-doc-master` 同步模块子 DESIGN 与 Proposal，纯内部重构不动 DESIGN；留下长期工程约束时按需调 `space-master` |
-| 实施后代码 / 测试 / 现状文档独立只读复核 | `df-implement-review` | 核查代码↔测试↔授权范围↔现状 DESIGN/Proposal 同步一致性，参照 `dev-doc-master` 清单抓假实现与 AI 废话；不修改代码或文档 |
+| 具体代码实现、单元测试与交付同步 | `df-implement` + `rules/testing.md` | 不擅自篡改批准的设计边界；`direct` 交付（已批准 Proposal 或独立 Issue）默认先建 `git-worktrees` 隔离工作树再实施，除非用户明确要求改主分支或主控已指派工作树；对外行为/边界变化时按需调 `dev-doc-master` 同步模块子 DESIGN 与 Proposal，纯内部重构不动 DESIGN；交付出口跑覆盖整次交付的 `verify-docset.py --check-sync --base <delivery-base>`；留下长期工程约束时按需调 `space-master` |
+| 实施后代码 / 测试 / 现状文档独立只读复核 | `df-implement-review` | 只读核查覆盖整次交付基线的完整 diff（代码↔测试↔授权范围↔现状 DESIGN/Proposal 同步），参照 `dev-doc-master` 清单抓假实现与 AI 废话；不修改代码或文档 |
 | 创建、审计或维护空间/项目/文档/模块 `AGENTS.md`、项目 `README.md`，或装删外部技能 | `space-master`（`/cupdate-agent-rules`、`/cupdate-readme`） | 生成由 Harness 自动注入、不可绕过的分级 `AGENTS.md`（接通 `Doc sync` 与现状 `DESIGN` 同步的项目根规范、轻量 `docs/AGENTS.md` 护栏卡、按需模块子目录规范）；遵循父子不重复、机械门禁非空正反实证、历史 `BUSINESS_RULES.md` 只读兼容；不负责编写 PRD/DESIGN |
 | 修改本体能力资产（技能、规则、Agent、命令、插件、装配） | `ontology-evolution` | **强制分流**：本体仓库修改一律直接走 `ontology-evolution`，不走 `dev-flow` 或业务 Proposal |
 

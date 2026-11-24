@@ -1,7 +1,7 @@
 # DESIGN — Coding Workflow
 
 > **Status**: Active
-> **Updated**: 2026-11-22
+> **Updated**: 2026-11-23
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -18,15 +18,19 @@
 - **决定记录** `dev-proposal`：业务/项目 Proposal 的创建、批准记录、生命周期迁移、已实施决策的再变更分流，配套确定性校验器 `verify-proposals.py` 与薄命令 `/cupdate-proposal`。
 - **实施前评审** `df-proposal-review`：对 Plan、本体进化提案、业务 Proposal、设计文档的独立只读评审，三种模式分流。
 
-`Owned Here`：以上三个技能的状态机、目录契约、校验规则与相互路由边界。
+实施与实施后评审两个流程技能的**现状契约**（授权输入、隔离工作树入口、交付门禁、对抗式评审范围）也由本模块描述：
+
+- **实施** `df-implement`：三种授权来源统一输入，`direct` 默认 `git-worktrees` 隔离实施，交付出口跑覆盖整次交付基线的机械门禁，交付报告携带必填 `DESIGN Sync` 证据块。
+- **实施后评审** `df-implement-review`：对覆盖整次交付基线的完整 diff 做对抗式双向核验，文档质量标准直接引用 `dev-doc-master` 清单。
+
+`Owned Here`：以上五个技能的状态机、目录契约、校验规则与相互路由边界；`df-implement` / `df-implement-review` 不含自有状态机，本模块只约束其输入输出契约与路由位置。
 
 不在此模块（各自在别处拥有）：
 
 - **Plan 编排状态机**（`dev-flow`）与本体能力进化状态机（`ontology-evolution`）——本模块只定义它们在流程里的位置与交接口，不复制其内部规则。
-- **代码实施与实施后评审**（`df-implement`、`df-implement-review`）——本模块只说明何时被调用。
 - `AGENTS.md` / `README.md` 治理（`space-master`）。
 
-`Source Carrier`：`skills/dev-doc-master/`、`skills/dev-proposal/`、`skills/df-proposal-review/`、`commands/cupdate-proposal.md`、`rules/coding-workflow.md`、`assembly/archetypes/coding.yaml`。
+`Source Carrier`：`skills/dev-doc-master/`、`skills/dev-proposal/`、`skills/df-proposal-review/`、`skills/df-implement/`、`skills/df-implement-review/`、`commands/cupdate-proposal.md`、`rules/coding-workflow.md`、`assembly/archetypes/coding.yaml`。
 
 ## Usage and Interface Contracts
 
@@ -37,15 +41,39 @@
 | `dev-doc-master` | 编写、更新、按模块拆分或校验 PRD、产品 DESIGN、项目/模块现状 DESIGN | `/cupdate-prd`、`/cupdate-design` | `skills/dev-doc-master/scripts/verify-docset.py` |
 | `dev-proposal` | 创建或修订 Proposal、判断是否需要 Proposal、记录批准与 `Delivery`、迁移或归档已交付决策 | `/cupdate-proposal` | `skills/dev-proposal/scripts/verify-proposals.py` |
 | `df-proposal-review` | 实施前独立只读评审 Plan、本体进化提案、业务 Proposal、设计文档 | 无独立命令，由请求方直接加载 | 复用上述两个脚本，自身不带脚本 |
+| `df-implement` | 实施已批准 Proposal（`Delivery: direct`）、明确 Issue 或 Plan Task：写代码、测试并同步所属模块 DESIGN 与 Proposal | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
+| `df-implement-review` | 实施后独立只读评审：对照授权来源与完整交付基线 diff 核查代码、测试、DESIGN 与 Proposal 同步 | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
 
-三个技能都随 `coding` 类型装配单分发（`assembly/archetypes/coding.yaml` 的 `skills` 与 `commands` 段）。装配单引用任一不存在的能力会让空间装配 fail closed，因此挂载与资产必须同批落地。
+五个技能都随 `coding` 类型装配单分发（`assembly/archetypes/coding.yaml` 的 `skills` 与 `commands` 段）。装配单引用任一不存在的能力会让空间装配 fail closed，因此挂载与资产必须同批落地。
+
+### `df-implement` 实施契约
+
+实施技能不绑定 Plan 状态机，也没有自有状态机。它的现状契约：
+
+- **授权输入**：已批准 Proposal（`Delivery: direct`，按其 `Authorized scope`）、明确 Issue、可选 Plan Task 三选一；按实际持有的授权路由，不按文件名猜来源。
+- **隔离入口**：`direct` 交付默认先加载 `git-worktrees` 创建隔离工作树与功能分支再编码，严禁默认直改主分支；仅用户显式要求或主控已指派工作树时免建。隔离分支起点即 `<delivery-base>`。
+- **同交付同步**：对外可见行为、公开接口、生效业务规则、默认值或失败边界变化时按需加载 `dev-doc-master` 同步所属模块 `DESIGN-<module>.md`；纯内部重构不动 DESIGN。涉及业务 Proposal 时按需加载 `dev-proposal` 执行生命周期迁移与互链；留下新长期工程约束时按需加载 `space-master`。并行任务只改授权写集内的模块子 DESIGN，越界漂移在报告中上报。
+- **交付出口门禁**：文档目录受 `dev-doc-master` 治理时运行 `verify-docset.py --check-sync --base <delivery-base>`（从项目工作树根目录执行，脚本路径按技能实际安装位置解析；跨多提交或独立分支必须传覆盖整次交付的基线；`--check-sync` 对所有受治理交付必开，纯内部重构以附加在 `--check-sync` 上的 `--pure-refactor "<reason>"` 免除 DESIGN 同步要求留痕待审，不能单独替代门禁）；涉及 Proposal 时运行 `verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...`。校验失败回去补文档，不修改校验器。
+- **交付报告**：沿用 `Done` / `Touched` / `Verified` / `AC Commands` / `Skipped` / `Notes/deviations` 字段，必填 `DESIGN Sync` 块（Worktree / Delivery base / Gates / Docs synced / Drift report 五个子字段）；缺块或空块的报告按未完成退回。
+- **边界**：实施者不 commit、不审批、不写 Plan Done、不自签验收；进行中旧 Plan 保持原有合同不被追溯改写。
+
+### `df-implement-review` 评审契约
+
+评审技能同样无自有状态机，只读。它的现状契约：
+
+- **评审范围**：覆盖整次交付基线的完整 `git diff <delivery_base>...HEAD`，与交付出口 `--check-sync --base` 检查同一范围；只有单次未提交改动可直接用 `git diff`。多提交交付只审最后一个提交是评审失效的头号形态。
+- **对抗式双向核验**：授权来源 → 实际代码（批准范围全交付、无夹带、排除项未被越过）；实际代码 → 所属模块 DESIGN 与 Proposal（契约变化都有同步、DESIGN 描述与真实行为一致、`DESIGN Sync` 块声明实测可复现、`--pure-refactor` 理由诚实）。
+- **Proposal 生命周期核查**：全交付且有用户验收才迁入 `implemented/`；部分替代全交付时双向互链；完全替代当场吸收删除或归档冻结；提前改老提案、回退 `implemented/`、改动 `archived/` 均为 Blocker。
+- **文档质量标准**：直接引用 `dev-doc-master` 的 5 项必填覆盖要素、新人测试、证据审查与 Slop Checklist，不另建第二套文档标准。
+- **严重度校准**：按真实影响分级——交付不完整、行为错误、契约变动漏更 DESIGN、虚假 `--pure-refactor`、越界改共享文档、未全交付提前迁移、回退/篡改冻结记录判 Blocker；轻微说明偏差与局部补链遗漏判 Warning；措辞瑕疵判 Info。
+- **不变部分**：Q1–Q4 四问题、报告结构、PASS/REVISE/BLOCK 裁决、2 轮收敛目标、只读原则全部保留。
 
 ### 路由契约
 
 `rules/coding-workflow.md` 拥有跨技能的路由边界，是技能之间的**唯一**分流权威：
 
 - 按场景给出首选入口与明确排除项，不做能力细节的二次定义；
-- 三个流程技能（`dev-proposal`、`df-proposal-review`、`dev-flow`）与两个能力底座（`dev-doc-master`、`space-master`）的职责不重叠；
+- 实施与评审技能（`df-implement`、`df-implement-review`）在交付出口与评审时调用两个能力底座，不复制其细则；
 - 本体能力资产变更一律走 `ontology-evolution`，不走业务 Proposal。
 
 规则的中文审核版位于 `docs/LANG/zh-CN/rules/coding-workflow.md`，两份语义保持一致，`keywords` 集合逐项相同。
@@ -238,6 +266,9 @@ python3 skills/dev-proposal/scripts/verify-proposals.py <proposals-root> [--json
 | `skills/dev-proposal/references/evolution-triage.md` | 再变更分流的判断细则 |
 | `skills/df-proposal-review/SKILL.md` | 三种评审模式与问题清单 |
 | `skills/df-proposal-review/references/review-rubric.md` | 分模式流程、严重度校准与实例 |
+| `skills/df-implement/SKILL.md` | 实施契约入口：授权来源、隔离工作树、交付门禁与 `DESIGN Sync` 报告 |
+| `skills/df-implement-review/SKILL.md` | 实施后评审契约入口：完整基线范围、对抗式核验与严重度校准 |
+| `skills/df-implement-review/references/review-rubric.md` | 评审排查细则：基线范围程序、DESIGN/Proposal 核查清单与严重度标尺 |
 | `commands/cupdate-proposal.md` | Proposal 薄命令入口 |
 | `rules/coding-workflow.md` | 跨技能路由与禁止越界 |
 | `assembly/archetypes/coding.yaml` | coding 类型装配单 |

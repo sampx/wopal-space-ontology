@@ -13,6 +13,7 @@ Contents:
 8. [Capability standards gate (evolution proposals)](#8-capability-standards-gate-evolution-proposals)
 9. [Severity calibration](#9-severity-calibration)
 10. [Worked examples](#10-worked-examples)
+11. [Delivery-baseline scope & adversarial DESIGN/Proposal verification](#11-delivery-baseline-scope--adversarial-designproposal-verification)
 
 ---
 
@@ -349,6 +350,7 @@ This gate complements df-proposal-review, which checked the *stated* deliverable
 | Implementation matches a tradeoff the design explicitly accepted (fixed short cache window, sequential execution, polling) and violates no clause | no finding — the design decided |
 | Implementation chose a shape the reviewer dislikes, but the design neither requires nor forbids it | no finding (Info at most, and usually stays in your notes) |
 | Change alters an API the docs describe, docs untouched in the diff | WARNING (Q4 documentation drift) |
+| Early commit in a multi-commit delivery changes a public contract, owning DESIGN untouched across the delivery window, last commit clean | BLOCKER (doc-sync miss visible only against the full delivery baseline) |
 | Two places in the same doc contradict each other about the design | WARNING (Q4 documentation drift) |
 | New `retry.ts` added by this diff duplicates `src/lib/http.ts:88` backoff already in use | WARNING (Q4 — duplication introduced by the diff) |
 | Diff switches command from `lib/doctor.ts` to `lib/inspect.ts`; `lib/doctor.ts` and `tests/lib/doctor.test.ts` now have zero production callers | WARNING (Q4 `delete:` orphan created by diff) |
@@ -452,3 +454,56 @@ await deleteAllUserContent(userId)
 Report under `Serious Logic Risks (Discuss with User)` only when both hold: the effect is irreversible and severe, **and** it contradicts an explicit design clause (e.g., the design requires soft delete with a 7-day retention window).
 
 If the design calls for a hard delete, this is conformance, not risk. When the reviewer believes the design is wrong, that is one `Design Feedback` item — "hard delete is irreversible; consider soft delete with retention" — so the user changes the design first instead of blocking this delivery.
+
+## 11. Delivery-baseline scope & adversarial DESIGN/Proposal verification
+
+### Establish the full delivery diff
+
+```bash
+# with a delivery base (preferred for multi-commit or branch deliveries):
+git diff --name-status <delivery_base>...HEAD
+# single uncommitted change only:
+git diff --name-status
+```
+
+The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..HEAD` each commit that touched non-test code under a Source Carrier prefix, then check whether the owning `DESIGN-<module>.md` was modified **in the same delivery window**. A module whose code changed early but whose DESIGN doc has no commit touching it after `<delivery_base>` is the exact miss `--check-sync --base` fails on — report it even when the last commit is clean.
+
+### Adversarial checklist — authorization → code (Chain 1)
+
+| Check | Method |
+|---|---|
+| Every authorized item delivered | Map each `Authorized scope` / Issue item / Plan task bullet to diff hunks; an unmapped item is a Q1 missing-deliverable finding |
+| Nothing beyond the approved scope | `git diff --name-status <base>...HEAD` vs the declared file/behavior scope; undeclared file changes or behavior shifts are findings |
+| Explicit exclusions respected | The proposal's exclusion list (e.g., "excludes layout changes") crossed by any hunk → Q1 scope violation |
+
+### Adversarial checklist — code → DESIGN/Proposal (Chain 2)
+
+| Check | Method |
+|---|---|
+| Owning DESIGN updated for every contract change | For each changed export/default/failure boundary, `rg '<symbol or behavior>' docs/` then confirm the owning `DESIGN-<module>.md` diff contains the updated statement |
+| DESIGN statements match real behavior | Read the updated DESIGN text against the code hunk; invented behavior or planned-but-unbuilt features → BLOCKER (fact distortion) |
+| `DESIGN Sync` block claims verified | Re-run or spot-check the claimed gate (`verify-docset.py --check-sync --base`); a claimed PASS that does not reproduce is a faked gate result → BLOCKER |
+| `--pure-refactor` reason honest | Diff the claimed-refactor files for any externally visible change (export surface, defaults, error contract); a visible change hidden behind the flag → BLOCKER |
+| Parallel write-set respected | Confirm the diff touches only authorized `DESIGN-<module>.md` files; any shared main `DESIGN.md` edit from a module worker → BLOCKER (violation of the stated write-set rule) |
+
+### Proposal lifecycle verification checklist
+
+| Check | Method |
+|---|---|
+| Migration only after full delivery + acceptance | `proposals/implemented/` contains the proposal only when the diff covers the whole `Authorized scope` and the record carries user-acceptance evidence; partial delivery sitting in `implemented/` → BLOCKER |
+| Partial supersession cross-links | At full delivery, the new proposal names which old decisions it supersedes and the old record links back; missing either direction at full delivery → WARNING |
+| Full replacement disposal | Old record absorbed-and-deleted or moved to `archived/<class>/` with `Archived: YYYY-MM-DD` in the same delivery; neither → WARNING |
+| Old proposal untouched before full delivery | `git diff <base>...HEAD -- <old-proposal-path>` must be empty until full delivery; an early edit → BLOCKER (premature tampering) |
+| No demotion, no archive tampering | Any `implemented/` → `proposed/` move, or any content change under `archived/` → BLOCKER |
+
+### Severity calibration for sync failures
+
+| Situation | Verdict |
+|---|---|
+| Public behavior changed in an early commit, owning DESIGN never updated in the delivery window | BLOCKER (fact distortion, caught by the full-baseline diff) |
+| Genuine pure internal refactor with `--pure-refactor` reason, no visible contract change | no finding — verify the reason is honest and move on |
+| `--pure-refactor` claimed but the diff changes an export, default, or error contract | BLOCKER (faked gate result) |
+| Parallel worker edited the shared main `DESIGN.md` | BLOCKER (write-set violation) |
+| New proposal migrated into `implemented/` while scope is partially delivered | BLOCKER (impersonated full delivery) |
+| Bidirectional cross-link missing at full-scope partial supersession | WARNING (fixable gap, core decision intact) |
+| Wording in the synced DESIGN slightly imprecise but factually correct | INFO |
