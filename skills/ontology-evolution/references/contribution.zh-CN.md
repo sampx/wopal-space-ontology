@@ -159,7 +159,7 @@ gh pr edit <pr-number> --repo "$UPSTREAM" --body-file "$BODY"
 
 1. **没有未回流的 PR 内容。** 本 PR 的文件集必须已与 local main 一致：`git -C "$R" diff --name-only main "$B" -- $PR_PATHS` 无输出。有输出说明 worktree 侧的改动从未进入来源 Space，先回流（见「评审修复与中断继续」的回流检查）。不要先跑同步去「看看会怎样」。这里绝不能用 `main.."$B"`——squash 合并后它永远非空。
 2. **PR 文件与上游一致。** 对 `$PR_PATHS`（合并后为 `$MERGED_PATHS`）里的每个路径，`git -C "$R" diff --quiet upstream/main main -- <路径>` 必须成功。某路径有差异，说明 local main 仍留着已合并内容的旧副本；要经来源 Space 对齐，不要直接改 local main。
-3. **来源 Space 干净且已同步。** `git -C "$S/.wopal" status --short` 无输出，且 `wopal space status` 报告没有待贡献提交。
+3. **来源 Space 干净且已同步。** `git -C "$S/.wopal" status --short` 无输出，且 `wopal space status` 报告没有待集成提交。
 
 三条都通过后，才按此顺序执行：
 

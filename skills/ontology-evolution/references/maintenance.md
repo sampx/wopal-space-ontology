@@ -10,14 +10,14 @@ Read this file for status inspection, space / ontology synchronization, capabili
 | `wopal space sync [--confirm]` | Align the space branch with `local main`: integrate space-unique evolution upward, then fast-forward downward |
 | `wopal space capability add/remove <kind>:<name> [--local]` | Without `--local`, change type-default assembly; with `--local`, change this space's include / exclude override. |
 | `wopal ontology capability list` | Show capabilities owned by the central pool |
-| `wopal ontology status` | Show ontology downstream / upstream deltas and contribution status |
+| `wopal ontology status` | Show ontology downstream / upstream deltas, fork sync status, and upstream contribution status |
 | `wopal ontology sync [--confirm]` | Align the `upstream ⇄ origin ⇄ local main` source chain; clone mode collapses to the applicable topology |
 
 ## Reading status
 
 `wopal space status` distinguishes:
 
-- **to contribute**: the space branch has shared changes not yet in `local main`.
+- **to integrate**: the space branch has commits not yet in `local main`.
 - **behind local main**: the space needs ontology-main changes.
 - **include**: an extra shared capability mounted only in this space.
 - **exclude**: a type-default capability disabled in this space.

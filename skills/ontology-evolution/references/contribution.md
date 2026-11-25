@@ -161,7 +161,7 @@ Run these checks before either synchronization, in this order. Each one answers 
 
 1. **No unreturned PR content.** The PR's file set must already agree with local main: `git -C "$R" diff --name-only main "$B" -- $PR_PATHS` prints nothing. Output means worktree-side work never reached the source Space; return it first (see Review Fixes, Return check). Do not start the sync to "see what happens". Never use `main.."$B"` here — a squash merge keeps that non-empty forever.
 2. **PR files agree with upstream.** For every path in `$PR_PATHS` (or `$MERGED_PATHS` after merge), `git -C "$R" diff --quiet upstream/main main -- <path>` must succeed. A path that differs means local main still carries an older duplicate of the merged content; align it through the source Space, not by editing local main.
-3. **Source Space is clean and synchronized.** `git -C "$S/.wopal" status --short` prints nothing, and `wopal space status` reports no to-contribute commits.
+3. **Source Space is clean and synchronized.** `git -C "$S/.wopal" status --short` prints nothing, and `wopal space status` reports no to-integrate commits.
 
 Only then run, in this order:
 

@@ -1,7 +1,7 @@
 # DESIGN — Evolution Loop
 
 > **Status**: Active
-> **Updated**: 2026-10-31
+> **Updated**: 2026-11-24
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -23,11 +23,11 @@ Ontology 以「中央能力池 + 空间装配 worktree」模型承载能力演�
 
 ### Core Rules
 
-1. **local main 是能力唯一真相源**：共享能力不维护长期空间分叉版本；空间的独有提交是待贡献的进化，不是第二套能力池。
+1. **local main 是能力唯一真相源**：共享能力不维护长期空间分叉版本；空间的独有提交是待集成的进化，不是第二套能力池。
 2. **`space sync` 定序：先上行、后下行**：先汇入空间独有进化，再 fast-forward 到 local main 最新，最终两分支指向同一提交。
-3. **正常推进一律 fast-forward**：空间分支必须可对齐时才能推进；有待贡献提交时先贡献，有未提交修改时先处理工作区。
+3. **正常推进一律 fast-forward**：空间分支必须可对齐时才能推进；有待集成提交时先集成，有未提交修改时先处理工作区。
 4. **冲突在隔离临时 worktree（`$WOPAL_HOME/.worktrees/`）中处理**：整合成功才推进 live space 与 local main 引用；失败双方保持原状。
-5. **更新/移除/贡献前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
+5. **更新/移除/集成前检查工作区状态**：CLI 以工作区事实为准，不单信 Git 命令退出码。
 6. **机制安全，不设审批门控**：CLI 默认 dry-run 预览，`--confirm` 才落盘；agent 按用户意图直接执行 `--confirm`，不引入额外审批门控。安全保障由机制承担——隔离整合、ff-only、冲突即停、工作区检查——最坏结果是未发生变更，而非破坏工作区。`--dry-run` 是诊断工具，不是执行前门控。
 7. **共享内容与空间选择正交**：共享资产的 Git 新增、修改、删除随提交上行；空间装配选择以完整能力或 `path:` 身份记录在空间根仓库，只决定当前空间物化范围。共享资产可只在一个空间挂载，其选择不阻止内容上行。
 8. **显式选择**：装配命令和新增整项资产的进化集成能更改空间挂载选择；已装配资产的内部文件编辑保持 Git 内容语义。同步范围由当前装配单、能力/`path:` 级选择及临时游离文件保护重算；未跟踪内容只是 working-tree 事实，内部文件删除不触发本地卸载。
@@ -182,7 +182,7 @@ draft → accepted → implementing → validating → archived
 
 **未跟踪内容保护**：`space sync`、装配重算和 Evolution 写入在第一个文件变更前计算会触及的精确路径集，并检查这些路径上的未跟踪内容。发生碰撞时拒绝执行并列出路径；未跟踪文件不会被自动暂存、删除或覆盖。决定保留的新能力先扩宽 sparse range并提交到空间分支，再参与正常同步。
 
-`space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将贡献、将更新与将纳入范围保护的清单。向上游贡献使用 fork 分支上的原生 Git/GitHub PR，clone 模式 `ontology sync` 塌缩为单向下行拉取。
+`space sync` 由 CLI 默认 dry-run 预览、`--confirm` 落盘，agent 按用户意图直接执行，不设审批门控；`--dry-run` 保留为诊断用途，展示将集成、将更新与将纳入范围保护的清单。向上游贡献使用 fork 分支上的原生 Git/GitHub PR，clone 模式 `ontology sync` 塌缩为单向下行拉取。
 
 `ontology capability list` 揭示本体拥有的全部共享能力。对已有共享能力，`space capability add/remove` 调整类型默认组合，`--local` 调整本空间挂载；对刚在当前 worktree 创建的新能力，`space capability add` 可以直接完成共享纳管与装配。若只想把能力放入共享池而不改变任何装配，使用普通本体提交即可。
 

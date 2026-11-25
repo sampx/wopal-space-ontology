@@ -10,14 +10,14 @@
 | `wopal space sync [--confirm]` | 在空间分支与 `local main` 之间对齐：先向上整合空间独有进化，再向下 fast-forward |
 | `wopal space capability add/remove <kind>:<name> [--local]` | 不带 `--local` 修改类型默认装配；带 `--local` 调整当前空间的 include / exclude 覆盖 |
 | `wopal ontology capability list` | 查看中央能力池拥有的能力 |
-| `wopal ontology status` | 查看本体 downstream / upstream 差异和 contribution 状态 |
+| `wopal ontology status` | 查看本体 downstream / upstream 差异、fork 同步状态和上游 contribution 状态 |
 | `wopal ontology sync [--confirm]` | 对齐 `upstream ⇄ origin ⇄ local main` 来源链；clone 模式按实际拓扑收缩 |
 
 ## 如何读状态
 
 `wopal space status` 重点区分：
 
-- **to contribute**：空间分支有尚未进入 `local main` 的共享变化。
+- **to integrate**：空间分支有尚未进入 `local main` 的提交。
 - **behind local main**：空间需要吸收本体主线变化。
 - **include**：当前空间额外挂载的共享能力。
 - **exclude**：当前空间停用的类型默认能力。
