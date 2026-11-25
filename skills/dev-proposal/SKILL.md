@@ -163,10 +163,11 @@ A new decision or a material change to the authorized scope requires fresh user 
 3. **Write the file**: copy `templates/proposal-proposed.md` to `proposed/<class>/yyyy-mm-dd-<slug>.md` and fill `## Problem`, `## Proposal`, `## Alternatives considered`, `## Acceptance criteria`, `## Risks`. Acceptance criteria must let a third party judge met or unmet.
 4. **Wait for the user to read it.** The file stays `Status: proposed`; you do not advance it yourself.
 5. **Record approval**: once the user explicitly agrees, add `Approved`, `Authorized scope`, and `Delivery`, set `Status: approved`, and leave the path alone.
-6. **Deliver** along the `Delivery` route. Keep the evidence chain — source, related Plan, actual commits, review acceptance — inside the Proposal as links; do not copy a progress table.
-7. **After full delivery and user acceptance, migrate**: move to `implemented/<class>/`, set `Status: implemented`, rewrite the skeleton into the present tense (`Decision` / `Consequences`) in the same delivery, and sync the affected present-state DESIGN.
-8. **On rejection**: ask whether the reason prevents someone from repeating a **tempting** mistake later. If yes, move to `rejected/<class>/` with the reason on the status line; if not, delete the file and repair every inbound link.
-9. **Archive and prune**: move `implemented/` records that finished their mission and no longer guide daily work into `archived/<class>/`, insert `Archived: YYYY-MM-DD`, and freeze them. Small UI adjustments and purely mechanical changes are not archived — delete them and repair inbound links.
+6. **Commit the approved Proposal before creating the delivery branch or worktree.** Commit it on the integration branch, then start delivery from that commit so the approved record is part of the delivery baseline. Keep this commit limited to the Proposal change.
+7. **Deliver** along the `Delivery` route. Keep the evidence chain — source, related Plan, actual commits, review acceptance — inside the Proposal as links; do not copy a progress table.
+8. **After full delivery and user acceptance, migrate**: move to `implemented/<class>/`, set `Status: implemented`, rewrite the skeleton into the present tense (`Decision` / `Consequences`) in the same delivery, and sync the affected present-state DESIGN.
+9. **On rejection**: ask whether the reason prevents someone from repeating a **tempting** mistake later. If yes, move to `rejected/<class>/` with the reason on the status line; if not, delete the file and repair every inbound link.
+10. **Archive and prune**: move `implemented/` records that finished their mission and no longer guide daily work into `archived/<class>/`, insert `Archived: YYYY-MM-DD`, and freeze them. Small UI adjustments and purely mechanical changes are not archived — delete them and repair inbound links.
 
 Run the check after each step (path relative to this skill directory):
 

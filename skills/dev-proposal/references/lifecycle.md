@@ -157,6 +157,7 @@ All four lifecycles require this section. Without the rejected paths recorded, s
 2. Add `Approved`, `Authorized scope`, `Delivery`.
 3. Set `Status` to `approved`.
 4. **Keep the location**: it stays in `proposed/<class>/`.
+5. **Commit the approved Proposal before creating the delivery branch or worktree.** Commit it on the integration branch so it becomes part of the delivery baseline.
 
 Staying in `proposed/` is deliberate: during delivery, Plans and external links point at the original path, and moving it breaks them.
 

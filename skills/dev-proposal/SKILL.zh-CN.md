@@ -159,10 +159,11 @@ Agent 可以把**客观事实**摆到用户面前帮助选择：涉及几个仓�
 3. **写文件**：从 `templates/proposal-proposed.md` 复制骨架到 `proposed/<class>/yyyy-mm-dd-<slug>.md`，填满 `## Problem`、`## Proposal`、`## Alternatives considered`、`## Acceptance criteria`、`## Risks`。验收标准要能被第三方判断"达成/未达成"。
 4. **等用户读**。文件写完即 `Status: proposed`，不自行推进。
 5. **记录批准**：用户明确同意后，补齐 `Approved`、`Authorized scope`、`Delivery` 三条，状态改为 `approved`，文件位置不变。
-6. **交付**：按 `Delivery` 分流。交付过程中把 Source、关联 Plan、实际提交与评审验收证据链在 Proposal 里（链接即可，不复制进度表）。
-7. **全范围交付且用户验收后迁移**：移动到 `implemented/<class>/`，改 `Status: implemented`，同交付机械改写骨架为现在时（`Decision` / `Consequences`），并同步受影响的现状 DESIGN。
-8. **否决时**：判断这份否决理由是否能防止**将来有人再犯同样有诱惑力的错误**。能——移入 `rejected/<class>/` 并把理由写进状态行；不能——整份删除，并修好所有入链。
-9. **归档清理**：`implemented/` 中已完成使命、不再指导日常工作的记录移入 `archived/<class>/`，插入 `Archived: YYYY-MM-DD` 后永久冻结。微小的 UI 调整或纯机械变更不归档，直接删除并修好入链。
+6. **创建交付分支或工作树前，先提交已批准的 Proposal**：在集成分支上单独提交这次 Proposal 变更，再从该提交开始交付，让已批准的记录进入交付基线。这个提交只包含 Proposal 变更。
+7. **交付**：按 `Delivery` 分流。交付过程中把 Source、关联 Plan、实际提交与评审验收证据链在 Proposal 里（链接即可，不复制进度表）。
+8. **全范围交付且用户验收后迁移**：移动到 `implemented/<class>/`，改 `Status: implemented`，同交付机械改写骨架为现在时（`Decision` / `Consequences`），并同步受影响的现状 DESIGN。
+9. **否决时**：判断这份否决理由是否能防止**将来有人再犯同样有诱惑力的错误**。能——移入 `rejected/<class>/` 并把理由写进状态行；不能——整份删除，并修好所有入链。
+10. **归档清理**：`implemented/` 中已完成使命、不再指导日常工作的记录移入 `archived/<class>/`，插入 `Archived: YYYY-MM-DD` 后永久冻结。微小的 UI 调整或纯机械变更不归档，直接删除并修好入链。
 
 每一步都要跑一次校验（路径相对本技能目录）：
 

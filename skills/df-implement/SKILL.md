@@ -32,6 +32,8 @@ Route by the authorization you actually hold — the proposal's recorded metadat
 
 When implementing an approved Proposal (`Delivery: direct`) or a standalone Issue, **load the `git-worktrees` skill and create an isolated worktree and feature branch before writing any code**. Never implement directly on the main (integration) branch by default — isolation keeps half-finished work off the main branch and out of parallel agents' way.
 
+For an approved Proposal, confirm its approved revision is committed on the integration branch that will serve as the worktree base. If the proposal exists only in the working tree, commit it first, then create the worktree from that commit.
+
 Skip creating a new worktree in exactly two cases:
 
 1. The user explicitly asked for the change on the main/current branch;
