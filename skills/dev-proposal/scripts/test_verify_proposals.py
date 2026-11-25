@@ -582,6 +582,29 @@ class InboundScopeTests(BaseCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("LINK_SCOPE_MISSING", codes(result), msg=result.stdout)
 
+    def test_scope_scan_skips_research_and_references_subdirs(self) -> None:
+        self.tree.write("proposals/proposed/architecture/2026-11-20-x.md",
+                        proposal("X", "Status: proposed"))
+        self.tree.write("DESIGN.md", "# Project\n\n- [x](./proposals/proposed/architecture/2026-11-20-x.md)\n")
+        self.tree.write(
+            "research/upstream-snapshot.md",
+            "# Upstream\n\nExample path `/home/coder/.local/share/x` and `file:///path/to/plugin.ts`.\n",
+        )
+        self.tree.write(
+            "references/notes.md",
+            "# Notes\n\nSee `/Users/example/demo.md`.\n",
+        )
+        self.assertPass("--link-scope", str(self.docs))
+
+    def test_scope_scan_still_checks_design_docs_when_research_is_skipped(self) -> None:
+        self.tree.write("proposals/proposed/architecture/2026-11-20-x.md",
+                        proposal("X", "Status: proposed"))
+        self.tree.write("DESIGN.md", "# Project\n\n- [gone](./proposals/implemented/feature/2026-01-01-deleted.md)\n")
+        self.tree.write("research/upstream-snapshot.md", "# Upstream\n\n`file:///path/to/plugin.ts`\n")
+        result = run(self.docs, "--json", "--link-scope", str(self.docs))
+        self.assertNotEqual(result.returncode, 0, msg=result.stdout)
+        self.assertEqual(codes(result), ["LINK_BROKEN_OUTBOUND"], msg=result.stdout)
+
 
 class HeaderContractTests(BaseCase):
     """A formatted file states one status and the fields that identify it."""
@@ -815,6 +838,34 @@ class PosixPathTests(BaseCase):
                      )),
         )
         self.assertPass()
+
+    def test_embedded_home_and_root_segments_are_not_flagged_as_absolute(self) -> None:
+        self.tree.write(
+            "proposed/architecture/2026-11-20-x.md",
+            proposal(
+                "Embedded path segments",
+                "Status: proposed",
+                body=PROPOSED_BODY.replace(
+                    "## Proposal\n",
+                    "## Proposal\n\nStore config under `$WOPAL_HOME/dsh/home/profiles/web/cordis.patch.yml`, "
+                    "pass `name/root/ontology`, and bundle `$bunfs/root/worker.js`.\n",
+                ),
+            ),
+        )
+        self.assertPass()
+
+    def test_standalone_home_and_root_paths_in_parens_or_backticks_are_rejected(self) -> None:
+        for snippet in ("See `/home/sam/file.md`.", "See (/root/x.md)."):
+            with self.subTest(snippet=snippet):
+                self.tree.write(
+                    "proposed/architecture/2026-11-20-x.md",
+                    proposal(
+                        "Standalone POSIX path",
+                        "Status: proposed",
+                        body=PROPOSED_BODY.replace("## Proposal\n", f"## Proposal\n\n{snippet}\n"),
+                    ),
+                )
+                self.assertFailsWith("LINK_ABSOLUTE_PATH")
 
 
 class UncoveredCodeTests(BaseCase):

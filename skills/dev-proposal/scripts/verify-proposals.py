@@ -138,7 +138,8 @@ _ARCHIVED_RE = re.compile(r"^Archived:\s*(\d{4}-\d{2}-\d{2})\s*$")
 _FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 _MD_LINK_RE = re.compile(r"\]\(([^)#\s]+?)(?:#[^)]*)?\)")
 _TICK_LINK_RE = re.compile(r"`((?:\.{1,2}/)[^`\s]*?\.md)`")
-_ABSOLUTE_RE = re.compile(r"file:///|/Users/|/Volumes/|/home/|/root/")
+_ABSOLUTE_RE = re.compile(r"file:///|(?<![A-Za-z0-9_.$}~-])(?:/Users/|/Volumes/|/home/|/root/)")
+_LINK_SCOPE_SKIP_DIRS = frozenset({"research", "references", "assets", "images"})
 _URL_RE = re.compile(r"\b(?:https?://|mailto:)\S+")
 _REJECT_REASON_RE = re.compile(r"^rejected\s*(?:—|-{1,2})\s*(\S.*)$")
 
@@ -288,9 +289,13 @@ def _check_link_scope(scope: Path, report: Report, seen: set[Path]) -> None:
     The proposal tree only sees its own files. A design document one level up
     can cite a proposal that was later moved or deleted; without this scan the
     dangling link survives until a human notices. Files already covered by the
-    tree scan are skipped so one defect is not reported twice.
+    tree scan are skipped so one defect is not reported twice, and historical
+    research/reference subdirectories are skipped unless targeted directly.
     """
     for path in sorted(scope.rglob("*.md")):
+        rel_parts = path.relative_to(scope).parts[:-1]
+        if any(part in _LINK_SCOPE_SKIP_DIRS for part in rel_parts):
+            continue
         resolved = path.resolve()
         if resolved in seen:
             continue
