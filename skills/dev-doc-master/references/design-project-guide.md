@@ -52,7 +52,7 @@ Never author or update present-state claims from memory or unverified assumption
 
 ### Scenario A: Feature / Architecture Changes Driven by a Proposal
 
-1. While a Proposal is in `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`, **never pre-write unbuilt design specs into present-state DESIGN**.
+1. While a Proposal is in `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`, **never pre-write unbuilt design specs into present-state DESIGN and never link to `proposals/proposed/` or `proposals/rejected/` from DESIGN prose or `## Reference Documents`** (transient proposal paths move on delivery or rejection, and the `proposals/proposed/` directory itself is the index; back-linking turns main `DESIGN.md` into a contention hotspot and breeds broken links).
 2. Upon implementation and verification, update all parts in the **same delivery**:
    - Update affected `DESIGN-<module>.md` (or single-module `DESIGN.md`) from real code, tests, and live outputs;
    - Only if module ownership, module existence, or cross-module boundaries changed, have the coordinator update thin main `DESIGN.md` and `## Key Decisions`;

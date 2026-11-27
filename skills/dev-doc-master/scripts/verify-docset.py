@@ -16,7 +16,8 @@ Checks:
   9. Every discovered sub-document is linked from the main document body outside Reference Documents (no orphan sub-DESIGNs).
  10. No unreplaced template placeholders or completely empty table skeleton rows.
  11. Non-empty ## sections (unless immediately followed by a ### subsection with content) and required boundaries on Project/Active Module DESIGNs.
- 12. Optional (--check-sync): map changed code paths via Module Architecture's Source Carrier column and require owning DESIGN updates unless --pure-refactor is justified.
+ 12. No links or file references to transient proposals (`proposals/proposed/.../*.md` or `proposals/rejected/.../*.md`); only `proposals/implemented/` and `proposals/archived/` may be linked from DESIGN/PRD documents.
+ 13. Optional (--check-sync): map changed code paths via Module Architecture's Source Carrier column and require owning DESIGN updates unless --pure-refactor is justified.
 
 Exit code 0 on pass, 1 on any failure. Prints a report.
 """
@@ -214,6 +215,48 @@ def check_relative_links(doc_dir, report):
                     errors.append(f"{p.name}:{i}: broken link {target}")
     for e in errors:
         fail(report, e)
+
+
+_TRANSIENT_PROPOSAL_MD_RE = re.compile(r"(?:^|/)proposals/(proposed|rejected)/[^`\s)#>]+?\.md$", re.IGNORECASE)
+
+
+def check_transient_proposal_links(doc_dir, report):
+    """Reject links or file paths pointing to transient proposal files.
+
+    Proposals under `proposals/proposed/` or `proposals/rejected/` change path or
+    disappear over their lifecycle, and the `proposals/proposed/` directory itself
+    is the index. Linking them from DESIGN/PRD prose or `## Reference Documents`
+    creates contention hotspots and broken links. Only `proposals/implemented/`
+    and `proposals/archived/` records may be linked from DESIGN documents.
+
+    Directory-only mentions (e.g. explaining the `proposals/proposed/` folder in
+    workflow documentation) carry no `.md` filename and are intentionally allowed.
+    """
+    md_link_re = re.compile(r"\]\(([^)#\s]+?\.md)(?:#[^)]*)?\)")
+    for p in _doc_files(doc_dir):
+        text = p.read_text(encoding="utf-8")
+        for i, line, in_fence in _iter_lines_with_fence_state(text):
+            if in_fence:
+                continue
+            seen_on_line = set()
+            candidates = list(md_link_re.findall(line))
+            for m in _LINK_RE.finditer(line):
+                target = m.group(1) or m.group(2)
+                if target:
+                    candidates.append(target)
+            for raw in candidates:
+                target = raw.split("#")[0].strip()
+                if not target or target in seen_on_line:
+                    continue
+                if target.startswith(("http://", "https://", "mailto:")):
+                    continue
+                if _TRANSIENT_PROPOSAL_MD_RE.search(target):
+                    seen_on_line.add(target)
+                    fail(
+                        report,
+                        f"{p.name}:{i}: transient proposal link '{target}' is forbidden in DESIGN/PRD "
+                        "(only proposals/implemented/ or proposals/archived/ may be linked)",
+                    )
 
 
 # A link may be written as a backticked path (`./DESIGN.md`) or as a bare
@@ -694,6 +737,7 @@ def main():
     check_sub_body_reachability(doc_dir, main_name, sub_files, report)
     check_absolute_paths(doc_dir, report)
     check_relative_links(doc_dir, report)
+    check_transient_proposal_links(doc_dir, report)
     check_end_section(doc_dir, main_name, sub_files, report)
     check_template_placeholders(doc_dir, report)
     check_required_sections(doc_dir, main_name, report)

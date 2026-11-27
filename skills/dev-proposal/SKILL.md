@@ -143,7 +143,7 @@ Moving into `implemented/` **rewrites the skeleton mechanically in the same deli
 
 `## Alternatives considered` is required in all four lifecycles. Each entry states what the alternative was and why it lost. **Record only alternatives that were genuinely considered**; never invent one, and do not backfill pre-format files.
 
-Expression standards — clarity, term consistency, no AI slop, `Source Carrier`, evidence-backed claims — come from `dev-doc-master` (including `references/design-project-guide.md`). This skill does not copy them. A Proposal **does not touch present-state DESIGN**: unbuilt design is never pre-written into `DESIGN.md` or `DESIGN-<module>.md`.
+Expression standards — clarity, term consistency, no AI slop, `Source Carrier`, evidence-backed claims — come from `dev-doc-master` (including `references/design-project-guide.md`). This skill does not copy them. A Proposal **does not touch present-state DESIGN**: unbuilt design is never pre-written into `DESIGN.md` or `DESIGN-<module>.md`, and **neither DESIGN prose nor `## Reference Documents` may back-link to `proposals/proposed/` or `proposals/rejected/`**; add the link to the owning DESIGN's `## Key Decisions` only when delivery moves the proposal into `implemented/`.
 
 ## Delivery mode: the user decides
 

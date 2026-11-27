@@ -161,7 +161,7 @@ Archived: 2026-11-22
 4. **文件位置不变**，仍在 `proposed/<class>/`。
 5. **创建交付分支或工作树前，先提交已批准的 Proposal**：在集成分支上提交，让它进入交付基线。
 
-留在 `proposed/` 是刻意的：实施期内 Plan 与外部链接都指向原路径，搬走就会断链。
+留在 `proposed/` 是刻意的：实施期内 Plan 与其他关联提案都指向原路径，搬走就会断链。注意：现状 `DESIGN.md` / `DESIGN-<module>.md`（含 `## Reference Documents`）严禁在 `proposed/` 或 `rejected/` 期间反向链接该提案——只有迁入 `implemented/`（或封存 `archived/`）后才由现状 DESIGN 链接。
 
 ### `approved` → `implemented`
 

@@ -39,7 +39,7 @@ All links are relative to the repository root or the document directory (such as
 Every document separates two link zones with distinct obligations:
 
 - **Header** (metadata block below the title): carries only **mandatory** binding dependencies — parent or constraining sibling documents (such as PRD `Related DESIGN`, sub-DESIGN `Parent: ./DESIGN.md`, project DESIGN `Parent Architecture` / `Parent Product`, or product DESIGN `Sibling DESIGNs`).
-- **End** (`## Reference Documents`): carries **reference-only** material that informs without binding.
+- **End** (`## Reference Documents`): carries **reference-only** material that informs without binding. Never link to `proposals/proposed/` or `proposals/rejected/` here (or anywhere in a DESIGN/PRD); only settled `proposals/implemented/` records (or sealed `proposals/archived/` snapshots) may be linked from DESIGN documents.
 
 A document never appears in both the header and `## Reference Documents`.
 

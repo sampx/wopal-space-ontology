@@ -52,7 +52,7 @@
 
 ### 场景 A：有 Proposal 驱动的功能或架构变更
 
-1. Proposal 审议期间，所有设计提案留在 `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`，**绝不提前写入现状 DESIGN**。
+1. Proposal 审议与待交付期间，所有设计提案留在 `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`：**既不把未落地设计预写进现状 DESIGN，也不在现状 DESIGN 的正文或 `## Reference Documents` 中挂载指向 `proposals/proposed/` 或 `proposals/rejected/` 的链接**（提案路径是易变临时态，`proposals/proposed/` 目录本身即索引，反向挂载会造成主文档热点与断链）。
 2. 当实施交付完成并经过测试验证时，**在同一轮交付中完成同步**：
    - 依据真实代码、测试与实测输出，更新受影响模块的 `DESIGN-<module>.md`（或小型单模块 `DESIGN.md`）；
    - 仅当本次变更引入/删除模块、调整模块间职责分工或改变项目级边界时，由主控整合更新薄主 `DESIGN.md` 地图及 `## Key Decisions`；

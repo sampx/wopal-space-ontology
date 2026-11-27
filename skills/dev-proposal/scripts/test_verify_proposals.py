@@ -544,12 +544,14 @@ class InboundScopeTests(BaseCase):
         self.tree.root = self.docs
 
     def test_inbound_link_to_an_existing_proposal_passes(self) -> None:
-        self.tree.write("proposals/proposed/architecture/2026-11-20-x.md",
-                        proposal("X", "Status: proposed"))
+        self.tree.write(
+            "proposals/implemented/architecture/2026-11-20-x.md",
+            proposal("X", "Status: implemented", body=IMPLEMENTED_BODY),
+        )
         self.tree.write(
             "DESIGN.md",
             "# Project\n\n> **Status**: Active\n\n## Key Decisions\n\n"
-            "- [x](./proposals/proposed/architecture/2026-11-20-x.md)\n",
+            "- [x](./proposals/implemented/architecture/2026-11-20-x.md)\n",
         )
         self.assertPass("--link-scope", str(self.docs))
 
@@ -583,9 +585,11 @@ class InboundScopeTests(BaseCase):
         self.assertIn("LINK_SCOPE_MISSING", codes(result), msg=result.stdout)
 
     def test_scope_scan_skips_research_and_references_subdirs(self) -> None:
-        self.tree.write("proposals/proposed/architecture/2026-11-20-x.md",
-                        proposal("X", "Status: proposed"))
-        self.tree.write("DESIGN.md", "# Project\n\n- [x](./proposals/proposed/architecture/2026-11-20-x.md)\n")
+        self.tree.write(
+            "proposals/implemented/architecture/2026-11-20-x.md",
+            proposal("X", "Status: implemented", body=IMPLEMENTED_BODY),
+        )
+        self.tree.write("DESIGN.md", "# Project\n\n- [x](./proposals/implemented/architecture/2026-11-20-x.md)\n")
         self.tree.write(
             "research/upstream-snapshot.md",
             "# Upstream\n\nExample path `/home/coder/.local/share/x` and `file:///path/to/plugin.ts`.\n",

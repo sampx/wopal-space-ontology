@@ -39,7 +39,7 @@
 每份文档有两个职责不同的链接区：
 
 - **头部**（标题后的元数据块）：只放**必须遵循**的依赖文档——父文档或受约束的兄弟文档（例如 PRD 的 `Related DESIGN`、子 DESIGN 的 `Parent: ./DESIGN.md`、项目 DESIGN 的 `Parent Architecture` / `Parent Product`、产品 DESIGN 的 `Sibling DESIGNs`）。
-- **末尾**（`## Reference Documents`）：放**仅参考**材料——提供背景或历史对照但不构成契约约束的资料。
+- **末尾**（`## Reference Documents`）：放**仅参考**材料——提供背景或历史对照但不构成契约约束的资料。严禁在此处（或正文任意位置）链接未落地的 `proposals/proposed/` 或已否决的 `proposals/rejected/` 提案；DESIGN 文档只允许链接已实施的 `proposals/implemented/` 或封存历史的 `proposals/archived/`。
 
 一份文档非此即彼，绝不同时出现在头部与末尾 `## Reference Documents` 中，否则读者无法区分强制约束与背景阅读。
 

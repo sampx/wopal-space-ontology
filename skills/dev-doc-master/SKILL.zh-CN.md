@@ -41,7 +41,7 @@ description: |
   3. **全面取消主文档头部 `Sub-DESIGNs` 强枚举**（无论产品 DESIGN 还是项目主 DESIGN，均靠文件名 `DESIGN-*.md` 与子文档头部 `Parent: ./DESIGN.md` 识别，主文档在正文对应章节/地图链接），消除并发碰撞；
   4. 日常单模块开发与修 Bug 不改主 `DESIGN.md`；多 Agent 并行期只改授权写集内所属子文档，发现主文档或他人模块漂移**只上报主控，严禁越界修改共享文档**。
 - **不手抄易变代码清单**：严禁手抄完整源码文件树、全量 CLI 参数表或 API 字段清单；按通用“固定首尾锚点 + 1..N 个领域自由分节”写出满足五项必填覆盖要素的完整行为契约（行为主体/触发、时序、必须/可能/禁止、状态副作用、完整失败后果与恢复），并在主地图标注 `Source Carrier` 源码路径前缀。
-- **业务规则与关键决策归属**：项目不再新建独立 `BUSINESS_RULES.md`（存量仅作只读参考）；生效业务规则与失败边界直接写入 `## Business Rules and Failure Boundaries`（项目主/生效模块子文档强制要求）；`## Key Decisions` 仅保留已落地结论摘要及指向对应 `proposals/implemented/<class>/...`（或引用历史快照时 `proposals/archived/<class>/...`）的链接。
+- **业务规则与关键决策归属**：项目不再新建独立 `BUSINESS_RULES.md`（存量仅作只读参考）；生效业务规则与失败边界直接写入 `## Business Rules and Failure Boundaries`（项目主/生效模块子文档强制要求）；`## Key Decisions` 仅保留已落地结论摘要及指向对应 `proposals/implemented/<class>/...`（或引用历史快照时 `proposals/archived/<class>/...`）的链接。**现状 DESIGN（含正文与 `## Reference Documents`）严禁链接未落地的 `proposals/proposed/` 或已否决的 `proposals/rejected/` 提案**——提案路径随生命周期变化，保持提案单向指向 DESIGN，交付迁入 `implemented/` 后再写入 DESIGN。
 - **实测取证与诚实边界**：记录的命令、配置、默认值、路由、错误码与限制必须由实际代码、测试或亲手运行结果核实；无法实测之处必须**显式标注未实测及验证条件**，绝不伪造已通过结论。
 - **英文标题 + 用户偏好语言正文**：所有章节标题（无数字编号，如 `## Module Architecture`）与头部字段名保持英文以便脚本解析与跨项目对比；正文及头部字段值解释跟随用户偏好语言。只使用相对链接，头部放必须遵循的依赖、末尾 `## Reference Documents` 放仅参考材料，互不重复。
 

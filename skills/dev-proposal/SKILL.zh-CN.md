@@ -139,7 +139,7 @@ Status: proposed
 
 `## Alternatives considered` 在四种生命周期里都必填。每条写清"是什么方案、为什么输"。**备选方案只记录真实考虑过的**，不凭空补写；早于本格式的存量文件不追溯。
 
-正文表达规范——清晰度、术语一致、去 AI 味、`Source Carrier`、实测取证——直接引用 `dev-doc-master`（含 `references/design-project-guide.md`），本技能不重复抄写。Proposal 阶段**不动现状 DESIGN**：未落地的设计不许预写进 `DESIGN.md` 或 `DESIGN-<module>.md`。
+正文表达规范——清晰度、术语一致、去 AI 味、`Source Carrier`、实测取证——直接引用 `dev-doc-master`（含 `references/design-project-guide.md`），本技能不重复抄写。Proposal 阶段**不动现状 DESIGN**：未落地的设计既不预写进 `DESIGN.md` / `DESIGN-<module>.md`，也**不在现状 DESIGN 的正文或 `## Reference Documents` 中反向挂载 `proposals/proposed/` 或 `proposals/rejected/` 的链接**；仅在完整交付迁入 `implemented/` 时才把链接写入对应 DESIGN 的 `## Key Decisions`。
 
 ## 交付方式：由用户显式决定
 
