@@ -1,6 +1,7 @@
 ---
 name: WopalSpace Ontology AGENT RULES
 description: WopalSpace soul, regulations, and capability gene toolkit — agents, rules, skills, commands, plugins, templates, and scripts
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
 ---
 
 # Agent Development Rules
@@ -15,7 +16,7 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 | Directory | Responsibility |
 |---|---|
-| `agents/` | Agent soul and permission configuration |
+| `agents/` | Agent soul and `permission` configuration |
 | `rules/` | Rule definitions; shared rules and agent-specific rules |
 | `skills/` | Skill definitions; scripts live in each skill's `scripts/` |
 | `commands/` | Command definitions; `commands/wopal/` holds Wopal-specific commands |
@@ -58,7 +59,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 
 ### Soul Prompts: `agents/`
 
-- Soul prompts only cover: role positioning, decision principles, output style, and permission.
+- Soul prompts only cover: role positioning, decision principles, output style, and `permission`.
 - Workflow, skill routing, tool APIs, delegation timing, and command steps do not go in soul prompts; those go into skills, commands, or rules respectively.
 - `permission` goes in frontmatter. Study ellamaka source and references for the configuration approach; solidify into the `ellamaka-config` skill.
 
