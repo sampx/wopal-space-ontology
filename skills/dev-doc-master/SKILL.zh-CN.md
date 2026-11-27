@@ -8,11 +8,11 @@ description: |
   不适用：/cupdate-agent-rules、/cupdate-readme 或 AGENTS.md/项目 README 治理（用 space-master）、编写开发 Plan 或 Task 编排（用 dev-flow）、编码实施（用 df-implement）、或独立方案/代码评审（用 df-proposal-review / df-implement-review）。
 ---
 
-# dev-doc-master — 开发文档规范与维护
+# dev-doc-master — Development Documentation Master
 
 面向多项目空间的跨项目文档规范与写作底座，覆盖产品 PRD、产品 DESIGN，以及项目/子模块**现状 DESIGN**（主 `DESIGN.md` + `DESIGN-<module>.md`）。`/cupdate-prd` 与 `/cupdate-design` 为薄入口，均路由至此技能；`AGENTS.md` 与项目 `README.md` 编制归 `space-master`。
 
-## 使用时机
+## When to Use
 
 - 创建或更新产品 PRD、产品 DESIGN。
 - 编写、同步或按模块拆分项目与子模块现状 DESIGN（将已落地系统行为、生效业务规则与失败边界写给读者）。
@@ -20,7 +20,7 @@ description: |
 
 > 未实施的需求演进、架构提案、替代方案对比与批准状态归 **Proposal**（`proposals/{proposed,implemented,rejected,archived}/{class}/yyyy-mm-dd-<slug>.md`），不预写进项目现状 DESIGN。
 
-## 文档集与路由
+## Document Set and Routing
 
 | 文档 | 命令 | 参考 | 模板 |
 |---|---|---|---|
@@ -32,7 +32,7 @@ description: |
 
 动笔前先读 `references/consistency.md` 通用规则，并按文档类型加载对应参考；写或更新项目/子模块现状 DESIGN 时务必加载 `references/design-project-guide.md`。
 
-## 核心规则要点（完整规范见 `references/consistency.md` 与 `references/design-project-guide.md`）
+## Core Principles (full rules in `references/consistency.md` and `references/design-project-guide.md`)
 
 - **现状准确（项目/子 DESIGN）vs 产品意图（PRD/产品 DESIGN）**：项目与子模块 DESIGN 只陈述**已落地、经核实存在且真实运行**的行为、约束与生效业务规则，不预写未交付蓝图或进度表；产品 PRD 与产品 DESIGN 保留原有架构与能力路线规范。两者均禁止过程态迁移碎语（`deprecated`/`legacy`/`moved from`/`已废弃`/`历史机制`）。
 - **防多 Agent 并行冲突结构**：
@@ -45,13 +45,13 @@ description: |
 - **实测取证与诚实边界**：记录的命令、配置、默认值、路由、错误码与限制必须由实际代码、测试或亲手运行结果核实；无法实测之处必须**显式标注未实测及验证条件**，绝不伪造已通过结论。
 - **英文标题 + 用户偏好语言正文**：所有章节标题（无数字编号，如 `## Module Architecture`）与头部字段名保持英文以便脚本解析与跨项目对比；正文及头部字段值解释跟随用户偏好语言。只使用相对链接，头部放必须遵循的依赖、末尾 `## Reference Documents` 放仅参考材料，互不重复。
 
-## 命名与拆分准则
+## Naming and Splitting Rules
 
 - 主文档无后缀：`PRD.md`、`DESIGN.md`；子文档：`PRD-<topic>.md`、`DESIGN-<module>.md`（kebab-case，与主文档同目录）。
 - 拆分以**独立模块或独立职责所有权**为准，多模块项目默认拆分以支持并发分工；单模块紧耦合规则保持在同一文档内，不为了凑字数机械切碎。
 - 跨切面参考真相源（如 `BRANDING.md`、`API-CONTRACT.md`）作为伴随文档在主文档头部 `Companion Documents` 声明，按内容而非按原文件名区分归属。
 
-## 工作流
+## Workflow
 
 1. **路由判断**：识别文档类型（PRD / 产品 DESIGN / 项目主现状 DESIGN / 模块子现状 DESIGN），加载 `references/consistency.md` 及对应指南。
 2. **采集并核实事实**：阅读现有目标文档、上下游关联文档与**真实代码/测试**；对关键命令与行为做实际验证取证；只把需要产品拍板的模糊点交用户决策，可从代码读出的问题不反问。

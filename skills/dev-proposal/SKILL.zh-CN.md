@@ -8,13 +8,13 @@ description: |
   不适用：既定设计内的普通缺陷与任务（用 df-implement）、对 Proposal/Plan/DESIGN 的独立只读评审（用 df-proposal-review）、PRD/DESIGN 写作（用 dev-doc-master）、本体能力进化提案（用 ontology-evolution）、编排开发 Plan（用 dev-flow）。
 ---
 
-# dev-proposal — 业务 Proposal 生命周期
+# dev-proposal — Business Proposal Lifecycle
 
 **你只做一件事：让一项重要设计决定有据可查、有主可问、有期可守。**
 
 Proposal 记录的是**决定**：为什么做、选了哪条路、放弃了什么、什么算完成、代价是什么。它不记录执行进度，也不是现状文档。执行进度归 Plan 与 Issue，已交付的系统行为归项目/模块现状 DESIGN。
 
-## 什么时候必须有 Proposal
+## When a Proposal is required
 
 出现下面任一种情况时，写 Proposal：
 
@@ -33,9 +33,9 @@ Proposal 记录的是**决定**：为什么做、选了哪条路、放弃了什�
 
 同一主题已有 Proposal 时，先审计再动笔：能原地同步事实就不新建，需要改决定就新建并互链，详见下文「已实施提案的再变更」。
 
-## 目录与状态机
+## Layout and state machine
 
-### 布局
+### Layout
 
 Proposal 根目录按归属确定：
 
@@ -64,7 +64,7 @@ proposals/
 - **禁止**单数 `proposal/` 目录、未知分类目录、集中式 `INDEX.md`。目录本身就是索引；`INDEX.md` 会与所有无关改动争抢同一个文件。
 - 存量前格式文件（旧路径、旧命名）保持历史只读兼容：可以读、可以引用，不强制迁移，也不要按新规则去改它。
 
-### 状态机
+### State machine
 
 ```text
 proposed ──用户批准──▶ approved ──全范围交付且用户验收──▶ implemented ──使命完成──▶ archived
@@ -87,10 +87,10 @@ proposed ──用户批准──▶ approved ──全范围交付且用户验�
 - 单个 Plan 完成或归档**不会**自动把 Proposal 变成 `implemented`。只有批准范围全部交付并经用户验收，才由 Agent 在同一交付内迁移。
 - 未获用户明确批准，不得写 `approved`；未获验收放行，不得写 `implemented`。**格式校验不能伪造审批**——脚本通过只说明写法合规，不代表有人批准过。
 
-### 文件头契约
+### Header contract
 
 ```markdown
-# <标题>
+# <Title>
 
 Status: proposed
 
@@ -110,7 +110,7 @@ Status: proposed
 
 归档时在 `Status: implemented` 正下方插入 `Archived: YYYY-MM-DD`，这是归档唯一允许的内容改动。
 
-### 正文骨架
+### Body skeleton
 
 `proposed/`（含 `approved`）用未来时骨架：
 
@@ -141,7 +141,7 @@ Status: proposed
 
 正文表达规范——清晰度、术语一致、去 AI 味、`Source Carrier`、实测取证——直接引用 `dev-doc-master`（含 `references/design-project-guide.md`），本技能不重复抄写。Proposal 阶段**不动现状 DESIGN**：未落地的设计既不预写进 `DESIGN.md` / `DESIGN-<module>.md`，也**不在现状 DESIGN 的正文或 `## Reference Documents` 中反向挂载 `proposals/proposed/` 或 `proposals/rejected/` 的链接**；仅在完整交付迁入 `implemented/` 时才把链接写入对应 DESIGN 的 `## Key Decisions`。
 
-## 交付方式：由用户显式决定
+## Delivery mode: the user decides
 
 `Delivery` 只有两个值，且**必须由用户决定**，Agent 不得代选：
 
@@ -152,7 +152,7 @@ Agent 可以把**客观事实**摆到用户面前帮助选择：涉及几个仓�
 
 新增决策或实质改变授权范围，必须重新获得用户确认；旧批准不覆盖新范围。
 
-## 工作流
+## Workflow
 
 1. **判定必要性**：按上文三条门槛确认这次改动需要 Proposal。不需要就转 Issue 或直接实施，并说明理由。
 2. **起草前审计**：在对应 `proposals/` 根目录下搜索同主题的活跃与已实施记录。命中的处理见「已实施提案的再变更」。
@@ -173,7 +173,7 @@ python3 scripts/verify-proposals.py <proposals-root>
 
 退出码 0 才算写法合规；脚本只查单快照的静态事实，设计质量仍由评审与用户判断。
 
-## 已实施提案的再变更
+## Evolving an implemented proposal
 
 这是本技能最容易出错、也最值得记住的部分。**已 `implemented/` 的提案记录的是历史决定；改事实可以，改决定不行。**
 
@@ -198,13 +198,13 @@ python3 scripts/verify-proposals.py <proposals-root>
 
 **`archived/` 永久只读冻结**：不解冻、不改写、不翻译、不重排、不移动、不删除，也不核查它的出链。后续演进只能新建活跃提案，必要时把它当历史背景引用。
 
-## 诚实边界
+## Honest boundaries
 
 - 本技能只负责 Proposal 的写作、批准记录、迁移与冻结。它**不执行实施**，也不替用户批准。
 - 当前工作流引擎还不能从 Proposal 直接派生 Plan/Task。在 `dev-flow` 支持之前，**不要假装或自动调用不存在的 Proposal→Plan 命令**；`Delivery: plan` 目前是记录在案的用户决定，具体拆解由用户安排。
 - 独立评审由 `df-proposal-review` 承担。本技能写，它审；不要自己给自己发通行证。
 
-## 参考
+## References
 
 - 状态机、字段与迁移细则：`references/lifecycle.md`
 - 再变更分流与替代合并的判断细则：`references/evolution-triage.md`

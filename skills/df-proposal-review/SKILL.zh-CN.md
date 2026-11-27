@@ -4,7 +4,7 @@ description: >
   在动手执行前独立、只读地评审方案、计划或设计文档。触发场景包括：用户要求评审、检查、把关 Plan、开发计划、本体进化提案、业务/项目 Proposal、设计文档（PRD、DESIGN）或方案（如"评审这个plan"、"看看方案行不行"、"检查设计文档"、"审一下这份提案"）。不适用：撰写或维护提案（用 dev-proposal 或 ontology-evolution）、评审已完成的代码（用 df-implement-review）。
 ---
 
-# df-proposal-review — 方案与计划评审
+# df-proposal-review — Proposal Review
 
 **你只判断一件事：照着这份方案字面执行，能不能做成、能不能达成目标、是不是用最简单直接的方式做成？**
 
@@ -12,7 +12,7 @@ description: >
 
 **先审实质，再审格式。** 评审 DESIGN 时，先判断目标、行为、边界和归属是否正确完整，并能否沿真实代码调用路径实施。评审有 DESIGN 依据的 Plan 时，先逐项核对**新增或改变的设计契约 → 实施 Task → 可观察验收**，覆盖真实入口、失败路径和既有行为保护。闭环成立后再检查任务顺序、仓库事实、命令和格式。清单齐全不代表设计决策完整，也不代表功能交付完整；报告时先给影响架构和覆盖的实质问题，再谈次要的验证细节。
 
-## 先选模式
+## Pick the mode
 
 看文档内容，一次选定：
 
@@ -26,7 +26,7 @@ description: >
 
 如果同时要求评审 DESIGN **及其对应的 Plan**，先按文档模式评审 DESIGN，再按 Plan 模式检查它对设计的覆盖。以当前工作树的 DESIGN 内容为准，即使它尚未提交，也不能退回集成分支的旧版本来评审。
 
-## 脚本查过的格式别重复查
+## What the script owns
 
 Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填字段、占位符、TDD 与 Behavior 配对、复选框格式、AC 命令是否存在、状态名是否合法。进化提案也有 `wopal space evo check`。业务 Proposal 有 `dev-proposal/scripts/verify-proposals.py`，负责目录布局、生命周期骨架、授权字段与链接图。重复查这些纯属浪费时间、制造噪音。你要查的是脚本算不出来的东西——前后步骤能不能接上、写的情况跟仓库真实代码对不对得上、所有任务加起来能不能达成总目标。
 
@@ -34,7 +34,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 方案没问题就直说没问题，马上结束。
 
-### 先分清：方案缺陷，还是执行现场还没准备好
+### Separate proposal defects from an execution site that is not ready yet
 
 评审只报告**方案本身会把人带错**的问题，不把普通工作流状态、尚未完成的收尾动作、最终验收资源尚未就绪，冒充成设计缺陷。
 
@@ -52,7 +52,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度校准：**Blocker 必须证明“照着这份方案实施会做错、会卡死、或最终无法达成目标”。“实施前/验收前还要再做一步”本身不是 Blocker。**
 
-### 先判断“哪里坏了”，再判断严重度
+### Classify what is wrong before assigning severity
 
 用户需要知道下一步该改什么，不只是看到一个红色标签。每条 Blocker / Warning 先归类：
 
@@ -70,7 +70,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 **评审范围门槛：** 只评设计是否正确、能否达成目标、是否可验证以及是否过度设计。执行 Agent 的人选、委派方式和运行引擎属于实施安排；默认协作分工可因用户决定或引擎能力而调整，不得仅因偏离默认分工就给设计提案记 Finding。用户单独要求检查执行准备时，另行说明执行安排的问题，不混入设计质量结论。
 
-## 怎么干：通读一遍、列三张表、集中核实
+## How to work: read once, three lists, then verify
 
 评审拖得越久，废话越多。分两步走完：
 
@@ -86,7 +86,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 实在没法核实的说法放进 `Unverified`（未核实），绝不硬凑成问题（finding）。
 
-## Plan 模式：查四个问题
+## Plan mode: the four questions
 
 | | 问题 | 重点抓什么 |
 |---|---|---|
@@ -97,7 +97,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 **从 Q3 开始，再看 Q1。** 对有正式设计依据的 Plan，先用设计的实际变化对照所有 Task 和 AC，并追踪正常入口以及绕过主要工具包装的入口；不要仅凭 `Affected Files` 或 AC 清单判断覆盖完整。核对完设计覆盖，再用 Q2 验证仓库事实、用 Q4 检查精简程度。Q4 发现的问题最高定为 WARNING，不单独卡死（BLOCK）。
 
-### Q1 — 前后步骤接得上吗？
+### Q1 — Do the parts fit together?
 
 1. **每条验收项都有任务认领。** `Agent Verification` 里的每一条验收项（AC），都必须被某个 Task 的 `Verification Intent` 认领，或者明确标出是跨任务联调。顺手看一眼归类对不对：凡是能跑命令自动测的（单测、lint、类型检查）都该放在 Agent Verification，不能推给人工验收（User Validation）。
 2. **用到的符号都有出处。** 后面任务调用的每一个函数名、常量名、类型名，前面必须有任务创建它，且名字拼写一模一样。比如任务 1 写"注册 5 个错误码"，任务 3 写"抛出 `TEMPLATE_MISSING`"，中间对不上号就会在实施时卡死。这是最容易抓出硬伤的一步。
@@ -109,7 +109,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：用到的符号没人创建、名字拼错、创建者排在调用者后面、并行任务改同一文件 → **BLOCKER**。验收项没人认领、Behavior 没法写成测试、自动化检查塞进了人工验收、文件新建/删除前提搞错 → **WARNING**。
 
-### Q2 — 关于仓库现状的说法是真的吗？
+### Q2 — Are its statements about the repo true?
 
 一切以仓库里的真实代码为准。文档里的每个事实说法都要跑命令核对，不能看它"写得像真的"就放过。
 
@@ -131,7 +131,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：方案立脚的前提是错的、悄悄违背安全规则、验收命令根本跑不起来 → **BLOCKER**。跟文档有出入但不影响实际开发 → **WARNING**；不影响理解的细微出入或行号小偏移 → **INFO**。
 
-### Q3 — 做完真能达成总目标吗？
+### Q3 — Will executing it deliver the goal?
 
 **完整流程验收核对。** 涉及公开命令或用户流程的 Plan，先查看项目 `AGENTS.md` 中适用的验收规范。检查 Task 和 AC 是否能证明用户从真实入口完成目标任务、获得最终结果，并覆盖关键失败与副作用安全约束；不能因为列出了现有测试文件、测试全绿或依赖 Mock 的内部测试，就推断完整流程已验收。能自动执行的真实流程验证应归 Agent Verification，不应交由用户逐条手工回归。E2E 按完整用户任务定义，而不是按 GitHub 或网络访问定义；只对 Plan 实际声明的范围评审，不自行扩大产品范围。
 
@@ -144,7 +144,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：目标漏了没排任务、关键决策被悄悄缩水 → **BLOCKER**。验收项抓不住错、任务缺关键接口信息导致没法开工 → **WARNING**。文档自己明确说明的分阶段简化 → 不算问题。
 
-### Q4 — Lean：做法够精简吗？
+### Q4 — Lean: is this the lean way to deliver it?
 
 对 Plan 要新建的每一个东西（新模块、新类、新接口、新配置项、新依赖），按下面 6 步挨个问：
 
@@ -161,7 +161,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 当业务 Proposal 的交付物里包含技能、规则或命令时，同一条能力门禁同样适用：它承诺的产物必须守这些规范。这门禁看的是提案声明的交付物；落地文件由实施后评审复查。
 
-## 业务 Proposal 模式：查五个问题
+## Business Proposal mode: the five questions
 
 这里的产品是**决策本身**，不是文笔。从 P1 和 P4 起手：一项没被真正拍板的决策、一组没被认真比较的备选，会让下面所有检查失去意义。
 
@@ -173,7 +173,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 | P4 | 它能被证伪吗？ | 怎么都算过的验收标准、没有可观察结果的"提升"、列了风险却没定边界 |
 | P5 | 这项决策够精简吗？ | 问题不需要的机制、除了一张任务表之外没有别的内容 |
 
-### P1 — 这真是个"已经定下来"的决定吗？
+### P1 — Is the decision actually decided?
 
 找出那句话说清"选了什么"。如果读者读完方案章节仍然说不出选了什么、排除了什么，那这项决策没有被做出，只是被描述了一遍。
 
@@ -185,13 +185,13 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：决策不可判定，或批准范围实际上什么都没授权 → **BLOCKER**。关键处缺边界 → **WARNING**。
 
-### P2 — 文中陈述的事实成立吗？
+### P2 — Do the stated facts hold?
 
 与 Q2／D2 同一套办法。权威是仓库，不是文字。逐条机械核实，并写明核对的是哪个内容快照。
 
 严重度：决策所依赖的前提是错的 → **BLOCKER**。过时说法但不影响决策 → **WARNING**。不影响理解的细微出入 → **INFO**。
 
-### P3 — 备选方案是真的吗？
+### P3 — Are the alternatives real?
 
 `## Alternatives considered` 存在的意义，是让被否掉的路子月底不会被人重新提一遍。逐条用这个标准读：**一个认真的作者会不会真的考虑过它？文中给出的理由真的能击败它吗？**
 
@@ -213,7 +213,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 其余情形严重度：被否掉的理由其实站不住，或真正够格的方案缺席 → **WARNING**。只是措辞不够讲究 → **INFO**。
 
-### P4 — 它能被证伪吗？
+### P4 — Can it be falsified?
 
 逐条问验收标准：**如果交付的东西是错的，这条抓得住吗？** 只是把目标复述一遍、或任何合理实现都不可能失败的条目，是装饰。
 
@@ -223,7 +223,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：验收标准永远不会失败，或"全部交付"的声称与证据矛盾 → **BLOCKER**。风险无边界、缺复查信号 → **WARNING**。
 
-### P5 — 这项决策够精简吗？
+### P5 — Is this the lean decision?
 
 爬 Q4 同一把梯子，只是对象换成决策而不是任务清单：
 
@@ -234,7 +234,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：与 Q4 同一上限。重复一份已有定论的方案 → **WARNING**（改法是引用既有记录）。同样决策写得更短 → **INFO**。没什么可砍 → 写 `Lean already`。
 
-### 审阅由已批准 Proposal 派生的 Plan
+### Reviewing the Plan derived from an approved Proposal
 
 这是最常见的越界，所以说清楚：**审一份已获批准的 Proposal 派生出来的 Plan，不是第二次设计审批。**
 
@@ -243,7 +243,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 - 超出批准范围的 Task → **BLOCKER**（那是没被批过的工作）。交付不足却声称完成 → **BLOCKER**。只是内部实现手法与 Proposal 草拟的不同、但批准的行为与边界都还在 → 不算问题。
 - 如果 Plan 暴露出批准范围其实无法按原样交付，那是给用户的 **Requirement Question**，不是评审期间重新设计 Proposal 的许可。
 
-## 文档模式：查四个问题
+## Document mode: the four questions
 
 设计文档还没有拆具体任务，改查下面四件事（D4 同样最高定为 WARNING）：
 
@@ -256,7 +256,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 **先看 D3 和 D1。** 核实目标行为、所有相关入口、责任归属和失败语义，再决定文档结构或一致性问题是否有实质影响。
 
-### D1 — 文档前后自洽吗？
+### D1 — Does the document cohere?
 
 查章节之间有没有自相矛盾；专业词或自定义概念是不是没解释就直接用，或者前后意思不一致；新引入的组件、状态归哪个模块管有没有写明。如果文档属于 `dev-doc-master` 规范体系，其结构规则（头部字段区、命名、子文档发现方式）以 `dev-doc-master/references/consistency.md` 为准，机械部分已由 `scripts/verify-docset.py` 扫描，跑一遍后把精力留给脚本看不见的内容逻辑。
 
@@ -264,7 +264,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：核心结论前后矛盾 → **BLOCKER**；概念含糊有歧义、新组件没写明归属 → **WARNING**。
 
-### D2 — 关于现状的说法是真的吗？
+### D2 — Are its statements about reality true?
 
 跟 Q2 一样跑命令核实：文档里凡是提到现有代码、系统行为或其他文档的地方，全部核对真伪。关联文档之间的冲突沿用 Q2 的权威判定。
 
@@ -277,25 +277,25 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 严重度：关键流程上的说法跟实际代码相反 → **BLOCKER**；过期的说法但不影响核心设计决策 → **WARNING**；不影响理解的细微出入 → **INFO**。
 
-### D3 — 目标和边界清楚吗？
+### D3 — Is the goal sound?
 
 目标（Goal）必须能判断"怎样才算做完"。边界（Boundary）必须写明本次不包含什么。列出来的用户痛点必须有对应的需求方案去解决——有痛点没方案，写代码的人就会自己瞎猜。需要拍板的选择必须在文档里定下来，不能含糊带过。
 
 严重度：目标含糊到没法判断算不算完成 → **BLOCKER**；缺边界说明、有痛点无方案、关键选择没拍板 → **WARNING**。
 
-### D4 — 内容够精简吗？
+### D4 — Is it lean?
 
 每个功能、每个章节、每层抽象都必须服务于本次目标。没人提过的多余功能、给猴年马月预留的扩展接口、为了套模板硬凑的空洞章节——统统砍掉。
 
 严重度：与 Q4 一样，最高 **WARNING**，精简写法建议为 **INFO**。
 
-### 语言与文风把关（两种模式通用）
+### Writing style gate (both modes)
 
 文档写得像不像人话，直接决定执行会不会走样：要求用大白话、具体明确、一句话只说一件事。凡是堆砌技术黑话、生造晦涩概念、翻译腔/机器腔浓重、让人读两遍还摸不着头脑的句子，统统当作问题标出来，并直接给出大白话改法。严重度：一段话要反复琢磨才能看懂 → **WARNING**；个别句子别扭 → **INFO**。
 
 这条规矩同样管技能（Skill）文件本身：如果提案要新建或修改一个技能，它的 `description` 和正文必须直白清楚，让人和 AI 读一遍就完全明白什么时候用、怎么用。
 
-## 评审效率——目标 2 轮内收敛
+## Review efficiency — target 2 rounds per proposal
 
 力求在**两轮内**（初审 + 一次复审）收敛评审：
 
@@ -304,7 +304,7 @@ Plan 模式下，`flow.sh plan check` 已经自动检查过固定格式：必填
 
 评审技能只负责实事求是呈现缺陷，不擅自设卡中断。迭代预算、熔断上限与升级用户机制属于控制工作流（如 `dev-flow`）。
 
-## 裁决与报告
+## Verdict and report
 
 按对用户目标的影响排列问题：先报告设计正确性和实施覆盖缺失，其次是验收缺口，最后才是格式与命令细节。仅靠自动格式检查通过，不能声称完成了深入的设计或实施方案评审。
 
@@ -319,7 +319,7 @@ BLOCK  — 至少一条 Blocker
 评审开始时，每个问题建一条 todo，做掉一条勾一条。所选模式的全部问题都过手才准裁决。预算耗尽不许装作做完：报告里显式给出 `UNCOVERED CHECKS` 节，写明什么没做、为什么。
 
 ```markdown
-# 提案评审 — {提案名}
+# Proposal Review — {proposal name}
 
 ## Summary
 - Review type: Proposal（Plan 模式 | 文档模式 | 业务 Proposal 模式）
@@ -330,7 +330,7 @@ BLOCK  — 至少一条 Blocker
 - Lean count: {net: -N lines, -M dependencies possible | Lean already}
 
 ## Blocker
-### B-01: {问题标题}
+### B-01: {issue title}
 - Kind: Design gap | Plan gap | Verification gap | Reality mismatch | Lean
 - Location: `{文档}:{行}`
 - Reality: `{文件}:{行}` 或 `{命令输出}` — {为什么这与文档矛盾}
@@ -358,7 +358,7 @@ BLOCK  — 至少一条 Blocker
 
 `PASS` 必须附简短的 `Positive Findings`——查了什么、怎么查的。光秃秃的 PASS 是要读者凭信仰接受裁决。
 
-## 裁决之后
+## After the verdict
 
 - **`REVISE` / `BLOCK`**：修订后的文档必须复审后才算干净——没经复验的修复不是修复。复用同一个评审会话（reply），先前的 finding 还在上下文里。
 - **`PASS`**：这是给评审请求方的输入，不是自动门禁。它不授权 `approve`，不替代 `plan check` 或 `evo check`，不改变执行中的状态。

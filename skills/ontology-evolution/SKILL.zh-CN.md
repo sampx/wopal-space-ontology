@@ -4,20 +4,20 @@ description: >
   必须使用本技能处理任何可能改变或维护 WopalSpace 可复用能力的工作：用户纠正、重复摩擦、工具/环境失败、可复用经验、进化提案、能力资产、空间/本体同步、装配变更或上游贡献。即使用户没说“本体”或“进化”，只要要判断一条会话经验是否应沉淀为能力，或要修改本体能力资产，也必须加载。`projects/` 下代码开发使用 `dev-flow`。
 ---
 
-# ontology-evolution — 本体进化
+# ontology-evolution
 
 把真实工作中的摩擦变成可靠信号，把成熟信号沉淀为持久能力，并让改进安全落地。
 
 主流程：**观察 → 诊断 → 路由 → 汇总 → 提案 → 落地**。主文件只保留决策规则和主流程；具体落地、命令和维护细节按需读取 references。
 
-## 核心契约
+## Core contract
 
 - 先找已有能力 owner，优先修正已有能力；只有没有自然 owner 时才新增能力。
 - 提案本身不是实施授权。任何提案都必须等待用户批准后才能落地。
 - 用户掌握三道终局门：**批准、验证、交付**。
 - Wopal 负责主控与记录；Fae 负责实施；Rook 负责实施评审；Maka 负责观察、分析和提案。
 
-## 角色分工
+## Roles
 
 | 角色 | 负责 | 不负责 |
 |------|------|--------|
@@ -29,9 +29,9 @@ description: >
 
 ---
 
-# 会话内持续进化
+# Continuous session evolution
 
-## 什么值得观察
+## What is worth observing
 
 只有当一个事件可能说明“**以后再遇到类似情况，某项能力应该表现得不同**”时，才把它当作进化信号。典型来源：
 
@@ -43,7 +43,7 @@ description: >
 
 普通项目 bug、一次性网络故障、单个任务的业务事实，不因“出错”自动成为进化信号。
 
-## Wopal 与 Maka 如何协作
+## How Wopal collaborates with Maka
 
 运行环境支持子 Agent 时：
 
@@ -54,9 +54,9 @@ description: >
 
 没有可用子 Agent 协作时，Wopal 可在收尾时自己做一次同等汇总；不要为了模拟后台 Maka 增加持久化机制。
 
-## Maka 的观察期与汇总期
+## Maka's observation and synthesis modes
 
-### 观察期
+### Observation
 
 Maka 只诊断、归类、积累证据，不创建提案：
 
@@ -69,7 +69,7 @@ Maka 只诊断、归类、积累证据，不创建提案：
 
 `mature` 不等于立即写提案。观察期的目标是降噪、合并重复、补齐证据。
 
-### 汇总期
+### Synthesis
 
 只有 Wopal 明确要求 `synthesize` 时，Maka 才：
 
@@ -78,7 +78,7 @@ Maka 只诊断、归类、积累证据，不创建提案：
 3. 先确定能力 owner，再判断修正已有能力还是新增能力。
 4. 判断该变化适合直接维护还是需要正式提案，并把建议交给用户；**未经用户明确确认，不创建提案**。零提案是有效结果。
 
-## 能力路由
+## Capability routing
 
 | 问题本质 | 优先 owner |
 |----------|------------|
@@ -94,11 +94,11 @@ owner 交叉、边界不清或准备写正式提案时，读取 [`references/cap
 
 ---
 
-# 编写进化提案
+# Writing an evolution proposal
 
 提案的目的不是记录发生了什么，而是让同类情况下一次处理得更好。
 
-## 先决定是否需要提案
+## Decide whether a proposal is needed first
 
 正式提案用于需要独立设计、实施、评审或验证边界的进化，不是所有本体修改的默认入口。创建提案前必须先向提出问题的人确认是否需要 proposal；不得因为“这是 reusable capability”就自动创建。
 
@@ -115,13 +115,13 @@ owner 交叉、边界不清或准备写正式提案时，读取 [`references/cap
 
 边界不清时，问用户“是否要建 proposal”，不要自行选择更重的流程。
 
-## 先去具体化
+## Generalize first
 
 - 去掉绝对路径、项目 / 产品 / 客户名、会话 id、时间戳、提交哈希等局部细节。
 - 保留真正决定能力行为的证据和约束。
 - 检验标准：没见过当前空间的人也能理解并应用这条变化。
 
-## 分开决定“内容归属”和“装配范围”
+## Decide content ownership and assembly scope separately
 
 先决定内容本身放在哪里：
 
@@ -138,7 +138,7 @@ owner 交叉、边界不清或准备写正式提案时，读取 [`references/cap
 
 能力进入能力池，不自动意味着它必须进入某个类型装配单；装配范围是独立决定。
 
-## 写提案
+## Write it
 
 只有用户已经明确确认需要 proposal，才执行本节。
 
@@ -153,7 +153,7 @@ owner 交叉、边界不清或准备写正式提案时，读取 [`references/cap
 
 ---
 
-# 落地已批准的提案
+# Landing an approved proposal
 
 状态机固定为：
 
@@ -163,7 +163,7 @@ draft → accepted → implementing → validating → archived
 
 阶段词汇与 `dev-flow` 刻意不同，不要混用或“统一”。评审不是独立阶段，而是 `implementing` 内、邀请用户验证之前的强制门。
 
-## 主流程
+## Main flow
 
 1. **用户批准**提案。
 2. **Wopal** `accept`，随后进入 `implementing`。
@@ -176,7 +176,7 @@ draft → accepted → implementing → validating → archived
 
 开始落地前读取 [`references/landing.zh-CN.md`](references/landing.zh-CN.md)。需要具体命令参数、拒绝条件或稀疏工作树机制时，再读取 [`references/commands.md`](references/commands.md)。
 
-## 缺陷修复与进化的边界
+## Defect repair vs evolution
 
 - **缺陷**：已经约定的行为实现错了 → 直接走 `wopal space evo commit` 的 instant mode，不创建提案。
 - **直接能力维护**：owner 清晰、范围受控、无需专门测试/验证的修改可直接维护；即使是新增一个完整 Skill / Rule / Command，也不因此自动升级为 Proposal。
@@ -185,7 +185,7 @@ draft → accepted → implementing → validating → archived
 
 ---
 
-# 维护本体与空间能力
+# Maintaining ontology and space capabilities
 
 本技能也负责本体 / 空间的维护入口，包括状态检查、同步、能力装配和上游贡献。
 
@@ -196,7 +196,7 @@ draft → accepted → implementing → validating → archived
 
 ---
 
-# 边界
+# Boundaries
 
 - **Maka 只写提案。** 它的写入范围是 `docs/evolutions/`，不能修改能力资产。
 - **Wopal 主控，Fae 实施，Rook 把关。** 不自动上传或发布。

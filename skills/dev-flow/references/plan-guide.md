@@ -203,7 +203,7 @@ Carries only items **the user must execute and observe by hand**: UI/UX, interac
 | Pass criteria | A specific, assertable observable result | "Confirm behavior is correct" |
 | Failure feedback | What the user provides on failure (log path, diff output) | Missing |
 
-If a mechanism the validation depends on is not yet documented in the project's AGENTS.md, add it to the project spec first, then reference it — never let it appear once in a Plan and be lost.
+If a mechanism the validation depends on is not yet documented in the project's AGENTS.md, add it to the project rules first, then reference it — never let it appear once in a Plan and be lost.
 
 **Correct scenario example**:
 

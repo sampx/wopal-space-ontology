@@ -87,18 +87,48 @@ Use only the applicable rows and record project-specific choices.
 
 ## 3. Content Boundary Rules
 
-`AGENTS.md` is the operating rulebook for implementing, testing, and verifying.
+### Rules and DESIGN divide the work
 
-A rule belongs only if all hold:
+**DESIGN describes the project's architecture and design specification completely.** The rules (`AGENTS.md`) are its operating summary: they point at the specification and distill the long-lived constraints an agent must follow while implementing, so that an agent **that never opens a DESIGN** still cannot break the architecture, the implementation rules, or the constraints.
+
+Decide where a piece belongs by the question it answers:
+
+| Question | Home |
+|---|---|
+| What the system is, why it is designed this way, what the concrete specification is | DESIGN |
+| How to implement it | Rules |
+
+### The rule tiers
+
+Rules are tiered by location and never duplicated across tiers:
+
+| Tier | Location |
+|---|---|
+| Project rules | `<project>/AGENTS.md` |
+| Docs rules | `<project>/docs/AGENTS.md` |
+| Module rules | `<project>/<module>/AGENTS.md`, the subdirectory being a module of the project |
+| Directory rules | `<project>/<dir>/AGENTS.md`, the subdirectory being an ordinary directory such as `scripts/` |
+
+Module and directory rules sit at the same tier; only the nature of the subdirectory differs. Create no rules file when the subdirectory adds no long-lived constraint its parent lacks.
+
+### What rules carry
+
+Rules carry **constraints and rules**, in three kinds:
+
+- **Rule constraints**: permission and responsibility boundaries, hard limits that must be obeyed (off-limits write scopes, the single credential entry point).
+- **Implementation guidance**: how to develop, test, verify, and gate quality, plus the mechanics of implementing, testing, debugging, and releasing.
+- **Corrections**: confirmed deviations and the right way, so an agent does not repeat them.
+
+A piece of content belongs only if all hold:
 
 - Long-lived across future tasks and refactors.
-- Restricts agent permissions, responsibilities, behavior, or decision boundaries.
-- Needed during work — logging, output and routing, deployment and release limits, testing and verification, coding discipline — even when DESIGN details the topic.
+- Restricts agent permissions, responsibilities, behavior, or decision boundaries, or directly guides how to implement, test, or verify.
+- **Changes what the agent does after reading it** — a fact that changes no behavior is not a rule.
 - A concise operating rule, not DESIGN prose restated; link DESIGN for detail.
 - Names the concrete command, path, symbol, format, or boundary.
 - Backed by an existing tool, script, or command when the check is mechanical.
 
-**“A DESIGN also describes it” is not a reason to omit.** An agent will not open every DESIGN on every task, so day-to-day constraints must be reachable from the rulebook: summarize here, link DESIGN. Delete a rule only when it adds nothing the agent must act on.
+**“A DESIGN also describes it” is not a reason to omit.** An agent will not open every DESIGN on every task; that is exactly why the rules exist: summarize here, link DESIGN.
 
 Never write:
 
@@ -106,7 +136,7 @@ Never write:
 - Single-bug records, or rules whose only purpose is preventing that bug's recurrence — make it a test.
 - Exhaustive directory, API, command, field, or architecture inventories.
 - “Check”, “inspect”, or “review” without an installed command or tool.
-- Facts already carried by code, config, scripts, Plans, or docs with no operating instruction.
+- Implementation facts already carried by code, config, scripts, Plans, or docs that change no agent behavior.
 - Experience notes that constrain no decision; those belong to long-term memory.
 
 **Two failure modes.** Over-stuffing pastes one-off decisions, bug stories, or DESIGN text verbatim, so later agents cannot tell a durable rule from history. Over-trimming deletes a working constraint because “DESIGN also describes it”, leaving the agent without the rule it must follow. When unsure, keep the summarized constraint.

@@ -70,11 +70,11 @@ description: >
    - **留**：安全边界（删除范围、凭证单写入口）、行为约束、长期工作约束（日志、输出/路由、部署/发布限制、测试与验证、编码纪律）、`Code Review Rules` 章节（标题原样保留，内容照常审计）、User-Supplied Rules
    - **改**：目录描述过时、与更新的权威 DESIGN 冲突、中英版本漂移
 2. **先建立可执行质量门禁（含非空与正反验证）**：写规则前，把该技术栈标准的格式化、lint/静态分析、类型检查、单元测试、集成测试及（存在 `docs/DESIGN.md` 时）`Doc sync / consistency`（`verify-docset.py --check-sync` 或包装命令）接入项目可执行命令，标明明确失败条件；若新增或修改机械检查命令/脚本，必须验证其**覆盖非空真实目标范围且通过至少 1 个正例与 1 个反例**（防止空目录扫描伪通过）；无法机械判定的语义检查交给独立评审而非凑脆弱正则
-3. **每次改完规范都要跑规范门禁**：任何新建或更新的 `AGENTS.md` 都必须通过 `python3 <skill-dir>/space-master/scripts/verify-agents.py <project>/AGENTS.md --base <delivery-base>`。它机械校验 frontmatter、占位符、章节编号、层级行数上限、引用路径、本地化版本的标题/规则/行内标识一致性、`User-Supplied Rules` 不可变，以及子级重复。它无法判定一条规则该不该存在——那仍归语义评审。各项目把它写进自己的 `Quality Gates` 表
-4. **按变更路径收敛规则与检查范围**：收集约束与触发门禁时按受影响路径自底向上取适用层级，只要求与变更面匹配的最小充分检查；只有当长期工程命令、门禁或硬边界变化时才更新规范，纯局部内部变动保持不改（存量 `BUSINESS_RULES.md` 仅作只读历史参考，生效业务规则已并入对应 DESIGN）
+3. **每次改完守则都要跑守则门禁**：任何新建或更新的 `AGENTS.md` 都必须通过 `python3 <skill-dir>/space-master/scripts/verify-agents.py <project>/AGENTS.md --base <delivery-base>`。它机械校验 frontmatter、占位符、章节编号、层级行数上限、引用路径、本地化版本的标题/规则/行内标识一致性、`User-Supplied Rules` 不可变，以及子级重复。它无法判定一条规则该不该存在——那仍归语义评审。各项目把它写进自己的 `Quality Gates` 表
+4. **按变更路径收敛规则与检查范围**：收集约束与触发门禁时按受影响路径自底向上取适用层级，只要求与变更面匹配的最小充分检查；只有当长期工程命令、门禁或硬边界变化时才更新守则，纯局部内部变动保持不改（存量 `BUSINESS_RULES.md` 仅作只读历史参考，生效业务规则已并入对应 DESIGN）
 5. **更新前出计划**：展示审计分类结果（保留/删除/修正 + 理由）和拟变更清单，获用户确认后才动笔
 6. **先审核版，后正式版**：先更新 `AGENTS.<locale>.md`，每个标题与英文模板完全一致，只翻译正文；确认后再更新正式英文 `AGENTS.md`
-7. **Code Review Rules 章节**：代码类项目的根 `AGENTS.md` 必须包含 `## Code Review Rules` 章节——新建项目按模板生成，更新项目时原样保留（禁止删除、改名、翻译标题；纯文档目录与继承项目根规范的轻量模块子目录可省略）。章节内只写方向性骨架：项目使用的审查流程、报缺陷边界、项目特有检查点。可复用模板不得写入任何具体项目的规则
+7. **Code Review Rules 章节**：代码类项目的根 `AGENTS.md` 必须包含 `## Code Review Rules` 章节——新建项目按模板生成，更新项目时原样保留（禁止删除、改名、翻译标题；纯文档目录与继承项目守则的轻量模块子目录可省略）。章节内只写方向性骨架：项目使用的审查流程、报缺陷边界、项目特有检查点。可复用模板不得写入任何具体项目的规则
 8. 不更新是默认且合法的结果——只有代码、测试、配置和既有文档无法承载边界时才更新
 
 **完整规范**：`references/agents-md-maintenance.zh-CN.md`。
@@ -123,5 +123,5 @@ wopal skills remove <name> --force       # 从空间移除
 | 文档 | 内容 |
 |------|------|
 | `references/skills-maintenance.md` | 完整生命周期细节、安全扫描检查项、质量评估标准 |
-| `references/agents-md-maintenance.zh-CN.md` | AGENTS.md 维护完整中文规范：质量门禁、内容边界、规则审计判据、工作流、质量清单 |
+| `references/agents-md-maintenance.zh-CN.md` | AGENTS.md 维护完整中文规范：守则定位与层级、内容边界、规则审计判据、工作流、门禁、质量清单 |
 | `references/readme-maintenance.zh-CN.md` | README 维护完整中文规范：能力感知、语言版本规则、模板、质量清单 |

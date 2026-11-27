@@ -35,7 +35,7 @@ Before generating, prefer reading: existing `README.md`, related project docs, p
 - Place quick-start, core capabilities, and key limitations first; development commands and reference links later.
 - List modules and core entry commands; do not enumerate every subcommand. Point to `--help` for complete usage.
 - Do not dive into internal implementation details or Agent-specific implementation rules.
-- Technology stack and project structure belong in the project spec (e.g. `AGENTS.md`) and design documents when those exist; do not duplicate them in README.
+- Technology stack and project structure belong in the project rules (e.g. `AGENTS.md`) and design documents when those exist; do not duplicate them in README.
 - All commands must be verified from package / config files. Never guess.
 - Technical References at the end carry reference-only documents (design doc, product docs, durable references). They are informational links, never mandatory-follow links. Do not repeat a document in both the body and Technical References.
 

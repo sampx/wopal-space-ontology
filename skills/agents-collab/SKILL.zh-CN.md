@@ -10,20 +10,20 @@ description: |
   注意：本技能不包含与特定工作流（如 dev-flow）绑定的 prompt 模板 — 那些由对应工作流技能提供。
 ---
 
-# agents-collab — 子 Agent 交互基础
+# agents-collab — Sub-agent collaboration basics
 
 本技能定义**如何**与子 Agent 进行工具级交互。至于**何时**委派、prompt 中应包含哪些工作流特定指令（如 Plan 路径、Done checkbox），由上层工作流技能（如 dev-flow）决定。
 
 ---
 
-## 工具优先级
+## Tool priority
 
 必须优先用 `wopal_task` 委派任务，只有当 `wopal_task` 不可用时才用内置 `task` 工具。
 `wopal_task` 提供：双向通信、进度监控、非阻塞执行。用 `task` = 放弃以上能力 = 降级执行。
 
 ---
 
-## Prompt 格式
+## Prompt format
 
 委派 prompt 必须精准完整，确保子 Agent 一次就能准确完成任务。标准格式：
 
@@ -42,7 +42,7 @@ Goal: <目标描述>
 
 **核心原则**：上下文精准完整，一次给全，减少返工。
 
-### 代码审查委派契约（尤其 rook）
+### Code review delegation contract, especially for rook
 
 委派 rook 做代码审查时，必须先明确**变更载体**，否则 rook 无法建立准确审查边界：
 
@@ -59,9 +59,9 @@ Goal: <目标描述>
 
 ---
 
-## 委派工具
+## Delegation tools
 
-### wopal_task — 启动任务
+### wopal_task — launch a task
 
 ```typescript
 wopal_task({
@@ -76,7 +76,7 @@ wopal_task({
 - 并发上限：由 wopal 插件配置决定，超出自动排队
 - TTL：30min 无交互自动清理
 
-### wopal_task_output — 检查状态与输出
+### wopal_task_output — inspect status and output
 
 ```typescript
 wopal_task_output({ task_id })                              // 概要状态
@@ -86,7 +86,7 @@ wopal_task_output({ task_id, section: "reasoning" })        // 思考过程
 wopal_task_output({ task_id, section: "text", last_n: 3 })  // 只看最近 3 条
 ```
 
-### wopal_task_reply — 通信/恢复/重定向
+### wopal_task_reply — communicate, resume, or redirect
 
 向 idle/waiting/stuck 任务发送消息，恢复执行或纠正方向。`error` 任务不可恢复，只能 finish 后重新创建。子 Agent **会被唤醒**。
 
@@ -105,7 +105,7 @@ wopal_task_reply({ task_id, message: "改为...", interrupt: true })  // abort �
 
 **禁止**：`wopal_task_reply({ message: "任务完成" })` — 子 Agent 被唤醒继续运行，形成无意义循环。IDLE 本身就是"完成信号"，验收通过后用 `wopal_task_finish` 终结。
 
-### wopal_task_abort — 停止活跃运行任务
+### wopal_task_abort — stop an actively running task
 
 纯停止，不发送消息，不唤醒子 Agent。后续可用 `finish` 终结或 `reply` 恢复。
 
@@ -113,7 +113,7 @@ wopal_task_reply({ task_id, message: "改为...", interrupt: true })  // abort �
 wopal_task_abort({ task_id })
 ```
 
-### wopal_task_finish — 终结任务
+### wopal_task_finish — terminate a task
 
 终结 idle/waiting/stuck/error 任务并删除子会话。子 Agent **不会被唤醒**。运行中任务需先 `abort` 或 `reply(interrupt=true)`。
 
@@ -123,9 +123,9 @@ wopal_task_finish({ task_id })
 
 ---
 
-## 任务生命周期
+## Task lifecycle
 
-### 状态模型
+### State model
 
 状态模型：`running | idle | waiting | stuck | error`
 
@@ -135,7 +135,7 @@ wopal_task_finish({ task_id })
 - `stuck`: 停止态，已观察到 assistant 执行证据（任意 assistant part / 工具调用 / text delta），但本轮无新 assistant text；可恢复或清理
 - `error`: 停止态，未观察到 assistant 执行证据即失败（如 agent 不存在）；不可恢复，只能清理后重建
 
-### 状态与行动
+### States and actions
 
 | 状态 | 含义 | Wopal 行动 |
 |------|------|-----------|
@@ -147,7 +147,7 @@ wopal_task_finish({ task_id })
 
 ---
 
-## 通知驱动机制
+## Notification-driven flow
 
 任务状态变更通过系统通知 `[WOPAL TASK *]` 告知 Wopal。**不要轮询，等待通知。**
 
@@ -163,7 +163,7 @@ wopal_task_finish({ task_id })
 
 ---
 
-## IDLE 任务处理决策树
+## IDLE task decision tree
 
 ```
 IDLE 通知到达
@@ -178,7 +178,7 @@ IDLE 通知到达
     └─ 子 Agent 提问 → wopal_task_reply 回答
 ```
 
-## STUCK 任务处理决策树
+## STUCK task decision tree
 
 ```
 STUCK 通知到达
@@ -191,7 +191,7 @@ STUCK 通知到达
     └─ 异常停止（session crash 等）→ wopal_task_reply 尝试恢复 或 wopal_task_finish 清理
 ```
 
-## ERR 任务处理决策树
+## ERR task decision tree
 
 ```
 ERR 通知到达
@@ -205,13 +205,13 @@ ERR 通知到达
 
 ---
 
-## 返工与复用策略
+## Rework and reuse strategy
 
-### 主控职责
+### Controller responsibility
 
 委派规范、复盘结论、何时复用/换 task 的判断由 Wopal 负责。fae/rook 不负责总结委派经验。收到审查结论后 Wopal 必须主动推进下一步，不要停等用户重复授权。
 
-### 复用与换代——上下文预算
+### Reuse or spawn — the context budget
 
 - 小幅返工与复审重审：`reply` 原 task——快，保住上下文。
 - 重型轮次先预估：`当前 + 本轮预估`——多 finding 修复批、大型 TDD 轮每轮耗 20–40%。
@@ -222,7 +222,7 @@ ERR 通知到达
 
 ---
 
-## 子会话上下文压缩
+## Child-session context compaction
 
 收到 `[WOPAL TASK PROGRESS]` 时检查上下文占用：
 
@@ -238,7 +238,7 @@ ERR 通知到达
 
 **子会话**：`context_manage(action="compact", session_id="wopal-task-xxx")`，压缩后 Plugin 发送 `[WOPAL TASK COMPACTED]` 通知，Wopal 用 `reply` 发送精准恢复指令。
 
-### 上下文救援（暂停 → 压缩 → 恢复）
+### Context rescue (suspend → compact → resume)
 
 运行中 fae 超 ~60%、完成度不高、后续工作量大 → 输出质量快速下降，**必须**救援。用户亦可直接下令：
 
@@ -249,16 +249,16 @@ ERR 通知到达
 
 ---
 
-## 并行委派中的产物交叉
+## Cross-agent artifacts in parallel delegation
 
 多 Agent 并行时，`output` 返回的文件列表可能含其他 Agent 的工作成果。只关注当前任务的预期产出，通过 `git status` 在对应项目目录检查。不要误判为异常或删除其他 Agent 的文件。
 
-### 并行委派的工作区保护（高危）
+### Workspace protection in parallel delegation (high-risk)
 
 并行运行多个 Agent 时，工作区是**共享的**。任何 Agent 一个不经意的 git 操作都可能吞掉其他 Agent 的未提交改动，而且无法从 git 历史找回（未提交 = 无记录）。**Wopal 在编写每个并行任务的 prompt 时，必须显式写入以下禁令**（不要依赖 Agent 自觉）：
 
 ```
-## 工作区保护（并行环境强制）
+## Workspace protection (mandatory in parallel environments)
 - 禁止执行 `git stash`、`git stash push/pop/apply`、`git checkout`、`git restore`、
   `git reset`、`git clean`、`git switch`、`git merge`、`git rebase`、`git worktree`
   等任何可能触碰共享工作区或他人未提交变更的命令。
@@ -274,7 +274,7 @@ ERR 通知到达
 
 ---
 
-## 禁止与限制
+## Prohibitions and limits
 
 | 禁止 | 原因 |
 |------|------|
@@ -291,6 +291,6 @@ ERR 通知到达
 
 ---
 
-## 故障排查
+## Troubleshooting
 
 详见 `references/troubleshooting.md`

@@ -216,7 +216,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 1. 找出文档里写它的地方——`rg '<symbol>' docs/ README* AGENTS.md` 以及公开的注释文档。
 2. 检查本次 diff 有没有同步更新这些文档。
 3. 文档与设计冲突（不是与代码冲突）→ **WARNING**（REVISE：补齐文档更新）。文档只是没提到某个实现细节，不算问题。
-4. 如果项目规范（如 `AGENTS.md`）明确规定"改代码必须同步改对应文档" → 违反直接标 **BLOCKER**。
+4. 如果项目守则（如 `AGENTS.md`）明确规定"改代码必须同步改对应文档" → 违反直接标 **BLOCKER**。
 
 纯粹的内部重构、对外行为毫无变化的，不需要改文档。如果文档在当前仓库之外看不到 → 列入 `Needs Human`。
 
@@ -293,14 +293,14 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 - **调用方排查（Q2）**：对 diff 修改的每个导出函数/类/类型，运行 `rg -l '<符号名>' <项目路径>` 找出所有调用方（重点看 diff 之外的文件）。
 - **孤儿代码排查（Q4）**：对 diff 中**删掉**的每个 `import` 或旧函数调用，运行 `rg -l '<旧模块或旧函数名>' <项目路径>`，检查它是否已经变成 0 生产引用（以及它的测试文件是否成了孤儿测试）。
 - **本次新增重复排查（Q4）**：用新代码里的一段特征片段跑 `rg -n '<特征片段>' <项目路径>`，看项目里是不是已经有同样的实现。只报本次改动写出来的重复；过度抽象和工厂类的扫描属于 Repo audit。
-- **项目规范检查**：仅当 diff 触及带本地化同名的 `AGENTS.md`（`AGENTS.<locale>.md`）时执行。标题与行内代码必须跨版本一致：
+- **项目守则检查**：仅当 diff 触及带本地化同名的 `AGENTS.md`（`AGENTS.<locale>.md`）时执行。标题与行内代码必须跨版本一致：
 
 ```bash
 diff <(grep '^#' AGENTS.md) <(grep '^#' AGENTS.<locale>.md)
 diff <(grep -o '`[^`]*`' AGENTS.md | sort -u) <(grep -o '`[^`]*`' AGENTS.<locale>.md | sort -u)
 ```
 
-diff 非空即漂移，是否算缺陷按 `SKILL.md`（`## 项目规范评审`）的级别规则判定。过了这层检查仍存在的语义差异需要人工阅读。
+diff 非空即漂移，是否算缺陷按 `SKILL.md`（`## 项目守则评审`）的级别规则判定。过了这层检查仍存在的语义差异需要人工阅读。
 
 ### Repo audit probes (Mode 3 — whole-repo or directory lean audit)
 

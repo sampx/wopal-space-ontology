@@ -4,9 +4,9 @@ description: >
   驱动开发 Plan 的全生命周期管理工作流。触发场景包括：创建或推进开发 Plan、组织代码实现与评审、执行 approve/complete/verify/archive 状态推进、协调用户验证，或将 PRD 与 Issue 拆解为开发任务。
 ---
 
-# dev-flow — Issue / Plan 驱动开发流程
+# dev-flow — Issue / Plan Development Workflow
 
-## 主控职责
+## Controller responsibilities
 
 主控者负责推进 Plan 生命周期、组织实施与评审、执行流程门禁，并处理需要用户确认的决策。
 
@@ -16,7 +16,7 @@ description: >
 - 实施评审遵循 `df-implement-review`。
 - 是否委派不改变 dev-flow 的门禁和主控责任。
 
-## 脚本执行
+## Running the CLI
 
 所有命令从本技能根目录执行：
 
@@ -27,7 +27,7 @@ description: >
 
 受限环境中，如果命令需要写 Git metadata，使用当前 Harness 自带的授权机制取得能力；不要修改权限配置绕过限制。命令失败时保留原始错误并停止，不手工伪造成功状态。
 
-## Issue / Plan 选择规则
+## Choosing Issue and Plan shape
 
 先按下面顺序判断，再进入生命周期；不要用复杂 Plan 结构代替这个判断：
 
@@ -39,7 +39,7 @@ description: >
 
 具体 Issue 标签、归并命令见 `references/issue-guide.md`；Plan 与 Graph group 写法见 `references/plan-guide.zh-CN.md` / `references/active-plan-graph.zh-CN.md`；完整命令行为见 `references/commands.md`。
 
-## DESIGN、Plan 与实现
+## DESIGN, Plan, implementation
 
 **层级固定为：DESIGN → 已批准 Plan → 实现。**
 
@@ -56,7 +56,7 @@ description: >
 
 以上边界针对**实施正式设计的 Plan**；如果用户单独要求交付一份文档，而文档本身就是产品，则不禁止为该独立文档交付安排任务。
 
-### Plan 批准前
+### Before Plan approval
 
 主控者负责让 Plan 对齐正式 DESIGN。项目/阶段 Plan 的设计事实只能来自 `Status: Active` 的 DESIGN/子 DESIGN；每个 Task 用 `Design Source` 指向其具体章节、决策或契约。
 
@@ -64,7 +64,7 @@ description: >
 
 只有没有项目、也没有设计依据的简单 Plan 才可使用 `Design Source: N/A`。
 
-### Plan 批准后
+### After Plan approval
 
 已批准 Plan 的实质内容和 DESIGN 都不再是主控者的自主编辑面。
 
@@ -75,7 +75,7 @@ description: >
 1. 如果能在现有 DESIGN + 已批准 Plan 内解决，主控者可以调查、判断并决定如何继续。
 2. 如果必须修改已批准 Plan 或 DESIGN，先停止受影响的实施，向用户说明冲突和影响，让用户决定改哪一边；确认前两者都不改，取得决定后再恢复。
 
-## 生命周期
+## Lifecycle
 
 标准链路：
 
@@ -114,7 +114,7 @@ Graph 手工更新与 lifecycle 命令目前是两个连续动作。命令已经
 
 非法状态不要强行推进；回到正确步骤处理。
 
-## Planning 与 Reviewing
+## Planning and Reviewing
 
 创建或定位 Plan 必须使用 `flow.sh plan ...`，不要手写新 Plan 文件，也不要用 grep/glob 在空间里盲找已有 Plan。已知名称用 `plan status`，需要浏览时用 `plan list`。
 
@@ -134,7 +134,7 @@ Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/
 flow.sh approve <plan> --confirm [mode-flags]
 ```
 
-### 实施模式
+### Implementation modes
 
 | 模式 | 适用情况 | 命令 |
 |---|---|---|
@@ -144,7 +144,7 @@ flow.sh approve <plan> --confirm [mode-flags]
 
 `--no-worktree` 与 `--existing-worktree` 语义不同，不能互相替代。`--keep-worktree` 只用于归档后仍需保留开发目录的场景；共享 Delivery 的中间成员需要保留，负责人最后归档时按正常流程清理。详细行为见 `references/commands.md`。
 
-### 一次正式交付与提交记录
+### Formal delivery and commit records
 
 有开发分支的模式把“开发过程”和“正式交付”分开记录：开发分支可以保留多条工作、评审修复和验证修复提交；正式分支默认只增加一条总结这次交付结果的提交。正常归档后，开发分支和额外 worktree 会被删除，所以这些逐条开发记录只保证保留到归档前。
 
@@ -170,7 +170,7 @@ Plan 用以下固定字段描述这次交付：
 
 多个 `--existing-worktree` Plan 可以共用一次 Delivery。第一个获批的 Plan 是负责人，记录共同的正式分支、开发分支、共同起点、集成方式和提交标题；后续成员必须填写同一个 `Delivery`，并复用这些记录。任何一项不一致，`approve` 都应拒绝。正式集成只做一次；从任一成员启动 `integrate` 时，都必须查齐同一 Delivery 中尚未归档的成员，并把共同起点之后的全部改动一起处理。
 
-## Executing：实施、验收、评审、Agent Verification
+## Executing: implementation, acceptance, review, Agent Verification
 
 进入 `executing` 后，主控者决定每个 Task 是自己实施还是委派。实施工作遵循 `df-implement`，但 **Task 的验收、提交和 Plan 进度始终由主控者负责**。
 
@@ -185,11 +185,11 @@ Plan 用以下固定字段描述这次交付：
 
 Plan 进度、AC 命令和 Done 证据是主控者的验收记录，不是实施者的写入面。
 
-### 实施评审
+### Implementation review
 
 所有 Task 完成后，必须执行一次实施评审。主控者可以自己加载 `df-implement-review` 评审，也可以委派评审者；**评审技能而不是 Agent 名字定义评审规则**。
 
-#### 评审轮次治理
+#### Review iteration governance
 
 主控者把控评审循环，严格设定**最多 3 轮**硬上限，兼顾质量并防止无限循环：
 
@@ -221,7 +221,7 @@ flow.sh complete <plan>
 
 `complete` 把 Plan 从 `executing` 推进到 `verifying`。**未到 `verifying` 之前，不要邀请用户做最终验证。**
 
-## 冲突与返工
+## Conflicts and rework
 
 实施或验证中出现 Plan、DESIGN 与代码现实不一致时，主控者先判断问题属于哪一类：
 
@@ -231,7 +231,7 @@ flow.sh complete <plan>
 
 不要用 `reset` 代替这个判断。`reset` 是破坏性操作，只在用户明确要求时使用。
 
-## 三层验证责任
+## Three verification layers
 
 | 层 | 谁负责 | 规则 |
 |---|---|---|
@@ -241,7 +241,7 @@ flow.sh complete <plan>
 
 可自动化的测试、lint、typecheck、静态检查或脚本断言不要推给用户，放在 Agent Verification。User Validation 的具体写法见 `references/plan-guide.zh-CN.md`。
 
-## Verifying 与用户验证
+## Verifying and user validation
 
 `complete` 后，把脚本输出的验证位置与可选方式完整告诉用户，由用户选择。主控者不能自行跳过用户验证或代替用户确认。
 
@@ -270,7 +270,7 @@ flow.sh archive <plan> [--keep-worktree]
 
 共享 Delivery 的成员必须等同组全部 Plan 都完成正式集成和 `verify --confirm` 后再归档。先归档非负责人 Plan，并使用 `--keep-worktree` 保留共用开发分支和 worktree；最后归档负责人 Plan，不加 `--keep-worktree`，由正常归档流程统一删除共用开发分支和 worktree。
 
-## 分支与 worktree 边界
+## Branch and worktree boundaries
 
 分支和 worktree 的创建/删除由 dev-flow 脚本管理：
 
@@ -287,7 +287,7 @@ flow.sh archive <plan> [--keep-worktree]
 
 不要加载其他 worktree 管理技能去接管 dev-flow 已经管理的 worktree。
 
-## 用户授权门
+## User authorization gates
 
 | 动作 | 需要的用户信号 |
 |---|---|
@@ -301,7 +301,7 @@ flow.sh archive <plan> [--keep-worktree]
 
 不要把“提交吧”之类单一指令扩展解释成整个收尾流程的授权。
 
-## 必须守住的边界
+## Boundaries that must hold
 
 - 带设计面的工作不要绕过 dev-flow 直接实施。
 - 本体 Issue 不是 dev-flow 的工作。Issue 的项目是本体组件——即改动落在本体 worktree 的技能、规则、agent、命令、插件、装配里，而不是 `projects/` 下的仓库——就交给 `ontology-evolution`，不要在这里出 Plan。Issue 仍是需求记录，提案才是实施授权。`--project` 怎么决定这一点见 `references/issue-guide.md`。
@@ -316,7 +316,7 @@ flow.sh archive <plan> [--keep-worktree]
 - 不手动创建/删除 dev-flow 管理的 branch/worktree。
 - `reset` 只响应用户明确要求，不用于绕过返工或重新审批。
 
-## 参考
+## References
 
 按需要加载，不把细节重复塞进主流程：
 
