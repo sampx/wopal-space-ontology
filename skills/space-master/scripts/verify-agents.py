@@ -9,7 +9,9 @@ Checks:
   1. frontmatter carries name, description and maintenance.
   2. No unreplaced template placeholders and no `N/A` placeholders.
   3. No chapter numbering in headings (`## 1. ...`).
-  4. Line count stays inside the tier limit (project root 300, docs/ 80, module 100).
+  4. Line count is reported against the 300-line advisory ceiling shared by
+     every tier. Passing that ceiling is advice, not a failure: tighten or drop
+     low-value rules rather than deleting content to hit a number.
   5. Every backticked path-like reference exists in the repository.
   6. A localized sibling `AGENTS.<locale>.md` carries the same headings.
   7. ... the same section skeleton, section by section.
@@ -31,7 +33,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-TIER_LIMITS = {"project": 300, "docs": 80, "module": 100}
+ADVISORY_LINE_CEILING = 300
 
 TEMPLATE_PLACEHOLDERS = (
     "<Project Name>",
@@ -70,8 +72,17 @@ PATH_CANDIDATE = re.compile(
 ROOTED_PREFIXES = ("internal/", "cmd/", "docs/", "labs/", "projects/", "scripts/", "templates/", "references/")
 
 
+class Report:
+    """Failures block the change; advisories only ask for editorial attention."""
+
+    def __init__(self):
+        self.failures = []
+        self.advisory = []
+        self.tier = None
+
+
 def fail(report, message):
-    report.append(message)
+    report.failures.append(message)
 
 
 def parse_frontmatter(text):
@@ -111,12 +122,24 @@ def headings_of(body):
     return [line.strip() for line in body.splitlines() if re.match(r"^#{1,6}\s", line)]
 
 
-def tier_for(path):
-    name, parent = path.name, path.parent.name
-    if name != "AGENTS.md":
+def tier_for(path, repo_root=None):
+    """Classify the rules file by its role, not by its own name.
+
+    A rules file at a repository root is the project rules; everything below it
+    is a module or directory rules file. Judging by the filename alone made
+    every nested AGENTS.md look like a project file and hid tier violations.
+    """
+    if path.name != "AGENTS.md":
         return "module"
-    if parent == "docs":
+    if path.parent.name == "docs":
         return "docs"
+    if repo_root is not None:
+        try:
+            if path.parent.resolve() == repo_root.resolve():
+                return "project"
+            return "module"
+        except OSError:
+            pass
     return "project"
 
 
@@ -145,10 +168,12 @@ def check_single(report, path, text, fields, body, tier):
         if CHAPTER_NUMBER.match(heading):
             fail(report, f"{path.name}: chapter numbering in heading {heading!r}")
 
-    limit = TIER_LIMITS[tier]
     total = len(text.splitlines())
-    if total > limit:
-        fail(report, f"{path.name}: {total} lines exceeds the {tier} limit of {limit}")
+    if total > ADVISORY_LINE_CEILING:
+        report.advisory.append(
+            f"{path.name}: {total} lines, past the advisory {ADVISORY_LINE_CEILING}-line ceiling; "
+            "look for redundant rules, low-value constraints, or prose to tighten"
+        )
 
 
 def check_paths(report, path, body, repo_root):
@@ -309,8 +334,9 @@ def main():
     text = main_path.read_text(encoding="utf-8")
     fields, body = parse_frontmatter(text)
     repo_root = locate_repo_root(main_path)
-    tier = tier_for(main_path)
-    report = []
+    tier = tier_for(main_path, repo_root)
+    report = Report()
+    report.tier = tier
 
     check_single(report, main_path, text, fields, body, tier)
     check_paths(report, main_path, body, repo_root)
@@ -321,11 +347,13 @@ def main():
 
     print(f"AGENTS verification: {main_path}")
     print("=" * 50)
-    if report:
-        for item in report:
+    for item in report.advisory:
+        print(f"  ADVICE: {item}")
+    if report.failures:
+        for item in report.failures:
             print(f"  FAIL: {item}")
         print("=" * 50)
-        print(f"RESULT: FAIL ({len(report)} issue(s))")
+        print(f"RESULT: FAIL ({len(report.failures)} issue(s))")
         sys.exit(1)
     print(f"  OK: tier={tier}, {len(text.splitlines())} lines")
     print("=" * 50)

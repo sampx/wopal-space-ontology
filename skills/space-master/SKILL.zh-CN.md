@@ -64,7 +64,7 @@ description: >
 1. **三级归属、按层选模板与规则审计先行**：按**空间 → 项目 → 文档/模块子目录**确定归属、严禁跨层重复，并按层选用对应模板：
    - **项目根（`<project>/AGENTS.md`）** → `templates/agent-rules.md`（存在 `docs/DESIGN.md` 时接入 `Doc sync / consistency` 门禁与现状 `DESIGN` 同步常驻规则；所在空间装配 `dev-doc-master` 且 `<project>/docs/` 存在却缺 `<project>/docs/AGENTS.md` 时，在同一确认方案中主动建议一并建档）
    - **文档目录（`<project>/docs/AGENTS.md`）** → `templates/agent-rules-docs.md`（25–45 行轻量护栏卡，强制路由 `dev-doc-master` / `dev-proposal`，钉死现状真实、防并行、可读性与实测诚实四条红线及 `verify-docset.py` 门禁，承载项目专属术语与校准文风，不抄写整套指南）
-   - **模块 / 子目录（`<project>/<dir>/AGENTS.md`）** → `templates/agent-rules-subdir.md`（15–45 行，**仅当**该目录存在父级未覆盖的长期局部约束时按需创建，指回父级 `AGENTS.md` 并链接所属 `docs/DESIGN-<module>.md`）
+   - **模块 / 子目录（`<project>/<dir>/AGENTS.md`）** → `templates/agent-rules-subdir.md`（建议不超过 300 行，**仅当**该目录存在父级未覆盖的长期局部约束时按需创建，指回父级 `AGENTS.md` 并链接所属 `docs/DESIGN-<module>.md`）
    更新现有文件前逐条审计规则（判据见参考文档 Rule Audit）：
    - **删**：引用的代码已不存在 / 结构或 CI 已自动保证 / 只是设计细节、不含可执行约束（长期*工作约束*即使 DESIGN 有描述也要精简保留）/ 纯实现事实
    - **留**：安全边界（删除范围、凭证单写入口）、行为约束、长期工作约束（日志、输出/路由、部署/发布限制、测试与验证、编码纪律）、`Code Review Rules` 章节（标题原样保留，内容照常审计）、User-Supplied Rules

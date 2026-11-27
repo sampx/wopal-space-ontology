@@ -17,15 +17,17 @@ Keep rules strictly tiered across **Space → Project → Docs / Module Director
 - **Space level (root)**: workspace-wide governance, cross-repo safety boundaries, and global routing rules.
 - **Project level (`<project>/AGENTS.md`)**: project tech-stack gates, build/test/logging/error contracts, **the `Doc sync / consistency` gate and standing present-state `DESIGN` sync rule**, and cross-module project rules.
 - **Project docs directory (`<project>/docs/AGENTS.md`)**: **recommended thin guardrail card (25–45 lines, hard limit 80)** whenever `<project>/docs/` exists in a space assembling `dev-doc-master`. Auto-injected whenever any agent enters `docs/`, it commands the agent to load `dev-doc-master` / `dev-proposal`, enforces the four non-negotiable redlines (present-state truth & active business rules, anti-conflict layout, universal coverage & readability, and fact-check honesty), wires the exact `verify-docset.py` command, and holds project-local doc conventions (glossary, target readers, user-calibrated style rules) — never copying full `dev-doc-master` templates or guides verbatim.
-- **Module / subdirectory level (such as `packages/*/AGENTS.md`, `scripts/AGENTS.md`, `src/<complex-module>/AGENTS.md`)**: **place only durable constraints unique to that directory** (15–45 lines, hard limit 100), linking parent `AGENTS.md` and the owning `docs/DESIGN-<module>.md`. Never repeat rules already governed by a parent `AGENTS.md`; **if a subdirectory adds no distinct long-lived constraint beyond its parent, do not create an `AGENTS.md` or add empty placeholder files**.
+- **Module / subdirectory level (such as `packages/*/AGENTS.md`, `scripts/AGENTS.md`, `src/<complex-module>/AGENTS.md`)**: **place only durable constraints unique to that directory** (aim for 300 lines at most), linking parent `AGENTS.md` and the owning `docs/DESIGN-<module>.md`. Never repeat rules already governed by a parent `AGENTS.md`; **if a subdirectory adds no distinct long-lived constraint beyond its parent, do not create an `AGENTS.md` or add empty placeholder files**.
 
 ### Template Selection by Tier (Single Sources of Truth)
 
 | Target Tier | Path Pattern | Template | Target Length | Creation Rule |
 |---|---|---|---|---|
-| **Project root** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 80–150 lines (max 300) | Required for code projects; wires `Doc sync` gate & `DESIGN` sync rule when `docs/DESIGN.md` exists; when bootstrapping/updating in a space assembling `dev-doc-master` and `<project>/docs/` exists without `<project>/docs/AGENTS.md`, proactively propose creating `<project>/docs/AGENTS.md` in the same confirmation plan |
-| **Docs directory** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 25–45 lines (max 80) | Recommended for every project with `docs/` in spaces assembling `dev-doc-master`; omits `Code Review Rules` |
-| **Module / subdirectory** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 15–45 lines (max 100) | On-demand only when `<dir>` carries durable local invariants/traps beyond `<project>/AGENTS.md`; omits project-wide sections |
+| **Project root** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 300 lines at most (advisory) | Required for code projects; wires `Doc sync` gate & `DESIGN` sync rule when `docs/DESIGN.md` exists; when bootstrapping/updating in a space assembling `dev-doc-master` and `<project>/docs/` exists without `<project>/docs/AGENTS.md`, proactively propose creating `<project>/docs/AGENTS.md` in the same confirmation plan |
+| **Docs directory** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 300 lines at most (advisory) | Recommended for every project with `docs/` in spaces assembling `dev-doc-master`; omits `Code Review Rules` |
+| **Module / subdirectory** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 300 lines at most (advisory) | On-demand only when `<dir>` carries durable local invariants/traps beyond `<project>/AGENTS.md`; omits project-wide sections |
+
+**300 lines is advisory guidance, not a hard limit.** Every tier shares the same ceiling. Past it, look for redundant rules, low-value constraints, and prose that can be tightened — not for content to delete wholesale. Never cut a working constraint just to fit a number.
 
 **Resolve rules by changed paths**: When executing a change, gather applicable `AGENTS.md` bottom-up along the touched paths (`subdir → project → space`) and run only the minimal sufficient checks covering that surface rather than scanning unrelated packages.
 
@@ -224,7 +226,7 @@ Get explicit confirmation before writing. The plan includes:
 6. Architecture/directory plan.
 7. Quality Gates and dev/test standards: commands, failure conditions, fixtures and helpers, error handling, CLI output, logging.
 8. Where `rules-context` merges.
-9. Compression or split strategy if the result may exceed the tier length ceiling (300 lines for project root; 80 for `docs/`; 100 for module subdirectories).
+9. Compression or split strategy if the result may exceed 300 lines, the advisory ceiling for every rules file.
 10. Confirmation that `User-Supplied Rules` stays unchanged.
 11. Low-information content to drop: `N/A` placeholders, text duplicated from DESIGN, frontmatter, or global regulations, long catalogs.
 12. Per structure item: current fact, durable target constraint, or temporary plan.
@@ -276,7 +278,7 @@ It cannot decide whether a rule should exist, whether it restates implementation
 - [ ] Body summarizes long-lived operating constraints; DESIGN is linked for detail
 - [ ] All long-lived operating constraints present: logging, output/routing, deployment and release limits, testing and verification, coding discipline
 - [ ] Style, error contract, CLI/output, log sink, and forbidden content stated with concrete commands, paths, types, or formats
-- [ ] Target tier matched to the right template (`templates/agent-rules.md`, `templates/agent-rules-docs.md`, or `templates/agent-rules-subdir.md`) and within its length ceiling (project: 80–150 / max 300; docs: 25–45 / max 80; subdir: 15–45 / max 100)
+- [ ] Target tier matched to the right template (`templates/agent-rules.md`, `templates/agent-rules-docs.md`, or `templates/agent-rules-subdir.md`) and within 300 lines, the advisory ceiling for every tier
 - [ ] Every Quality Gates row has a real executable command and blocking condition; projects maintaining `docs/DESIGN.md` wire `Doc sync / consistency` (`verify-docset.py --check-sync` or wrapper) and the standing present-state `DESIGN` sync rule (and in spaces assembling `dev-doc-master`, propose bootstrapping `<project>/docs/AGENTS.md` if missing); added/updated mechanical scripts verified for non-empty scope and +/- cases; semantic checks left to independent review
 - [ ] The edited `AGENTS.md` passes the rules gate `scripts/verify-agents.py` (exit 0)
 - [ ] Test commands, layers, fixtures, helpers, and runner registration explicit

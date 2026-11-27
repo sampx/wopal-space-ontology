@@ -1,6 +1,12 @@
-# wopal-plugin — Agent Development Rules
+---
+name: wopal-plugin Agent Rules
+description: Module rules for the Wopal ellamaka runtime plugin — logging, path resolution, module boundaries, session model discipline, and module-local gates.
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
+---
 
-## 1. Project Positioning
+# Agent Rules — wopal-plugin
+
+## Scope and Owning Design
 
 Wopal's dedicated ellamaka runtime plugin — rule injection, task delegation, memory system, context management.
 
@@ -10,7 +16,7 @@ Canonical references:
 - DESIGN: `.wopal/docs/DESIGN.md`
 - Parent Rules: `.wopal/AGENTS.md`
 
-## 2. Architecture and Directories
+## Architecture and Directories
 
 | Module | Responsibility | Disable Switch |
 |--------|---------------|----------------|
@@ -34,47 +40,17 @@ Canonical references:
 
 Deployment: declared in `config/settings.jsonc` as the relative path `../plugins/wopal-plugin/src/index.ts`.
 
-## 3. Development Commands
+## Development Commands
 
 | Scenario | Command |
 |----------|---------|
 | Install dependencies | `bun install` |
-| Type check | `bun run typecheck` |
-| Auto-fix types | `bun run typecheck:fix` |
-| Run tests | `bun run test:run` |
-| Watch tests | `bun run test` |
+| Type check / auto-fix | `bun run typecheck` / `bun run typecheck:fix` |
+| Tests / watch | `bun run test:run` / `bun run test` |
 | Build | `bun run build` |
-| Lint | `bun run lint` |
-| Format | `bun run format` / `bun run format:fix` |
-| Format check | `bun run format:check` (not a hard gate) |
+| Lint / format | `bun run lint` / `bun run format` |
 
-### Post-Change Verification Order
-
-`bun run typecheck:fix` → `bun run typecheck` → `bun run test:run`.
-
-Issues that `typecheck:fix` cannot resolve must be fixed manually; do not skip and commit. `build` is for artifact verification/release only, not routine validation.
-
-### Verification Mechanisms
-
-Runtime behavior that unit tests cannot exercise (plugin bootstrap, config loading from real files, resource construction, tool registration) is verified by launching ellamaka headless against the real space:
-
-```bash
-# From the space root; prints plugin logs to stderr and appends to the plugin log file.
-ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
-```
-
-Output lands in `<space>/.wopal-space/logs/wopal-plugin.log`. Boot markers to look for:
-
-| Marker | Meaning |
-|--------|---------|
-| `Runtime context initialized` | Space root and `wopalHome` resolved |
-| `Effective wopal config loaded` | Engine-delivered plugin config consumed; effective snapshot logged, secrets redacted |
-| `Resources resolved` | Which of store / embedder / llm were constructed |
-| `Plugin initialized` | Final tool list and `memory` flag |
-
-Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.tmp/` (never by editing the user's real `settings.local.jsonc`); `loadWopalConfig` accepts an injected `pluginConfig` slice / `inlineOptions` / `fallbackEnvironment` for this purpose.
-
-`WOPAL_HOME` overrides the user-level config and storage root, which makes sandboxed runs possible.
+Post-change order: `typecheck:fix` -> `typecheck` -> `test:run`. `typecheck:fix` leftovers must be fixed by hand, never skipped. `build` is for artifact verification only, not routine validation.
 
 ## Quality Gates
 
@@ -82,11 +58,13 @@ Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.
 |---|---|---|
 | Type check | `bun run typecheck` | any type error |
 | Tests | `bun run test:run` | any test fails |
-| Headless boot | the `ellamaka run ... --print-logs` command above | a boot marker is missing or a new warning/error appears |
+| Headless boot | `ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG` from the space root | a `Plugin initialized` marker is missing, or a new warning/error appears in `.wopal-space/logs/wopal-plugin.log` |
 
 `bun run lint` and `bun run format:check` are informational, not gates: the lint script passes a `scripts` glob the ESLint config does not cover, and Prettier reports style issues this module has not cleared. Do not treat their non-zero exit as a new blocker, and do not widen config to silence them in an unrelated change.
 
-## 4. Implementation Rules
+Unit tests cannot cover bootstrap, config loading from real files, resource construction, or tool registration; the headless run above is their verification. Config-driven behavior uses isolated fixtures under `.wopal-space/.tmp/` (never the user's real `settings.local.jsonc`); `loadWopalConfig` accepts injected `pluginConfig` / `inlineOptions` / `fallbackEnvironment`. `WOPAL_HOME` overrides the config and storage root to make sandboxed runs possible.
+
+## Local Constraints and Traps
 
 ### Logging
 
@@ -179,22 +157,22 @@ Use module-level loggers (`src/logger.ts`); `console.log` is forbidden.
 
 Source files ≤500 lines; split when exceeded. Split signals: >500 lines / function >50 lines / >2 responsibilities / >15 imports.
 
-## 5. Testing
+## Testing
 
 - Plugin behavior changes that meet the canonical `rules/testing.md` TDD applicability criteria must use TDD; keep the failing assertion at the observable plugin boundary instead of testing private implementation structure.
 - New modules must have `*.test.ts` covering main paths and edge cases
 - Code style: TypeScript ESM, `.js` extension imports; Vitest framework, tests co-located with source
 
-## 6. Do Not
+## Do Not
 
 - Use `console.log` (use module-level loggers)
-- Use npm / pnpm (Bun only) — the Bun toolchain is the single toolchain. No `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or `package-lock.json` may ever exist in this plugin; the only lockfile is `bun.lock`. Native postinstall builds are declared via `trustedDependencies` in `package.json`, never via pnpm "onlyBuiltDependencies" or npm scripts
+- Use npm / pnpm (Bun only) — the Bun toolchain is the single toolchain. No `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or `package-lock.json` may ever exist in this plugin; the only lockfile is `bun.lock`. Native postinstall builds are declared via `trustedDependencies` in `package.json`, never via pnpm `onlyBuiltDependencies` or npm scripts
 - Import contract or SDK types from `@opencode-ai/*` — fork contract types (`SystemPromptMetadata` etc.) come from `@wopal/ellamaka-plugin`, SDK consumers (`createOpencodeClient`, `Model`) come from `@wopal/ellamaka-sdk`; hand-copying fork types in `types.ts` is forbidden (a residual local definition duplicates the contract and drifts silently)
 - Use `^` prefix for LanceDB — `@lancedb/lancedb` and `@lancedb/lancedb-darwin-x64` must have matching exact versions (currently `0.22.3`); ABI incompatibility crashes the memory system
 - Directly concatenate injection content in `system-transform.ts`
 - Cross-use loggers across modules
 
-## 7. Debug Switches
+## Debug Switches
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -203,7 +181,7 @@ Source files ≤500 lines; split when exceeded. Split signals: >500 lines / func
 | `WOPAL_PLUGIN_LOG_MODULES` | (empty) | Module filter (comma-separated), empty=all. Options: core/rules/task/memory/context (env override; config `pluginConfig["wopal-plugin"].logModules` is the default source) |
 | `ELLAMAKA_LOG_LEVEL` | (unset) | Host unified log level fallback (DEBUG/INFO/WARN/ERROR, normalized to lowercase). Effective only when neither `WOPAL_PLUGIN_LOG_LEVEL` nor config `logLevel` yields a valid level; read from the real process environment only, never from `.env` |
 
-## 8. Config Nodes (`wopal.pluginConfig["wopal-plugin"]`)
+## Config Nodes (`wopal.pluginConfig["wopal-plugin"]`)
 
 Feature switches and connection settings live in the `wopal.pluginConfig["wopal-plugin"]` entry of the three-layer settings (`global` → `space-public` → `space-local`, later wins). The engine deep-merges the layers and delivers the effective entry through `PluginInput.pluginConfig`; the plugin consumes the in-memory slice and never reads settings files.
 

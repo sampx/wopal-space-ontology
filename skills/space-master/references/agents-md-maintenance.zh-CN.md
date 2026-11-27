@@ -17,15 +17,17 @@
 - **空间级（根）**：全空间通行的工作区守则、跨仓库安全边界与全局路由规则。
 - **项目级（`<project>/AGENTS.md`）**：该项目的技术栈门禁、构建/测试/日志/错误契约、**`Doc sync / consistency` 文档同步门禁与常驻现状 `DESIGN` 同步硬规则**，以及项目内跨模块共性约束。
 - **项目文档目录（`<project>/docs/AGENTS.md`）**：凡装配了 `dev-doc-master` 且存在 `<project>/docs/` 的项目，**推荐配套一份轻量化护栏卡（25–45 行，上限 80 行）**。只要任何 Agent 进入 `docs/` 目录读写文件即由 Harness 自动注入：强制路由至 `dev-doc-master` / `dev-proposal`，钉死 4 条不可违背红线（现状真实与生效规则归 DESIGN、薄地图防并行与零孤立子文档、通用五要素覆盖与人类可读性红线、实测诚实），挂死真实可执行的 `verify-docset.py` 门禁命令，并承接本项目独有的术语表、读者对象或用户校准文风——绝不把 `dev-doc-master` 整套模板/长指南照抄进来。
-- **模块 / 子目录级（如 `packages/*/AGENTS.md`、`scripts/AGENTS.md`、`src/<complex-module>/AGENTS.md`）**：**只写入该局部目录特有的长期约束与避坑边界（15–45 行，上限 100 行）**，指回父级 `AGENTS.md` 并直接链接所属 `docs/DESIGN-<module>.md`。凡父级 `AGENTS.md` 已经覆盖的规则绝不在子目录重复；**若某子目录没有任何不同于父级的新增长期约束，禁止新建该目录的 `AGENTS.md`（也不创建空壳占位文件）**。
+- **模块 / 子目录级（如 `packages/*/AGENTS.md`、`scripts/AGENTS.md`、`src/<complex-module>/AGENTS.md`）**：**只写入该局部目录特有的长期约束与避坑边界（建议不超过 300 行）**，指回父级 `AGENTS.md` 并直接链接所属 `docs/DESIGN-<module>.md`。凡父级 `AGENTS.md` 已经覆盖的规则绝不在子目录重复；**若某子目录没有任何不同于父级的新增长期约束，禁止新建该目录的 `AGENTS.md`（也不创建空壳占位文件）**。
 
 ### Template Selection by Tier (Single Sources of Truth)
 
 | 目标层级 | 路径形态 | 选用模板 | 目标篇幅 | 创建与引导规则 |
 |---|---|---|---|---|
-| **项目根** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 80–150 行（上限 300） | 代码项目必备；维护 `docs/DESIGN.md` 时必须接入 `Doc sync` 门禁与现状 `DESIGN` 同步常驻规则；在装配了 `dev-doc-master` 的空间中新建或更新时若 `<project>/docs/` 存在却缺 `<project>/docs/AGENTS.md`，须在同份确认方案中主动建议一并初始化 |
-| **文档目录** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 25–45 行（上限 80） | 装配 `dev-doc-master` 且含 `docs/` 的项目推荐标配；不写 `Code Review Rules` |
-| **模块 / 子目录** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 15–45 行（上限 100） | 仅当 `<dir>` 存在不同于 `<project>/AGENTS.md` 的长期局部约束/陷阱时按需创建；省略项目级通栏章节 |
+| **项目根** | `<project>/AGENTS.md` | `templates/agent-rules.md` | 建议不超过 300 行 | 代码项目必备；维护 `docs/DESIGN.md` 时必须接入 `Doc sync` 门禁与现状 `DESIGN` 同步常驻规则；在装配了 `dev-doc-master` 的空间中新建或更新时若 `<project>/docs/` 存在却缺 `<project>/docs/AGENTS.md`，须在同份确认方案中主动建议一并初始化 |
+| **文档目录** | `<project>/docs/AGENTS.md` | `templates/agent-rules-docs.md` | 建议不超过 300 行 | 装配 `dev-doc-master` 且含 `docs/` 的项目推荐标配；不写 `Code Review Rules` |
+| **模块 / 子目录** | `<project>/<dir>/AGENTS.md` | `templates/agent-rules-subdir.md` | 建议不超过 300 行 | 仅当 `<dir>` 存在不同于 `<project>/AGENTS.md` 的长期局部约束/陷阱时按需创建；省略项目级通栏章节 |
+
+**300 行是建议上限，不是硬性限制。** 所有层级共用同一上限。超过后应检查重复规则、低价值约束与可压缩的叙述，而不是成批删除内容。绝不为了凑数字砍掉正在起作用的约束。
 
 **按变更路径收集适用守则**：Agent 执行具体改动时，仅按受影响文件路径自底向上收集对应层级（当前目录 → 项目根 → 空间根）的 `AGENTS.md` 与该变更面所需的最小充分验证检查，无需牵扯无关目录守则。
 
@@ -224,7 +226,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 6. 架构/目录方案。
 7. Quality Gates 与开发/测试标准：命令、失败条件、fixture 和 helper、错误处理、CLI 输出、日志。
 8. `rules-context` 合并到哪里。
-9. 可能超过对应层级上限（项目根 300 行、`docs/` 80 行、模块子目录 100 行）时的压缩或拆分策略。
+9. 可能超过 300 行（所有守则文件的建议上限）时的精简或拆分策略。
 10. 确认 `User-Supplied Rules` 不变。
 11. 要丢弃的低信息内容：`N/A` 占位、与 DESIGN/frontmatter/全局规章重复的文字、冗长清单。
 12. 每个结构条目：当前事实、长期目标约束，还是临时方案。
@@ -276,7 +278,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 - [ ] 正文概括长期操作约束；细节链接 DESIGN
 - [ ] 长期操作约束齐全：日志、输出/路由、部署与发布限制、测试与验证、编码纪律
 - [ ] 风格、错误契约、CLI/输出、日志位置、禁止内容都用具体命令、路径、类型或格式写明
-- [ ] 目标层级已选用正确模板（`templates/agent-rules.md`、`templates/agent-rules-docs.md` 或 `templates/agent-rules-subdir.md`）并落在对应篇幅上限内（项目根：80–150 / 上限 300；文档目录：25–45 / 上限 80；模块子目录：15–45 / 上限 100）
+- [ ] 目标层级已选用正确模板（`templates/agent-rules.md`、`templates/agent-rules-docs.md` 或 `templates/agent-rules-subdir.md`）并控制在 300 行以内（所有层级的建议上限）
 - [ ] Quality Gates 每行都有真实可执行命令和阻断条件；维护 `docs/DESIGN.md` 的项目已接入 `Doc sync / consistency` 门禁（`verify-docset.py --check-sync` 或包装命令）及现状 `DESIGN` 同步常驻规则（在装配 `dev-doc-master` 的空间中若缺少 `<project>/docs/AGENTS.md` 已提议同步建档）；新增/修改的机械脚本检查已确认扫描范围非空并通过正反测试；语义检查留给人工/独立评审
 - [ ] 测试命令、分层、fixture、helper、运行器注册都明确
 - [ ] Agent 不用翻源码重新找惯例就能实现；按变更路径即可收集最小必要检查，没有不点名的泛泛提醒
