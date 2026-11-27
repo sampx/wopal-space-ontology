@@ -32,6 +32,20 @@ maintenance: Maintain only when a long-lived constraint appears that neither cod
 | Plugin build & test | See `.wopal/plugins/wopal-plugin/AGENTS.md` | After any plugin code change |
 | Content change verification | Remind user to restart ellamaka | Any change involving load paths |
 
+## Quality Gates
+
+Run inside `.wopal/plugins/wopal-plugin/` unless stated otherwise.
+
+| Gate | Command | Blocks work when |
+|---|---|---|
+| Plugin type check | `bun run typecheck` | any type error |
+| Plugin tests | `bun run test:run` | any test fails |
+| Rules consistency | `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` from the ontology root | any check in the rules gate fails; required when the diff touches any `AGENTS.md` |
+
+`bun run lint` and `bun run format:check` are informational only until their existing failures are cleared: the lint script passes a `scripts` glob that the ESLint config does not cover, and Prettier reports unresolved style issues. Do not treat a non-zero exit from either as a new blocker.
+
+Declarative content (`agents/`, `rules/`, `skills/`, `commands/`, `assembly/templates/`) has no automated gate. Review it by reading, per `## Code Review Rules`.
+
 ## Implementation Rules
 
 ### i18n / Multilingual

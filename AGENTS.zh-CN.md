@@ -31,6 +31,20 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 | 插件构建与测试 | 参见 `.wopal/plugins/wopal-plugin/AGENTS.md` | 插件代码变更后 |
 | 内容变更验证 | 提醒用户重启 ellamaka | 涉及加载链路的任何变更 |
 
+## Quality Gates
+
+除另行说明外，均在 `.wopal/plugins/wopal-plugin/` 目录下执行。
+
+| 门禁 | 命令 | 何时阻断 |
+|---|---|---|
+| 插件类型检查 | `bun run typecheck` | 任何类型错误 |
+| 插件测试 | `bun run test:run` | 任何测试失败 |
+| 守则一致性 | 在本体根目录执行 `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` | 守则门禁任何一项失败；diff 触及任何 `AGENTS.md` 时必须执行 |
+
+`bun run lint` 与 `bun run format:check` 在存量问题清零前仅作参考：lint 脚本传入的 `scripts` glob 未被 ESLint 配置覆盖，Prettier 也报有尚未处理的格式问题。两者的非零退出不构成新的阻断项。
+
+声明式内容（`agents/`、`rules/`、`skills/`、`commands/`、`assembly/templates/`）没有自动门禁，按 `## Code Review Rules` 直接读文件评审。
+
 ## Implementation Rules
 
 ### i18n / Multilingual
