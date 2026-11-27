@@ -93,34 +93,33 @@ Archived: 2026-11-22
 
 ### `proposed/`（含 `approved`）— 目标态
 
-必填章节，顺序固定：
+固定入口与出口，`Design Decisions` 按需保留：
 
 ```markdown
 ## Problem
+## Design Basis
 ## Proposal
-…（0..N 个专属章节）…
-## Alternatives considered
+…（0..N 个专属设计章节）…
+## Design Decisions
 ## Acceptance criteria
-## Risks
 ```
 
 - `## Problem`：为什么现在要做这件事。要能脱离方案独立成立——读者看完就知道痛点，不必先读 `## Proposal`。
-- `## Proposal`：用用户偏好语言、正向肯定式的目标态描述选定行为与边界；批准前解决待定决策。
-- `## Alternatives considered`：真实考虑过的其它路径与它们失败的原因。
-- `## Acceptance criteria`：什么可观察状态算完成。每条都要能被第三方判断达成或未达成。
-- `## Risks`：可能出的问题，以及这次明知放弃的东西。
-
-专属章节按需插入在 `## Proposal` 与 `## Alternatives considered` 之间，例如接口契约、数据迁移、分阶段策略。
+- `## Design Basis`：适用的设计依据、继承约束和明确要调整的既有设计。
+- `## Proposal`：按 `design-specification.md` 写确定、完整的目标设计；专属章节按领域组织。
+- `## Design Decisions`（可选）：最终选择、重要理由及有长期价值的备选取舍、剩余代价。风险控制写进目标契约。
+- `## Acceptance criteria`：覆盖重要契约，第三方可判定。
 
 ### `implemented/` — 现在时
 
-必填章节，顺序固定：
+固定入口与出口，`Design Decisions` 按需保留：
 
 ```markdown
 ## Problem
+## Design Basis
 ## Decision
 …（0..N 个专属章节）…
-## Alternatives considered
+## Design Decisions
 ## Consequences
 ```
 
@@ -131,7 +130,7 @@ Archived: 2026-11-22
 - `## Migration plan`
 - `## Acceptance criteria`
 
-理由：这些是计划期词汇。已实施记录描述的是现在的系统，不是当初的计划。原 `## Acceptance criteria` 与 `## Risks` 的内容合并进 `## Consequences`——写清这套决定最终换来了什么、付出了什么。
+已实施记录描述已交付的决定。保留设计依据和重要决策理由；将原验收标准的实际结果及重要剩余代价写入 `## Consequences`。
 
 ### `rejected/`
 
@@ -141,15 +140,9 @@ Archived: 2026-11-22
 
 保留归档那一刻的正文与章节，只加 `Archived` 行。冻结之后不再要求满足任何活跃骨架规则，也不再抽查它的出链。
 
-### `## Alternatives considered` 的硬要求
+### 新旧骨架兼容
 
-四种生命周期都要有这一节。它存在的意义是：一项决定如果没写下被否掉的路径，将来一定会有人重新提一遍。
-
-写法要求：
-
-- 每条一行起头，加粗写方案名，后接为什么输；
-- 只记录**真实发生过**的备选讨论，不编造；
-- 早于本格式的存量文件不追溯补写，可保留原样。
+新提案必须使用 `Design Basis` 骨架。没有 `Design Basis` 但满足原骨架的记录仍按原规则校验、迁移；不批量改写旧记录。旧骨架在 proposed 中要求 Problem、Proposal、Alternatives considered、Acceptance criteria、Risks；implemented 中要求 Problem、Decision、Alternatives considered、Consequences；rejected 中要求 Problem、Proposal、Alternatives considered。归档记录保持冻结。校验器按可见章节识别骨架，不能证明文件何时创建，作者和评审负责新提案使用新规范。
 
 ## 5. 迁移清单
 
@@ -165,7 +158,7 @@ Archived: 2026-11-22
 
 ### 验收前维护 `approved` 提案
 
-以 SKILL.md 的验收前维护规则为准。用户明确授权的新决定优先在代码调整前融入当前提案；同步授权范围、设计、验收标准及受影响的备选和风险，保持路径、状态、基线不变。原地替换失效内容，不追加过程记录。自动实施不得自行改变授权。
+以 SKILL.md 的验收前维护规则为准。用户明确授权的新决定优先在代码调整前融入当前提案；同步授权范围、设计依据、目标设计、验收标准及受影响的决策理由和剩余风险，保持路径、状态、基线不变。原地替换失效内容，不追加过程记录。自动实施不得自行改变授权。
 
 ### `approved` → `implemented`
 
@@ -173,7 +166,7 @@ Archived: 2026-11-22
 
 1. 移动到 `implemented/<class>/`，文件名不变。
 2. `Status` 改为 `implemented`。
-3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；`## Acceptance criteria` 与 `## Risks` 合并进 `## Consequences`，删除计划期标题。
+3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；实际验收结果及重要剩余代价写入 `## Consequences`，删除计划期标题，保留设计依据和重要决策。旧骨架保留原备选记录并将 Risks 合并到 Consequences。
 4. 正文转现在时，删掉"计划""待定""v1 先这样"这类计划期表述。
 5. 同交付同步受影响的现状 DESIGN（`DESIGN.md` / `DESIGN-<module>.md`），补上 `## Key Decisions` 的相对链接。
 6. 修好所有指向旧路径的入链。

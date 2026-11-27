@@ -14,9 +14,7 @@ description: >
 
 # dev-proposal — Business Proposal Lifecycle
 
-**You do one thing: make an important design decision traceable, ownable, and bounded in time.**
-
-A Proposal records a **decision**: why it was needed, which path was chosen, what was given up, what counts as done, and what it costs. It does not record execution progress, and it is not a present-state document. Progress lives in Plans and Issues; delivered system behavior lives in the project/module present-state DESIGN.
+A Proposal is the **target design specification and record of important decisions** for a change. Resolve the design first, then write a determinate, complete, implementable, and verifiable specification. Progress lives in Plans and Issues; delivered system behavior lives in the project/module present-state DESIGN.
 
 ## When a Proposal is required
 
@@ -36,6 +34,12 @@ Skip the Proposal only when all of these hold:
 Ordinary bugs, style tweaks, mechanical renames, and pure internal refactors go through an Issue or direct implementation. **A Proposal is not a ritual attached to development work**: wrapping every change in a Proposal just to look disciplined produces files nobody reads.
 
 When a Proposal already covers the topic, audit before writing: sync facts in place if nothing changed, or write a new one and cross-link if the decision changed — see "Evolving an implemented proposal" below.
+
+## Design analysis and specification
+
+When asked to write a Proposal, first load `references/design-discussion.md` and `references/design-specification.md`; select relevant guidance from `references/design-practices.md`. Investigate applicable higher-level design, current decisions, code, and terminology; model the domain, discuss decisions in dependency-ordered rounds with recommendations and reasons, and test the design against concrete scenarios. Write the formal specification only when material decisions are settled, critical feasibility is verified, and material risks are addressed. Do not repeat settled questions. Record decisions each round and reconcile all of them with the final specification.
+
+Existing architecture and contracts not explicitly changed by the approved scope remain binding. For proposed changes, identify scope, reasons, impact, and surviving constraints for the user to decide. Determine the design, leave implementation free. After self-check, send for independent review; do not implement before user approval.
 
 ## Layout and state machine
 
@@ -120,28 +124,31 @@ Archiving inserts `Archived: YYYY-MM-DD` immediately below `Status: implemented`
 
 ```markdown
 ## Problem
+## Design Basis
 ## Proposal
-…(bespoke sections as needed: interfaces, migration, trade-off analysis)…
-## Alternatives considered
+…(bespoke design sections by domain)…
+## Design Decisions
 ## Acceptance criteria
-## Risks
 ```
 
 `implemented/` uses the present-tense skeleton:
 
 ```markdown
 ## Problem
+## Design Basis
 ## Decision
 …(bespoke sections as needed)…
-## Alternatives considered
+## Design Decisions
 ## Consequences
 ```
 
-Moving into `implemented/` **rewrites the skeleton mechanically in the same delivery**: `## Proposal` becomes `## Decision`, and `## Acceptance criteria` plus `## Risks` fold into `## Consequences` (both the cost and the gain). These planning-era headings are **forbidden** in `implemented/`: `## Proposal`, `## Plan`, `## Migration plan`, `## Acceptance criteria`.
+`Design Decisions` is optional: record final choices and material reasons; include rejected alternatives and accepted costs only when they have lasting value, never as implementation options. Put risk controls in target contracts and acceptance; no separate risk section is required.
+
+Moving into `implemented/` **rewrites the skeleton in the same delivery**: `## Proposal` becomes `## Decision`; actual acceptance results and material residual costs go into `## Consequences`. Preserve the design basis and important decisions. These planning-era headings are **forbidden** in `implemented/`: `## Proposal`, `## Plan`, `## Migration plan`, `## Acceptance criteria`.
 
 `rejected/` keeps its proposal-time body and sections (including `## Acceptance criteria` if present); the verdict lives only on the status line.
 
-`## Alternatives considered` is required in all four lifecycles. Each entry states what the alternative was and why it lost. **Record only alternatives that were genuinely considered**; never invent one, and do not backfill pre-format files.
+The old skeleton (no `Design Basis` and satisfying the former required sections) remains compatible; new Proposals use the new skeleton. Existing Proposals follow their original lifecycle without mandatory format migration or rewriting historical decisions or frozen records.
 
 Expression standards — clarity, term consistency, no AI slop, `Source Carrier`, evidence-backed claims — come from `dev-doc-master` (including `references/design-project-guide.md`). This skill does not copy them. A Proposal **does not touch present-state DESIGN**: unbuilt design is never pre-written into `DESIGN.md` or `DESIGN-<module>.md`, and **neither DESIGN prose nor `## Reference Documents` may back-link to `proposals/proposed/` or `proposals/rejected/`**; add the link to the owning DESIGN's `## Key Decisions` only when delivery moves the proposal into `implemented/`.
 
@@ -156,18 +163,18 @@ The agent may lay **objective facts** in front of the user: how many repositorie
 
 ## Maintain the approved Proposal before acceptance
 
-The current user-approved Proposal is the sole target authority for a Proposal-driven delivery: design decisions, authorized scope and acceptance criteria. Automated implementation may not change them autonomously. An explicit user decision during post-implementation testing or validation, including added features, expanded scope or a changed direction, authorizes that adjustment. Resolve undecided questions with the user; do not ask for approval again when the decision is explicit.
+The current user-approved Proposal is the sole target authority for the approved change in a Proposal-driven delivery: design decisions, authorized scope and acceptance criteria. Existing design constraints not explicitly changed remain binding. Automated implementation may not change them autonomously. An explicit user decision during post-implementation testing or validation, including added features, expanded scope or a changed direction, authorizes that adjustment. Resolve undecided questions with the user; do not ask for approval again when the decision is explicit.
 
-Integrate the decision into the existing scope, design, acceptance criteria and affected alternatives and risks, preferably before changing code; if already implemented, synchronize before delivery. Keep the file path, `Status: approved` and delivery baseline. The controller coordinates shared files and Plan write sets. Once accepted and moved to `implemented/`, the historical-decision rules below apply.
+Integrate the decision into the existing scope, design basis, target design, acceptance criteria, and affected decision rationale and residual risks, preferably before changing code; if already implemented, synchronize before delivery. Keep the file path, `Status: approved` and delivery baseline. The controller coordinates shared files and Plan write sets. Once accepted and moved to `implemented/`, the historical-decision rules below apply.
 
 Write in the user's preferred language, for the user, in concise, clear, affirmative target-state prose. Replace superseded statements in their existing sections; maintain a coherent proposal rather than appending amendments, parallel old/new designs or a change log. Git retains the editing history.
 
 ## Workflow
 
 1. **Decide whether it is needed** using the three thresholds above. If not, route to an Issue or direct implementation and say why.
-2. **Audit before drafting**: search the matching `proposals/` root for active and implemented records on the same topic. Handle hits per "Evolving an implemented proposal".
-3. **Write the file**: copy `templates/proposal-proposed.md` to `proposed/<class>/yyyy-mm-dd-<slug>.md` and fill `## Problem`, `## Proposal`, `## Alternatives considered`, `## Acceptance criteria`, `## Risks`. Acceptance criteria must let a third party judge met or unmet.
-4. **Wait for the user to read it.** The file stays `Status: proposed`; you do not advance it yourself.
+2. **Analyze and discuss the design**: investigate higher-level design, current facts, and active and implemented records on the same topic using the design method above; resolve material open questions. Handle hits per "Evolving an implemented proposal".
+3. **Write the specification and self-check**: copy `templates/proposal-proposed.md` to `proposed/<class>/yyyy-mm-dd-<slug>.md` and fill it using the target specification standard. Reconcile all confirmed decisions, architecture inheritance, contracts, and acceptance; return to discussion when necessary.
+4. **Independent review and user reading**: send to `df-proposal-review` and resolve material findings. The file stays `Status: proposed`; you do not advance it yourself.
 5. **Record approval**: once the user explicitly agrees, add `Approved`, `Authorized scope`, and `Delivery`, set `Status: approved`, and leave the path alone.
 6. **Commit the approved Proposal before creating the delivery branch or worktree.** Commit it on the integration branch, then start delivery from that commit so the approved record is part of the delivery baseline. Keep this commit limited to the Proposal change.
 7. **Deliver** along the `Delivery` route. Keep the evidence chain — source, related Plan, actual commits, review acceptance — inside the Proposal as links; do not copy a progress table.
@@ -216,6 +223,9 @@ Hard constraints for the third class: dispose of the old record **at delivery ti
 
 ## References
 
+- Design analysis and discussion rounds: `references/design-discussion.md`
+- Target design specification and self-check: `references/design-specification.md`
+- Design practices by domain: `references/design-practices.md`
 - State machine, fields, and migration detail: `references/lifecycle.md`
 - Follow-up triage and supersession judgement: `references/evolution-triage.md`
 - Skeleton templates: `templates/proposal-proposed.md`, `templates/proposal-implemented.md`

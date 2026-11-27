@@ -93,34 +93,33 @@ Archived: 2026-11-22
 
 ### `proposed/` (including `approved`) — target state
 
-Required sections, in this order:
+Fixed entry and exit sections; `Design Decisions` is optional:
 
 ```markdown
 ## Problem
+## Design Basis
 ## Proposal
-…(0..N bespoke sections)…
-## Alternatives considered
+…(0..N bespoke design sections)…
+## Design Decisions
 ## Acceptance criteria
-## Risks
 ```
 
 - `## Problem`: why this has to happen now. It must stand without the solution — a reader understands the pain before reading the proposal.
-- `## Proposal`: the selected behavior and boundaries, in clear affirmative target-state prose in the user’s preferred language; resolve open decisions before approval.
-- `## Alternatives considered`: the other paths genuinely considered and why each lost.
-- `## Acceptance criteria`: the observable state that means done. Each entry must let a third party judge met or unmet.
-- `## Risks`: what could go wrong and what this knowingly gives up.
-
-Bespoke sections go between `## Proposal` and `## Alternatives considered` — interface contracts, data migration, staged strategy.
+- `## Design Basis`: applicable design authorities, inherited constraints, and explicitly changed existing design.
+- `## Proposal`: determinate and complete target design per `design-specification.md`; organize bespoke sections by domain.
+- `## Design Decisions` (optional): final choices, material reasons, and lasting rejected alternatives or residual costs. Put risk controls in target contracts.
+- `## Acceptance criteria`: cover important contracts; a third party can judge met or unmet.
 
 ### `implemented/` — present tense
 
-Required sections, in this order:
+Fixed entry and exit sections; `Design Decisions` is optional:
 
 ```markdown
 ## Problem
+## Design Basis
 ## Decision
 …(0..N bespoke sections)…
-## Alternatives considered
+## Design Decisions
 ## Consequences
 ```
 
@@ -131,7 +130,7 @@ Forbidden headings (their presence is a format error):
 - `## Migration plan`
 - `## Acceptance criteria`
 
-These are planning-era words. An implemented record describes the present system, not the original plan. Fold the former `## Acceptance criteria` and `## Risks` content into `## Consequences`: what the decision bought and what it cost.
+An implemented record describes delivered decisions. Retain the design basis and important decision rationale; write actual acceptance results and material residual costs into `## Consequences`.
 
 ### `rejected/`
 
@@ -141,13 +140,9 @@ Keep the proposal-time structure (a `## Acceptance criteria` or `## Plan` is fin
 
 Keep the body and sections as they stood at archiving, plus the `Archived` line. Once frozen it need not satisfy any active skeleton rule, and its outbound links are not checked.
 
-### The `## Alternatives considered` requirement
+### Skeleton compatibility
 
-All four lifecycles require this section. Without the rejected paths recorded, someone will certainly propose them again.
-
-- Start each entry with a bolded alternative name, then why it lost.
-- Record only **real** alternatives that were discussed; never invent one.
-- Do not backfill pre-format files; leave them as they are.
+New Proposals must use the `Design Basis` skeleton. Records without `Design Basis` that satisfy the former skeleton remain valid and follow the original migration rules; do not bulk-rewrite them. The old proposed skeleton requires Problem, Proposal, Alternatives considered, Acceptance criteria, Risks; implemented requires Problem, Decision, Alternatives considered, Consequences; rejected requires Problem, Proposal, Alternatives considered. Archived records stay frozen. The verifier identifies skeletons by visible headings, not creation history; authors and reviewers ensure new Proposals use the new standard.
 
 ## 5. Migration checklists
 
@@ -163,7 +158,7 @@ Staying in `proposed/` is deliberate: during delivery, Plans and sibling proposa
 
 ### Maintain an `approved` Proposal before acceptance
 
-Follow the pre-acceptance maintenance rules in SKILL.md. Integrate explicit user-authorized changes into the current Proposal preferably before code changes: scope, design, acceptance criteria and affected alternatives/risks. Retain its path, status and baseline. Replace superseded statements rather than append a process log. Automated implementation cannot change authorization autonomously.
+Follow the pre-acceptance maintenance rules in SKILL.md. Integrate explicit user-authorized changes into the current Proposal preferably before code changes: scope, design basis, target design, acceptance criteria, and affected decision rationale and residual risks. Retain its path, status and baseline. Replace superseded statements rather than append a process log. Automated implementation cannot change authorization autonomously.
 
 ### `approved` → `implemented`
 
@@ -171,7 +166,7 @@ Preconditions: the approved scope is **fully** delivered and the user has accept
 
 1. Move to `implemented/<class>/` without renaming.
 2. Set `Status` to `implemented`.
-3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; fold `## Acceptance criteria` and `## Risks` into `## Consequences`; delete the planning-era headings.
+3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; put actual acceptance results and material residual costs in `## Consequences`, remove planning-era headings, and retain the design basis and important decisions. For the old skeleton, preserve the alternatives record and fold Risks into Consequences.
 4. Convert the prose to the present tense; remove "planned", "pending", "v1 for now".
 5. Sync the affected present-state DESIGN (`DESIGN.md` / `DESIGN-<module>.md`) in the same delivery and add the relative link under `## Key Decisions`.
 6. Repair every inbound link pointing at the old path.

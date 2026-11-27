@@ -5,50 +5,26 @@ Status: proposed
 - **Class**: <feature | bug-fix | simplification | architecture | process | testing>
 - **Created**: <YYYY-MM-DD>
 
-<!--
-  Usage: this template covers proposed/<class>/ and the approved state. Copy it to
-  <proposals-root>/proposed/<class>/<yyyy-mm-dd-slug>.md and fill it in.
-  Write in the user’s preferred language, in clear, concise, affirmative target-state prose. Integrate explicitly user-authorized changes into this file before acceptance; replace superseded content rather than append amendments.
-  Expression standards live in dev-doc-master (references/consistency.md,
-  references/design-project-guide.md).
-  Do not record execution progress, task checkboxes, or ownership assignments here —
-  those belong to Plans and Issues.
--->
+<!-- Resolve material design decisions before writing the formal specification per design-specification.md. Use the user's preferred language and determinate target-state prose. Progress belongs to Plans and Issues. -->
 
 ## Problem
 
-<!-- Why this must happen now. It must read without the solution: a reader finishes
-     this section able to state the pain and its cost. -->
+<!-- Current problem, impact, and change goal. -->
+
+## Design Basis
+
+<!-- Reference applicable higher-level design, existing decisions and constraints; identify the existing design explicitly changed and constraints that remain binding. -->
 
 ## Proposal
 
-<!-- What the chosen target does. State the behavior and boundaries affirmatively; resolve open decisions before approval. -->
+<!-- Determinate target design. Organize bespoke sections by domain per design-practices.md; define applicable behavior, responsibilities, interfaces, rules, state, and failure outcomes. Put risk controls in the design. -->
 
-<!--
-  Add bespoke sections as needed, for example:
-  ## <Interface or Contract>
-  ## <Migration>
-  ## <Trade-off Analysis>
--->
+## Design Decisions
 
-## Alternatives considered
-
-<!--
-  Start each entry with a bolded alternative name, then why it lost.
-  Record only alternatives genuinely considered; never invent one.
--->
-
-- **<Alternative A>** — <why it was not chosen>.
+<!-- Optional: retain only important final choices and reasons; include genuine rejected alternatives and accepted residual costs when useful. Delete this section if none. -->
 
 ## Acceptance criteria
 
-<!-- The observable state that means done. Each entry must let a third party judge
-     met or unmet. -->
+<!-- Cover important design contracts and affected existing invariants; a third party can judge met or unmet. -->
 
-1. <observable, judgeable completion condition>
-
-## Risks
-
-<!-- What could go wrong, and what this knowingly gives up. -->
-
-- <risk or known cost>
+1. <observable or inspectable completion condition>

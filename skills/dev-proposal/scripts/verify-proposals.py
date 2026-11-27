@@ -21,8 +21,9 @@ Single-snapshot, static, deterministic checks only:
      `Archived: YYYY-MM-DD`; `rejected — <reason>` only in `rejected/`.
   3. Skeleton: the future-tense sections in `proposed/`, the present-tense
      sections in `implemented/` with planning-era headings forbidden, and the
-     proposal-time sections in `rejected/`. Archived bodies are frozen and
-     skipped.
+     proposal-time sections in `rejected/`. The Design Basis skeleton and
+     the former complete skeleton are both supported. Archived bodies are
+     frozen and skipped.
   4. Authorization: `Status: approved` carries `Approved`, `Authorized scope`
      and `Delivery: direct | plan`, with a real calendar date and a named
      approver. This checks shape only; it can never prove that a human approved
@@ -77,6 +78,12 @@ REQUIRED_BY_LIFECYCLE = {
     "proposed": PROPOSED_REQUIRED,
     "implemented": IMPLEMENTED_REQUIRED,
     "rejected": REJECTED_REQUIRED,
+    "archived": (),
+}
+DESIGN_BASIS_REQUIRED_BY_LIFECYCLE = {
+    "proposed": ("Problem", "Design Basis", "Proposal", "Acceptance criteria"),
+    "implemented": ("Problem", "Design Basis", "Decision", "Consequences"),
+    "rejected": ("Problem", "Design Basis", "Proposal"),
     "archived": (),
 }
 FORBIDDEN_BY_LIFECYCLE = {
@@ -304,10 +311,16 @@ def _check_link_scope(scope: Path, report: Report, seen: set[Path]) -> None:
 
 
 def _check_skeleton(path: Path, text: str, lifecycle: str, report: Report) -> None:
-    required = REQUIRED_BY_LIFECYCLE[lifecycle]
-    if not required:
+    if lifecycle == "archived":
         return
     present = _h2_sections(text)
+    # Existing records remain valid under the former skeleton; authors and
+    # reviewers enforce the new skeleton for newly written Proposals.
+    required = (
+        DESIGN_BASIS_REQUIRED_BY_LIFECYCLE[lifecycle]
+        if "Design Basis" in present
+        else REQUIRED_BY_LIFECYCLE[lifecycle]
+    )
     for name in required:
         if name not in present:
             report.add("SKELETON_MISSING_SECTION", path, f"missing required section '## {name}'")

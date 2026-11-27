@@ -8,41 +8,24 @@ Status: implemented
 - **Authorized scope**: <批准范围，含明确排除项>
 - **Delivery**: <direct | plan>
 
-<!--
-  用法：本模板对应 implemented/<class>/。迁移时从 proposed 骨架机械改写而来，
-  不是重新写一遍：
-    ## Proposal              -> ## Decision
-    ## Acceptance criteria   -> 并入 ## Consequences
-    ## Risks                 -> 并入 ## Consequences
-  正文转现在时，删掉计划、待定、分阶段这类计划期表述。
-  implemented/ 中禁用标题：## Proposal / ## Plan / ## Migration plan / ## Acceptance criteria。
--->
+<!-- 迁移时 Proposal 改为 Decision；验收实际结果与重要剩余代价写入 Consequences。保留设计依据、原决策及必要理由。旧骨架按原生命周期规则迁移。 -->
 
 ## Problem
 
-<!-- 当初为什么必须做这件事。保持原问题陈述，不因落地而改写痛点。 -->
+<!-- 当初的问题和变更目标。 -->
+
+## Design Basis
+
+<!-- 保留原设计依据及已授权变更的记录。 -->
 
 ## Decision
 
-<!-- 现在生效的是什么。用现在时描述已交付的系统行为与边界。 -->
+<!-- 用现在时说明已交付的设计行为与边界；保留实际适用的专属设计章节。 -->
 
-<!--
-  按需插入专属章节，例如：
-  ## <Interface or Contract>
-  ## <Operating Rules>
--->
+## Design Decisions
 
-## Alternatives considered
-
-<!--
-  每条一行起头，加粗方案名，后接为什么输。保留提议期的真实备选记录。
-  若本决策部分替代了更早的已实施提案，在这里用相对链接写明替代关系与继续有效的部分。
--->
-
-- **<Alternative A>** — <为什么没选它>.
+<!-- 可选：保留重要决策理由、确有价值的备选和代价。部分替代历史提案时明确替代和继续有效的部分，并相对链接。无则删除本节。 -->
 
 ## Consequences
 
-<!-- 这套决定最终换来了什么、付出了什么。原验收标准与实际观察结果、原风险与最终代价都在这里。 -->
-
-- <收益或代价>
+<!-- 实际交付结果、验收证据及重要收益和代价。 -->

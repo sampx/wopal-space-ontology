@@ -10,9 +10,7 @@ description: |
 
 # dev-proposal — Business Proposal Lifecycle
 
-**你只做一件事：让一项重要设计决定有据可查、有主可问、有期可守。**
-
-Proposal 记录的是**决定**：为什么做、选了哪条路、放弃了什么、什么算完成、代价是什么。它不记录执行进度，也不是现状文档。执行进度归 Plan 与 Issue，已交付的系统行为归项目/模块现状 DESIGN。
+Proposal 是本次变更的**目标设计规格与重要决策记录**。先把设计讨论清楚，再写出确定、完整、可实施、可验收的设计。执行进度归 Plan 与 Issue，已交付的系统行为归项目/模块现状 DESIGN。
 
 ## When a Proposal is required
 
@@ -32,6 +30,12 @@ Proposal 记录的是**决定**：为什么做、选了哪条路、放弃了什�
 普通 Bug、样式微调、机械改名、纯内部重构一律走 Issue 或直接实施。**Proposal 不是开发动作的仪式**：为了"看起来规范"而给每个改动套一份 Proposal，只会制造没人读的档案。
 
 同一主题已有 Proposal 时，先审计再动笔：能原地同步事实就不新建，需要改决定就新建并互链，详见下文「已实施提案的再变更」。
+
+## 设计分析与规格编写
+
+用户要求写提案时，先加载 `references/design-discussion.md`、`references/design-specification.md`，按实际对象选用 `references/design-practices.md`。调查适用上层设计、现有决策、代码及术语；构建领域模型，按决策依赖分轮讨论，每个问题附推荐与理由，用实际场景检验设计。重要决定全部明确、关键可行性验证完成、重要风险得到处理后才整理正式规格。已明确的设计不重复提问。每轮及时记录已确认的内容，最终逐项核对防止遗漏。
+
+本次未授权改变的既有架构和契约继续有效；需要改变时明确范围、理由、影响及继续有效的约束，交用户决定。设计确定，代码实现自由。自检通过后交独立评审，用户批准前不得实施。
 
 ## Layout and state machine
 
@@ -116,28 +120,31 @@ Status: proposed
 
 ```markdown
 ## Problem
+## Design Basis
 ## Proposal
-…（按需的专属章节：接口、迁移、取舍分析等）…
-## Alternatives considered
+…（按实际领域组织的专属设计章节）…
+## Design Decisions
 ## Acceptance criteria
-## Risks
 ```
 
 `implemented/` 用现在时骨架：
 
 ```markdown
 ## Problem
+## Design Basis
 ## Decision
 …（按需的专属章节）…
-## Alternatives considered
+## Design Decisions
 ## Consequences
 ```
 
-迁移到 `implemented/` 时**同一交付内机械改写**：`## Proposal` → `## Decision`，`## Acceptance criteria` 与 `## Risks` 合并进 `## Consequences`（代价与收益都写）。`implemented/` 中**禁用**计划期标题：`## Proposal`、`## Plan`、`## Migration plan`、`## Acceptance criteria`。
+`Design Decisions` 按需保留：记录最终选择及重要理由，只有具备长期价值的被放弃方案与已接受的代价才附记，不构成实施选项。风险控制落实在目标契约和验收中；不要求独立风险章节。
+
+迁移到 `implemented/` 时**同一交付内改写**：`## Proposal` → `## Decision`，`## Acceptance criteria` 的实际结果及重要剩余代价写入 `## Consequences`，保留设计依据和重要决策。`implemented/` 中**禁用**计划期标题：`## Proposal`、`## Plan`、`## Migration plan`、`## Acceptance criteria`。
 
 `rejected/` 保留提议期正文与原本章节（可以有 `## Acceptance criteria`），结论只写在状态行。
 
-`## Alternatives considered` 在四种生命周期里都必填。每条写清"是什么方案、为什么输"。**备选方案只记录真实考虑过的**，不凭空补写；早于本格式的存量文件不追溯。
+旧骨架（没有 `Design Basis` 且符合原有必填章节）仍兼容；新提案使用新骨架。旧提案正常推进原生命周期，不强制迁移格式，不改写历史决定或冻结记录。
 
 正文表达规范——清晰度、术语一致、去 AI 味、`Source Carrier`、实测取证——直接引用 `dev-doc-master`（含 `references/design-project-guide.md`），本技能不重复抄写。Proposal 阶段**不动现状 DESIGN**：未落地的设计既不预写进 `DESIGN.md` / `DESIGN-<module>.md`，也**不在现状 DESIGN 的正文或 `## Reference Documents` 中反向挂载 `proposals/proposed/` 或 `proposals/rejected/` 的链接**；仅在完整交付迁入 `implemented/` 时才把链接写入对应 DESIGN 的 `## Key Decisions`。
 
@@ -152,18 +159,18 @@ Agent 可以把**客观事实**摆到用户面前帮助选择：涉及几个仓�
 
 ## 验收前的提案维护
 
-已批准的 Proposal 是提案驱动交付的唯一目标依据，包含设计决定、授权范围和验收要求。自动化实施不得自行改变这些内容。用户在实施后的测试、验证中明确提出并认可的调整，包括增加功能、扩大范围和改变方向，即为本次交付的有效授权；尚未明确的决定由用户确认，不重复审批已经明确的决定。
+已批准的 Proposal 是提案驱动交付中获批变更的唯一目标依据，包含设计决定、授权范围和验收要求；未明确变更的既有设计约束仍有效。自动化实施不得自行改变这些内容。用户在实施后的测试、验证中明确提出并认可的调整，包括增加功能、扩大范围和改变方向，即为本次交付的有效授权；尚未明确的决定由用户确认，不重复审批已经明确的决定。
 
-在原文件内将新决定融入授权范围、方案、验收标准及受影响的备选理由和风险，优先在调整代码前完成；若代码已调整，则在交付前补齐。保持 `Status: approved`、原路径和交付基线。主控协调共享文件及 Plan 写集。已验收的 `implemented/` 提案遵循后文的历史决策规则。
+在原文件内将新决定融入授权范围、设计依据、目标方案、验收标准及受影响的决策理由和剩余风险，优先在调整代码前完成；若代码已调整，则在交付前补齐。保持 `Status: approved`、原路径和交付基线。主控协调共享文件及 Plan 写集。已验收的 `implemented/` 提案遵循后文的历史决策规则。
 
 提案正文使用用户偏好语言，面向用户，以最终目标态、正向肯定式语言写清设计。直接替换失效内容，使整份文档准确、简洁、自洽；Git 保存修改历史，不追加补丁式说明、变更流水账或并列的新旧方案。
 
 ## Workflow
 
 1. **判定必要性**：按上文三条门槛确认这次改动需要 Proposal。不需要就转 Issue 或直接实施，并说明理由。
-2. **起草前审计**：在对应 `proposals/` 根目录下搜索同主题的活跃与已实施记录。命中的处理见「已实施提案的再变更」。
-3. **写文件**：从 `templates/proposal-proposed.md` 复制骨架到 `proposed/<class>/yyyy-mm-dd-<slug>.md`，填满 `## Problem`、`## Proposal`、`## Alternatives considered`、`## Acceptance criteria`、`## Risks`。验收标准要能被第三方判断"达成/未达成"。
-4. **等用户读**。文件写完即 `Status: proposed`，不自行推进。
+2. **分析并讨论设计**：按上文设计方法调查上层设计、当前事实及同主题活跃与已实施记录，解决重要未决问题。命中的处理见「已实施提案的再变更」。
+3. **写规格并自检**：复制 `templates/proposal-proposed.md` 到 `proposed/<class>/yyyy-mm-dd-<slug>.md`，按目标规格规范填写。核对所有已确认决定、架构继承、设计契约与验收，必要时回到讨论。
+4. **独立评审并等用户读**：交 `df-proposal-review` 独立评审，解决重要问题。文件保持 `Status: proposed`，不自行推进。
 5. **记录批准**：用户明确同意后，补齐 `Approved`、`Authorized scope`、`Delivery` 三条，状态改为 `approved`，文件位置不变。
 6. **创建交付分支或工作树前，先提交已批准的 Proposal**：在集成分支上单独提交这次 Proposal 变更，再从该提交开始交付，让已批准的记录进入交付基线。这个提交只包含 Proposal 变更。
 7. **交付**：按 `Delivery` 分流。交付过程中把 Source、关联 Plan、实际提交与评审验收证据链在 Proposal 里（链接即可，不复制进度表）。
@@ -212,6 +219,9 @@ python3 scripts/verify-proposals.py <proposals-root>
 
 ## References
 
+- 设计分析与分轮讨论：`references/design-discussion.md`
+- 目标设计规格与自检：`references/design-specification.md`
+- 分类设计最佳实践：`references/design-practices.md`
 - 状态机、字段与迁移细则：`references/lifecycle.md`
 - 再变更分流与替代合并的判断细则：`references/evolution-triage.md`
 - 骨架模板：`templates/proposal-proposed.md`、`templates/proposal-implemented.md`

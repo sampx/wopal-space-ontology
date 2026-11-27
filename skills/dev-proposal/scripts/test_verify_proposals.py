@@ -308,6 +308,28 @@ class StatusPathTests(BaseCase):
 
 
 class SkeletonTests(BaseCase):
+    def test_design_basis_skeleton_accepts_optional_decisions_and_no_risks(self) -> None:
+        bodies = {
+            "proposed": ("Status: proposed", "## Proposal\n\nUse a bus.\n\n## Acceptance criteria\n\n1. Producers publish through the bus."),
+            "implemented": ("Status: implemented", "## Decision\n\nProducers publish through the bus.\n\n## Consequences\n\nVerified delivery."),
+            "rejected": ("Status: rejected — infeasible", "## Proposal\n\nUse a bus."),
+        }
+        for lifecycle, (status, tail) in bodies.items():
+            with self.subTest(lifecycle=lifecycle):
+                body = "\n## Problem\n\nReduce coupling.\n\n## Design Basis\n\nPreserve module ownership.\n\n" + tail + "\n"
+                self.tree.write(f"{lifecycle}/architecture/2026-11-20-x.md",
+                                proposal("Bus", status, body=body))
+                self.assertPass()
+
+    def test_new_skeleton_missing_required_heading_is_rejected(self) -> None:
+        body = "\n## Problem\n\nReduce coupling.\n\n## Design Basis\n\nPreserve ownership.\n\n## Proposal\n\nUse a bus.\n\n## Acceptance criteria\n\n1. Publish."
+        for heading in ("Design Basis", "Proposal", "Acceptance criteria"):
+            with self.subTest(heading=heading):
+                self.tree.write("proposed/architecture/2026-11-20-x.md",
+                                proposal("Incomplete", "Status: proposed",
+                                         body=body.replace(f"## {heading}", "## Other")))
+                self.assertFailsWith("SKELETON_MISSING_SECTION")
+
     def test_proposed_missing_alternatives_is_rejected(self) -> None:
         self.tree.write(
             "proposed/architecture/2026-11-20-x.md",
