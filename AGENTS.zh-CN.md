@@ -29,7 +29,6 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 | 场景 | 命令 | 时机 |
 |---|---|---|
 | 插件构建与测试 | 参见 `.wopal/plugins/wopal-plugin/AGENTS.md` | 插件代码变更后 |
-| 内容变更验证 | 提醒用户重启 ellamaka | 涉及加载链路的任何变更 |
 
 ## Quality Gates
 
@@ -102,7 +101,7 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 ## Testing
 
 - 通用测试设计与 TDD 判定统一遵循装配的 `rules/testing.md`（**测试最佳实践**）；仓库/包规范必须让 Agent 明确看到这层继承关系，可以写明本地哪些行为边界必须使用 TDD，并补充 runner、fixture、helper 与宿主/协议约束，但不得另写一套通用 RED/GREEN 判定语义。
-- 本项目声明式内容变更后，提醒用户重启 ellamaka 验证加载结果；验证通过前不要频繁提交。
+- 声明式内容变更后，重新读取变更文件并核查引用、触发条件与语义；验证通过前不要频繁提交。
 
 ## Code Review Rules
 

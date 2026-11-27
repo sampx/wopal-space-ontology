@@ -30,7 +30,6 @@ maintenance: Maintain only when a long-lived constraint appears that neither cod
 | Scenario | Command | When |
 |---|---|---|
 | Plugin build & test | See `.wopal/plugins/wopal-plugin/AGENTS.md` | After any plugin code change |
-| Content change verification | Remind user to restart ellamaka | Any change involving load paths |
 
 ## Quality Gates
 
@@ -103,7 +102,7 @@ Applies to semantic content in: `agents/`, `rules/`, `commands/`, `assembly/temp
 ## Testing
 
 - General test design and TDD decisions follow the assembled `rules/testing.md` (**Testing Best Practices**). Repository/package rules must keep that inheritance visible to the agent; they may name local behavior boundaries where TDD is required and add local runners, fixtures, helpers, or host/protocol constraints, but must not redefine the general RED/GREEN decision semantics.
-- After any declarative content change, remind the user to restart ellamaka for verification. Do not commit frequently before verification passes.
+- After changing declarative content, reread the changed files and check references, trigger conditions, and semantics. Do not commit frequently before verification passes.
 
 ## Code Review Rules
 
