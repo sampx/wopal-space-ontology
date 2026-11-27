@@ -5,15 +5,16 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 # Agent Development Rules
 
-## 1. Canonical References
+## Canonical References
 
 - Parent Rules: `.wopal/AGENTS.md`
 - Commands: `references/commands.md`
 - Plan Guide: `references/plan-guide.md`
+- Active Plan Graph: `references/active-plan-graph.md`
 - Issue Guide: `references/issue-guide.md`
 - Troubleshooting: `references/troubleshooting.md`
 
-## 2. Architecture and Directories
+## Architecture and Directories
 
 | Directory | Responsibility |
 |---|---|
@@ -25,7 +26,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 | `references/` | 命令参考、Plan 编写指南、故障处理 |
 | `tests/python/` | unit/ + integration/ 测试 |
 
-## 3. Development Commands
+## Development Commands
 
 | Scenario | Command |
 |---|---|
@@ -37,7 +38,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 运行依赖：bash 3.x+, `gh` CLI, `jq`, Python 3
 
-## 4. Implementation Rules
+## Implementation Rules
 
 ### Command Routing
 
@@ -54,7 +55,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 ### Plan Directory Rules
 
 - `--project` 是 `plan` 命令必填参数
-- 所有项目：`.wopal-space/plans/<项目名>/`
+- 所有项目：`.wopal-space/plans/<project>/`
 - Plan 文件必须通过 `flow.sh plan ...` 生成或定位，禁止手写创建
 
 ### Script Conventions
@@ -64,7 +65,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 - GitHub API 操作通过 `scripts/lib/github.py`，不直接调用 `gh`
 - Git 操作通过 `scripts/lib/git.py`，不直接调用 `git`
 
-## 5. Testing
+## Testing
 
 - 测试框架：pytest
 - 测试目录：`tests/python/unit/`（单元测试）、`tests/python/integration/`（集成测试）
@@ -73,7 +74,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 - **TDD 要求**：新命令或 `scripts/lib/` 模块功能必须先写失败测试，再实现功能使测试通过
 - 修改子命令逻辑后必须运行对应单元测试确认无回归
 
-### 六条硬规则（R1–R6）
+### Six Hard Rules (R1–R6)
 
 以下规则用于防止测试膨胀与装饰性测试（测试全绿但逻辑错误）。每个新增或修改的测试必须同时满足全部六条。
 
@@ -89,12 +90,12 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 
 **R6 禁止固化实现巧合。** 仅当前实现恰好成立的行为（如"worktree 目录名 == 分支名"）不得写成断言，除非有契约文档依据。此类测试会把 bug 固化成规范。
 
-### Mock 隔离规则
+### Mock Isolation Rules
 
 **模块级 mock 禁令**：禁止在测试文件顶层用 `sys.modules[name] = MagicMock()` 注入 mock。这种做法会污染全局模块缓存，导致后续测试文件拿到假模块而非真实代码。正确做法是直接 import 真实模块，在函数级用 `@patch` mock 有副作用的函数。
 
 **函数级 mock 原则**：只 mock 有副作用的函数（git 操作、网络请求、日志输出），不要 mock 整个模块。Python 导入模块 = 加载函数定义，不会执行任何副作用。被测函数操作文件系统时必须用 `tempfile.mkdtemp()` 隔离，`tearDown` 中清理。
 
-## 6. User-Supplied Rules
+## User-Supplied Rules
 
 (None)

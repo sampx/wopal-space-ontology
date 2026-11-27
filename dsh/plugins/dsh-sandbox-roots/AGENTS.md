@@ -1,6 +1,7 @@
 ---
 name: dsh-sandbox-roots
 description: Sandbox writable-roots extension plugin (@wopal/dsh-sandbox-roots) — plugin dependency-resolution, verification, and TDD boundaries
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
 ---
 
 # dsh-sandbox-roots — Agent Rules
@@ -33,7 +34,7 @@ pnpm check       # typecheck + test + build full chain
 
 - General TDD applicability follows the canonical `rules/testing.md`. Observable behavior changes in `src/` that meet those criteria require a failing `tests/*.test.ts` assertion before implementation; behavior-preserving refactors keep the existing safety net green instead of manufacturing a fake RED.
 - Run `pnpm test` for changed logic and keep regression coverage under `tests/*.test.ts` for the affected plugin behavior.
-- Upstream-behavior replication such as `internal/containment.ts` stays locked by focused regression tests against the behavior copied from REF.
+- Upstream-behavior replication such as `src/internal/containment.ts` stays locked by focused regression tests against the behavior copied from REF.
 
 ## Plugin dependency resolution (highest priority)
 

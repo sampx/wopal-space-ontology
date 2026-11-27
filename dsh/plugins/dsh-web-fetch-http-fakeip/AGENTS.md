@@ -1,6 +1,7 @@
 ---
 name: dsh-web-fetch-http-fakeip
 description: @wopal fork of the official dsh-web-fetch-http plugin — dual-runtime (ellamaka/official dsh) install and dependency-resolution boundaries, fork modification constraints, and verification requirements
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
 ---
 
 # dsh-web-fetch-http-fakeip — Agent Rules

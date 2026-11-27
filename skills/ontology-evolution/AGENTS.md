@@ -1,18 +1,19 @@
 ---
 name: ontology-evolution
 description: Ontology capability evolution — continuous observation, synthesis, proposals, and landing (state machine, sparse isolation, user-owned delivery)
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
 ---
 
 # Agent Development Rules
 
-## 1. Canonical References
+## Canonical References
 
 - Parent Rules: `.wopal/AGENTS.md`
 - Skill entry: `SKILL.md`
 - Command contract: `references/commands.md`
 - Design source of truth: `docs/DESIGN-evolution.md`
 
-## 2. Architecture and Directories
+## Architecture and Directories
 
 The skill ships collaboration/routing guidance, references, and the proposal
 template only. The mechanism — state-machine commands, sparse safety,
@@ -38,7 +39,7 @@ and verify sparse patterns plus status before and after. Upstream contributions
 use native Git in a separate, fully checked-out contribution worktree; follow
 `references/contribution.md`.
 
-## 3. Implementation Rules
+## Implementation Rules
 
 ### State Machine
 
@@ -95,6 +96,6 @@ only the synchronization/publication the user authorized. Never add remotes,
 push, merge, or delete on your own initiative. Contribution naming, worktree
 retention, and safe closeout are owned by `references/contribution.md`.
 
-## 4. User-Supplied Rules
+## User-Supplied Rules
 
 (None)

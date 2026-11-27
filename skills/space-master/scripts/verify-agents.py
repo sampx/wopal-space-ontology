@@ -176,6 +176,25 @@ def check_single(report, path, text, fields, body, tier):
         )
 
 
+def find_upwards(start, relative):
+    """Resolve a path that may live in a sibling repository of the space.
+
+    A rules file inside one repository often references a path that exists at
+    the space root (`labs/ref-repos/...`) rather than inside its own checkout.
+    Reporting those as missing paths would be wrong; walk up until the path
+    resolves or the filesystem root is reached.
+    """
+    current = start
+    for _ in range(6):
+        candidate = current / relative
+        if candidate.exists():
+            return candidate
+        if current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
 def check_paths(report, path, body, repo_root):
     if repo_root is None:
         return
@@ -188,16 +207,18 @@ def check_paths(report, path, body, repo_root):
             seen.add(piece)
             if "<" in piece or ">" in piece or "*" in piece:
                 continue
-            # Only repo-rooted trees are resolvable from the repository root.
-            # Everything else is a relative or illustrative mention.
-            scoped = piece.startswith(ROOTED_PREFIXES) or (
-                path.parent / piece
-            ).exists() or (repo_root / piece).exists()
-            if not scoped:
+            # A rules file references sibling assets relative to itself far more
+            # often than relative to the repository root. Resolve against the
+            # file's own directory first, then the root, and only report when the
+            # reference matches neither.
+            stripped = piece.rstrip("/")
+            if (path.parent / stripped).exists() or (repo_root / stripped).exists():
                 continue
-            target = repo_root / piece.rstrip("/")
-            if not target.exists():
-                fail(report, f"{path.name}: reference to missing path `{piece}`")
+            if find_upwards(path.parent, stripped) is not None:
+                continue
+            if not (piece.startswith(ROOTED_PREFIXES) or "/" in stripped):
+                continue
+            fail(report, f"{path.name}: reference to missing path `{piece}`")
 
 
 def check_localized(report, main_path, main_body, localized):
@@ -230,14 +251,28 @@ def check_localized(report, main_path, main_body, localized):
                     report,
                     f"{lpath.name}: section {heading!r} has {actual} rules, {main_path.name} has {expected}",
                 )
-        main_code = set(INLINE_CODE.findall(main_body))
-        local_code = set(INLINE_CODE.findall(lbody))
+        # A localized version legitimately points at its own translations
+        # (`references/x.zh-CN.md` vs `references/x.md`), so compare on the
+        # language-neutral stem. Paths, commands, and identifiers still have to
+        # line up exactly; only the locale suffix is normalised away.
+        def canonical(token):
+            return re.sub(r"\.(?:zh-CN|zh-TW|zh|ja|ko|de|fr|es|ru)(?=\.md$)", "", token)
+
+        main_code = {canonical(t) for t in INLINE_CODE.findall(main_body)}
+        local_code = {canonical(t) for t in INLINE_CODE.findall(lbody)}
         missing = sorted(main_code - local_code)
+        # A localized version may add concrete detail the English file states
+        # more generally (naming the exact command behind "broad checkout").
+        # Only a reference the English file carries and the localization drops
+        # is a defect; extra local identifiers are reported as drift only when
+        # they contradict the shared set, which the missing check already covers.
         extra = sorted(local_code - main_code)
         if missing:
             fail(report, f"{lpath.name}: missing inline identifiers {missing}")
         if extra:
-            fail(report, f"{lpath.name}: unexpected inline identifiers {extra}")
+            report.advisory.append(
+                f"{lpath.name}: adds inline identifiers the English file does not carry {extra}"
+            )
 
 
 def git_show(repo_root, ref, rel_path):

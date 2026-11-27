@@ -3,7 +3,7 @@ name: dsh-sandbox-roots
 description: 沙箱可写根扩展插件（@wopal/dsh-sandbox-roots）——插件依赖解析、验证与 TDD 边界
 ---
 
-# dsh-sandbox-roots — Agent 规范
+# dsh-sandbox-roots — Agent Rules
 
 在 `workspace-write` 沙箱模式下，把本插件 `sandbox-roots-policy` entry
 config（持久化在 profile `cordis.patch.yml`）声明的 `writableRoots` 并入
@@ -16,7 +16,7 @@ fs 工具 allow-list、进程沙箱 allow-list 与策略对象。DSH 0.2.0-rc.2 
 - 实现规格：`docs/design.md`
 - 上游参考源码（与部署闭包同版本）：`labs/ref-repos/deepseek-harness/`（REF）
 
-## 开发命令
+## Development commands
 
 ```bash
 pnpm typecheck   # tsc --noEmit
@@ -25,23 +25,23 @@ pnpm build       # tsdown，产物进 lib/
 pnpm check       # typecheck + test + build 全链
 ```
 
-## 测试
+## Testing
 
 - 通用 TDD 适用条件统一遵循 canonical `rules/testing.md`。`src/` 中可观察行为变更只要满足这些条件，就必须先写能失败的 `tests/*.test.ts` 断言再实现；纯行为保持型重构使用已有安全网保持全绿，不制造假的 RED。
 - 修改逻辑后运行 `pnpm test`，并在 `tests/*.test.ts` 中保留覆盖对应插件行为的回归测试。
-- 上游行为复刻代码（如从 REF 复制的 `internal/containment.ts`）继续由聚焦的回归测试锁定其复制行为。
+- 上游行为复刻代码（如从 REF 复制的 `src/internal/containment.ts`）继续由聚焦的回归测试锁定其复制行为。
 
-## 插件依赖解析边界（最高优先级）
+## Plugin dependency resolution (highest priority)
 
 两个运行时共用同一个安装器：官方 pluginManager 的 pnpm，作用于 profile
-自己的 `package.json`。`ellamaka dsh plugin add <目录>` 直接转发给它。本包是
+自己的 `package.json`。`ellamaka dsh plugin add <dir>` 直接转发给它。本包是
 标准 dsh bundle，不需要任何特殊打包；但 spec 形式决定装进 profile 的东西
 （在 dsh 0.2.0-rc.2 实测）：
 
-- **`file:<绝对路径>`**：把包按 `files` 字段拷进 `<profile>/node_modules/`，
-  并在那里安装它的 `dependencies`。`ellamaka dsh plugin add <目录>` 记录的就
+- **`file:<abs>`**：把包按 `files` 字段拷进 `<profile>/node_modules/`，
+  并在那里安装它的 `dependencies`。`ellamaka dsh plugin add <dir>` 记录的就
   是这种；有 registry 依赖的包也只能用这种。
-- **裸路径**：记为 `link:<绝对路径>`，即指向源码目录的软链。它的
+- **裸路径**：记为 `link:<abs>`，即指向源码目录的软链。它的
   `dependencies` **不会安装**，任何 `import` 都会 `ERR_MODULE_NOT_FOUND`。
   只适用于运行时 import 全部另有出处的包的边改边测。
 
@@ -53,14 +53,14 @@ pnpm check       # typecheck + test + build 全链
 - **peer**（`peerDependencies`）由 dsh loader 从安装作用域解析，与 spec 形式
   无关：`link:` 安装同样能解析。不存在也不需要任何逐插件链接步骤。
 - **pnpm** 是宿主前置条件，与官方 `dsh` CLI 一致：双方都不随包分发、也不代
-  为安装。缺失时安装入口直接给出明确报错。
+  为安装。缺失 `pnpm` 时安装入口直接给出明确报错。
 - **`lib/` 随版本控制分发**：安装只取 `files` 字段，因此构建产物 `lib/**`
   必须提交，`file:` 安装才能在不安装 devDependencies 的情况下工作；
   `node_modules/`、`pnpm-lock.yaml` 仍属本地开发状态。禁止手改 `lib/**`，
   改 `src/` 后用 `pnpm build` 重建并连同源码一起提交。不要在此处做任何
-  peer 实体化（旧 `link-peers` 那类）或 `npm install`，都不需要。
+  peer 实体化（旧 `pnpm run link-peers` 那类）或 `npm install`，都不需要。
 
-## 上游对齐约束
+## Upstream alignment constraints
 
 - 闭包内官方包不带 `src/`，运行时不可深导 `@deepseek-ai/*` 的 `src/*`；
   需要的上游实现按 `docs/design.md` 的指示复制进 `internal/` 并以测试锁定。
@@ -68,10 +68,10 @@ pnpm check       # typecheck + test + build 全链
   `static Config` 必须完整复述 stock 字段再加新增字段（patch 行 config 整体
   替换、不深合并）。
 
-## 验证要求
+## Verification requirements
 
 - 自动化：`pnpm check` 全绿是提交前置条件。
-- ellamaka：`ellamaka dsh plugin --profile web add <目录>` 重装后由用户重启
+- ellamaka：`ellamaka dsh plugin --profile web add <dir>` 重装后由用户重启
   引擎验证（重启永远由用户执行）。
 - 官方 dsh：在**隔离副本**的 `$DSH_HOME` 下 `dsh web` 启动验证插件树
   零错误；禁止对着任何 live home 做启动实验。

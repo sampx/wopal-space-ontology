@@ -1,11 +1,12 @@
 ---
 name: dev-flow
 description: Issue/Plan-driven development workflow CLI — state-machine commands, plan validation, worktree isolation, and delegation orchestration
+maintenance: Maintain only when a long-lived constraint appears that neither code, tests, nor DESIGN can carry. Record only rules that change future agent decisions; never one-off tasks, implementation facts, or anything derivable from the code. Every change must also update AGENTS.zh-CN.md with identical headings and the same rules.
 ---
 
 # Agent Development Rules
 
-## 1. Canonical References
+## Canonical References
 
 - Parent Rules: `.wopal/AGENTS.md`
 - Commands: `references/commands.md`
@@ -14,7 +15,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 - Issue Guide: `references/issue-guide.md`
 - Troubleshooting: `references/troubleshooting.md`
 
-## 2. Architecture and Directories
+## Architecture and Directories
 
 | Directory | Responsibility |
 |---|---|
@@ -26,7 +27,7 @@ description: Issue/Plan-driven development workflow CLI — state-machine comman
 | `references/` | Command reference, plan guide, troubleshooting |
 | `tests/python/` | unit/ + integration/ tests |
 
-## 3. Development Commands
+## Development Commands
 
 | Scenario | Command |
 |---|---|
@@ -38,7 +39,7 @@ Working directory: `.wopal/skills/dev-flow/`
 
 Runtime dependencies: bash 3.x+, `gh` CLI, `jq`, Python 3.10+
 
-## 4. Implementation Rules
+## Implementation Rules
 
 ### Command Routing
 
@@ -65,7 +66,7 @@ Each command requires a prerequisite state; invalid transitions error out. New c
 - GitHub API operations use `scripts/lib/github.py`; do not call `gh` directly
 - Git operations use `scripts/lib/git.py`; do not call `git` directly
 
-## 5. Testing
+## Testing
 
 - Test framework: pytest
 - Test directories: `tests/python/unit/` (unit), `tests/python/integration/` (integration)
@@ -96,6 +97,6 @@ These rules prevent test bloat and decoration tests (tests that pass while the l
 
 **Function-level mock principle**: Only mock functions with side effects (git operations, network requests, log output). Python module import = loading function definitions, no side effects execute. Tests that operate on the filesystem must use `tempfile.mkdtemp()` for isolation and clean up in `tearDown`.
 
-## 6. User-Supplied Rules
+## User-Supplied Rules
 
 (None)
