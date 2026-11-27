@@ -1,9 +1,9 @@
 ---
 name: dev-proposal
 description: |
-  编写与维护业务/项目 Proposal：判断某项改动是否需要提案、起草正文、记录用户批准与 `Delivery: direct | plan`、在 proposed/implemented/rejected/archived 之间迁移，以及处理已实施决定的后续变更。
+  分析、讨论、编写与维护业务/项目 Proposal：判断是否需要提案、澄清设计要求与决策、编写目标规格、记录用户批准、迁移或归档提案、处理已实施决定的后续变更。
 
-  使用场景：用户要求新建、修订、批准、迁移、归档或演进一份 Proposal。
+  使用场景：用户要求设计或讨论一项拟写入提案的变更，或新建、修订、批准、迁移、归档、演进 Proposal。
 
   不适用：既定设计内的普通缺陷与任务（用 df-implement）、对 Proposal/Plan/DESIGN 的独立只读评审（用 df-proposal-review）、PRD/DESIGN 写作（用 dev-doc-master）、本体能力进化提案（用 ontology-evolution）、编排开发 Plan（用 dev-flow）。
 ---
@@ -33,7 +33,9 @@ Proposal 是本次变更的**目标设计规格与重要决策记录**。先把�
 
 ## 设计分析与规格编写
 
-用户要求写提案时，先加载 `references/design-discussion.md`、`references/design-specification.md`，按实际对象选用 `references/design-practices.md`。调查适用上层设计、现有决策、代码及术语；构建领域模型，按决策依赖分轮讨论，每个问题附推荐与理由，用实际场景检验设计。重要决定全部明确、关键可行性验证完成、重要风险得到处理后才整理正式规格。已明确的设计不重复提问。每轮及时记录已确认的内容，最终逐项核对防止遗漏。
+用户要求讨论或写提案时，先读取 `references/design-discussion.md`，并读取 `references/design-practices.md` 中与实际设计对象相关的部分。调查上层设计、现有决策、代码及术语；主动建模，按设计决策树分轮讨论，直到所有重要分支都已确定。已明确的设计不重复提问。每轮及时记录决定。
+
+讨论收口后，读取 `references/design-specification.md`，确定验证边界，将全部已确认的设计整理成目标规格并逐项核对。写规格是综合既定决定，不是再次选型。若发现遗漏的重要决定，返回讨论。
 
 本次未授权改变的既有架构和契约继续有效；需要改变时明确范围、理由、影响及继续有效的约束，交用户决定。设计确定，代码实现自由。自检通过后交独立评审，用户批准前不得实施。
 

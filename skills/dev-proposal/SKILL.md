@@ -1,11 +1,10 @@
 ---
 name: dev-proposal
 description: >
-  Author and maintain business/project Proposal records: decide whether a change
-  needs one, write it, record user approval with `Delivery: direct | plan`, move
-  it through proposed/implemented/rejected/archived, and handle later changes to
-  an already-implemented decision. Use when asked to create, revise, approve,
-  migrate, archive, or evolve a Proposal. Do not use for routine bugs inside a
+  Analyze, discuss, write, and maintain business/project Proposals. Use when
+  asked to design or discuss a change intended for a Proposal, clarify its
+  requirements and decisions, create or revise the target specification,
+  approve, migrate, archive, or evolve a Proposal. Do not use for routine bugs inside a
   settled design (use df-implement), independent read-only review of a
   Proposal/Plan/DESIGN (use df-proposal-review), PRD/DESIGN authoring (use
   dev-doc-master), ontology capability evolution proposals (use
@@ -37,7 +36,9 @@ When a Proposal already covers the topic, audit before writing: sync facts in pl
 
 ## Design analysis and specification
 
-When asked to write a Proposal, first load `references/design-discussion.md` and `references/design-specification.md`; select relevant guidance from `references/design-practices.md`. Investigate applicable higher-level design, current decisions, code, and terminology; model the domain, discuss decisions in dependency-ordered rounds with recommendations and reasons, and test the design against concrete scenarios. Write the formal specification only when material decisions are settled, critical feasibility is verified, and material risks are addressed. Do not repeat settled questions. Record decisions each round and reconcile all of them with the final specification.
+When asked to discuss or write a Proposal, first read `references/design-discussion.md` and the relevant parts of `references/design-practices.md`. Investigate higher-level design, current decisions, code, and terminology; actively model the domain and work the decision tree in rounds until every material branch is settled. Do not repeat settled questions. Record decisions each round.
+
+After discussion closes, read `references/design-specification.md`, determine verification boundaries, and synthesize every confirmed design decision into the target specification. Writing is synthesis, not a new round of selection. Return to discussion if a material decision is missing.
 
 Existing architecture and contracts not explicitly changed by the approved scope remain binding. For proposed changes, identify scope, reasons, impact, and surviving constraints for the user to decide. Determine the design, leave implementation free. After self-check, send for independent review; do not implement before user approval.
 
