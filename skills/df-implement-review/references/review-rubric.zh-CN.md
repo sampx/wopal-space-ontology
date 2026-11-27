@@ -1,4 +1,4 @@
-# 实施评审手册 — 常见问题模式与排查方法
+# Implementation Review Rubric — Pattern Catalogues & Procedures
 
 四个核心问题背后的具体排查方法。当某项检查需要详细步骤、常见问题清单或具体案例时，加载本文件。
 
@@ -17,7 +17,7 @@
 
 ---
 
-## 1. 通读一遍建立三张清单
+## 1. Building the three lists
 
 先把改动（`git diff`、`git diff --cached`、`git show <hash>` 或 `git diff <A>..<B>`）和被修改的文件完整读一遍。不要边读边跑搜索命令来回切换——反复重读文件最浪费上下文。在通读过程中顺手建好三张清单：
 
@@ -29,7 +29,7 @@
 
 找不到任何 Plan、设计条款或已记录的决定时，如实写进报告，并且只查 Q2、Q3 的真实缺陷——没有设计依据，就没有资格判断 Q1 的交付完整性，更没有资格提改进建议。
 
-## 2. Q1 — 半成品与未接通代码排查
+## 2. Q1 — Stub patterns & probes
 
 搜到特征词只是线索，不是最终结论——要按**"承诺的功能或调用方是不是真的依赖这段逻辑"**来定性。
 
@@ -100,11 +100,11 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 - 接口 → 存储：数据库查询真正执行并把结果返回，而不是查完直接丢弃
 - 路由 → 注册：新写的路由/子命令/任务已经在总入口注册，能被框架加载到
 
-## 3. Q2 — 对外接口与共用逻辑排查（防误伤）
+## 3. Q2 — Contract-surface procedure
 
 这是编译和测试最容易漏掉的地方。最常溜过去的坑是：**函数签名没变但行为悄悄变了**，或者**把以前没写测试的老调用方搞坏了**。
 
-### 第一步——列出所有对外接口与共用逻辑
+### Step 1 — extract the contract surface
 
 从 diff 中列出其他代码可能依赖的每一项改动：
 
@@ -114,11 +114,11 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 - **参数和返回类型没变，但内部逻辑变了的函数**——最危险、最隐蔽的一类
 - 测试公共设施——fixture、mock、辅助函数（改了它们可能导致原本能抓 bug 的老测试失效）
 
-### 第二步——找出所有调用方
+### Step 2 — find all consumers
 
 在全项目搜索 `rg <symbol>`，特别注意 **diff 之外**的文件。如果调用方太多，先用 `rg -l <symbol>` 列出文件，挑选几类有代表性的调用点核对，并在报告里如实说明哪些没查完。
 
-### 第三步——核对破坏类型
+### Step 3 — classify the break type
 
 | 破坏类型 | 重点查什么 |
 |---|---|
@@ -135,13 +135,13 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 对每个调用方问一句：它依赖上面表格里的哪条假设？改完之后这条假设还成立吗？
 
-### 严重度
+### Severity
 
 - diff 之外的调用点在具体场景下会被改崩 → **BLOCKER**
 - 行为确实变了，但可能是设计有意为之 → 先回去查设计条款；设计已经批准的改动不算问题。查不到依据的，最多写进 `Info`
 - 调用方太多没查全 → `UNCOVERED STEPS`，绝不假装全查过了
 
-## 4. Q3 — 常见 Bug 与边界漏洞清单
+## 4. Q3 — Defect catalogue
 
 对着改动的每一段代码排查以下问题。**只报告能写出具体触发场景的真实问题。**
 
@@ -192,9 +192,9 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 排查命令：`rg -n 'eval\(|dangerouslySetInnerHTML|innerHTML|exec\(|spawn\(' <被改文件>`；逐个检查新增的 POST/PUT 接口是否先校验后使用，新增路由是否挂载了鉴权中间件。
 
-## 5. Q4 — 测试有效性与文档同步
+## 5. Q4 — Test integrity & documentation drift
 
-### 测试有效性——常见假测试套路
+### Test integrity — broken patterns
 
 | 假测试模式 | 排查命令 | 判定 |
 |---|---|---|
@@ -209,7 +209,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 判定范围严格限定在**设计明确承诺的行为**上。设计没提的内部实现分支、你没预料到的写法，都不算测试缺口——那是实现自由，不是漏测。把"所有改动的分支都该有测试"当标准，等于用评审员的想象给实现方加需求。
 
-### 文档未同步
+### Documentation drift
 
 改了对外接口或命令用法，却不更新对应的文档，等于误导用户。直接复用 Q2 整理出的对外接口清单，对每一项变更（API、数据结构、CLI 参数、配置项、设计明确规定的行为）：
 
@@ -220,7 +220,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 纯粹的内部重构、对外行为毫无变化的，不需要改文档。如果文档在当前仓库之外看不到 → 列入 `Needs Human`。
 
-## 6. Q4 — 孤儿代码标签（仅在本次 diff 范围内）
+## 6. Q4 — Orphan tags (change review: diff-created orphans only)
 
 **变更评审只查本次改动制造的孤儿与重复**，不做全仓瘦身；全仓瘦身是 Repo audit 模式的事。
 
@@ -233,20 +233,20 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 `stdlib:`、`native:`、`yagni:` 只在 Repo audit 模式下使用。变更评审里提这三类，等于替实现方重新选技术方案——除非设计条款本来就这么要求，否则不报。
 
-### 重点抓什么（变更评审）
+### What to hunt (change review)
 
 - **本次改动留下的孤儿代码与孤儿测试**：对 diff 里删掉的每一个 `import` 或函数调用，在全项目搜一下（`rg <符号或模块名>`）还有没有生产代码在用。如果生产代码已经是 0 引用（或者只剩它自己的测试文件在测它），必须把**旧模块和它的测试文件**一起标 `delete:`。
 - 本次改动新写进来的死代码、注释掉的旧代码块、没人用的导出
 
 不要在变更评审里做这些事（它们属于 Repo audit）：盘点历史遗留死代码、扫全仓 0 引用依赖、评估既有实现该不该用标准库、审查已有接口是否过度抽象。这些都不是本次改动引入的，提了只会把一次小修变成重构。
 
-### 提出 `stdlib:` 与 `native:` 替换前的兼容性核查（仅 Repo audit 模式）
+### Runtime & platform check for `stdlib:` and `native:` (Repo audit only)
 
 在建议用标准库或系统命令替换前，必须核实两件事：
 1. **运行时最低版本**：查看 `package.json` 的 `engines`、`pyproject.toml` 的 `requires-python`、`go.mod` 等，确认该内置 API 在项目支持的最低版本中已经存在（例如 `path.matchesGlob` 需要 Node >=20.17 / >=22.5）。
 2. **跨平台兼容性**：如果 `native:` 建议调用系统外部命令（如 `zip`、`tar`、`sed`），确认该项目支持的所有目标操作系统（macOS / Linux / Windows）默认都自带该命令和对应参数。
 
-### 绝对不要标为冗余的内容
+### Never flag
 
 - 能护住核心逻辑的最精简测试——一个冒烟测试、一条 `assert` 自检、一个小巧的单元测试文件。那是质量底线，不是赘肉。
 - 带有合规 `simplified:` 标记、且明确写清了上限与升级触发条件的临时简化方案（仅在缺少升级触发条件时才标为无锚点腐烂风险）。
@@ -254,7 +254,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 - 设计明确接受的技术取舍：轮询代替事件、固定节流窗口、顺序执行代替并发、一次重试代替指数退避。这些是设计决策，不是赘肉。
 - 纯个人偏好（"换我写会换一种目录结构"）、变量起名风格、代码格式偏好。
 
-### 严重度
+### Severity
 
 | 情形 | 严重度 |
 |---|---|
@@ -266,15 +266,15 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 **先保正确，再求精简**——绝不能为了省几行代码牺牲正确性。如果某条精简建议与 Q1–Q3 的正确性/安全性冲突，无条件保正确性，放弃该精简建议。
 
-### 汇总指标（仅 Repo audit 模式）
+### The metric (Repo audit only)
 
 报告末尾附上：`net: -N lines, -M dependencies possible`（合计可精简的真实代码行数与依赖数）。如果代码已经很干净，写 `Lean already. Ship.`。
 
 变更评审不算这笔账：那里没有"必须找出可删代码"的义务，硬算总账只会催生凑数的重构建议。
 
-## 7. 批量排查命令（Probes）
+## 7. Probe bundle
 
-### 改动审查命令（模式 1 与模式 2 — 针对 Diff）
+### Diff review probes (Modes 1 & 2)
 
 通读完 diff 后，针对被修改的文件一次性运行以下命令（把 `<被改文件>` 替换为实际路径）：
 
@@ -293,8 +293,16 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 - **调用方排查（Q2）**：对 diff 修改的每个导出函数/类/类型，运行 `rg -l '<符号名>' <项目路径>` 找出所有调用方（重点看 diff 之外的文件）。
 - **孤儿代码排查（Q4）**：对 diff 中**删掉**的每个 `import` 或旧函数调用，运行 `rg -l '<旧模块或旧函数名>' <项目路径>`，检查它是否已经变成 0 生产引用（以及它的测试文件是否成了孤儿测试）。
 - **本次新增重复排查（Q4）**：用新代码里的一段特征片段跑 `rg -n '<特征片段>' <项目路径>`，看项目里是不是已经有同样的实现。只报本次改动写出来的重复；过度抽象和工厂类的扫描属于 Repo audit。
+- **项目规范检查**：仅当 diff 触及带本地化同名的 `AGENTS.md`（`AGENTS.<locale>.md`）时执行。标题与行内代码必须跨版本一致：
 
-### 全仓瘦身扫描命令（模式 3 — Repo audit，针对现有项目或目录）
+```bash
+diff <(grep '^#' AGENTS.md) <(grep '^#' AGENTS.<locale>.md)
+diff <(grep -o '`[^`]*`' AGENTS.md | sort -u) <(grep -o '`[^`]*`' AGENTS.<locale>.md | sort -u)
+```
+
+diff 非空即漂移，是否算缺陷按 `SKILL.md`（`## 项目规范评审`）的级别规则判定。过了这层检查仍存在的语义差异需要人工阅读。
+
+### Repo audit probes (Mode 3 — whole-repo or directory lean audit)
 
 当不看 diff、直接对现有项目或目录做**全仓瘦身审查（Repo audit）**时，先跑以下静态扫描命令把底数摸清，避免纯靠肉眼漏掉孤儿文件或误判动态导入：
 
@@ -314,7 +322,7 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
    - 运行 `rg -n 'TODO|FIXME|XXX|HACK|PLACEHOLDER|simplified:' src/` 和 `rg -n 'it\.skip|xdescribe|xit|describe\.skip|@pytest\.mark\.skip|t\.Skip' tests/`，把代码里留下的半成品欠账、临时简化记号与失效测试一并揪出来。对 `simplified:` 检查是否注明了升级触发条件（未注明升级条件的标为无触发条件的腐烂风险）。
    - 报告按收益从高到低分组输出：**可删减的依赖** → **死文件与死导出（`delete:`）** → **标准库/原生替换（`stdlib:` / `native:`）** → **过度抽象与重复逻辑（`yagni:` / `shrink:`）**（如有遗留 `TODO`/`simplified:`/失效测试/过期文档则单列一组**遗留欠账与测试/文档缺口**），末尾汇总 `net: -N lines, -M dependencies possible`。
 
-## 8. 能力资产规范检查（进化提案）
+## 8. Capability standards gate (evolution proposals)
 
 当传入的参数包含进化提案（evolution proposal）路径时，说明本次落地的是空间的能力资产（技能、规则、Agent）。对照平台规范逐项检查落地文件：
 
@@ -331,7 +339,7 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 
 这项检查与 `df-proposal-review` 前后呼应：提案评审查的是**计划写得对不对**，这里查的是**实际写出来的文件合不合格**。
 
-## 9. 严重度判定参考
+## 9. Severity calibration
 
 | 具体场景 | 正确判定 |
 |---|---|
@@ -366,9 +374,9 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 
 裁决规则：只要有 1 条 Blocker → **BLOCK**；没有 Blocker 但有 Warning → **REVISE**；其余 → **PASS**。按问题性质裁决，不搞凑数计分。
 
-## 10. 评审实例
+## 10. Worked examples
 
-### 实例 A — Q1 抓到的半成品空壳
+### Example A — Stub caught by Q1
 
 **承诺功能**："从数据库读取消息列表"。代码里有路由文件：
 
@@ -389,7 +397,7 @@ finding:
   fix: "连接数据库查询消息列表并返回真实查询结果"
 ```
 
-### 实例 B — Q2 抓到的静默行为破坏
+### Example B — Silent behavior change caught by Q2
 
 **Diff 改动**：为了迎合一个新调用方，把某工具函数在空输入时的返回值从 `[]` 改成了 `null`。原本的老测试没有覆盖空输入场景。
 
@@ -408,13 +416,13 @@ finding:
   fix: "恢复空输入返回空数组 [] 的行为，只在需要 null 的那一个新调用方做转换；或者把全部 14 处调用点都改好并补齐空输入测试"
 ```
 
-### 实例 C — 调用方太多时的如实划界
+### Example C — Contract surface too large: honest scoping
 
 某次 diff 重写了被 60 个文件引用的公共函数 `formatDate`。把 60 个文件挨个读完不现实，也会撑爆上下文。
 
 **正确做法**：先提炼出函数的**对外约定**——参数类型、支持的输入格式、返回的字符串格式、时区处理方式，对比新旧版本有哪些差异。用 `rg -l` 列出所有调用方，按使用场景（页面展示、接口序列化、缓存 key 拼接等）挑 3–5 个代表性调用点深读。剩下的如实写进 `UNCOVERED STEPS` 或 `Needs Human` 并说明原因。
 
-### 实例 D — Q4 抓到的"自己证自己"假测试
+### Example D — Circular proof caught by Q4
 
 ```typescript
 // tests/parser.test.ts:14-16
@@ -433,7 +441,7 @@ finding:
   fix: "把 expected 改成手写的、确定的期望结果"
 ```
 
-### 实例 E — 本次改动引入的重复实现（变更评审可以报的精简问题）
+### Example E — Duplication this diff introduced (reportable in a change review)
 
 **Diff 改动**：本次改动新建了 `src/lib/slug.ts`（18 行）手写字符串转 URL slug 的逻辑。搜了一下项目发现 `package.json` 已经安装了 `lodash`，里面的 `kebabCase` 就能直接搞定，而且 `rg "kebabCase" src/` 显示项目里已有两个文件在用它。
 
@@ -445,7 +453,7 @@ src/lib/slug.ts:L1-18: delete/shrink: 本次新增的 18 行 slug 转换与项�
 
 注意范围和时机：只有**这次改动新写出来的重复**才归变更评审管。如果项目里本来就装着 `lodash` 而两个老文件手写了 slug 转换，那属于历史遗留，留给 Repo audit，不在本次报告里出现。
 
-### 实例 F — 重大逻辑风险（与设计冲突时才单独列出）
+### Example F — Serious logic risk only when it contradicts the design
 
 ```typescript
 // src/jobs/purge.ts:18
@@ -456,20 +464,20 @@ await deleteAllUserContent(userId)
 
 如果设计要求就是硬删除，这不是风险，是照做。此时若评审员认为设计错了，写一条 `Design Feedback` 说明"硬删不可逆，建议改为软删除 + 保留期"，让用户先改设计，而不是在实施评审里拦下这次交付。
 
-## 11. 完整交付基线范围与对抗式 DESIGN/Proposal 核查
+## 11. Delivery-baseline scope & adversarial DESIGN/Proposal verification
 
-### 先确定完整交付 diff
+### Establish the full delivery diff
 
 ```bash
-# 有交付基线时（多提交或独立分支交付必须用这个）：
+# with a delivery base (preferred for multi-commit or branch deliveries):
 git diff --name-status <delivery_base>...HEAD
-# 仅单次未提交的工作区改动才可以直接用：
+# single uncommitted change only:
 git diff --name-status
 ```
 
 要专门搜的"早期漏同步"形态：用 `git log --oneline <delivery_base>..HEAD` 列出每个碰了非测试代码的提交，核对所属 `DESIGN-<module>.md` 是否在**同一交付窗口内**被改过。某模块的代码在早期提交变了、但它的 DESIGN 文档在 `<delivery_base>` 之后没有任何提交碰过——这正是 `--check-sync --base` 会拦的漏同步，即使最后一个提交是干净的也要报。
 
-### 对抗式核查清单——授权 → 代码（链 1）
+### Adversarial checklist — authorization → code (Chain 1)
 
 | 核查点 | 方法 |
 |---|---|
@@ -477,7 +485,7 @@ git diff --name-status
 | 没有超出批准范围的夹带 | `git diff --name-status <base>...HEAD` 对照声明的文件与行为范围；未声明的文件改动或行为变化都是问题 |
 | 明确排除项未被越过 | 提案的排除清单（如"不含布局改动"）被任何一个代码块越过 → Q1 范围违约 |
 
-### 对抗式核查清单——代码 → DESIGN/Proposal（链 2）
+### Adversarial checklist — code → DESIGN/Proposal (Chain 2)
 
 | 核查点 | 方法 |
 |---|---|
@@ -487,7 +495,7 @@ git diff --name-status
 | `--pure-refactor` 理由诚实 | 对声称纯重构的文件 diff 检查有无对外可见变化（导出面、默认值、错误契约）；藏着行为变化的 → BLOCKER |
 | 并行写集未越界 | 确认 diff 只碰授权写集内的 `DESIGN-<module>.md`；模块实施者改了共享主 `DESIGN.md` → BLOCKER（违反成文写集规则） |
 
-### Proposal 生命周期核查清单
+### Proposal lifecycle verification checklist
 
 | 核查点 | 方法 |
 |---|---|
@@ -497,7 +505,7 @@ git diff --name-status
 | 全交付前老提案不被触碰 | `git diff <base>...HEAD -- <老提案路径>` 在全交付前必须为空；提前被改 → BLOCKER（提前篡改） |
 | 不回退、不解冻 | 任何 `implemented/` → `proposed/` 的回退，或 `archived/` 下任何内容改动 → BLOCKER |
 
-### 同步失败的严重度标尺
+### Severity calibration for sync failures
 
 | 情形 | 判定 |
 |---|---|

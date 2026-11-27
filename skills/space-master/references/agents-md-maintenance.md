@@ -213,8 +213,26 @@ A small update (no frontmatter, path, or scope change; 1–2 sections) may compr
 2. After the review version is approved, translate into `AGENTS.md`, keeping the semantics aligned.
 3. English preference: write `AGENTS.md` directly; no `AGENTS.en-US.md`.
 4. Never write, overwrite, or reorder `AGENTS.md` before confirmation.
+5. Run the rules gate `python3 scripts/verify-agents.py <AGENTS.md path> --base <delivery-base>`; exit 0 is required to finish.
 
 **Output**: updated review and/or formal path.
+
+### The rules gate: `scripts/verify-agents.py`
+
+The gate is mechanical verification, not semantic review. It decides:
+
+| Check | Rejects |
+|---|---|
+| frontmatter | missing `name` / `description` / `maintenance` |
+| placeholders | leftover template placeholders and `N/A` placeholders |
+| chapter numbering | `## 1. xxx` style numbered headings |
+| length | over the tier limit (project root 300, `docs/` 80, module 100) |
+| referenced paths | a backticked repository path that does not exist on disk |
+| localized parity | heading set, per-section rule count, or inline identifiers differ from the English file |
+| user rules | `User-Supplied Rules` changed against the baseline (needs `--base`) |
+| tier duplication | a nested `AGENTS.md` repeating a parent rule verbatim |
+
+It cannot decide whether a rule should exist, whether it restates implementation, whether it conflicts with a DESIGN, or whether it reads clearly. Those stay with semantic review — passing the gate does not mean the rules are correct.
 
 ## 6. Quality Checklist
 
@@ -230,6 +248,7 @@ A small update (no frontmatter, path, or scope change; 1–2 sections) may compr
 - [ ] Style, error contract, CLI/output, log sink, and forbidden content stated with concrete commands, paths, types, or formats
 - [ ] Target tier matched to the right template (`templates/agent-rules.md`, `templates/agent-rules-docs.md`, or `templates/agent-rules-subdir.md`) and within its length ceiling (project: 80–150 / max 300; docs: 25–45 / max 80; subdir: 15–45 / max 100)
 - [ ] Every Quality Gates row has a real executable command and blocking condition; projects maintaining `docs/DESIGN.md` wire `Doc sync / consistency` (`verify-docset.py --check-sync` or wrapper) and the standing present-state `DESIGN` sync rule (and in spaces assembling `dev-doc-master`, propose bootstrapping `<project>/docs/AGENTS.md` if missing); added/updated mechanical scripts verified for non-empty scope and +/- cases; semantic checks left to independent review
+- [ ] The edited `AGENTS.md` passes the rules gate `scripts/verify-agents.py` (exit 0)
 - [ ] Test commands, layers, fixtures, helpers, and runner registration explicit
 - [ ] Agent can implement without reopening source to rediscover conventions; applicable checks resolvable bottom-up from changed paths; no unnamed generic reminders
 - [ ] README has no agent rules; DESIGN has no duplicated coding or test policy

@@ -292,6 +292,14 @@ rg -n 'toBeDefined|toBeTruthy|toBeFalsy|not\.toBeNull' $FILES
 - **Consumer check (Q2)**: for each exported symbol touched by the diff, run `rg -l '<symbol>' <project>` to find consumers, including outside the diff.
 - **Orphan check (Q4)**: for each `import` or helper call *removed* by the diff, run `rg -l '<old-module-or-symbol>' <project>` to verify whether the old target now has zero production callers (and whether its test file is now testing dead code).
 - **New-duplication check (Q4)**: `rg -n '<distinctive snippet from the new code>' <project>` to see whether an existing helper already does this. Report only duplication this diff introduced; abstract-class and factory scans belong to Repo audit.
+- **Project rules check**: only when the diff touches an `AGENTS.md` with a localized sibling (`AGENTS.<locale>.md`). Headings and inline code must match across versions:
+
+```bash
+diff <(grep '^#' AGENTS.md) <(grep '^#' AGENTS.<locale>.md)
+diff <(grep -o '`[^`]*`' AGENTS.md | sort -u) <(grep -o '`[^`]*`' AGENTS.<locale>.md | sort -u)
+```
+
+A non-empty diff means drift; whether it is a defect follows the severity rules in `SKILL.md` (`## Project rules review`). Semantic differences that survive this check still need a read.
 
 ### Repo audit probes (Mode 3 — whole-repo or directory lean audit)
 

@@ -75,7 +75,9 @@ A defect — existing, already-agreed behavior that is wrong — is repaired
 directly with `wopal space evo commit` in **instant mode** (no proposal name),
 committed on the space branch. The same direct path also applies to a bounded,
 clearly owned capability maintenance change that needs no dedicated validation
-boundary; creating one complete Skill, Rule, or Command does not by itself
+boundary — wording fixes, a wrong rule corrected, bloat removed, a missing
+constraint added, a broken reference repaired; creating one complete Skill,
+Rule, or Command does not by itself
 require a proposal. The safety contract (sparse preflight, widen-then-stage,
 named staging) still applies. Instant mode is the designed direct path — there
 is no separate `fix` command; do not add one, an alias, or a shim.

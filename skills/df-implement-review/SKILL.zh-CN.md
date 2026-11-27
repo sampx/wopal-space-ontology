@@ -8,9 +8,9 @@ description: >
   实施前的方案/提案/Plan 评审走 df-proposal-review，不归本技能管。
 ---
 
-# df-implement-review — 代码与项目审查
+# df-implement-review — Implementation Review
 
-## 审查回答四个问题
+## The review answers four questions
 
 凡是能溜过单测、lint、类型检查和 CI 的问题，都逃不出这四类：
 
@@ -21,7 +21,7 @@ description: >
 | Q3 | 新代码在真实输入和极端情况下对吗？ | 并发冲突、资源未释放、边界值报错、吞掉异常、安全漏洞 |
 | Q4 | 测试真能兜底吗？有没有留下本次改动制造的孤儿？ | 走过场的假测试、文档与设计矛盾、本次改动留下的孤儿代码/依赖 |
 
-## 设计是唯一的尺子
+## The design is the yardstick
 
 你只审一件事：**实现有没有按设计做**。设计本身好不好，不归这次评审管。
 
@@ -35,7 +35,7 @@ description: >
 
 这三条是评审效率的来源。尊重设计的评审，产出的是一份很短的偏离清单；反复重审设计的评审，产出的是一堆伪装成需求的个人偏好。
 
-## 先选模式
+## Pick the mode
 
 开始时根据指令内容一次选定：
 
@@ -51,7 +51,7 @@ description: >
 
 指令可能附带的参数：`review_type: implementation`、`project_path`、`change_scope: working_tree`、`commit: <hash>`、`commit_range: <A>..<B>`、`background`、Plan 或提案路径、`design_docs: <path>`、`business_logic_review: requested`、`delivery_base: <git-ref>`。
 
-## 评审范围必须覆盖整次交付基线
+## The review scope covers the whole delivery baseline
 
 交付评审与变更评审的默认 diff 范围是**覆盖整次交付的完整变更**，不是最后一个提交。多提交交付最常见的翻车形态是：早期提交改了对外行为但漏更 DESIGN，最后一次提交干净——只审 `HEAD~1..HEAD` 就会把漏同步放过去。所以：
 
@@ -61,7 +61,7 @@ description: >
 
 这个范围与实施交付出口 `verify-docset.py --check-sync --base <delivery-base>` 检查的范围完全一致——评审者与门禁看的是同一份完整 diff，两者结论才可对账。
 
-## 对抗式双向核验：授权 ↔ 代码 ↔ DESIGN ↔ Proposal
+## Adversarial two-way verification: authorization ↔ code ↔ DESIGN ↔ Proposal
 
 在四问题之外，交付评审还要走两条双向证据链：
 
@@ -69,9 +69,21 @@ description: >
 
 **链 2：实际代码 → 所属模块 DESIGN 与 Proposal。** 对完整基线 diff 里的每处对外可见行为、公开接口、生效业务规则、默认值、失败边界变化，核实所属模块 `DESIGN-<module>.md` 在同一交付里同步更新，且写的内容与代码真实行为一致（不虚构、不写未来功能）。实施报告的 `DESIGN Sync` 块不是免检通行证——块里的门禁结论、`--pure-refactor` 理由、同步文档清单都要实际打开核对。
 
+**Chain 3：代码 → 项目规范。** 全基线 diff 一旦触及任何 `AGENTS.md`，被改的规则本身就是评审对象，按 `space-master` 的维护标准（`references/agents-md-maintenance.md`）判定。见下一节。
+
 **Proposal 生命周期核查**（涉及业务 Proposal 的交付）：批准范围全交付且有用户验收证据才允许迁入 `implemented/`，部分交付留在 `proposed/` 的 `Status: approved`；部分替代的全交付里新旧双向互链齐全；完全替代当场吸收删除或迁入 `archived/` 冻结；把 `implemented/` 回退成 `proposed/`、未全交付就提前改老提案、或改动 `archived/` 任何内容，都按 Blocker 处理。
 
-## 文档质量审查直接用 `dev-doc-master` 清单
+## Project rules review uses the `space-master` checklists
+
+diff 改到项目级或目录级 `AGENTS.md` 时，标准取自 `space-master`，不得另立一套。英文正式版是规范版本；用户偏好语言版本必须原样保留同一批标题，并承载同一批规则。
+
+**属错误 → BLOCKER**：规则记录一次性决策或为某个已发生的缺陷设护栏（应做成测试）；规则复述代码、配置或测试里已有的实现事实；引用已不存在的目录、命令或测试；规则与更新的权威 DESIGN 冲突；`User-Supplied Rules` 被改动；本地化版本翻译或改名了标题；英文版有的规则在偏好语言版本里缺失。
+
+**不属错误 → WARNING**：超过该层级篇幅上限；父子层级重复同一约束。
+
+按内容匹配规则，绝不按翻译措辞匹配。
+
+## Documentation quality review uses the `dev-doc-master` checklists
 
 核验同步后的模块 DESIGN 时，语义质量标准直接参照 `dev-doc-master`（`references/design-project-guide.md`），不要另造一套：
 
@@ -80,7 +92,7 @@ description: >
 - **证据审查**：文档里的命令、默认值、路径、失败模式是否与真实代码和实跑结果对得上，未验证的是否如实标注；
 - **Slop Checklist**：AI 思考过程泄漏、过程态叙述（`deprecated`/`used to`/`已废弃`）、规则膨胀、加粗滥用、跨层复制、段落墙与空洞黑话，五类全查。
 
-## 自动工具查过的事别重复干
+## What the mechanical gates own
 
 单测、lint、typecheck 和 CI 已经管了"能不能编译、测试过没过、格式对不对"。再去重跑一遍纯属浪费。关于测试你只问一个问题：**万一功能坏了，这个测试真能报错吗**（Q4）——绝不是问"测试绿没绿"。
 
@@ -88,7 +100,7 @@ description: >
 
 改动没问题就简短说没问题，马上结束。
 
-## 怎么干：通读一遍、列三张表、定点排查
+## How to work: read once, three lists, then probe
 
 审查拖得越久，废话越多。分两步走完：
 
@@ -100,7 +112,7 @@ description: >
 
 **第二步——对着三张表跑命令核实，不回头重读。** 用 `rg`、`git diff`、`sed -n` 定点查清表里的每一项。读过的文件不要反复重读；除非接口调用链牵涉到外面的文件，否则不要去翻无关文件。查空壳、查假测试、查危险调用的命令攒成一批一次性跑完（见细则 §7 的批量排查命令）。
 
-## Q1 — 代码真把声称要做的事做成了吗？
+## Q1 — Does the change really deliver what it claims?
 
 优先级最高。绝大多数"看着交差了、其实根本用不了"的改动都倒在这一关。
 
@@ -111,7 +123,7 @@ description: >
 
 严重度：核心功能是空壳、答应交付的东西缺失、违背明确的验收标准或设计约束 → **BLOCKER**；代码写好了但没有任何地方调用它 → **WARNING**（如果"接通调用"本身就是任务要求，升为 **BLOCKER**）；未说明就删文件 → **WARNING**。有明确决策记录同意分阶段简化的，不算问题。设计没规定的地方，实现方自己选的做法就成立；如果你觉得这个留白是错的，走 `Design Feedback`。
 
-## Q2 — 有没有把本来正常的地方改坏？
+## Q2 — Does the change break anything that already worked?
 
 这是自动测试最容易漏掉的地方。最危险的就是：**函数参数和返回值类型都没变，编译和旧测试全绿，但函数的实际行为变了**。
 
@@ -123,7 +135,7 @@ description: >
 
 严重度：diff 之外的调用点在具体场景下会被改崩 → **BLOCKER**；行为变了但可能是设计有意为之 → 先回去查设计条款，设计已批准的改动不算问题；查不到依据的最多写进 `Info`。
 
-## Q3 — 新代码在真实输入和极端情况下对吗？
+## Q3 — Are the new code paths correct under real inputs and states?
 
 对着改动的代码块，按常见缺陷清单（细则 §4）逐项过一遍，不靠感觉猜：并发读写冲突、文件/连接/定时器打开后没关闭（尤其是报错分支漏关）、空数组/零值/越界、异步 `await` 漏写、catch 后把错误吞掉不处理、不安全的类型强转、安全漏洞（拼接命令/SQL、`innerHTML`、新接口漏鉴权、硬编码密钥）。
 
@@ -133,7 +145,7 @@ description: >
 
 严重度：有明确触发场景、且行为未经设计批准的 bug，或安全漏洞 → **BLOCKER**；边界条件下存在隐患或公开接口缺参数校验 → **WARNING**。
 
-## Q4 — 测试真能兜底吗？有没有留下本次改动制造的孤儿？
+## Q4 — Do the tests prove it, and did the change leave orphans?
 
 **用户完整流程验收。** 评审公开命令或用户操作流程的交付时，先读取项目 `AGENTS.md` 的适用验收规范，把设计承诺的实际用户任务映射到自动化测试。确认测试确实从公开入口运行到可观察的最终状态，并检查关键失败路径和持久状态安全约束；不能把 Mock 掉核心副作用的测试、仅验证内部函数的测试，或仅凭 `.e2e.test` 文件名，当成完整流程证据。E2E 可以使用隔离资源或真实外部服务，是否联网不是测试分层依据。只有规范或交付范围明确要求的行为缺少有效证据，才按现有 Q4 严重度规则报告。
 
@@ -162,7 +174,7 @@ description: >
 
 总账 `net: -N lines, -M dependencies possible` 只在 **Repo audit** 模式下输出。变更评审不欠读者一个"必须砍点什么"的交代——在变更评审里找删除机会，正是一次小修变成多余重构的起点。
 
-## 本体进化提案的落地把关
+## Delivery review of ontology evolution proposals
 
 如果评审的是本体进化提案落地后的能力文件（技能、规则、agent、命令），在 Q1 基础上多查一条：
 
@@ -170,18 +182,18 @@ description: >
 
 严重度：违反规范或满篇黑话让人没法评审 → **WARNING**（REVISE）；缺 frontmatter 或引用了不存在的文件导致根本用不了 → **BLOCKER**。
 
-## 规模：快速评审 vs 完整评审
+## Scale: Quick vs Full review
 
 - **快速评审**——改动很小（约 ≤ 50 行、只改了单个文件、局部微调）：四个问题都过一遍，不翻细则，建一条 todo，输出精简版报告。
 - **完整评审**——其余所有情况：每个问题建一条 todo，对照细则排查，输出完整版报告。
 
 哪怕只有 10 行改动也绝不能跳过 Q2——改一行函数返回值，照样能弄崩外面十几个调用点。
 
-## 怎么避免瞎报错（误报校准）
+## False-positive calibration
 
 报错准不准，看你能不能忍住不报废话。以下情况一律不报：编译器/linter/测试已经管了的事；纯属个人口味的代码风格或命名偏好；"如果是我写我会换种设计"；拿不出具体出错场景的空洞担忧；不在本次评审范围内的老问题；已经明确批准的分阶段简化；设计已经拍板的取舍；保底的最小测试。**每一条 Blocker 和 Warning 都必须标出 `文件:行号`、实打实的证据（代码片段或命令输出），以及它违背的设计依据**——挂不上设计依据的最多算 `Info`，纯偏好则不写进报告。
 
-## 设计意见怎么提（Design Feedback）
+## Design Feedback
 
 认为设计本身有问题时，说一次就停：
 
@@ -197,11 +209,11 @@ description: >
 - **说设计问题，不要拆成一串下游实施缺陷。** 把一个设计选择拆成五条"风险"，就是评审自己发明范围的过程。
 - **设计只是没写，不算错。** 留白时实现方的选择成立；拿需求去填留白，就是在发明需求。
 
-## 严重逻辑风险怎么报
+## Yardstick for severe logic risks
 
 `Serious Logic Risks` 只服务一种情况：有 `文件:行号` 证据、后果不可逆或严重（误删数据、破坏状态、伤害用户），**并且与设计某条明确条款冲突**。这个门槛比 Q3 更严：后果要严重，而且设计没接受过它。设计明确接受过的严重后果，走 `Design Feedback`，不走这里。
 
-## 严重度按真实影响分级
+## Severity calibrates to real impact
 
 Blocker / Warning / Info 的唯一判据是**真实影响**，配合投入产出门槛，避免一刀切制造低价值阻塞噪音：
 
@@ -221,7 +233,7 @@ Blocker / Warning / Info 的唯一判据是**真实影响**，配合投入产出
 
 拿不准往哪档放时，问一句：这个问题会让用户拿到错误的事实、坏掉的功能，或被伪造的门禁结论骗过吗？会——升 Blocker；只是要多花一点修正成本——Warning；都不涉及——Info 或不报。
 
-## 评审效率——目标 2 轮内收敛
+## Review efficiency — target 2 rounds per change
 
 力求在**两轮内**（初审 + 一次复审）收敛评审：
 
@@ -230,7 +242,7 @@ Blocker / Warning / Info 的唯一判据是**真实影响**，配合投入产出
 
 评审技能只负责实事求是呈现缺陷，不擅自设卡中断。迭代预算、熔断上限与升级用户机制属于控制工作流（如 `dev-flow`）。
 
-## 结论与报告格式
+## Verdict and report
 
 ```
 PASS   — 0 个 Blocker，0 个 Warning
@@ -243,7 +255,7 @@ BLOCK  — 至少 1 个 Blocker
 **完整报告格式：**
 
 ```markdown
-# 实施评审 — {范围名称}
+# Implementation Review — {scope label}
 
 ## Summary
 - Review type: Implementation（交付评审 | 变更评审 | 全仓瘦身审查）
@@ -254,7 +266,7 @@ BLOCK  — 至少 1 个 Blocker
 - Lean count: {仅全仓瘦身审查：net: -N lines, -M dependencies possible | Lean already}
 
 ## Blocker
-### B-01: {问题标题}
+### B-01: {title}
 - Location: `{file}:{line}`
 - Basis: {违背的设计条款、Plan 任务或明确记录的决定}
 - Evidence: {代码片段或命令输出}
@@ -292,13 +304,13 @@ BLOCK  — 至少 1 个 Blocker
 
 判 `PASS` 时必须在 `Positive Findings` 里写明查了哪些关键点、怎么核实的——不写核实依据的空头 PASS 没有可信度。
 
-## 下完结论之后
+## After the verdict
 
 - **REVISE / BLOCK**：改完代码后必须经过复审才算通过。复审时接着同一个评审会话继续，确保之前查出的问题一条不漏地复核。
 - **PASS**：评审结论是给主控者或用户的决策依据，不代表自动合并或自动改写任务状态。
 - 审查者只管查问题，不准在审查过程中擅自动手改业务代码。
 
-## 参考细则
+## References
 
 某个问题需要查详细步骤、常见坏味道清单、批量扫描命令或具体案例时，按需读取：
 

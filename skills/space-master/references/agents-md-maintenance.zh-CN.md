@@ -213,8 +213,26 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 2. 审核版确认后，翻译进 `AGENTS.md`，语义保持一致。
 3. 偏好语言是英文：直接写 `AGENTS.md`；不建 `AGENTS.en-US.md`。
 4. 确认前绝不写入、覆盖或重排 `AGENTS.md`。
+5. 跑规范门禁 `python3 scripts/verify-agents.py <AGENTS.md 路径> --base <交付基线>`，exit 0 才算完成。
 
 **产出**：更新后的审核版和/或正式版路径。
+
+### The rules gate: `scripts/verify-agents.py`
+
+规范门禁是机械校验，不是语义评审。它能判定：
+
+| 检查 | 拦截内容 |
+|---|---|
+| frontmatter | 缺少 `name` / `description` / `maintenance` |
+| 占位符 | 残留模板占位与 `N/A` 占位 |
+| 章节编号 | `## 1. xxx` 形式的编号标题 |
+| 篇幅 | 超过层级上限（项目根 300、`docs/` 80、模块 100） |
+| 引用路径 | 反引号里的仓库路径在磁盘上不存在 |
+| 本地化一致 | 标题集合、各章节规则条数、行内标识与英文版不符 |
+| 用户规则 | `User-Supplied Rules` 相对基线被改动（需 `--base`） |
+| 层级重复 | 子级 `AGENTS.md` 逐字重复父级规则 |
+
+它判定不了：一条规则该不该存在、是否复述实现、是否与 DESIGN 冲突、表述是否清楚。这些留给语义评审——门禁通过不等于规范正确。
 
 ## 6. Quality Checklist
 
@@ -244,6 +262,7 @@ AGENTS.md 只写已安装的工具和命令。缺脚手架就先建，再写依�
 - [ ] 生效业务规则留在所属 DESIGN，没有从存量 `BUSINESS_RULES.md` 抽取规则写进正文，也未向独立 `BUSINESS_RULES.md` 新增规则
 - [ ] Testing 章节显式继承空间的 canonical testing/TDD rule；可以写明项目特有的 TDD 行为边界，但不重复通用 RED/GREEN 判定理论；项目特有命令、分层、fixture/helper、runner 注册和宿主/人工验证边界继续写清楚
 - [ ] 偏好语言版本的标题与英文模板一致
+- [ ] 修改后的 `AGENTS.md` 通过规范门禁 `scripts/verify-agents.py`（exit 0）
 - [ ] `User-Supplied Rules` 未变：无增、无改、无删、无重排，原始规范迁移除外
 - [ ] 未过时的原规则都保留；删除的在方案中有理由
 - [ ] 动笔前已展示完整方案并获确认

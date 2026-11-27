@@ -100,7 +100,9 @@ The point of a proposal is not to archive what happened; it is to make the same 
 
 ## Decide whether a proposal is needed first
 
-A formal proposal is for evolution that needs its own design, implementation, review, or validation boundary. It is not the default entry for every ontology edit. Before creating one, explicitly ask the person who raised the problem whether they want a proposal; do not create one automatically merely because the target is a reusable capability.
+**A proposal is the exception, not the default.** Small maintenance — a wording fix, a wrong rule corrected, a bloated rule removed, a missing constraint added, a broken reference repaired — lands directly on the registered `space/<name>` branch through instant mode: no proposal, no working branch, no extra worktree, no waiting. Never escalate a small correction into a formal proposal, and never tell the user one is required.
+
+A formal proposal is for evolution that needs its own design, implementation, review, or validation boundary. Before creating one, explicitly ask the person who raised the problem whether they want a proposal; do not create one automatically merely because the target is a reusable capability.
 
 Prefer direct maintenance when all of the following describe the work:
 

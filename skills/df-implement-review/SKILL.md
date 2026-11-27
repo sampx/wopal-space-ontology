@@ -72,7 +72,19 @@ Beyond the four questions, a delivery review runs two bidirectional evidence cha
 
 **Chain 2: actual code → owning module DESIGN and Proposal.** For every externally visible behavior, public interface, effective business rule, default, or failure-boundary change in the full-baseline diff, verify the owning module's `DESIGN-<module>.md` was updated in the same delivery and describes what the code actually does — no invented behavior, no future features. The implementation report's `DESIGN Sync` block is not a pass-through token — open and verify its gate results, its `--pure-refactor` reason, and its synced-doc claims.
 
+**Chain 3: code → project rules.** When the full-baseline diff touches any `AGENTS.md`, the changed rules are a review target in their own right, judged by the maintenance standard in `space-master` (`references/agents-md-maintenance.md`). See the next section.
+
 **Proposal lifecycle verification** (when the delivery touches a business Proposal): migration into `implemented/` is allowed only after the approved scope is fully delivered with user-acceptance evidence; a partial delivery stays in `proposed/` at `Status: approved`. At full-scope partial supersession, bidirectional cross-links must be complete. Full replacement absorbs-and-deletes or archive-freezes in the same delivery. Demoting `implemented/` back to `proposed/`, modifying the old proposal before full delivery, or touching anything in `archived/` is a **Blocker**.
+
+## Project rules review uses the `space-master` checklists
+
+When the diff changes a project or directory `AGENTS.md`, take the standard from `space-master` — never build a second set. The formal English file is the normative version; a user-preference-language version must carry the same headings verbatim and the same rules.
+
+**Error → BLOCKER**: a rule recording a one-off decision or guarding a single past bug (it belongs in a test instead); a rule restating implementation facts already visible in code, config, or tests; a reference to a directory, command, or test that no longer exists; a rule contradicting a newer authoritative DESIGN; `User-Supplied Rules` altered; headings translated or renamed in the localized version; a rule present in the English file but absent from the preferred-language version.
+
+**Not an error → WARNING**: over the tier line limit; the same constraint duplicated across parent and child tiers.
+
+Match rules by content, never by translation wording.
 
 ## Documentation quality review uses the `dev-doc-master` checklists
 
