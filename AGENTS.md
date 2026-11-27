@@ -34,15 +34,13 @@ maintenance: Maintain only when a long-lived constraint appears that neither cod
 
 ## Quality Gates
 
-Run inside `.wopal/plugins/wopal-plugin/` unless stated otherwise.
+This project has no single build or test entry: each module owns its own development model and gates. Module-specific gates live in that module's own rules file (for example `plugins/wopal-plugin/AGENTS.md`), never here.
+
+The only project-wide gate is the rules gate, which applies whenever this file or any module rules file changes:
 
 | Gate | Command | Blocks work when |
 |---|---|---|
-| Plugin type check | `bun run typecheck` | any type error |
-| Plugin tests | `bun run test:run` | any test fails |
-| Rules consistency | `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` from the ontology root | any check in the rules gate fails; required when the diff touches any `AGENTS.md` |
-
-`bun run lint` and `bun run format:check` are informational only until their existing failures are cleared: the lint script passes a `scripts` glob that the ESLint config does not cover, and Prettier reports unresolved style issues. Do not treat a non-zero exit from either as a new blocker.
+| Rules consistency | `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` | any check in the rules gate fails |
 
 Declarative content (`agents/`, `rules/`, `skills/`, `commands/`, `assembly/templates/`) has no automated gate. Review it by reading, per `## Code Review Rules`.
 

@@ -76,6 +76,16 @@ Config-driven behavior is exercised with isolated fixtures under `.wopal-space/.
 
 `WOPAL_HOME` overrides the user-level config and storage root, which makes sandboxed runs possible.
 
+## Quality Gates
+
+| Gate | Command | Blocks work when |
+|---|---|---|
+| Type check | `bun run typecheck` | any type error |
+| Tests | `bun run test:run` | any test fails |
+| Headless boot | the `ellamaka run ... --print-logs` command above | a boot marker is missing or a new warning/error appears |
+
+`bun run lint` and `bun run format:check` are informational, not gates: the lint script passes a `scripts` glob the ESLint config does not cover, and Prettier reports style issues this module has not cleared. Do not treat their non-zero exit as a new blocker, and do not widen config to silence them in an unrelated change.
+
 ## 4. Implementation Rules
 
 ### Logging

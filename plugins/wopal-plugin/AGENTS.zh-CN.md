@@ -76,6 +76,16 @@ ellamaka run "reply with exactly: OK" --print-logs --log-level DEBUG
 
 `WOPAL_HOME` 覆盖用户级配置与存储根，使沙箱化运行成为可能。
 
+## Quality Gates
+
+| 门禁 | 命令 | 何时阻断 |
+|---|---|---|
+| 类型检查 | `bun run typecheck` | 任何类型错误 |
+| 测试 | `bun run test:run` | 任何测试失败 |
+| headless 引导 | 上文的 `ellamaka run ... --print-logs` 命令 | 缺少引导标记，或出现新的 warning/error |
+
+`bun run lint` 与 `bun run format:check` 仅供参照，不作为门禁：lint 脚本传入的 `scripts` glob 未被 ESLint 配置覆盖，Prettier 也报有本模块尚未处理的格式问题。两者的非零退出不构成新的阻断项，也不得在无关改动里通过放宽配置来掩盖。
+
 ## 4. 实现规则
 
 ### 日志

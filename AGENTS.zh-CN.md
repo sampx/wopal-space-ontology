@@ -33,15 +33,13 @@ description: WopalSpace soul, regulations, and capability gene toolkit — agent
 
 ## Quality Gates
 
-除另行说明外，均在 `.wopal/plugins/wopal-plugin/` 目录下执行。
+本项目没有统一的构建或测试入口：每个模块各有自己的开发模式与门禁。模块专项门禁写在该模块自己的守则里（例如 `plugins/wopal-plugin/AGENTS.md`），不写在本文件。
+
+唯一的项目级门禁是守则门禁，本文件或任何模块守则文件改动时都适用：
 
 | 门禁 | 命令 | 何时阻断 |
 |---|---|---|
-| 插件类型检查 | `bun run typecheck` | 任何类型错误 |
-| 插件测试 | `bun run test:run` | 任何测试失败 |
-| 守则一致性 | 在本体根目录执行 `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` | 守则门禁任何一项失败；diff 触及任何 `AGENTS.md` 时必须执行 |
-
-`bun run lint` 与 `bun run format:check` 在存量问题清零前仅作参考：lint 脚本传入的 `scripts` glob 未被 ESLint 配置覆盖，Prettier 也报有尚未处理的格式问题。两者的非零退出不构成新的阻断项。
+| 守则一致性 | `python3 skills/space-master/scripts/verify-agents.py AGENTS.md --base <delivery-base>` | 守则门禁任何一项失败 |
 
 声明式内容（`agents/`、`rules/`、`skills/`、`commands/`、`assembly/templates/`）没有自动门禁，按 `## Code Review Rules` 直接读文件评审。
 
