@@ -41,7 +41,9 @@ See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.m
 
 ## DESIGN, Plan, implementation
 
-**The hierarchy is fixed: DESIGN → approved Plan → implementation.**
+**Proposal-driven Plans follow: approved Proposal → Plan → implementation → present-state DESIGN → engineering rules at all tiers.** The Plan organizes tasks; the Proposal owns the target, scope, decisions and acceptance. For explicit user-authorized adjustments during validation, the controller maintains the current Proposal first where possible under `dev-proposal`, coordinates Plan tasks/ACs, and follows `df-implement` for implementation and artifact sync. No duplicate approval or new Plan state.
+
+The DESIGN → approved Plan → implementation constraints below apply to legacy in-flight Plans under their existing contract and Issues within settled designs; they do not require updating present-state DESIGN in advance of a Proposal-driven delivery.
 
 - DESIGN defines the target state.
 - The Plan translates the settled design into implementation Tasks, with delivery boundaries and behavioral acceptance.
@@ -223,6 +225,8 @@ flow.sh complete <plan>
 
 ## Conflicts and rework
 
+For a Proposal-driven delivery, rework follows the current authorized Proposal, the authorization rules above and the artifact-sync order in `df-implement`. The following DESIGN + Plan classification applies to legacy contracts and Issue-driven work.
+
 When implementation or validation reveals disagreement among the Plan, DESIGN, and code reality, the controller classifies the problem:
 
 - **Implementation problem**: existing DESIGN + approved Plan already answer it → fix the code inside the current boundaries and re-verify.
@@ -259,7 +263,7 @@ Default to validating before integration. Integrate-first is a user choice, not 
 
 `preserve-history` is an explicit exception only: the integration branch keeps the development commits only when `Integration Strategy` is already `preserve-history` and the user explicitly chooses that history-preserving delivery before integration. The default path must not fall back to ordinary `git merge`, which can carry intermediate commits or an extra merge commit into formal history.
 
-Rework during validation follows the same conflict rule: the controller may decide fixes inside the existing DESIGN + Plan; any Plan or design change requires user confirmation first.
+Rework during validation follows the conflict rules above. For Proposal-driven work, implement the current user-authorized Proposal; update it first where possible for an explicit user decision, then coordinate the Plan and delivered artifacts. Legacy Plans and Issue-driven work retain their existing contract.
 
 After the user explicitly confirms validation and authorizes the corresponding closure, finish the selected formal integration path and run:
 

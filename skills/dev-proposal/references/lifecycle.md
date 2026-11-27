@@ -91,7 +91,7 @@ Archived: 2026-11-22
 
 ## 4. Body skeleton
 
-### `proposed/` (including `approved`) — future tense
+### `proposed/` (including `approved`) — target state
 
 Required sections, in this order:
 
@@ -105,7 +105,7 @@ Required sections, in this order:
 ```
 
 - `## Problem`: why this has to happen now. It must stand without the solution — a reader understands the pain before reading the proposal.
-- `## Proposal`: what changes. Future tense, migration steps, and open questions are all legitimate here because nothing has shipped.
+- `## Proposal`: the selected behavior and boundaries, in clear affirmative target-state prose in the user’s preferred language; resolve open decisions before approval.
 - `## Alternatives considered`: the other paths genuinely considered and why each lost.
 - `## Acceptance criteria`: the observable state that means done. Each entry must let a third party judge met or unmet.
 - `## Risks`: what could go wrong and what this knowingly gives up.
@@ -160,6 +160,10 @@ All four lifecycles require this section. Without the rejected paths recorded, s
 5. **Commit the approved Proposal before creating the delivery branch or worktree.** Commit it on the integration branch so it becomes part of the delivery baseline.
 
 Staying in `proposed/` is deliberate: during delivery, Plans and sibling proposals point at the original path, and moving it breaks them. Present-state `DESIGN.md` / `DESIGN-<module>.md` (including `## Reference Documents`) must never back-link to a proposal while it sits in `proposed/` or `rejected/`; DESIGN documents link only after it moves into `implemented/` (or sealed `archived/`).
+
+### Maintain an `approved` Proposal before acceptance
+
+Follow the pre-acceptance maintenance rules in SKILL.md. Integrate explicit user-authorized changes into the current Proposal preferably before code changes: scope, design, acceptance criteria and affected alternatives/risks. Retain its path, status and baseline. Replace superseded statements rather than append a process log. Automated implementation cannot change authorization autonomously.
 
 ### `approved` → `implemented`
 

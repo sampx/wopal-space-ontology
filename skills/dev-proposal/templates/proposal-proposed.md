@@ -8,7 +8,7 @@ Status: proposed
 <!--
   Usage: this template covers proposed/<class>/ and the approved state. Copy it to
   <proposals-root>/proposed/<class>/<yyyy-mm-dd-slug>.md and fill it in.
-  Write the body in the future tense: nothing has shipped yet.
+  Write in the user’s preferred language, in clear, concise, affirmative target-state prose. Integrate explicitly user-authorized changes into this file before acceptance; replace superseded content rather than append amendments.
   Expression standards live in dev-doc-master (references/consistency.md,
   references/design-project-guide.md).
   Do not record execution progress, task checkboxes, or ownership assignments here —
@@ -22,7 +22,7 @@ Status: proposed
 
 ## Proposal
 
-<!-- What changes. Future tense, migration steps, and open questions are all fine. -->
+<!-- What the chosen target does. State the behavior and boundaries affirmatively; resolve open decisions before approval. -->
 
 <!--
   Add bespoke sections as needed, for example:

@@ -215,7 +215,7 @@ A change that alters an external contract without updating the docs that describ
 
 1. Find where it is documented — `rg '<symbol>' docs/ README* AGENTS.md` and public docstrings.
 2. Check whether the diff updated those spots.
-3. Docs that now contradict the **design** (not merely a code detail) → WARNING (REVISE: update docs). Docs that simply do not mention an implementation detail are fine.
+3. Inconsistency between code and present-state DESIGN, DESIGN and rules, or affected rule tiers, or failure of their governing quality standards → BLOCKER. Proposal-target drift alone → WARNING. Unrequired internal implementation detail need not be documented.
 4. A project rule requiring docs to ship with code (stated in `AGENTS.md`) → violating it is BLOCKER, same as any stated constraint.
 
 Pure internal refactors with no contract change trigger nothing. Docs outside the repo you can see → `Needs Human`.
@@ -334,7 +334,7 @@ When the prompt carries an evolution proposal path, the change lands capability 
 | No invented structure | asset anatomy matches the platform's other assets (no rogue subdirs, no novel file types) |
 | Plain, precise language | an agent knows what to do after one read; jargon and machine prose are findings |
 
-Severity: violates a stated standard → **WARNING** (REVISE); asset cannot work as landed (missing frontmatter, references to files that do not exist) → **BLOCKER**.
+Use the severity rules in SKILL.md. Affected engineering rules violating their governing SOP or quality standards → **BLOCKER**; other capability assets violating mandatory standards or unable to work as landed → **BLOCKER**.
 
 This gate complements df-proposal-review, which checked the *stated* deliverable; this review checks the *landed* files.
 
@@ -354,17 +354,17 @@ This gate complements df-proposal-review, which checked the *stated* deliverable
 | Query executed, result discarded, static `{ ok: true }` returned | BLOCKER (Q1) |
 | Deletion of a helper that turns out to still be imported (build would catch) | no finding — CI owns build breakage |
 | Race between two async writes with a concrete interleaving | BLOCKER (Q3) |
-| Implementation works but violates a stated design constraint (module boundary, API contract written as "must") | BLOCKER (Q1 design conformance) |
+| Implementation works but differs from the Proposal target | WARNING (Q1 target drift; independent bugs or DESIGN/rule inconsistencies are BLOCKER) |
 | Implementation matches a tradeoff the design explicitly accepted (fixed short cache window, sequential execution, polling) and violates no clause | no finding — the design decided |
 | Implementation chose a shape the reviewer dislikes, but the design neither requires nor forbids it | no finding (Info at most, and usually stays in your notes) |
-| Change alters an API the docs describe, docs untouched in the diff | WARNING (Q4 documentation drift) |
+| Change alters a documented API, owning DESIGN left stale | BLOCKER (Q4 DESIGN sync) |
 | Early commit in a multi-commit delivery changes a public contract, owning DESIGN untouched across the delivery window, last commit clean | BLOCKER (doc-sync miss visible only against the full delivery baseline) |
-| Two places in the same doc contradict each other about the design | WARNING (Q4 documentation drift) |
+| Two places in the same DESIGN or rule contradict each other | BLOCKER (Q4 artifact consistency) |
 | New `retry.ts` added by this diff duplicates `src/lib/http.ts:88` backoff already in use | WARNING (Q4 — duplication introduced by the diff) |
 | Diff switches command from `lib/doctor.ts` to `lib/inspect.ts`; `lib/doctor.ts` and `tests/lib/doctor.test.ts` now have zero production callers | WARNING (Q4 `delete:` orphan created by diff) |
 | `package.json` lists `eventsource`; `rg 'eventsource' src/` finds zero imports (pre-existing, untouched) | INFO in Repo audit only; not in a change review |
 | `AbstractStore` with a single `FileStore` implementation (pre-existing, untouched) | INFO in Repo audit only; not in a change review |
-| Landed skill buries triggering conditions in body section 4 | WARNING (capability gate) |
+| Landed skill buries required trigger conditions in body | BLOCKER (mandatory capability standard) |
 | Landed skill's frontmatter lacks `description` | BLOCKER (capability gate) |
 | Design says unconfirmed quota exhaustion is transient rate limiting; implementation does that, but the reviewer thinks it should disable the account | `Design Feedback`, no verdict change |
 | Design never mentions an internal branch; implementation picked its own approach and left it untested | no finding — the design never promised that behavior |
@@ -484,7 +484,7 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 | Nothing beyond the approved scope | `git diff --name-status <base>...HEAD` vs the declared file/behavior scope; undeclared file changes or behavior shifts are findings |
 | Explicit exclusions respected | The proposal's exclusion list (e.g., "excludes layout changes") crossed by any hunk → Q1 scope violation |
 
-### Adversarial checklist — code → DESIGN/Proposal (Chain 2)
+### Adversarial checklist — code → DESIGN (Chain 2)
 
 | Check | Method |
 |---|---|
@@ -494,6 +494,10 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 | `--pure-refactor` reason honest | Diff the claimed-refactor files for any externally visible change (export surface, defaults, error contract); a visible change hidden behind the flag → BLOCKER |
 | Parallel write-set respected | Confirm the diff touches only authorized `DESIGN-<module>.md` files; any shared main `DESIGN.md` edit from a module worker → BLOCKER (violation of the stated write-set rule) |
 
+### DESIGN → engineering rules (Chain 3)
+
+Use the actual `space-master` and `dev-doc-master` quality standards. Inspect affected rules at project, module, directory, documentation and other applicable tiers, including unchanged rules invalidated by the delivery. Check agreement with code, present-state DESIGN, parent/child rules and all applicable mandatory SOP, language, reference and gate requirements. Any noncompliance is BLOCKER. Pure internal changes need no artificial document edits.
+
 ### Proposal lifecycle verification checklist
 
 | Check | Method |
@@ -501,7 +505,7 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 | Migration only after full delivery + acceptance | `proposals/implemented/` contains the proposal only when the diff covers the whole `Authorized scope` and the record carries user-acceptance evidence; partial delivery sitting in `implemented/` → BLOCKER |
 | Partial supersession cross-links | At full delivery, the new proposal names which old decisions it supersedes and the old record links back; missing either direction at full delivery → WARNING |
 | Full replacement disposal | Old record absorbed-and-deleted or moved to `archived/<class>/` with `Archived: YYYY-MM-DD` in the same delivery; neither → WARNING |
-| Old proposal untouched before full delivery | `git diff <base>...HEAD -- <old-proposal-path>` must be empty until full delivery; an early edit → BLOCKER (premature tampering) |
+| Current approved Proposal maintained before acceptance | Integrate explicit user-authorized changes into the current Proposal; missing sync alone → WARNING. Premature changes to the superseded historical `implemented/` record remain BLOCKER |
 | No demotion, no archive tampering | Any `implemented/` → `proposed/` move, or any content change under `archived/` → BLOCKER |
 
 ### Severity calibration for sync failures
@@ -513,5 +517,5 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 | `--pure-refactor` claimed but the diff changes an export, default, or error contract | BLOCKER (faked gate result) |
 | Parallel worker edited the shared main `DESIGN.md` | BLOCKER (write-set violation) |
 | New proposal migrated into `implemented/` while scope is partially delivered | BLOCKER (impersonated full delivery) |
-| Bidirectional cross-link missing at full-scope partial supersession | WARNING (fixable gap, core decision intact) |
-| Wording in the synced DESIGN slightly imprecise but factually correct | INFO |
+| Bidirectional cross-link missing at full-scope partial supersession | WARNING (Proposal maintenance gap; independent DESIGN/rule quality violation is BLOCKER) |
+| Wording in the synced DESIGN slightly imprecise but factually correct and quality-compliant | INFO |

@@ -116,7 +116,7 @@ Archiving inserts `Archived: YYYY-MM-DD` immediately below `Status: implemented`
 
 ### Body skeleton
 
-`proposed/` (including `approved`) uses the future-tense skeleton:
+`proposed/` (including `approved`) uses the target-state skeleton:
 
 ```markdown
 ## Problem
@@ -154,7 +154,13 @@ Expression standards — clarity, term consistency, no AI slop, `Source Carrier`
 
 The agent may lay **objective facts** in front of the user: how many repositories are involved, whether parallel work is needed, whether staged acceptance is required. **Never** substitute a subjective judgement ("this model is strong/weak enough", "this task is complex/simple") for the user's choice of path.
 
-A new decision or a material change to the authorized scope requires fresh user confirmation; an old approval does not cover a new scope.
+## Maintain the approved Proposal before acceptance
+
+The current user-approved Proposal is the sole target authority for a Proposal-driven delivery: design decisions, authorized scope and acceptance criteria. Automated implementation may not change them autonomously. An explicit user decision during post-implementation testing or validation, including added features, expanded scope or a changed direction, authorizes that adjustment. Resolve undecided questions with the user; do not ask for approval again when the decision is explicit.
+
+Integrate the decision into the existing scope, design, acceptance criteria and affected alternatives and risks, preferably before changing code; if already implemented, synchronize before delivery. Keep the file path, `Status: approved` and delivery baseline. The controller coordinates shared files and Plan write sets. Once accepted and moved to `implemented/`, the historical-decision rules below apply.
+
+Write in the user's preferred language, for the user, in concise, clear, affirmative target-state prose. Replace superseded statements in their existing sections; maintain a coherent proposal rather than appending amendments, parallel old/new designs or a change log. Git retains the editing history.
 
 ## Workflow
 

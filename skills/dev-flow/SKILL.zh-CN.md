@@ -41,7 +41,9 @@ description: >
 
 ## DESIGN, Plan, implementation
 
-**层级固定为：DESIGN → 已批准 Plan → 实现。**
+**提案驱动的 Plan：已批准 Proposal → Plan → 实现 → 现状 DESIGN → 各层级规约。** Plan 只组织任务；目标、范围、设计与验收来自 Proposal。用户在验证阶段明确授权调整时，由主控按 `dev-proposal` 优先更新当前提案，并协调 Plan 任务及 AC，再按 `df-implement` 实施和同步成果；不重复审批，不改变 Plan 状态机。
+
+以下 DESIGN → 已批准 Plan → 实现 的约束仅适用于保留旧合同的进行中 Plan、以及既定设计内的 Issue 路线，不要求提案驱动交付提前改现状 DESIGN。
 
 - DESIGN 定义目标状态。
 - Plan 把已经定案的设计转成具体实施 Task，明确这次交付的边界和可观察的行为验收。
@@ -223,6 +225,8 @@ flow.sh complete <plan>
 
 ## Conflicts and rework
 
+提案驱动交付的返工以当前 Proposal 为依据，按本技能前述授权规则及 `df-implement` 的成果同步顺序执行。以下 DESIGN + Plan 分类用于旧合同和 Issue 路线。
+
 实施或验证中出现 Plan、DESIGN 与代码现实不一致时，主控者先判断问题属于哪一类：
 
 - **实现问题**：现有 DESIGN + 已批准 Plan 已经给出答案 → 在原边界内修代码并重新验证。
@@ -259,7 +263,7 @@ flow.sh complete <plan>
 
 `preserve-history` 只是明确例外：只有 `Integration Strategy` 已写明 `preserve-history`，并且用户在集成前明确选择保留开发历史时，正式分支才保留多条开发提交。默认流程不能退回普通 `git merge`，因为那会把中间开发提交或额外 merge commit 带进正式分支。
 
-验证期间需要返工时仍遵守上一节的冲突规则：能在现有 DESIGN + Plan 内解决，由主控者决定返工；需要改 Plan 或设计，先让用户确认。
+验证期间返工遵守本节冲突规则。提案驱动的交付按当前用户授权的 Proposal 实施；需要调整目标时先取得用户明确决定，优先维护提案，再协调 Plan 和实施成果。旧 Plan 和 Issue 路线沿用原合同。
 
 用户明确确认验证通过并授权相应收尾后，按所选模式完成正式集成，并执行：
 

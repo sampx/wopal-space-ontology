@@ -2,13 +2,13 @@
 name: df-implement
 description: >
   编写或修改代码与测试，把已批准的 Proposal（direct 交付）、明确 Issue 或已批准 Plan 任务落地为真实交付，
-  并在同一交付内同步所属模块现状 DESIGN、业务 Proposal 与机械门禁证据。动手写代码、修 bug、补测试、
+  并在同一交付内同步业务 Proposal、现状 DESIGN、各层级规约与机械门禁证据。动手写代码、修 bug、补测试、
   在隔离工作树实施，或作为被委派的实施 Agent 时加载本技能。实施前设计方案评审不归本技能管。
 ---
 
 # df-implement — Implementation Discipline
 
-你现在承担的是**编码实施工作**。目标是在既有设计和任务边界内，用最精简、可靠、可验证的代码改动完成交付，并让代码、测试与所属模块现状 DESIGN 在同一交付里保持一致。
+你现在承担的是**编码实施工作**。目标是在既有设计和任务边界内，用最精简、可靠、可验证的代码改动完成交付，并让代码、测试、现状 DESIGN 与各层级规约在同一交付里保持一致。
 
 ## Authorized input sources
 
@@ -18,11 +18,11 @@ description: >
 |---|---|---|
 | 已批准 Proposal（`Delivery: direct`） | 提案路径、`Status: approved` 及其记录的 `Authorized scope` | 提案中批准的授权范围 |
 | 明确 Issue | 既定设计内缺陷/任务的 Issue 描述 | Issue 描述本身 |
-| Plan Task（可选） | 已批准 Plan 中的任务及其 `Design Source`、AC 与约束 | Plan 任务定义 |
+| Plan Task（可选） | 已授权的任务、来源及 AC 与约束 | 来源授权范围内的任务定义 |
 
-按你实际持有的授权路由——提案记录的 metadata、Issue 原文或 Plan 任务定义，绝不按文档名或文件名猜来源。如果说不清这次改动由哪个授权覆盖，先停下来问主控者，再动手写代码。
+提案驱动交付以当前已批准 Proposal 为唯一目标依据，Plan 只组织实施；Issue 在既定设计内授权任务。按实际来源路由，不按文件名猜测。如果说不清这次改动由哪个授权覆盖，先停下来问主控者，再动手写代码。
 
-**进行中的旧 Plan** 保持原有合同：DESIGN 定目标，已批准的 Plan 定本次范围，编码负责把事做成。不得按新的现状文档规范追溯改写旧 Plan 或其任务；只有 Plan 本身已经要求时，才对它套用新的同步纪律。
+**进行中的旧 Plan** 保持原有合同：DESIGN 定目标，已批准的 Plan 定本次范围，编码负责把事做成。不得按新的现状文档规范追溯改写旧 Plan 或其任务；保留旧目标合同，但本次受影响成果仍须符合适用的现状文档与规约质量要求。
 
 ## direct mode starts in an isolated worktree
 
@@ -37,11 +37,15 @@ description: >
 
 隔离分支起点就是整次交付的基线；在报告中记为 `<delivery-base>`，交给交付门禁和实施评审使用。
 
-## Sync the owning module DESIGN at delivery
+## 同步交付成果
 
-项目/模块现状 DESIGN（`DESIGN.md` / `DESIGN-<module>.md`）只写代码里已真实交付的行为。因此当本次改动改变对外可见行为、公开接口、生效业务规则、默认值或失败边界，或发现现有 DESIGN 写错时，**按需加载 `dev-doc-master`** 同步所属模块的 `DESIGN-<module>.md`，让文档在同一次交付里跟上代码；不写未来才交付的功能。纯内部重构不改对外行为，不动 DESIGN。
+按以下顺序完成同一交付：
 
-**并行写集纪律**：并行任务或分支中，只能修改授权写集内所属模块的 `DESIGN-<module>.md`；严禁越界修改共享主 `DESIGN.md` 或他人模块的文档。在实施中发现写集之外的文档过时或写错时，不要动手改——写进交付报告的 `DESIGN Sync` 块上报主控者处理。
+1. 实施代码、测试并验证提案目标。
+2. 对照实际实现，加载 `dev-doc-master` 同步受影响的项目/模块现状 DESIGN。它描述已实现的行为，不提前写目标；纯内部重构且现状描述无变化时不改 DESIGN。
+3. 加载 `space-master` 审查受影响的各层级规约（项目、模块、目录、文档等），依据实际设计修正过时约束、加固必要的长期规则。所有受影响文档和规约都必须符合各自技能 SOP、质量要求及相互一致性；不为形式完整制造改动。
+
+并行任务只修改授权写集内的成果；共享主 DESIGN、共享规约和提案由主控协调。写集外的问题上报主控，交付前收口。
 
 ## Mechanical gates at the delivery exit
 
@@ -59,7 +63,7 @@ python3 <skill-dir>/dev-doc-master/scripts/verify-docset.py <docs-dir> --main DE
 - `--check-sync` 是文档门禁的开关，任何受治理的交付（含纯内部重构）都必须带上它：`--pure-refactor` 只在 `--check-sync` 开启时才被校验器识别，单独传它等于没跑门禁。纯内部重构不改文档时，运行 `--check-sync --base <delivery-base> --pure-refactor "<reason>"`——门禁照常执行，`--pure-refactor` 只为代码变更免除 DESIGN 同步要求并留下理由供评审审计。拿它搪塞实际改了对外行为的交付会被评审按违约处理。
 - 不修改 `verify-docset.py` 本身，也不另造替代工具；校验失败就回去补文档，不是改脚本来让检查变绿。
 
-**Proposal 门禁** — 涉及业务 Proposal 生命周期时，**按需加载 `dev-proposal`** 并运行：
+**Proposal 门禁** — 涉及业务 Proposal 内容或生命周期时，**按需加载 `dev-proposal`** 并运行：
 
 ```bash
 python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...
@@ -75,14 +79,14 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 - 普通代码改动造成路径/符号/默认值漂移但原决定未变时，同一交付里原地同步受影响 `implemented/` 提案中的事实引用。
 - **严禁**把 `implemented/` 回退成 `proposed/`，严禁解冻或修改 `archived/`。这些动作只能由新提案走正式流程完成。
 
-**AGENTS 维护** — 本次交付留下新的长期工程约束（操作命令、验证入口、目录纪律）时，**按需加载 `space-master`** 审计或更新对应层级的 `AGENTS.md`；一次性实现细节不要写进去。测试遵循常驻的 `rules/testing.md`，不在本技能内另立测试规则。
+**规约门禁** — 对受影响的各级规约执行 `space-master` 规定的适用质量检查和校验，报告真实结果。测试遵循常驻的 `rules/testing.md`。
 
 ## Read before writing
 
 动手前读清：
 
 - 当前任务要求和验收标准；
-- Task 的 `Design Source`（如有），并确认引用的 DESIGN 状态为 `Status: Active`；
+- Task 的授权来源及 `Design Source`（如有，旧 Plan 仍检查其 Active 合同）；
 - direct Proposal 或 Issue：提案的 `Authorized scope` 及其引用的 DESIGN 与约束；
 - Task 的 `Pre-read`、`Interface`、`Constraints`（如有）；
 - 相关调用链和调用方；
@@ -112,7 +116,7 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 不能自行改变：
 
-- DESIGN / `Design Source` 定义的目标和架构约束；
+- 已批准 Proposal 的目标、设计决定、授权范围和验收要求；旧 Plan 或 Issue 路线的既定设计约束；
 - 已批准 Plan 的功能行为、范围、边界、接口和验收标准；
 - 用户明确要求的内容。
 
@@ -131,26 +135,11 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 - Plan 没点名某个测试，但代码暴露出真实边界漏洞：补上测试，并在报告中说明。
 - 新增或升级依赖：先说明现有能力为什么不够用，并在报告中明确列出。
 
-### Stop on conflict
+### 授权冲突和用户调整
 
-如果 `Design Source` 指向的 DESIGN 不是 `Active`，或者授权来源（Proposal/Issue/Plan）、Active DESIGN 与实际代码互相矛盾，不要现场改设计，也不要擅自改 Plan、Proposal 或设计文档去迁就代码。授权范围缺失或本次改动需要越过批准边界时，同样停下来交回决策，不要自行扩张或填补。
+自动化实施发现目标、范围或验收要求需要变更时，停止受影响的工作，向主控或用户说明具体冲突和影响，取得决定后继续。现状 DESIGN 与预期新行为不同并非冲突；它应在代码实现后同步。旧 Plan 的前置设计合同仍按原约定处理。
 
-带着冲突的 Plan 条目、设计依据和 `file:line` 代码位置停下来，把决策交回**主控者（delegator）**：
-
-- 有委派人（delegator）→ 上报并等待决定；
-- 你自己就是主控者 → 切回主控流程做决定。
-
-统一使用这个简短格式报告：
-
-```text
-STOP
-Task: <任务>
-Found: <冲突内容 + file:line 证据>
-Impact: <为什么当前任务无法继续>
-Awaiting: <需要主控者拍板的决定>
-```
-
-是否修改已批准的 Plan、Proposal 或 DESIGN，不属于实施阶段的自主权限。提案的 `Authorized scope`、计划期标题与批准决定在实施期间一律只读。
+用户在测试、验证中明确授权的调整，按 `dev-proposal` 的验收前维护规则优先融入当前提案再实施，已实施的调整在交付前补齐。委派任务由主控协调提案和共享文档的写入；不重新申请已经明确的批准，也不新增流程状态。
 
 ## TDD
 
@@ -222,7 +211,7 @@ DESIGN Sync:
   Worktree: <所用工作树与分支；direct 默认隔离树，Plan 委派写主控指派的树>
   Delivery base: <覆盖整次交付的基线（隔离分支起点或 Delivery Base Commit）；单次未提交改动写 working tree>
   Gates: <verify-docset.py --check-sync --base <base> 的实跑结论（纯重构加 --pure-refactor 理由）；涉 Proposal 加 verify-proposals.py 实跑结论>
-  Docs synced: <更新的所属模块 DESIGN-<module>.md 与对应代码事实；纯内部重构写 none（理由已随 --pure-refactor 记在 Gates）>
+  Docs synced: <同步的 Proposal、现状 DESIGN、各层级规约及对应事实；无变更则说明原因>
   Drift report: <写集外发现的文档漂移，只上报不改；无则写 none>
 ```
 
@@ -230,4 +219,4 @@ DESIGN Sync:
 
 ## Decisions outside implementation
 
-在本技能下，不要自行拍板产品需求、扩大既定范围、改写已批准的 Plan/DESIGN/Proposal，或自己给自己下最终审查通过结论。被委派执行时，也不要自行 git commit 或改写 Plan 状态；把代码和验证证据交回主控者即可。委派实施的 Agent 只提交代码、测试、授权写集内的文档改动和验证证据，不做审批、不自签 Task 完成、不写 Plan Done 记录——记录由主控者核验后统一写回。
+在本技能下，不要自行拍板产品需求、扩大既定范围、改写已批准的目标或验收要求，或自己给自己下最终评审通过结论。被委派执行时，也不要自行 git commit 或改写 Plan 状态；把代码和验证证据交回主控者即可。委派实施的 Agent 只提交代码、测试、授权写集内的文档改动和验证证据，不做审批、不自签 Task 完成、不写 Plan Done 记录——记录由主控者核验后统一写回。

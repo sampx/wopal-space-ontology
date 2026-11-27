@@ -215,7 +215,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 
 1. 找出文档里写它的地方——`rg '<symbol>' docs/ README* AGENTS.md` 以及公开的注释文档。
 2. 检查本次 diff 有没有同步更新这些文档。
-3. 文档与设计冲突（不是与代码冲突）→ **WARNING**（REVISE：补齐文档更新）。文档只是没提到某个实现细节，不算问题。
+3. 现状 DESIGN 与代码、规约与 DESIGN 或各级规约之间不一致，或受影响的 DESIGN、规约违反各自技能质量要求 → **BLOCKER**。只存在提案目标偏差 → **WARNING**。未要求记载的内部实现细节不算缺漏。
 4. 如果项目守则（如 `AGENTS.md`）明确规定"改代码必须同步改对应文档" → 违反直接标 **BLOCKER**。
 
 纯粹的内部重构、对外行为毫无变化的，不需要改文档。如果文档在当前仓库之外看不到 → 列入 `Needs Human`。
@@ -335,7 +335,7 @@ diff 非空即漂移，是否算缺陷按 `SKILL.md`（`## 项目守则评审`�
 | 目录结构守规矩 | 目录和文件命名与其他技能保持一致，不自创奇怪的子目录或文件格式 |
 | 说人话、指令明确 | 无论是人还是 Agent，读一遍就能明白具体步骤；满篇技术黑话、翻译腔或模棱两可的表述直接作为问题报出 |
 
-严重度：违反上述规范要求 → **WARNING**（REVISE）；落地后根本无法正常工作（如缺 frontmatter、引用的文件不存在）→ **BLOCKER**。
+严重度按 SKILL.md 统一判定；受影响的规约违反权威 SOP 或质量要求 → **BLOCKER**。其他能力资产违反强制标准或无法正常工作 → **BLOCKER**。
 
 这项检查与 `df-proposal-review` 前后呼应：提案评审查的是**计划写得对不对**，这里查的是**实际写出来的文件合不合格**。
 
@@ -355,17 +355,17 @@ diff 非空即漂移，是否算缺陷按 `SKILL.md`（`## 项目守则评审`�
 | 数据库查询执行了，但返回结果被丢弃，直接返回写死的 `{ ok: true }` | BLOCKER（Q1 假实现） |
 | 删掉了一个还在被别处 import 的函数（编译或打包会直接报错） | 不报——编译报错归 CI 管 |
 | 两个异步写操作存在明确的交错覆盖场景 | BLOCKER（Q3 并发竞态） |
-| 代码能跑通，但违反了设计文档明确写死的边界约束（标了"必须/严禁"的规则） | BLOCKER（Q1 违反设计约束） |
+| 代码正常，但与提案目标有偏差 | WARNING（Q1 目标偏差；若另有真实缺陷或现状 DESIGN/规约不一致，按该缺陷 BLOCKER） |
 | 代码实现了一种设计文档明确接受的取舍（如固定的短缓存窗口、顺序执行、轮询），且没有违背任何设计条款 | 不报——设计已拍板 |
 | 代码用了一种评审员不喜欢的写法，但设计既没规定也没禁止 | 不报（最多 Info，且通常只在报告外记下） |
-| 改了文档里明确描述的接口参数或行为，但 diff 里没改文档 | WARNING（Q4 文档未同步） |
+| 修改已记录的接口，所属现状 DESIGN 未同步 | BLOCKER（Q4 DESIGN 同步） |
 | 多提交交付中早期提交改了公开契约，所属 DESIGN 整个交付窗口未动，最后一次提交干净 | BLOCKER（只有对着完整交付基线 diff 才能发现的漏同步） |
-| 文档与设计条款互相矛盾（同一篇文档里两种说法） | WARNING（Q4 文档未同步） |
+| 同一现状 DESIGN 或规约的两处描述互相矛盾 | BLOCKER（Q4 成果一致性） |
 | 本次改动新增的 `retry.ts` 与项目已有的 `src/lib/http.ts:88` 退避重试逻辑重复 | WARNING（Q4 重复造轮子） |
 | Diff 把命令从调 `lib/doctor.ts` 改成调 `lib/inspect.ts`，导致 `lib/doctor.ts` 和 `tests/lib/doctor.test.ts` 在生产代码中变成 0 引用 | WARNING（Q4 `delete:` 本次改动留下的孤儿代码与测试） |
 | `package.json` 里装着 `eventsource`，但 `rg 'eventsource' src/` 显示 0 引用（历史遗留，本次没动） | Repo audit 模式才报 INFO；变更评审不报 |
 | 定义了 `AbstractStore` 接口，但全项目只有一个 `FileStore` 实现（历史遗留，本次没动） | Repo audit 模式才报 INFO；变更评审不报 |
-| 新落地的技能把触发条件藏在正文第 4 节，没写进 `description` | WARNING（能力资产规范） |
+| 落地技能将必需触发条件藏在正文里 | BLOCKER（强制能力规范） |
 | 新落地的技能文件头缺少 `description` 字段 | BLOCKER（能力资产规范） |
 | 担心改完后的界面样式好不好看 | 列入 `Needs Human`（请人眼确认） |
 | "要是让我写，我会换一种模块划分方式" | 个人偏好，不报错 |
@@ -485,7 +485,7 @@ git diff --name-status
 | 没有超出批准范围的夹带 | `git diff --name-status <base>...HEAD` 对照声明的文件与行为范围；未声明的文件改动或行为变化都是问题 |
 | 明确排除项未被越过 | 提案的排除清单（如"不含布局改动"）被任何一个代码块越过 → Q1 范围违约 |
 
-### Adversarial checklist — code → DESIGN/Proposal (Chain 2)
+### Adversarial checklist — code → DESIGN (Chain 2)
 
 | 核查点 | 方法 |
 |---|---|
@@ -495,6 +495,10 @@ git diff --name-status
 | `--pure-refactor` 理由诚实 | 对声称纯重构的文件 diff 检查有无对外可见变化（导出面、默认值、错误契约）；藏着行为变化的 → BLOCKER |
 | 并行写集未越界 | 确认 diff 只碰授权写集内的 `DESIGN-<module>.md`；模块实施者改了共享主 `DESIGN.md` → BLOCKER（违反成文写集规则） |
 
+### 现状 DESIGN → 各层级规约（第三链）
+
+读取 `space-master` 和 `dev-doc-master` 的实际质量标准。检查受影响的项目、模块、目录、文档等规约，包括未修改但已因交付失效的规则；核查与代码、现状 DESIGN、父子级规约的一致性、全部适用的强制 SOP、语言、引用和门禁。任何不符合均为 BLOCKER。纯内部改动不强制制造文档变更。
+
 ### Proposal lifecycle verification checklist
 
 | 核查点 | 方法 |
@@ -502,7 +506,7 @@ git diff --name-status
 | 全交付且有用户验收才迁移 | `proposals/implemented/` 里出现该提案的前提是 diff 覆盖全部 `Authorized scope` 且记录带用户验收证据；部分交付躺在 `implemented/` → BLOCKER |
 | 部分替代双向互链 | 全交付时新提案写明替代了老决策的哪些部分、老记录链回新提案；全交付时缺任一方向 → WARNING |
 | 完全替代当场处置 | 老记录被吸收删除或迁入 `archived/<class>/`（带 `Archived: YYYY-MM-DD`）且发生在同一交付；都没做 → WARNING |
-| 全交付前老提案不被触碰 | `git diff <base>...HEAD -- <老提案路径>` 在全交付前必须为空；提前被改 → BLOCKER（提前篡改） |
+| 未验收的当前提案维护 | 用户明确授权的调整融入原提案；单纯漏同步 → WARNING。被替代的历史 `implemented/` 提案提前改动仍为 BLOCKER |
 | 不回退、不解冻 | 任何 `implemented/` → `proposed/` 的回退，或 `archived/` 下任何内容改动 → BLOCKER |
 
 ### Severity calibration for sync failures
@@ -514,5 +518,5 @@ git diff --name-status
 | 声称 `--pure-refactor`，但 diff 改了导出、默认值或错误契约 | BLOCKER（伪造门禁结论） |
 | 并行实施者改了共享主 `DESIGN.md` | BLOCKER（越界） |
 | 范围只交付了一部分就迁入 `implemented/` | BLOCKER（冒充全交付） |
-| 全交付时部分替代的双向互链缺一边 | WARNING（可修复缺口，核心决定未变） |
-| 同步后的 DESIGN 措辞略欠精确但事实正确 | INFO |
+| 全交付时部分替代的双向互链缺一边 | WARNING（提案维护缺口；若导致现状 DESIGN/规约违反质量要求则 BLOCKER） |
+| 同步后的 DESIGN 措辞略欠精确但事实正确且符合质量要求 | INFO |

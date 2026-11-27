@@ -1,7 +1,7 @@
 # DESIGN — Coding Workflow
 
 > **Status**: Active
-> **Updated**: 2026-11-23
+> **Updated**: 2026-11-27
 > **Parent**: `./DESIGN.md`（ontology overall design: Module Architecture section）
 > **Parent Architecture**: `../../docs/products/wopal-space/DESIGN.md`
 > **Parent Product**: `../../docs/products/wopal-space/PRD.md`
@@ -15,7 +15,7 @@
 已落地的能力分三层：
 
 - **文档底座** `dev-doc-master`：产品 PRD、产品 DESIGN、项目/模块现状 DESIGN 的写作与确定性校验，是正文表达标准的**唯一**来源。
-- **决定记录** `dev-proposal`：业务/项目 Proposal 的创建、批准记录、生命周期迁移、已实施决策的再变更分流，配套确定性校验器 `verify-proposals.py` 与薄命令 `/cupdate-proposal`。
+- **决定记录** `dev-proposal`：业务/项目 Proposal 的创建、批准记录、验收前授权调整维护、生命周期迁移、已实施决策的再变更分流，配套确定性校验器 `verify-proposals.py` 与薄命令 `/cupdate-proposal`。
 - **实施前评审** `df-proposal-review`：对 Plan、本体进化提案、业务 Proposal、设计文档的独立只读评审，三种模式分流。
 
 实施与实施后评审两个流程技能的**现状契约**（授权输入、隔离工作树入口、交付门禁、对抗式评审范围）也由本模块描述：
@@ -41,10 +41,18 @@
 | `dev-doc-master` | 编写、更新、按模块拆分或校验 PRD、产品 DESIGN、项目/模块现状 DESIGN | `/cupdate-prd`、`/cupdate-design` | `skills/dev-doc-master/scripts/verify-docset.py` |
 | `dev-proposal` | 创建或修订 Proposal、判断是否需要 Proposal、记录批准与 `Delivery`、迁移或归档已交付决策 | `/cupdate-proposal` | `skills/dev-proposal/scripts/verify-proposals.py` |
 | `df-proposal-review` | 实施前独立只读评审 Plan、本体进化提案、业务 Proposal、设计文档 | 无独立命令，由请求方直接加载 | 复用上述两个脚本，自身不带脚本 |
-| `df-implement` | 实施已批准 Proposal（`Delivery: direct`）、明确 Issue 或 Plan Task：写代码、测试并同步所属模块 DESIGN 与 Proposal | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
-| `df-implement-review` | 实施后独立只读评审：对照授权来源与完整交付基线 diff 核查代码、测试、DESIGN 与 Proposal 同步 | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
+| `df-implement` | 实施已批准 Proposal（`Delivery: direct`）、明确 Issue 或 Plan Task：实施代码、测试，维护 Proposal 并依次同步现状 DESIGN 与各层级规约 | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
+| `df-implement-review` | 实施后独立只读评审：对照授权来源与完整交付基线 diff 核查提案目标、代码与测试、现状 DESIGN 和各级规约 | 无独立命令，由请求方直接加载 | 复用上述两个校验器，自身不带脚本 |
 
 五个技能都随 `coding` 类型装配单分发（`assembly/archetypes/coding.yaml` 的 `skills` 与 `commands` 段）。装配单引用任一不存在的能力会让空间装配 fail closed，因此挂载与资产必须同批落地。
+
+### `df-proposal-review` 评审契约
+
+业务 Proposal 评审决策、可行性与验收；Plan 评审当前授权目标的实施覆盖和任务衔接，不重复审批已认可决定；文档评审区分产品前瞻规划与项目/模块现状。提案驱动 Plan 以当前 Proposal 为目标依据，现状 DESIGN 用于核实现有事实。旧 Plan 与 Issue 路线保留原合同。
+
+评审先核查实质，再复用适用机械门禁。错误方案、关键目标或验收缺失、未授权的 Plan 范围、虚假证据，以及受评审现状 DESIGN 或各级规约违反权威技能 SOP、质量要求或相互不一致，判为 Blocker；非关键验证缺口、已授权调整尚未同步提案或有证据的冗余成本判为 Warning；合理技术建议为 Info。未验证事项不冒充缺陷或已通过。
+
+报告与实施评审采用相同的简明结构：用户偏好语言、范围与结论、问题位置、依据和影响、修正要求、验收方式；Info、积极发现和建议合计最多一两句话。评审只读，不授权实施或审批。
 
 ### `df-implement` 实施契约
 
@@ -52,8 +60,8 @@
 
 - **授权输入**：已批准 Proposal（`Delivery: direct`，按其 `Authorized scope`）、明确 Issue、可选 Plan Task 三选一；按实际持有的授权路由，不按文件名猜来源。
 - **隔离入口**：`direct` 交付默认先加载 `git-worktrees` 创建隔离工作树与功能分支再编码，严禁默认直改主分支；仅用户显式要求或主控已指派工作树时免建。隔离分支起点即 `<delivery-base>`。
-- **同交付同步**：对外可见行为、公开接口、生效业务规则、默认值或失败边界变化时按需加载 `dev-doc-master` 同步所属模块 `DESIGN-<module>.md`；纯内部重构不动 DESIGN。涉及业务 Proposal 时按需加载 `dev-proposal` 执行生命周期迁移与互链；留下新长期工程约束时按需加载 `space-master`。并行任务只改授权写集内的模块子 DESIGN，越界漂移在报告中上报。
-- **交付出口门禁**：文档目录受 `dev-doc-master` 治理时运行 `verify-docset.py --check-sync --base <delivery-base>`（从项目工作树根目录执行，脚本路径按技能实际安装位置解析；跨多提交或独立分支必须传覆盖整次交付的基线；`--check-sync` 对所有受治理交付必开，纯内部重构以附加在 `--check-sync` 上的 `--pure-refactor "<reason>"` 免除 DESIGN 同步要求留痕待审，不能单独替代门禁）；涉及 Proposal 时运行 `verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...`。校验失败回去补文档，不修改校验器。
+- **同交付同步**：Proposal 是提案驱动交付的唯一目标依据，Plan 组织实施。用户在测试或验证中明确授权的调整按 `dev-proposal` 优先融入当前提案。代码和测试实施验证后，调用 `dev-doc-master` 同步实际变化的项目/模块现状 DESIGN，再按 `space-master` 审查、同步和加固受影响的项目、模块、目录、文档等各级规约。纯内部改动无需制造文档变更。并行任务只改授权写集，主控协调共享成果。
+- **交付出口门禁**：文档目录受 `dev-doc-master` 治理时运行 `verify-docset.py --check-sync --base <delivery-base>`（从项目工作树根目录执行，脚本路径按技能实际安装位置解析；跨多提交或独立分支必须传覆盖整次交付的基线；`--check-sync` 对所有受治理交付必开，纯内部重构以附加在 `--check-sync` 上的 `--pure-refactor "<reason>"` 免除 DESIGN 同步要求留痕待审，不能单独替代门禁）；涉及 Proposal 内容或生命周期时运行 `verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...`，各级规约执行 `space-master` 的适用检查。校验失败修正成果，不修改校验器。
 - **交付报告**：沿用 `Done` / `Touched` / `Verified` / `AC Commands` / `Skipped` / `Notes/deviations` 字段，必填 `DESIGN Sync` 块（Worktree / Delivery base / Gates / Docs synced / Drift report 五个子字段）；缺块或空块的报告按未完成退回。
 - **边界**：实施者不 commit、不审批、不写 Plan Done、不自签验收；进行中旧 Plan 保持原有合同不被追溯改写。
 
@@ -62,11 +70,11 @@
 评审技能同样无自有状态机，只读。它的现状契约：
 
 - **评审范围**：覆盖整次交付基线的完整 `git diff <delivery_base>...HEAD`，与交付出口 `--check-sync --base` 检查同一范围；只有单次未提交改动可直接用 `git diff`。多提交交付只审最后一个提交是评审失效的头号形态。
-- **对抗式双向核验**：授权来源 → 实际代码（批准范围全交付、无夹带、排除项未被越过）；实际代码 → 所属模块 DESIGN 与 Proposal（契约变化都有同步、DESIGN 描述与真实行为一致、`DESIGN Sync` 块声明实测可复现、`--pure-refactor` 理由诚实）。
-- **Proposal 生命周期核查**：全交付且有用户验收才迁入 `implemented/`；部分替代全交付时双向互链；完全替代当场吸收删除或归档冻结；提前改老提案、回退 `implemented/`、改动 `archived/` 均为 Blocker。
-- **文档质量标准**：直接引用 `dev-doc-master` 的 5 项必填覆盖要素、新人测试、证据审查与 Slop Checklist，不另建第二套文档标准。
-- **严重度校准**：按真实影响分级——交付不完整、行为错误、契约变动漏更 DESIGN、虚假 `--pure-refactor`、越界改共享文档、未全交付提前迁移、回退/篡改冻结记录判 Blocker；轻微说明偏差与局部补链遗漏判 Warning；措辞瑕疵判 Info。
-- **不变部分**：Q1–Q4 四问题、报告结构、PASS/REVISE/BLOCK 裁决、2 轮收敛目标、只读原则全部保留。
+- **三段核验**：当前授权 Proposal → 代码及测试，代码 → 项目/模块现状 DESIGN，DESIGN → 各级规约；检查受影响但未更新的文档/规约，核实 `DESIGN Sync` 的真实证据和 `--pure-refactor` 理由。
+- **Proposal 生命周期核查**：全交付且有用户验收才迁入 `implemented/`；部分替代全交付时双向互链；完全替代当场吸收删除或归档冻结；未验收的当前提案融入用户明确授权的调整；提前改被替代的历史提案、回退 `implemented/`、改动 `archived/` 均为 Blocker。
+- **质量标准**：现状 DESIGN 按 `dev-doc-master` 审核；各级规约按 `space-master` 审核，不复制两套底座的细则。
+- **严重度**：单纯提案目标偏差为 Warning；真实 Bug、回归、安全缺陷、虚假证据、代码与现状 DESIGN 不一致、DESIGN 与规约或规约之间不一致，以及任一受影响 DESIGN/规约违反适用技能 SOP 和质量要求，均为 Blocker。历史保护和写集违规仍阻断。技术取舍与选型建议为 Info，不冒充缺陷。
+- **报告**：Q1–Q4 检查、PASS/REVISE/BLOCK、只读与两轮收敛目标保持；默认简报使用用户偏好语言，按位置、问题、修复要求、验收组织发现，Info、积极发现和技术建议合计最多一两句话，披露未覆盖范围。
 
 ### 路由契约
 
@@ -151,6 +159,10 @@ proposed ──用户批准──▶ approved ──批准范围全交付且用�
 - `plan` — 启用可选 `dev-flow` 拆解 Plan/Task，隔离工作树与共享 Delivery 由 `dev-flow` 管理。
 
 Agent 可以陈述客观事实（涉及几个仓库、是否需要并行、是否需分批验收）帮助选择，不能以主观判断替代用户决策。
+
+### 验收前的授权调整
+
+已批准但未验收的 Proposal 是当前交付目标、设计决定、范围和验收要求的唯一来源。自动化实施不自行改目标；用户参与测试、验证时明确授权的新增、扩围或方向调整，优先在代码变更前融入原提案，已经实施的在交付前补齐。提案以用户偏好语言、正向肯定的目标态写作，原地替换失效内容并同步授权范围、验收、备选理由及风险，保持状态、路径、基线不变，不重复审批。共享成果由主控协调。
 
 ### 已实施决策的再变更
 

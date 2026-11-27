@@ -3,8 +3,8 @@ name: df-implement
 description: >
   Write or update code and tests to deliver an approved Proposal (direct
   delivery), an explicit Issue, or an approved Plan task as a real delivery,
-  syncing the owning module present-state DESIGN, business Proposal, and
-  mechanical gate evidence in the same delivery. Load when writing code,
+  syncing the business Proposal, present-state DESIGN, engineering rules at
+  all tiers, and mechanical gate evidence in the same delivery. Load when writing code,
   fixing bugs, adding tests, implementing in an isolated worktree, or acting
   as a delegated implementation agent. Pre-implementation design review does
   not belong here.
@@ -12,7 +12,7 @@ description: >
 
 # df-implement — Implementation Discipline
 
-You are doing **implementation work**. Deliver the requested change with the smallest reliable, verifiable code change that stays inside the design and task boundaries, keeping code, tests, and the owning module present-state DESIGN consistent within one delivery.
+You are doing **implementation work**. Deliver the requested change with the smallest reliable, verifiable code change that stays inside the design and task boundaries, keeping code, tests, present-state DESIGN and all affected engineering rules consistent within one delivery.
 
 ## Authorized input sources
 
@@ -22,11 +22,11 @@ This skill accepts exactly one of three authorized sources and binds to no Plan 
 |---|---|---|
 | Approved Proposal (`Delivery: direct`) | The proposal path, its `Status: approved`, and its recorded `Authorized scope` | The scope the proposal's approval covers |
 | Explicit Issue | An issue describing a defect or task inside a settled design | The issue description itself |
-| Plan Task (optional) | A task inside an approved Plan, with its `Design Source`, ACs, and constraints | The Plan task definition |
+| Plan Task (optional) | An authorized task, its source, ACs and constraints | Task definition within its source authorization |
 
-Route by the authorization you actually hold — the proposal's recorded metadata, the issue text, or the Plan task definition — never by guessing from file or document names. If you cannot say which authorization covers this change, stop and ask the controller before writing code.
+For a Proposal-driven delivery, the current approved Proposal is the sole target authority; Plans organize execution. An Issue authorizes a task within settled design. Route by the actual source, never by guessing from file names. If you cannot say which authorization covers this change, stop and ask the controller before writing code.
 
-**Plans already in flight** keep their existing contract: DESIGN defines the target, the approved Plan defines the delivery scope, implementation builds it. Do not retroactively rewrite an in-flight Plan or its tasks to the present-state documentation rules; apply the new sync discipline to a Plan only when that Plan itself asks for it.
+**Plans already in flight** keep their existing contract: DESIGN defines the target, the approved Plan defines the delivery scope, implementation builds it. Do not retroactively rewrite an in-flight Plan or its tasks to the present-state documentation rules; retain the legacy target contract, while applying the applicable present-state documentation and rule quality requirements to affected artifacts.
 
 ## direct mode starts in an isolated worktree
 
@@ -41,11 +41,15 @@ Skip creating a new worktree in exactly two cases:
 
 The isolation branch's starting point is the delivery baseline; record it as `<delivery-base>` in your report and hand it to the delivery gate and the implementation review.
 
-## Sync the owning module DESIGN at delivery
+## Synchronize delivery artifacts
 
-Project and module present-state DESIGNs (`DESIGN.md` / `DESIGN-<module>.md`) describe only behavior that is really delivered in code. When your change alters externally visible behavior, public interfaces, effective business rules, defaults, or failure boundaries — or you find an existing DESIGN written wrong — **load `dev-doc-master` on demand** and sync the owning module's `DESIGN-<module>.md` in the same delivery; never document features not yet delivered. Pure internal refactors change no external behavior and touch no DESIGN.
+Complete the following in one delivery, in order:
 
-**Parallel write-set discipline**: in parallel tasks or branches, edit only the `DESIGN-<module>.md` files inside your authorized write set; never cross into the shared main `DESIGN.md` or another agent's module docs. When you find out-of-scope docs stale or wrong during implementation, do not touch them — report them in the delivery report's `DESIGN Sync` block for the controller to coordinate.
+1. Implement code and tests and verify the authorized target.
+2. Load `dev-doc-master` and synchronize affected project/module present-state DESIGNs with the actual implementation. They describe implemented behavior, not future targets. Pure internal changes that leave the documented facts intact need no DESIGN edit.
+3. Load `space-master` to audit affected rules at every applicable tier (project, module, directory, documentation, etc.), correcting stale constraints and strengthening necessary durable rules against the resulting design. All affected documents and rules must meet their owning skill's SOP and quality standards and agree with one another; do not manufacture edits for ceremony.
+
+Parallel tasks only edit artifacts inside their authorized write set. The controller coordinates shared main DESIGNs, shared rules and Proposals. Report out-of-set drift for resolution before delivery.
 
 ## Mechanical gates at the delivery exit
 
@@ -63,7 +67,7 @@ python3 <skill-dir>/dev-doc-master/scripts/verify-docset.py <docs-dir> --main DE
 - `--check-sync` is the doc gate's switch: every governed delivery carries it, including pure internal refactors. `--pure-refactor` is recognized by the checker only when `--check-sync` is on — passing it alone runs no gate at all. For a pure internal refactor that touches no docs, run `--check-sync --base <delivery-base> --pure-refactor "<reason>"`: the gate executes as usual, and `--pure-refactor` only exempts the code change from the DESIGN-sync requirement while putting the reason on record for review. Using it to wave through a delivery that actually changed external behavior is treated as a contract violation in review.
 - Do not modify `verify-docset.py` itself and do not build a substitute; when the check fails, go back and fix the docs — not the script.
 
-**Proposal gate** — when the delivery touches business Proposal lifecycle, **load `dev-proposal` on demand** and run:
+**Proposal gate** — when the delivery touches business Proposal content or lifecycle, **load `dev-proposal` on demand** and run:
 
 ```bash
 python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [--link-scope <docs-dir>]...
@@ -79,14 +83,14 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 - Ordinary code changes that drift paths/symbols/defaults without changing the decision: sync the affected fact references inside `implemented/` in place, in the same delivery.
 - **Never** demote `implemented/` back to `proposed/`, never unfreeze or modify `archived/`. Those moves belong to a new proposal through the formal flow.
 
-**AGENTS maintenance** — when the delivery leaves a new durable engineering constraint (operating commands, verification entries, directory discipline), **load `space-master` on demand** to audit or update the corresponding `AGENTS.md` tier; one-off implementation details do not belong there. Testing follows the resident `rules/testing.md`; this skill adds no testing rules of its own.
+**Rules gate** — apply the applicable `space-master` quality checks and verifiers to affected rules at all tiers and report actual results. Testing follows the resident `rules/testing.md`.
 
 ## Read before writing
 
 Before editing, understand:
 
 - the current task and acceptance criteria;
-- the Task's `Design Source` when present, confirming every cited DESIGN is `Status: Active`;
+- the Task's authorizing source and `Design Source` when present (legacy Plans retain the Active DESIGN contract);
 - for a direct Proposal or Issue: the proposal's `Authorized scope` and the DESIGNs and constraints it cites;
 - the Task's `Pre-read`, `Interface`, and `Constraints` when present;
 - the relevant call path and callers;
@@ -116,7 +120,7 @@ When your change replaces or removes a function call, a module import, or a pack
 
 Do not autonomously change:
 
-- the target or architecture constraints defined by DESIGN / `Design Source`;
+- the approved Proposal target, decisions, authorized scope and acceptance criteria; the settled design constraints of an Issue or legacy Plan;
 - the behavior, scope, boundaries, interfaces, or acceptance criteria of an approved Plan;
 - anything the user explicitly required.
 
@@ -135,26 +139,11 @@ A few easy-to-misjudge boundaries:
 - The Plan did not name a test, but the code reveals a real edge case: add the test and report it.
 - Adding or upgrading a dependency: first explain why existing capability is not enough, and list it explicitly in the report.
 
-### Stop on conflict
+### Authorization conflicts and user adjustments
 
-If a DESIGN cited by `Design Source` is not `Active`, or the authorized source (Proposal/Issue/Plan), Active DESIGN, and actual code conflict with each other, do not redesign on the fly and do not edit the Plan, Proposal, or design documents to make implementation fit. Missing scope authorization or a change that would cross the approved boundary is the same: stop and return the decision instead of expanding or filling in on your own.
+If automated implementation needs a change to the target, scope or acceptance criteria, stop affected work, explain the concrete conflict and impact to the controller or user, and resume after the decision. Present-state DESIGN differing from the intended new behavior is not a conflict; synchronize it after implementation. Legacy Plans retain their prior design-source contract.
 
-Stop with the relevant Plan text, design basis, and `file:line` evidence, then return the decision to the **controller/delegator**:
-
-- if there is a delegator, report it and wait;
-- if you are also the controller, switch back to the controlling workflow and decide there.
-
-Use this minimal report format:
-
-```text
-STOP
-Task: <task>
-Found: <conflict + file:line evidence>
-Impact: <why the current task cannot continue>
-Awaiting: <controller/delegator decision>
-```
-
-Whether an approved Plan, Proposal, or DESIGN should change is not an implementation-level decision under this skill. A proposal's `Authorized scope`, planning-time headings, and approval decisions stay read-only throughout implementation.
+For explicit user-authorized adjustments during testing or validation, follow the pre-acceptance maintenance rules in `dev-proposal`: integrate the decision into the current Proposal preferably before implementation, or before delivery if already implemented. The controller coordinates Proposal and shared document edits in delegated work. Do not ask for approval again or add workflow states.
 
 ## TDD
 
@@ -225,8 +214,8 @@ Do not replace commands and results with “should be fine” or “tests are gr
 DESIGN Sync:
   Worktree: <worktree and branch used; the default isolation tree for direct, the controller-assigned tree for Plan>
   Delivery base: <Git baseline covering the whole delivery (isolation branch start or Delivery Base Commit); a single uncommitted change says working tree>
-  Gates: <verify-docset.py --check-sync --base <base> real result (pure refactors add the --pure-refactor reason); plus verify-proposals.py real result when a Proposal was touched>
-  Docs synced: <updated owning DESIGN-<module>.md files and the code facts they now carry; for pure internal refactors say none (the reason is already recorded with --pure-refactor in Gates)>
+  Gates: <verify-docset.py --check-sync --base <base> real result (pure refactors add the --pure-refactor reason); plus verify-proposals.py real result when a Proposal was touched, and applicable rule quality checks>
+  Docs synced: <synchronized Proposal, present-state DESIGNs, rules at all affected tiers, and corresponding facts; explain when no change is needed>
   Drift report: <documentation drift found outside the write set, reported not edited; none if nothing found>
 ```
 
@@ -234,4 +223,4 @@ Three typical fills: a direct isolated delivery records the worktree, the branch
 
 ## Decisions outside implementation
 
-Do not decide product requirements, expand approved scope, rewrite an approved Plan/DESIGN/Proposal, or issue the final review verdict while acting under this skill. When delegated by a controlling workflow, also do not commit code or update Plan/progress records; return the implementation and evidence to the controller. Stop and return higher-level decisions to the controlling workflow. A delegated implementation agent submits code, tests, documentation changes inside the authorized write set, and verification evidence — never approvals, never a self-signed task completion, never Plan Done records; the controller verifies and writes those back.
+Do not autonomously decide product requirements, expand approved scope, rewrite approved targets or acceptance requirements, or issue the final review verdict while acting under this skill. When delegated by a controlling workflow, also do not commit code or update Plan/progress records; return the implementation and evidence to the controller. Stop and return higher-level decisions to the controlling workflow. A delegated implementation agent submits code, tests, documentation changes inside the authorized write set, and verification evidence — never approvals, never a self-signed task completion, never Plan Done records; the controller verifies and writes those back.

@@ -31,7 +31,7 @@ Then run commands. Do not alternate between reading and verifying — each retur
 
 ## 2. Plan mode — Q1: Do the parts fit together?
 
-Needs the artifact only. Run it right after reading — pure mechanics, and it catches the most common cross-task defect class.
+Start with the artifact, then verify producers provided by existing code, dependencies and interfaces where needed.
 
 ### 2.1 Expected file scope (no audit)
 
@@ -46,12 +46,12 @@ The `## Affected Files` table is the expected footprint, not a contract; the imp
 
 1. Walk the Tasks in order. Collect code-like backticked names a task *uses*: function calls, upper-snake constants, exported types, fixtures, CLI flags, env vars.
 2. Collect the names each task *declares*: "register X", "create Y", "export Z".
-3. Match each used name to a producer: a producer exists, spelling matches exactly, the producer's Task precedes the consumer's.
+3. Match each used name to an existing source or producer Task: spelling matches, and any required new producer Task precedes the consumer.
 4. When a task registers a *set* of names, verify every name used elsewhere appears in that set.
 
 | Condition | Severity |
 |---|---|
-| Used name with no producer anywhere | BLOCKER |
+| New symbol with neither an existing source nor a producer Task | BLOCKER |
 | Producer name differs from the consumer's expected name | BLOCKER |
 | Producer sits in a later wave than its consumer | BLOCKER |
 | Producer exists but its export/registration site is unstated and matters to wiring | WARNING |
@@ -69,13 +69,13 @@ The `## Affected Files` table is the expected footprint, not a contract; the imp
 
 - Declared wave/dependency order must match the dependency table: no consumer before its producer.
 - Declared execution mode must match reality: sequential waves tolerate same-wave overlap; claimed parallel waves require disjoint files.
-- No task depends on an artifact the Plan never schedules for creation.
+- A required artifact already exists, has a viable acquisition path, or is produced by an earlier Task.
 
 ---
 
 ## 3. Plan mode — Q2: Are its statements about the repo true?
 
-The repo is the only authority. Check each claim mechanically — never wave one through because it looks right.
+The repository is evidence of current facts; current user authorization governs the target. Verify material factual claims, not the old present-state DESIGN as a new Proposal target.
 
 ### 3.1 Command cookbook
 
@@ -108,13 +108,13 @@ Line anchors locate code; they are not contracts. Probe the anchor and read a fe
 3. For each decision, find the governing statement in the authorities and compare.
 4. Classify divergence: **Acknowledged** (stated and justified → not a finding), **Deferred** (explicitly out of scope with a reason → not a finding), **Silent** (→ finding).
 
-Judgement note: not every document statement is binding — older docs may describe a superseded model. Establish which document is authoritative *for the model this artifact implements* before calling a conflict.
+For Proposal-driven Plans, the current authorized Proposal governs the target; present-state DESIGN describes the system before the change. An authorized new target differing from current DESIGN is expected. Legacy Plans and Issues retain their contract. Plans cannot autonomously override genuine safety/engineering rules; necessary rule maintenance follows implementation and DESIGN sync.
 
 ---
 
 ## 4. Plan mode — Q3: Will executing it deliver the goal?
 
-Needs the artifact only (plus goal decomposition — zero repo commands).
+Trace current authorized goals through real entry points, call paths, failures and acceptance; do not trust the artifact’s own coverage claims alone.
 
 ### 4.1 Goal covered
 
@@ -131,7 +131,7 @@ Split `## Goal` into independently meaningful parts; find the Task(s) delivering
 
 ### 4.3 ACs that can fail
 
-For each AC: if the feature were broken, would this check catch it? An AC asserting file existence where behavior is the claim proves nothing; one that merely repeats the task title proves less. An AC that cannot catch a broken implementation is WARNING — `plan check` checks whether a command is filled in; you check whether the AC actually proves anything.
+For each AC: if the feature were broken, would this check catch it? An AC asserting file existence where behavior is the claim proves nothing; one that merely repeats the task title proves less. A critical AC that cannot catch a broken implementation is BLOCKER; noncritical verification gaps are WARNING — `plan check` checks whether a command is filled in; you check whether the AC actually proves anything.
 
 ### 4.4 Handoff possible
 
@@ -173,7 +173,7 @@ Any new third-party dependency in the Plan needs a stated reason the ladder cann
 | Same logic in a shorter form | INFO |
 | Style or naming preference | not a finding |
 
-Q4 never blocks: the fix is shrinking the Plan, and lean findings are judgement calls, not execution failures. Report the total as `net: -N lines, -M dependencies possible` in the report Summary; nothing to cut → `Lean already`.
+Leanness alone never blocks; report evidenced needless cost as Warning and technical preferences only as useful suggestions. No mandatory line or dependency reduction estimates.
 
 ### Evolution-proposal capability gate
 
@@ -184,7 +184,7 @@ On top of Q1–Q4, an ontology evolution proposal's deliverable must satisfy the
 - scripts/ holds only deterministic, reusable logic
 - no invented structure beyond the platform's asset anatomy
 
-Violation → WARNING. This gate checks the *proposal's stated deliverable*; the implementation review (df-implement-review) re-checks the landed files.
+A proposal explicitly requiring a deliverable that violates a mandatory standard → BLOCKER. Unspecified implementation details are not findings. This gate checks the stated deliverable; implementation review checks landed files.
 
 ---
 
@@ -206,10 +206,10 @@ Approval trail:
 | `Status: approved`, plus `Approved` with a date and a person | plausible authorization; still confirm the conversation, never the file alone |
 | `Authorized scope` names concrete inclusions **and** exclusions | usable scope |
 | `Authorized scope` says "everything", repeats the title, or names a topic with no edge | scope absent → WARNING, or BLOCKER when a Task depends on the missing edge |
-| Scope grew after approval with no fresh confirmation | unapproved at the new size → BLOCKER |
+| Substantive adjustment after approval lacks user authorization | unapproved new scope → BLOCKER; explicit user authorization not yet integrated into current Proposal → WARNING |
 | `Status: approved` with no approval block | the verifier catches the shape; report it as unauthorized content, not a formatting nit |
 
-**Do not accept a valid format as proof of approval.** The verifier checks that the fields exist and read correctly. Only the conversation establishes that a human granted them. When the review has no access to that conversation, say so under `Unverified` rather than assuming either way.
+**Do not accept a valid format as proof of approval.** The verifier checks that the fields exist and read correctly. Only the conversation establishes that a human granted them. When the authorization evidence is unavailable, disclose it in other notes rather than assuming either way. Before acceptance, integrate explicit user-authorized adjustments under dev-proposal without duplicate approval.
 
 ### 6.2 P2 — Do the stated facts hold?
 
@@ -233,9 +233,9 @@ The mechanical part (does the file's `Status` match its directory, is the skelet
 
 ### 6.4 P4 — Can it be falsified?
 
-Apply the "if it were broken, would this catch it" test to every acceptance criterion. Then check the risk section: a named risk with no bound and no observation method cannot be managed, and a decision with no revisit signal cannot be corrected later.
+Apply the "if it were broken, would this catch it" test to every acceptance criterion. Then check the risk section: verify the impact, necessary controls and observation for material risks; do not demand fabricated numeric thresholds or revisit signals for every risk.
 
-Partial-delivery discipline: a proposal in `proposed/` with `Status: approved` is legitimately partial. The finding is the opposite — claiming the approved scope is complete when the evidence shows a subset, or presenting a partial scope in the wording of full delivery.
+Partial-delivery discipline: a proposal in `proposed/` with `Status: approved` may be unimplemented, partially delivered or awaiting acceptance. The finding is the opposite — claiming the approved scope is complete when the evidence shows a subset, or presenting a partial scope in the wording of full delivery.
 
 ### 6.5 P5 — Is this the lean decision?
 
@@ -276,7 +276,7 @@ Read for: contradictions between sections; terms used before definition or used 
 | Internal contradiction on a load-bearing statement | BLOCKER |
 | Undefined term with real ambiguity | WARNING |
 | Component or state introduced without an owner | WARNING |
-| Structure drift the gate script already catches | report only if the gate was not run |
+| Applicable DESIGN or rule fails mandatory structure/quality gate | BLOCKER; reuse actual results and avoid duplicate findings |
 
 ### D2 — Are its statements about reality true?
 
@@ -291,8 +291,8 @@ Same mechanical probes as Q2 (command cookbook, revision discipline, anchor drif
 | Condition | Severity |
 |---|---|
 | Claim the code contradicts on a load-bearing path | BLOCKER |
-| Stale claim with no effect on decisions | WARNING |
-| Process-state narration (doc-master set) | WARNING |
+| Stale fact in present-state DESIGN or conflict with applicable rules | BLOCKER; noncritical Proposal fact drift is graded by impact |
+| Module DESIGN violates governing present-state writing requirements | BLOCKER |
 | Cosmetic drift | INFO |
 
 ### D3 — Is the goal sound?
@@ -318,9 +318,9 @@ Every feature, section, and abstraction earns its place against the goal:
 - boilerplate structure the template suggested but the content does not need
 - configuration surfaces with no reader
 
-Template conformance is not a goal — structure serves the document's content, not the other way around. Severity: same table as Q4 (WARNING cap, INFO for shorter forms), with `net: -N sections possible` in place of the line count where applicable.
+Template conformance is not a goal — structure serves the document's content, not the other way around. Pure leanness follows Q4; violations of mandatory DESIGN or rule quality standards → BLOCKER. No mandatory reduction counts.
 
-### Writing style gate (both modes)
+### Writing style gate (all modes)
 
 The artifact's language is part of its quality: plain, concrete, one idea per sentence, affirmative over negative, ownership over exclusion. This gate flags:
 
@@ -328,7 +328,7 @@ The artifact's language is part of its quality: plain, concrete, one idea per se
 - machine-sounding prose (nominalization stacks, passive voice chains)
 - negative definitions ("X does not do Y") where ownership ("Y is owned by Z") says it better
 
-Severity: a paragraph a reader must decode twice → **WARNING**; isolated awkward phrasing → **INFO**. For skill deliverables in evolution proposals, the bar is explicit: description and body must be plain and precise enough that an agent knows what to do after one read.
+Severity: material writing defects impairing proposal comprehension → **WARNING**; isolated phrasing → **INFO**. A reviewed present-state DESIGN or rule violating governing skill quality requirements → **BLOCKER**. For skill deliverables in evolution proposals, the bar is explicit: description and body must be plain and precise enough that an agent knows what to do after one read.
 
 ---
 
@@ -338,12 +338,12 @@ Four classes, defined by what the reader should do:
 
 | Class | Meaning | Test to apply |
 |---|---|---|
-| **BLOCKER** | Executing or adopting as written will fail, violate a contract, under-deliver the goal, or silently rewrite a closed decision | "If this ships, is it broken or dishonest?" |
-| **WARNING** | Execution succeeds but the artifact is unsafe, bloated, ambiguous, or unverified where it should be verified | "Will this cost rework, bloat, or hide a gap?" |
+| **BLOCKER** | Wrong design, missing key goal/acceptance, unauthorized planned scope, false evidence, historical tampering, present-state DESIGN/rule inconsistency or mandatory quality violation | Apply SKILL.md to the actual defect |
+| **WARNING** | Correct delivery is feasible, but noncritical ambiguity, verification gaps or evidenced unnecessary cost remain | Apply SKILL.md; real security defects and mandatory quality violations do not downgrade |
 | **INFO** | Improvement worth knowing, no action required | "Would a reasonable author shrug?" |
 | **Unverified** | Claim could not be settled from the workspace | "Could I not check this?" |
 
-Blockers and Warnings also pass an impact gate: they must name a **concrete trigger → concrete failure, rework, or verification hole**. “It is not ready yet,” “it is not committed yet,” or “the final environment is not provisioned yet” is insufficient by itself.
+Blockers and Warnings require concrete evidence and impact; a mandatory document/rule quality violation is itself blocking evidence and needs no invented runtime failure. “It is not ready yet,” “it is not committed yet,” or “the final environment is not provisioned yet” is insufficient by itself.
 
 Deliberately absent: **size/count thresholds**. Task count, file count, wave count, document length are never defects. Context budget is managed per task; a large cohesive artifact is normal.
 
@@ -351,24 +351,24 @@ Deliberately absent: **size/count thresholds**. Task count, file count, wave cou
 
 | Situation | Correct verdict |
 |---|---|
-| Task references a function no other task creates | BLOCKER (Q1) |
+| Task references a nonexistent function with no viable producer | BLOCKER (Q1) |
 | Task registers 5 error codes, a later task uses a 6th | BLOCKER (Q1) |
 | Anchor `file.ts:964` lands at 967 on the described function | no finding |
 | A DESIGN / Plan change is uncommitted, unpushed, or unmerged during review, while current working-tree content is available | no finding; review the current content |
 | Current DESIGN changes are not in HEAD, so a future approve-created worktree would not see them yet | no finding; later lifecycle execution gate, not a proposal defect |
 | An AC requires final validation on a real Linux host and explicitly remains unchecked without that evidence; the current development machine has no Linux host | no finding (Execution dependency) |
-| Plan contradicts a design doc it also cites, without acknowledgement | WARNING (Q2) |
-| Plan contradicts a design doc and states "this supersedes §X of doc Y" | no finding |
+| Plan contradicts a key behavior or authorization of the current approved Proposal | BLOCKER (pre-implementation target/scope error) |
+| Authorized new Proposal target differs from existing present-state DESIGN | no finding; synchronize artifacts after implementation |
 | Reduction to "v1" where `D-04` sanctions the static layer | no finding (Q3) |
 | Reduction to "v1" where `D-04` says "config displays calculated costs" | BLOCKER (Q3) |
 | Plan adds `fast-xml-parser` while stdlib ships no XML parser and none is installed | no finding (Q4 — rung 5 legitimately holds) |
 | Plan adds a new utility module duplicating `src/lib/hash.ts:12` | WARNING (Q4 — rung 2) |
 | Plan creates `AbstractStore` with a single `FileStore` implementation | WARNING (Q4 — rung 1) |
 | Design doc's §2 says the scheduler owns retries; §5 hand-wires a retry loop in the worker | BLOCKER (D1 — load-bearing contradiction) |
-| Module DESIGN narrates "the old monolith path is deprecated" | WARNING (D2 — present-state violation) |
+| Module DESIGN violates governing present-state writing requirements | BLOCKER (D2 — document quality) |
 | Product DESIGN describes a planned capability as future work, clearly marked as not yet shipped | no finding (product intent) |
 | Main DESIGN has no `Sub-DESIGNs` header, sub-DESIGNs link back via `Parent` and are reachable from the module map | no finding (correct structure) |
-| Sub-DESIGN exists on disk but only the header names it | WARNING (D1 — orphan) |
+| Sub-DESIGN exists on disk but only the header names it | BLOCKER (D1 — mandatory structure gate) |
 | Business Proposal changes a shipped default and opens a new `proposed/` record naming the superseded decision | no finding (correct partial supersession) |
 | Business Proposal edits an `implemented/` record in place to change a default | BLOCKER (P3 — decision rewritten) |
 | Business Proposal claims the approved scope is complete while a Task-level AC shows a subset | BLOCKER (P4 — partial presented as complete) |
@@ -376,7 +376,7 @@ Deliberately absent: **size/count thresholds**. Task count, file count, wave cou
 | Plan derived from an approved Proposal includes a Task outside the authorized scope | BLOCKER (scope exceedance) |
 | Business Proposal has `Status: approved` and a well-formed approval block; the conversation granting it was not available to the reviewer | `Unverified`, not a finding |
 | Design doc's goal is "improve developer experience" with no observable outcome | BLOCKER (D3 — undecidable goal) |
-| Proposal deliverable is a skill whose body buries triggering conditions in section 4 | WARNING (capability gate) |
+| Proposal explicitly requires mandatory triggers buried in the skill body rather than description | BLOCKER (mandatory capability standard) |
 | Proposal body uses "leverage synergistic alignment layers" | WARNING (style gate) |
 | A concern you could not check for lack of a sandbox | `Unverified`, never a finding |
 
@@ -469,10 +469,10 @@ fix: "keep it in proposed/ with Status: approved until every consumer is migrate
 
 An approved Proposal authorizes "scheduled CSV export for two reporting tables, `Delivery: plan`". The derived Plan splits the work into four Tasks, uses a different scheduler library than the Proposal sketched, and adds a lock file the Proposal never mentioned.
 
-**Correct handling**: no finding on the library choice (internal approach) and no finding on the lock file (it protects the approved behaviour). The review checks only that every Task stays inside the two-table scope and that the scope is fully covered. Emit `PASS` with `Positive Findings` noting both checks.
+**Correct handling**: no finding on the library choice (internal approach) and no finding on the lock file (it protects the approved behaviour). The review checks only that every Task stays inside the two-table scope and that the scope is fully covered. Emit `PASS` with a brief statement of both checks.
 
 ### Example H — Correctly NOT reporting a finding (size and dependency admission)
 
 Six tasks, 11 Affected Files rows, four waves; a `D-10` states "single-Plan delivery, not split by task count; tasks are mutually dependent; context budget is managed per task". The Plan also adds a new dependency, with a paragraph naming the stdlib options it considered and why each falls short.
 
-**Correct handling**: no finding on size (size is not a defect), and no finding on the dependency (rung admission was explicitly satisfied). Report both under Positive Findings if useful.
+**Correct handling**: no finding on size (size is not a defect), and no finding on the dependency (rung admission was explicitly satisfied). Report both briefly in other notes if useful.
