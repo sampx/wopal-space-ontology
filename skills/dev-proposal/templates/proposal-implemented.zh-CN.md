@@ -8,7 +8,7 @@ Status: implemented
 - **Authorized scope**: <批准范围，含明确排除项>
 - **Delivery**: <direct | plan>
 
-<!-- 迁移时 Proposal 改为 Decision；验收实际结果与重要剩余代价写入 Consequences。保留设计依据、原决策及必要理由。 -->
+<!-- 迁移时 Proposal 改为 Decision；保留设计依据、原决策及必要理由。Consequences 只写仍约束将来工作的实质性遗留风险与代价：不写验收流水账、不抄测试或门禁结果、不复述交付内容。 -->
 
 ## Problem
 
@@ -28,4 +28,4 @@ Status: implemented
 
 ## Consequences
 
-<!-- 实际交付结果、验收证据及重要收益和代价。 -->
+<!-- 只写仍约束将来工作的实质性遗留风险与代价。 -->

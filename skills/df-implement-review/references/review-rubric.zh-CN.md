@@ -512,7 +512,7 @@ git diff --name-status
 
 | 核查点 | 方法 |
 |---|---|
-| 全交付且有用户验收才迁移 | `proposals/implemented/` 里出现该提案的前提是 diff 覆盖全部 `Authorized scope` 且记录带用户验收证据；部分交付躺在 `implemented/` → BLOCKER |
+| 全交付且有用户验收才迁移 | `proposals/implemented/` 里出现该提案的前提是 diff 覆盖全部 `Authorized scope` 且迁移前已取得用户验收（提交历史、交付报告或记录本身任一可查即可）；部分交付躺在 `implemented/` → BLOCKER |
 | 部分替代双向互链 | 全交付时新提案写明替代了老决策的哪些部分、老记录链回新提案；全交付时缺任一方向 → WARNING |
 | 完全替代当场处置 | 老记录被吸收删除或迁入 `archived/<class>/`（带 `Archived: YYYY-MM-DD`）且发生在同一交付；都没做 → WARNING |
 | 未验收的当前提案维护 | 用户明确授权的调整融入原提案；单纯漏同步 → WARNING。被替代的历史 `implemented/` 提案提前改动仍为 BLOCKER |

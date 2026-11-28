@@ -511,7 +511,7 @@ Use the actual `space-master` and `dev-doc-master` quality standards. Inspect af
 
 | Check | Method |
 |---|---|
-| Migration only after full delivery + acceptance | `proposals/implemented/` contains the proposal only when the diff covers the whole `Authorized scope` and the record carries user-acceptance evidence; partial delivery sitting in `implemented/` → BLOCKER |
+| Migration only after full delivery + acceptance | `proposals/implemented/` contains the proposal only when the diff covers the whole `Authorized scope` and user acceptance happened before migration (visible in commit history, delivery report, or the record itself); partial delivery sitting in `implemented/` → BLOCKER |
 | Partial supersession cross-links | At full delivery, the new proposal names which old decisions it supersedes and the old record links back; missing either direction at full delivery → WARNING |
 | Full replacement disposal | Old record absorbed-and-deleted or moved to `archived/<class>/` with `Archived: YYYY-MM-DD` in the same delivery; neither → WARNING |
 | Current approved Proposal maintained before acceptance | Integrate explicit user-authorized changes into the current Proposal; missing sync alone → WARNING. Premature changes to the superseded historical `implemented/` record remain BLOCKER |

@@ -127,7 +127,7 @@ Archived: 2026-11-22
 - `## Migration plan`
 - `## Acceptance criteria`
 
-已实施记录描述已交付的决定。保留设计依据和重要决策理由；将原验收标准的实际结果及重要剩余代价写入 `## Consequences`。
+已实施记录描述已交付的决定。保留设计依据和重要决策理由。`## Consequences` 只写仍约束将来工作的实质性遗留风险与代价；它不是验收流水账，不抄测试或门禁结果，也不复述交付内容。
 
 ### `rejected/`
 
@@ -159,7 +159,7 @@ Archived: 2026-11-22
 
 1. 移动到 `implemented/<class>/`，文件名不变。
 2. `Status` 改为 `implemented`。
-3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；实际验收结果及重要剩余代价写入 `## Consequences`，删除计划期标题，保留设计依据和重要决策。
+3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；实质性遗留风险与代价写入 `## Consequences`，删除计划期标题，保留设计依据和重要决策。
 4. 正文转现在时，删掉"计划""待定""v1 先这样"这类计划期表述。
 5. 同交付同步受影响的现状 DESIGN（`DESIGN.md` / `DESIGN-<module>.md`），补上 `## Key Decisions` 的相对链接。
 6. 修好所有指向旧路径的入链。

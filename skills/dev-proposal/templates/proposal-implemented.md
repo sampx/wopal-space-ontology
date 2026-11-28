@@ -8,7 +8,7 @@ Status: implemented
 - **Authorized scope**: <approved scope including explicit exclusions>
 - **Delivery**: <direct | plan>
 
-<!-- On migration, rename Proposal to Decision; record actual acceptance results and material residual costs in Consequences. Retain design basis, original decisions, and necessary rationale. -->
+<!-- On migration, rename Proposal to Decision; retain design basis, original decisions, and necessary rationale. Consequences records only material residual risks and costs that still constrain future work: no acceptance logs, test or gate results, or restated delivery. -->
 
 ## Problem
 
@@ -28,4 +28,4 @@ Status: implemented
 
 ## Consequences
 
-<!-- Actual delivery results, acceptance evidence, and material benefits and costs. -->
+<!-- Only the material residual risks and costs that still constrain future work. -->

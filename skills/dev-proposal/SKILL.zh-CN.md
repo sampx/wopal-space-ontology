@@ -150,7 +150,7 @@ Proposal（提案）记录本次变更的**确定目标方案、重要决策和�
 
 ### 验收后迁移
 
-仅当批准范围全部交付并经用户验收时，迁入 implemented，改 Status，使用 `templates/proposal-implemented.md`：Proposal → Decision，实际验收结果和重要剩余代价归 Consequences，保留 Design Basis 与有价值的决策理由，清除计划期标题及表述。
+仅当批准范围全部交付并经用户验收时，迁入 implemented，改 Status，使用 `templates/proposal-implemented.md`：Proposal → Decision，保留 Design Basis 与有价值的决策理由。`## Consequences` 只写仍约束将来工作的实质性遗留风险与代价，不写验收记录、测试或门禁结果，不复述交付内容；清除计划期标题及表述。
 
 同一交付同步受影响的现状 DESIGN 和术语表，DESIGN 的 Key Decisions 链接已实施记录；修复所有旧路径入链。部分交付保持 approved。单个 Plan 完成不能触发整个 Proposal 迁移。
 

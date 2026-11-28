@@ -127,7 +127,7 @@ Forbidden headings (their presence is a format error):
 - `## Migration plan`
 - `## Acceptance criteria`
 
-An implemented record describes delivered decisions. Retain the design basis and important decision rationale; write actual acceptance results and material residual costs into `## Consequences`.
+An implemented record describes delivered decisions. Retain the design basis and important decision rationale. `## Consequences` records only the material residual risks and costs that still constrain future work; it is not an acceptance log, does not copy test or gate results, and does not restate what was delivered.
 
 ### `rejected/`
 
@@ -159,7 +159,7 @@ Preconditions: the approved scope is **fully** delivered and the user has accept
 
 1. Move to `implemented/<class>/` without renaming.
 2. Set `Status` to `implemented`.
-3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; put actual acceptance results and material residual costs in `## Consequences`, remove planning-era headings, and retain the design basis and important decisions.
+3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; put the material residual risks and costs in `## Consequences`, remove planning-era headings, and retain the design basis and important decisions.
 4. Convert the prose to the present tense; remove "planned", "pending", "v1 for now".
 5. Sync the affected present-state DESIGN (`DESIGN.md` / `DESIGN-<module>.md`) in the same delivery and add the relative link under `## Key Decisions`.
 6. Repair every inbound link pointing at the old path.

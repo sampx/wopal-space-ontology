@@ -154,7 +154,7 @@ Integrate changes into the existing scope, design basis, target solution, accept
 
 ### Migrate after acceptance
 
-Only after full approved delivery and user acceptance, move to implemented, change Status and use `templates/proposal-implemented.md`: Proposal → Decision, actual acceptance results and residual costs → Consequences, preserving Design Basis and important rationale. Remove planning-era headings and prose.
+Only after full approved delivery and user acceptance, move to implemented, change Status and use `templates/proposal-implemented.md`: Proposal → Decision, preserving Design Basis and important rationale. `## Consequences` carries only the material residual risks and costs that still constrain future work — never acceptance logs, test or gate results, or restated delivery. Remove planning-era headings and prose.
 
 In the same delivery, synchronize affected present-state DESIGNs and glossary, link the implemented record from DESIGN's Key Decisions, and repair inbound links. Partial delivery stays approved. Completing one Plan cannot migrate the entire Proposal.
 
