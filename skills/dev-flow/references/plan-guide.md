@@ -29,7 +29,7 @@ Use exact technical terms where precision matters — especially `Design Source`
 
 ## Plan must derive from an authorized target
 
-Choose `Design Source` under SKILL.md's authorization and delivery rules: a Proposal-derived Plan cites the current approved Proposal's relevant target sections and unchanged governing DESIGN/companion contracts; work within settled design cites applicable Active DESIGN and the authorized Issue or user scope. PRD and Phase supply context, constraints, and traceability, not direct implementation authorization. Every Task names the concrete decision/contract it implements using space-relative paths and headings; list multiple sources when needed. Use N/A only for simple work with no project and no design basis.
+Choose `Design Source` under SKILL.md's authorization and delivery rules: a Proposal-derived Plan cites the current approved Proposal's relevant target sections and unchanged governing DESIGN/companion contracts; an Issue-derived Plan cites the authorized Issue scope and applicable Active DESIGN. PRD and Phase supply context, constraints, and traceability, not direct implementation authorization. Every Task names the concrete decision/contract it implements using space-relative paths and headings; list multiple sources when needed. Use N/A only for simple work with no project and no design basis.
 
 Derive Tasks from the authorized target against real code and entry paths. Map every material changed contract to an implementation owner and falsifiable AC, including affected existing invariants. A document gate does not prove runtime behavior. Unapproved proposals and Draft/Proposed DESIGNs are research references, not target authority.
 

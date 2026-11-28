@@ -39,9 +39,9 @@ PRD (Product Goals, dev-doc-master)
     └─ Proposal (Substantial decision, dev-proposal)     │
            └─ Proposal Review (df-proposal-review) → User Approval ┤
                                                          ▼
-                          ┌──── Simple / bounded work (direct, skip dev-flow) ────┐
+                          ┌──── Direct delivery (skip dev-flow) ────┐
                           │                                                       ▼
-                          └─ Complex / multi-task / parallel (optional: dev-flow Plans + Graph)
+                          └─ Explicit Issue Plan or approved Proposal Delivery: plan (dev-flow Plans + Graph)
                                                                                   │
                                                                                   ▼
                                      df-implement (code + tests → present-state DESIGN → rules at all affected tiers)
@@ -77,7 +77,7 @@ Workflow Skills (own phase advancement and gates; call capability bases explicit
 | Author, update, module-split, or audit a Product PRD, Product DESIGN, or Project/Module Present-State DESIGN | `dev-doc-master` (`/cupdate-prd`, `/cupdate-design`) | Project/module DESIGNs document verified shipped reality only; Product DESIGNs plan ahead of implementation; never intercepts `/cupdate-agent-rules` or `/cupdate-readme` |
 | Create, maintain, or check business/product Proposal lifecycle (`proposals/{proposed,implemented,rejected,archived}/{class}/`) | `dev-proposal` (`/cupdate-proposal`) | Owns approved target, decisions, scope, acceptance and `Delivery: direct \| plan`; maintain explicit user-authorized adjustments in the current Proposal before acceptance; routine bugs use Issues |
 | Independent pre-execution review of Proposals or Plans | `df-proposal-review` | Read-only review of decisions, feasibility, Plan coverage of the authorized source, and document quality by document kind; follow df-proposal-review, never edit or substitute for user approval |
-| Complex work orchestration: direct vs Plan triage, Plan/Task split, parallel write-set coordination, and Plan Graph | `dev-flow` | **Optional orchestration layer**: use only for multi-project, multi-deliverable, or parallel work; bounded tasks go straight to `df-implement`, but a `Delivery` choice already recorded in an approved Proposal outranks this heuristic; never duplicates Proposal approval or doc rules |
+| Implementation Plan explicitly chosen for an Issue within settled design, or approved Proposal with `Delivery: plan`; lifecycle of those Plans | `dev-flow` | Only these two Plan routes. Standalone Issue operations, direct delivery, proposal writing and independent reviews do not trigger dev-flow. Complexity or parallelism alone does not authorize a Plan. |
 | Execute implementation, automated tests, and delivery sync | `df-implement` + `rules/testing.md` | Respect authorized targets; `direct` starts in an isolated worktree unless the user or controller specifies otherwise. Follow `df-implement`: implement and verify code, synchronize affected present-state DESIGN via `dev-doc-master`, then audit/sync all affected rule tiers via `space-master`; verify applicable delivery gates |
 | Independent post-implementation code/test/doc review | `df-implement-review` | Read-only review across the full delivery baseline: target fidelity, code/tests, DESIGN and all affected rules. Apply the severity and concise report contract in `df-implement-review`; never edits files |
 | Create, audit, or maintain space/project/docs/module `AGENTS.md`, project `README.md`, or install/scan/remove external skills | `space-master` (`/cupdate-agent-rules`, `/cupdate-readme`) | Generates the unbypassable harness-injected `AGENTS.md` hierarchy (`<project>/AGENTS.md` wiring `Doc sync` + `DESIGN` sync, thin `<project>/docs/AGENTS.md` guardrail card, and on-demand `<dir>/AGENTS.md`); enforces zero parent-child duplication, non-empty +/- gate verification, and read-only legacy `BUSINESS_RULES.md`; does not author PRDs or DESIGNs |

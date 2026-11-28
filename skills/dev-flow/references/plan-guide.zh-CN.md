@@ -29,7 +29,7 @@ Plan 内容使用用户偏好语言，模板的结构性 heading 和字段名保
 
 ## Plan 必须来自已授权目标
 
-按 SKILL.md 的授权和交付方式选择 `Design Source`：Proposal 派生 Plan 引用当前获批提案的目标条款及未改变的 DESIGN/伴随契约；既定设计内的工作引用适用 Active DESIGN 和授权 Issue 或用户范围。PRD 与 Phase 仅提供背景、约束及追溯关系，不能直接授权实施。每个 Task 使用空间相对路径及章节明确指向所实施决定/契约，按需列多项。仅没有项目也没有设计依据的简单工作可写 N/A。
+按 SKILL.md 的授权和交付方式选择 `Design Source`：Proposal 派生 Plan 引用当前获批提案的目标条款及未改变的 DESIGN/伴随契约；Issue 派生 Plan 引用已授权 Issue 范围及适用 Active DESIGN。PRD 与 Phase 仅提供背景、约束及追溯关系，不能直接授权实施。每个 Task 使用空间相对路径及章节明确指向所实施决定/契约，按需列多项。仅没有项目也没有设计依据的简单工作可写 N/A。
 
 对照获批目标、真实代码及入口推导 Task。每项重要变更契约对应实施责任者和可证伪 AC，覆盖受影响的既有不变量；文档门禁不证明运行时行为。未批准提案和 Draft/Proposed DESIGN 仅作研究参考，不作为目标权威。
 

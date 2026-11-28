@@ -1,10 +1,10 @@
 ---
 name: dev-flow
 description: >
-  Manage project Issues and implementation Plans. Use when managing Issues, creating or revising Plans from approved Proposals with plan delivery or authorized work within settled design, coordinating Tasks or multiple Plans, or advancing an existing Plan through implementation, review, user validation, integration, and archive.
+  Use only for implementation Plans explicitly chosen for an Issue within settled design that needs no new Proposal, or for an approved Proposal with Delivery: plan. Load to create, revise, or advance those Plans through their lifecycle. Standalone Issue operations, proposal discussion or writing, direct implementation, and independent review do not trigger this skill.
 ---
 
-# dev-flow — Issue / Plan Development Workflow
+# dev-flow — Implementation Plan Lifecycle
 
 ## Controller responsibilities
 
@@ -41,11 +41,11 @@ See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.m
 
 ## Plan authority and responsibility
 
-A Plan is optional implementation orchestration, not solution design or design approval. Establish authorization and delivery mode before entering the Plan lifecycle:
+A Plan is optional implementation orchestration. Create Plans only through the two entry routes below; retain the same authorization throughout their lifecycle:
 
 - Approved Proposal with `Delivery: plan` → organize implementation under its target, contracts, acceptance, and unchanged governing design constraints; `Delivery: direct` → route to `df-implement` without creating a Plan.
-- Issue or explicitly authorized work within settled design → implement bounded tasks directly; create a Plan from authorized scope and applicable design when complex orchestration is needed or the user explicitly requests a Plan.
-- PRD, product DESIGN, and Phase provide product intent, architectural constraints, and traceability. Route unresolved material design decisions to `dev-proposal` for discussion and approval; do not derive implementation Plans directly from PRDs or Phases.
+- Issue within settled design → create a Plan only when scope is settled, no new Proposal is needed, and Plan delivery has been explicitly chosen. Other bounded work goes directly to implementation; complexity, task count, or parallelism alone does not authorize a Plan.
+PRD, product DESIGN, and Phase provide product intent, architectural constraints, and traceability. Route unresolved material design decisions to `dev-proposal` for discussion and approval; do not derive implementation Plans directly from these context documents.
 
 A Plan organizes implementation of the settled solution. Synchronize present-state DESIGN and affected glossary after verified implementation, not in advance.
 

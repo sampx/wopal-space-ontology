@@ -1,10 +1,10 @@
 ---
 name: dev-flow
 description: >
-  管理项目 Issue 与实施 Plan。当用户要求管理 Issue、依据获批 Proposal（Delivery: plan）或既定设计内的已授权工作创建或修订 Plan、协调 Task 或多 Plan 实施关系，或推进已有 Plan 的实施、评审、用户验证、集成与归档时使用。
+  仅用于两类实施 Plan：既定设计内、无需新提案且明确采用 Plan 交付的 Issue；已批准且 Delivery: plan 的 Proposal。创建、修订或推进这些 Plan 的生命周期时加载。普通 Issue 操作、提案讨论或编写、直接实施及独立评审不触发本技能。
 ---
 
-# dev-flow — Issue 与实施 Plan 管理
+# dev-flow — 实施 Plan 生命周期
 
 ## Controller responsibilities
 
@@ -41,11 +41,11 @@ description: >
 
 ## Plan 的授权来源与职责
 
-Plan 是可选的实施组织机制，不是方案设计或审批机制。先确定授权与交付方式，再进入 Plan 流程：
+Plan 是可选的实施组织机制。仅以下两类入口创建 Plan，后续生命周期沿用同一入口的授权：
 
 - 获批 Proposal 的 `Delivery: plan` → 按提案目标、契约、验收及未变更的既有设计约束组织实施；`Delivery: direct` → 交 `df-implement`，不创建 Plan。
-- 既定设计内的 Issue 或用户明确授权的工作 → 范围清晰的单点任务直接实施；需要复杂实施编排或用户明确要求 Plan 时，依据已授权范围及适用设计创建 Plan。
-- PRD、产品 DESIGN 与 Phase 提供产品意图、架构约束与追溯背景。若需求包含未确定的重要设计决定，先交 `dev-proposal` 讨论并获批；不从 PRD 或 Phase 直接推导实施 Plan。
+- 既定设计内的 Issue → 仅在范围已明确、无需新提案且明确采用 Plan 交付时创建 Plan。其他有界工作直接实施；复杂程度、任务数或并行需求本身不构成 Plan 授权。
+PRD、产品 DESIGN 与 Phase 提供产品意图、架构约束与追溯背景。若需求包含未确定的重要设计决定，先交 `dev-proposal` 讨论并获批；不从这些背景文档直接推导实施 Plan。
 
 Plan 组织已确定方案的实施，现状 DESIGN 与受影响术语表在实施验证后同步，不提前写入。
 
