@@ -129,14 +129,20 @@ Forbidden headings (their presence is a format error):
 
 An implemented record describes delivered decisions. Retain the design basis and important decision rationale. `## Consequences` records only the material residual risks and costs that still constrain future work; it is not an acceptance log, does not copy test or gate results, and does not restate what was delivered.
 
-### `## Reference Documents` (optional, all lifecycles)
+### `## References` (optional, all lifecycles)
 
-Link only what stays stable and authoritative outside this record:
+Record only reference sources outside this project, with a short note on what each contributed:
 
-- Higher-level design authorities and adjacent decisions the reader must consult (DESIGN documents, other Proposals).
-- External specifications — vendor API documentation, protocol specs, standards.
+- External protocol specifications, standards, and vendor public API documentation.
+- External open-source projects or materials researched and drawn from.
+- Design or reference materials in other repositories within the workspace.
 
-Never link source code, test files, symbols, commits, Issues, Plans, or a file inventory. Those paths churn with refactors and normal tuning, so every code change would force editing a frozen historical record. The design contract belongs in the body; code location is not a contract. Omit the section when nothing qualifies.
+Do not put either of these here:
+
+- This project's own DESIGN documents or Proposals — they belong in `## Design Basis` (or inline where relevant); never repeat them at the end.
+- This project's own source code, test files, symbols, commits, Issues, Plans, or file inventories — those paths churn with refactors and would force edits to a frozen historical record.
+
+Omit the section entirely when none of the three categories apply.
 
 ### `rejected/`
 

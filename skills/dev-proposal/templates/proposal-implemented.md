@@ -30,6 +30,6 @@ Status: implemented
 
 <!-- Only the material residual risks and costs that still constrain future work. -->
 
-## Reference Documents
+## References
 
-<!-- Optional. Link only stable authorities: higher-level DESIGN documents, adjacent Proposals, and external specifications. Never link source code, tests, symbols, commits, Issues, Plans, or file inventories — those paths churn and would force edits to this record on every refactor. Omit the section when nothing qualifies. -->
+<!-- Optional. List only reference sources outside this project (noting briefly what each contributed): external protocol specs / vendor API docs, external projects researched, or reference materials in other workspace repos. Never repeat this project's own DESIGNs or Proposals (those belong in Design Basis), and never link this project's source code, tests, symbols, commits, Issues, Plans, or file inventories. Delete this section if none apply. -->

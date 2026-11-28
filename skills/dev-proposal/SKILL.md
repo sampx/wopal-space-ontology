@@ -99,7 +99,7 @@ Before writing, read `references/specification.md` and `references/lifecycle.md`
 | Design Decisions (optional) | Final choices and rationale with lasting value |
 | Acceptance criteria | Observable or inspectable completion conditions |
 
-Keep fixed headings in English and body prose in the user's preferred language. Organize by user scenarios and domain concepts, not a mechanical technical outline. File inventories and implementation tasks are not a solution. State exclusions and preserved behavior, reference unchanged contracts. A `## Reference Documents` section links only stable authorities — higher-level DESIGN documents, adjacent Proposals and external specifications — never source code, tests, symbols, commits, Issues, Plans or file inventories, because those paths churn and would force edits to a historical record on every refactor.
+Keep fixed headings in English and body prose in the user's preferred language. Organize by user scenarios and domain concepts, not a mechanical technical outline. File inventories and implementation tasks are not a solution. State exclusions and preserved behavior, reference unchanged contracts. An optional `## References` section holds only reference sources outside this project — external protocol specs or vendor API docs, external projects or materials researched, and reference materials in other repositories within the space (noting briefly what each contributed). Never repeat this project's own DESIGN documents or Proposals here (they belong in `## Design Basis`), and never link this project's source code, tests, symbols, commits, Issues, Plans, or file inventories; omit the section when none apply.
 
 ### Contracts and decisions
 
