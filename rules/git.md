@@ -95,6 +95,12 @@ An owning workflow takes precedence over this shared rule. When `dev-flow`, `ont
 - `dev-flow` owns its Work Branch and Integration Branch semantics; `ontology-evolution` owns ontology isolation and `contribute/<slug>` contribution branches.
 - For manual repository work that is genuinely outside an owning workflow, choose a short, meaningful branch name and follow that repository's own rules.
 
+### Integrate a branch into the trunk with a squash merge
+
+When a feature branch or worktree branch — including a delegated agent's branch — lands on the main or integration branch, use `git merge --squash` (or the owning workflow's equivalent, such as `dev-flow integrate`) so the trunk gains one clean delivery commit. Development history is noise there: it invites amending fixes, review rework and abandoned attempts to live forever on the trunk, and it inverts the graph when the trunk is merged back into the branch instead.
+
+Preserving the branch's own commits is the exception, and it needs the user's explicit choice before the merge, because only a third party can depend on those intermediate commits (a tag, bisect target or referenced commit). Record the reason in the commit message. `dev-flow` already defaults to squash and maps this exception to `Integration Strategy: preserve-history`.
+
 ### Manual merge verification for structural changes
 
 When a merge is manual and not already owned by a workflow, structural changes such as renames, directory moves, file merges, or file splits require explicit verification; “no Git conflict” does not prove the result is lossless.

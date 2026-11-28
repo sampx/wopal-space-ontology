@@ -39,7 +39,7 @@ Skip creating a new worktree in exactly two cases:
 1. The user explicitly asked for the change on the main/current branch;
 2. The controller (such as `dev-flow`) already created and assigned an isolated worktree — reuse it, do not nest another one.
 
-The isolation branch's starting point is the delivery baseline; record it as `<delivery-base>` in your report and hand it to the delivery gate and the implementation review.
+The isolation branch's starting point is the delivery baseline; record it as `<delivery-base>` in your report and hand it to the delivery gate and the implementation review. When that branch is integrated into the trunk, use a squash merge, and keep the branch's own commits only when the user explicitly chose to preserve them.
 
 ## Synchronize delivery artifacts
 

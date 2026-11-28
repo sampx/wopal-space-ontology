@@ -132,7 +132,7 @@ Plans use these fixed metadata fields:
 |---|---|
 | `Delivery` | The formal delivery identifier. A single Plan owns itself; Plans sharing a delivery all name the owner Plan. |
 | `Commit Subject` | The exact subject used for the formal delivery commit. Every Plan in one Delivery must use the same value. |
-| `Integration Strategy` | How the work reaches the integration branch. Default `squash`; `preserve-history` is allowed only when the user explicitly chooses it before integration. |
+| `Integration Strategy` | How the work reaches the integration branch. Default `squash`; `preserve-history` is allowed only when the user explicitly chooses it before integration. The squash default also satisfies the general `rules/git.md` requirement for every branch landing on the trunk; choosing to keep history needs a stated reason. |
 | `Integration Branch` | The formal branch that receives the delivered change, such as `main`. |
 | `Work Branch` | The branch that keeps development commits. Newly generated names are at most 55 characters; when longer, only the Plan-name tail is shortened and a stable four-character checksum derived from the full name is appended. |
 | `Delivery Base Commit` | The integration-branch commit immediately before this Delivery began. Shared-Delivery Plans use the same value. |

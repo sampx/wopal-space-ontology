@@ -65,7 +65,7 @@ cd .worktrees/ellamaka-feature-logging
 cd .worktrees/ellamaka-hotfix-security-patch
 # 修复、提交...
 cd ../../projects/ellamaka
-git merge hotfix/security-patch
+git merge --squash hotfix/security-patch && git commit -m "fix: patch the security issue"
 ./scripts/worktree.sh remove ellamaka hotfix/security-patch
 ```
 
@@ -134,6 +134,14 @@ git merge hotfix/security-patch
 ./scripts/worktree.sh prune <project>
 ```
 
+### Land branches on the trunk with a squash merge
+
+When a feature or worktree branch (including a branch delegated to a sub-agent) lands on the main or integration branch, squash it into one clean delivery commit with `git merge --squash`, then delete the branch.
+
+That is the default. Keep the branch's own commits only when a third party actually references them (a tag, a bisect target, a commit someone depends on); that is the exception and needs the user's answer before merging. "Keeping the steps for later reference" is not a reason: the commits still exist in Git after the branch is deleted, and can be found by hash.
+
+Do not invert the operation either: never merge the trunk into the feature branch first and then fast-forward the trunk to it — that reverses the trunk's history line and makes the feature branch the first parent.
+
 ## 项目列表
 
 可用项目名由脚本自动扫描 `projects/` 下包含 `.git` 的仓库目录得到。
@@ -191,9 +199,9 @@ bun install
 git add .
 git commit -m "feat: add new feature"
 
-# 4. 回到主工作区合并
+# 4. 回到主工作区压缩合并为一条交付提交
 cd ../../projects/ellamaka
-git merge feature/new-feature --no-ff
+git merge --squash feature/new-feature && git commit -m "feat: add the new feature"
 
 # 5. 清理 worktree
 ./scripts/worktree.sh remove ellamaka feature/new-feature

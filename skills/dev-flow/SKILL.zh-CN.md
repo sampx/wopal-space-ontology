@@ -132,7 +132,7 @@ Plan 用以下固定字段描述这次交付：
 |---|---|
 | `Delivery` | 一次正式交付的编号。单 Plan 由自己负责；多个 Plan 共用交付时，都填写负责人 Plan 名称。 |
 | `Commit Subject` | 正式分支上交付提交的标题。共享 Delivery 的所有 Plan 必须完全一致。 |
-| `Integration Strategy` | 正式集成方式。默认 `squash`，即把开发分支上的多条提交压成正式分支的一条；只有用户在集成前明确选择时才用 `preserve-history` 保留多条提交。 |
+| `Integration Strategy` | 正式集成方式。默认 `squash`，即把开发分支上的多条提交压成正式分支的一条；只有用户在集成前明确选择时才用 `preserve-history` 保留多条提交。默认 `squash` 同时也是 `rules/git.md` 对一切分支合入主干的通用要求，选择保留历史时必须写明理由。 |
 | `Integration Branch` | 接收最终改动的正式分支，例如 `main`。 |
 | `Work Branch` | 保存开发过程中各条提交的开发分支。新建分支最长 55 个字符；超长时只截短 Plan 名称部分，并追加由完整名称算出的稳定四位校验码。 |
 | `Delivery Base Commit` | 本次交付开始前，正式分支上的共同起点。共享 Delivery 的所有 Plan 必须一致。 |

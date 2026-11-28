@@ -95,6 +95,12 @@ keywords:
 - `dev-flow` 自己定义 Work Branch 与 Integration Branch；`ontology-evolution` 自己定义 ontology isolation 与 `contribute/<slug>` 贡献分支。
 - 确实不属于任何 owning workflow 的手工仓库工作，才使用简短、有意义的分支名，并遵守该仓库自身规则。
 
+### 分支合入主干用压缩合并
+
+特性分支或 worktree 分支（包括委派给子 Agent 的分支）合入主分支或集成分支时，使用 `git merge --squash`（或所属 workflow 的等价入口，例如 `dev-flow integrate`），让主干只增加一条干净的交付提交。开发历史留在主干上是噪音：它会让反复修补、评审返工和被放弃的尝试永久留在主干，并且在把主干合并回分支时把图方向搞反。
+
+保留分支自身提交是例外，且必须在合并前由用户明确选择，因为只有第三方可能依赖那些中间提交（打了 tag、作为 bisect 定位点或被引用的提交）。理由写进提交信息。`dev-flow` 已默认 squash，并把该例外映射为 `Integration Strategy: preserve-history`。
+
 ### 结构变更的手工合并验证
 
 只有在合并不属于现成 workflow 管理、需要手工执行时，文件重命名、目录迁移、多文件合并/拆分等结构变更才按本节检查；“Git 无冲突”不能证明结果无损。
