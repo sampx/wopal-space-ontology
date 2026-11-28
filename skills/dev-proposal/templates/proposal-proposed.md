@@ -28,3 +28,7 @@ Status: proposed
 <!-- Cover important design contracts and affected existing invariants; a third party can judge met or unmet. -->
 
 1. <observable or inspectable completion condition>
+
+## Reference Documents
+
+<!-- Optional. Link only stable authorities: higher-level DESIGN documents, adjacent Proposals, and external specifications. Never link source code, tests, symbols, commits, Issues, Plans, or file inventories — those paths churn and would force edits to this record on every refactor. Omit the section when nothing qualifies. -->

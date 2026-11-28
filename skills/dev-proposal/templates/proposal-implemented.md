@@ -29,3 +29,7 @@ Status: implemented
 ## Consequences
 
 <!-- Only the material residual risks and costs that still constrain future work. -->
+
+## Reference Documents
+
+<!-- Optional. Link only stable authorities: higher-level DESIGN documents, adjacent Proposals, and external specifications. Never link source code, tests, symbols, commits, Issues, Plans, or file inventories — those paths churn and would force edits to this record on every refactor. Omit the section when nothing qualifies. -->

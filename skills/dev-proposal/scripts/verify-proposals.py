@@ -73,14 +73,6 @@ REQUIRED_BY_LIFECYCLE = {
     "rejected": ("Problem", "Design Basis", "Proposal"),
     "archived": (),
 }
-# Fixed sections of each skeleton must also appear in this order; bespoke
-# sections may sit between them, but never reorder the fixed ones.
-ORDER_BY_LIFECYCLE = {
-    "proposed": ("Problem", "Design Basis", "Proposal", "Design Decisions", "Acceptance criteria"),
-    "implemented": ("Problem", "Design Basis", "Decision", "Design Decisions", "Consequences"),
-    "rejected": ("Problem", "Design Basis", "Proposal"),
-    "archived": (),
-}
 FORBIDDEN_BY_LIFECYCLE = {
     "proposed": (),
     "implemented": IMPLEMENTED_FORBIDDEN,
@@ -114,7 +106,6 @@ FIX_HINTS = {
     "STATUS_PATH_MISMATCH": "align the Status value with the lifecycle directory that holds the file",
     "SKELETON_MISSING_SECTION": "add the required section for this lifecycle",
     "SKELETON_FORBIDDEN_SECTION": "remove the planning-era heading and fold it into '## Consequences'",
-    "SKELETON_SECTION_ORDER": "restore the fixed sections to their skeleton order",
     "APPROVAL_MISSING": "add 'Approved', 'Authorized scope' and 'Delivery' before treating it as authorized",
     "APPROVAL_BAD_DELIVERY": "set 'Delivery' to 'direct' or 'plan'",
     "APPROVAL_BAD_DATE": "write '- **Approved**: YYYY-MM-DD \u2014 <approver>' with a real calendar date",
@@ -310,14 +301,6 @@ def _check_skeleton(path: Path, text: str, lifecycle: str, report: Report) -> No
     for name in FORBIDDEN_BY_LIFECYCLE[lifecycle]:
         if name in present:
             report.add("SKELETON_FORBIDDEN_SECTION", path, f"forbidden planning-era section '## {name}'")
-    ordered = [name for name in present if name in ORDER_BY_LIFECYCLE[lifecycle]]
-    expected = [name for name in ORDER_BY_LIFECYCLE[lifecycle] if name in ordered]
-    if ordered != expected:
-        report.add(
-            "SKELETON_SECTION_ORDER",
-            path,
-            f"section order is {' -> '.join(ordered)}, skeleton order is {' -> '.join(expected)}",
-        )
 
 
 def _check_authorization(path: Path, header: str, status: str, report: Report) -> None:

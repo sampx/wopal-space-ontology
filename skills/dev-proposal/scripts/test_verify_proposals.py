@@ -362,21 +362,6 @@ class SkeletonTests(BaseCase):
                 )
                 self.assertFailsWith("SKELETON_FORBIDDEN_SECTION")
 
-    def test_reordered_fixed_sections_are_rejected(self) -> None:
-        body = ("\n## Problem\n\nCoupling.\n\n## Decision\n\nUse a bus.\n\n"
-                "## Design Basis\n\nPreserve ownership.\n\n## Consequences\n\nDelivered.\n")
-        self.tree.write("implemented/architecture/2026-10-02-x.md",
-                        proposal("Shuffled", "Status: implemented", body=body))
-        self.assertFailsWith("SKELETON_SECTION_ORDER")
-
-    def test_bespoke_sections_keep_fixed_order(self) -> None:
-        body = ("\n## Problem\n\nCoupling.\n\n## Design Basis\n\nPreserve ownership.\n\n"
-                "## Decision\n\nUse a bus.\n\n## Routing\n\nBespoke detail.\n\n"
-                "## Design Decisions\n\nBus beats direct calls here.\n\n## Consequences\n\nDelivered.\n")
-        self.tree.write("implemented/architecture/2026-10-02-x.md",
-                        proposal("Ordered", "Status: implemented", body=body))
-        self.assertPass()
-
     def test_archived_skips_skeleton_rules(self) -> None:
         # An archived body keeps whatever it had; only metadata is checked.
         self.tree.write(

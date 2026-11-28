@@ -129,6 +129,15 @@ Forbidden headings (their presence is a format error):
 
 An implemented record describes delivered decisions. Retain the design basis and important decision rationale. `## Consequences` records only the material residual risks and costs that still constrain future work; it is not an acceptance log, does not copy test or gate results, and does not restate what was delivered.
 
+### `## Reference Documents` (optional, all lifecycles)
+
+Link only what stays stable and authoritative outside this record:
+
+- Higher-level design authorities and adjacent decisions the reader must consult (DESIGN documents, other Proposals).
+- External specifications — vendor API documentation, protocol specs, standards.
+
+Never link source code, test files, symbols, commits, Issues, Plans, or a file inventory. Those paths churn with refactors and normal tuning, so every code change would force editing a frozen historical record. The design contract belongs in the body; code location is not a contract. Omit the section when nothing qualifies.
+
 ### `rejected/`
 
 Keep the proposal-time structure (a `## Acceptance criteria` or `## Plan` is fine); the verdict is on the status line. When the rejection is retained for its guardrail value, the body should explain why the idea was tempting and why it ultimately fails.
