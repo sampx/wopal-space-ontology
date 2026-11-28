@@ -76,7 +76,8 @@ PRD（产品目标，dev-doc-master）
 | 编写、更新、按模块拆分或校验产品 PRD / 产品 DESIGN / 项目或模块现状 DESIGN | `dev-doc-master`（`/cupdate-prd`、`/cupdate-design`） | 项目/模块 DESIGN 仅写核实已落地的现状；产品 DESIGN 负责前瞻架构与能力图；不抢 `/cupdate-agent-rules` 或 `/cupdate-readme` |
 | 创建、维护或审查业务/产品 Proposal 生命周期（`proposals/{proposed,implemented,rejected,archived}/{class}/`） | `dev-proposal`（`/cupdate-proposal`） | 管批准的目标、设计决定、范围、验收与 `Delivery: direct \| plan`；用户明确授权的调整在验收前融入当前提案；普通缺陷走 Issue |
 | 独立方案 / Proposal / Plan 评审 | `df-proposal-review` | 只读审查方案决策、可行性、Plan 对授权来源的覆盖及各类型文档质量；按 df-proposal-review 执行，不代作者改写或代用户批准 |
-| 既定设计内明确采用 Plan 的 Issue，或已批准且 `Delivery: plan` 的 Proposal；以及这些 Plan 的生命周期 | `dev-flow` | 仅这两种 Plan 入口。普通 Issue 操作、直接交付、提案编写和独立评审不触发 dev-flow。复杂程度或并行需求本身不构成 Plan 授权。 |
+| Issue 管理（创建、查询、编辑、合并、关闭） | `dev-flow` | Issue 管理不启动 Plan 生命周期。 |
+| 既定设计内明确采用 Plan 的 Issue，或已批准且 `Delivery: plan` 的 Proposal；以及这些 Plan 的生命周期 | `dev-flow` | 仅这两种 Plan 入口。仅直接交付、提案编写或独立评审时不触发 dev-flow。复杂程度或并行需求本身不构成 Plan 授权。 |
 | 具体代码实现、单元测试与交付同步 | `df-implement` + `rules/testing.md` | 遵守授权目标；`direct` 默认隔离工作树，用户或主控另有指定除外。按 `df-implement` 实施并验证代码，调用 `dev-doc-master` 同步受影响现状 DESIGN，再调用 `space-master` 审查和同步各受影响层级规约；执行适用交付门禁 |
 | 实施后代码 / 测试 / 现状文档独立只读复核 | `df-implement-review` | 只读检查完整交付基线：目标一致性、代码与测试、DESIGN 和所有受影响规约。按 `df-implement-review` 的定级及简明报告规范执行，不修改成果 |
 | 创建、审计或维护空间/项目/文档/模块 `AGENTS.md`、项目 `README.md`，或装删外部技能 | `space-master`（`/cupdate-agent-rules`、`/cupdate-readme`） | 生成由 Harness 自动注入、不可绕过的分级 `AGENTS.md`（接通 `Doc sync` 与现状 `DESIGN` 同步的项目根规范、轻量 `docs/AGENTS.md` 护栏卡、按需模块子目录规范）；遵循父子不重复、机械门禁非空正反实证、历史 `BUSINESS_RULES.md` 只读兼容；不负责编写 PRD/DESIGN |

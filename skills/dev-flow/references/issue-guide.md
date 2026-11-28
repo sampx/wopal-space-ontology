@@ -162,7 +162,7 @@ flow.sh sync-issue <issue> --body-only
 | 既定设计内的 Issue 明确采用 Plan，或获批 `Delivery: plan` 提案有关联 Issue | 使用 `flow.sh plan new <issue> ...` |
 | 获批 `Delivery: plan` 提案无关联 Issue | 使用 `flow.sh plan new --project ... --type ... --slug ...` |
 
-用户要求讨论或“出方案”时，交 `dev-proposal`；Issue 号、普通 Issue 操作或“开发”本身不触发 Plan 流程。
+创建、查询、编辑、合并、关闭等 Issue 管理操作由 `dev-flow` 负责，无需创建 Plan。用户要求讨论或“出方案”时交 `dev-proposal`；Issue 号或“开发”本身不授权启动 Plan 流程。
 
 一个目标需要**多份**实施时，不要合并成一个跨项目 Plan；分别创建多份 Plan，再用 Active Plan Graph `groups` 组织共同目标、用 `edges` 表达实施先后。详见 `references/plan-guide.md` / `references/plan-guide.zh-CN.md` 与 `references/active-plan-graph.md`。
 

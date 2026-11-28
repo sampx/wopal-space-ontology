@@ -1,14 +1,14 @@
 ---
 name: dev-flow
 description: >
-  Use only for implementation Plans explicitly chosen for an Issue within settled design that needs no new Proposal, or for an approved Proposal with Delivery: plan. Load to create, revise, or advance those Plans through their lifecycle. Standalone Issue operations, proposal discussion or writing, direct implementation, and independent review do not trigger this skill.
+  Use for Issue management (create, query, edit, merge, close) and for creating, revising, or advancing two kinds of implementation Plans: an explicitly chosen Plan for an Issue within settled design requiring no new Proposal, or an approved Proposal with Delivery: plan. Managing Issues does not start a Plan. Proposal discussion or writing, direct implementation, and independent review alone do not trigger this skill.
 ---
 
-# dev-flow — Implementation Plan Lifecycle
+# dev-flow — Issue Management and Implementation Plan Lifecycle
 
 ## Controller responsibilities
 
-The controller advances the Plan lifecycle, organizes implementation and review, enforces workflow gates, and handles decisions that require user confirmation.
+This skill owns Issue management and the Plan lifecycle. For Issue management alone, use Issue commands under `references/issue-guide.md` without entering the Plan lifecycle. The controller advances the Plan lifecycle, organizes implementation and review, enforces workflow gates, and handles decisions that require user confirmation.
 
 The controller may implement or review directly, or delegate:
 

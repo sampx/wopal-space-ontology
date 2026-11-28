@@ -1,14 +1,14 @@
 ---
 name: dev-flow
 description: >
-  仅用于两类实施 Plan：既定设计内、无需新提案且明确采用 Plan 交付的 Issue；已批准且 Delivery: plan 的 Proposal。创建、修订或推进这些 Plan 的生命周期时加载。普通 Issue 操作、提案讨论或编写、直接实施及独立评审不触发本技能。
+  管理 Issue（创建、查询、编辑、合并、关闭等），以及两类实施 Plan 的创建、修订和生命周期推进：既定设计内、无需新提案且明确采用 Plan 交付的 Issue；已批准且 Delivery: plan 的 Proposal。Issue 管理不等于启动 Plan。仅讨论或编写提案、直接实施或独立评审时不加载本技能。
 ---
 
-# dev-flow — 实施 Plan 生命周期
+# dev-flow — Issue 管理与实施 Plan 生命周期
 
 ## Controller responsibilities
 
-主控者负责推进 Plan 生命周期、组织实施与评审、执行流程门禁，并处理需要用户确认的决策。
+本技能负责 Issue 管理与 Plan 生命周期。仅管理 Issue 时，按 `references/issue-guide.md` 使用 Issue 命令，不进入 Plan 生命周期。主控者负责推进 Plan 生命周期、组织实施与评审、执行流程门禁，并处理需要用户确认的决策。
 
 主控者可以自行实施或评审，也可以委派：
 
