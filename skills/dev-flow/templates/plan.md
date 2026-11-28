@@ -50,7 +50,7 @@
 
 ### Key Decisions
 
-<!-- Plan-level implementation decisions must follow upstream DESIGN; never override or rewrite design truth here. Use D-NN numbering. -->
+<!-- Plan-level implementation decisions must follow the authorized target and unchanged governing design constraints; do not override settled design decisions here. Use D-NN numbering. -->
 - D-01: <decision and rationale>
 
 ### Key Interfaces

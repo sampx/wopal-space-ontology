@@ -2,7 +2,7 @@
 
 A Plan has two kinds of readers: **the human reviewer** (must understand what you want) and **the implementing agent** (must be able to build it).
 
-So a Plan's job is to state three things: **what is wanted (behavior)**, **what counts as done (acceptance)**, and **what must not be touched (contracts and boundaries)**. Which files to change and how to organize code internally are decisions that can only be made well during implementation, against the real code — written into a Plan they become straitjackets and guesses.
+So a Plan's job is to translate an authorized target into three things: **what is wanted (behavior)**, **what counts as done (acceptance)**, and **what must not be touched (contracts and boundaries)**. Which files to change and how to organize code internally are decisions that can only be made well during implementation, against the real code — written into a Plan they become straitjackets and guesses.
 
 One line: **pin the contract surface, open up the implementation surface.**
 
@@ -27,9 +27,9 @@ Write Plan content in the user's preferred language while keeping template headi
 
 Use exact technical terms where precision matters — especially `Design Source`, `Interface`, `Constraints`, commands, identifiers, types, and protocol names. When a non-obvious term is unavoidable, explain its practical meaning on first use. Do not repeat the same fact across multiple fields.
 
-## Plan must derive from an authorized design
+## Plan must derive from an authorized target
 
-Choose `Design Source` by authorization: a Proposal-derived Plan cites the current approved Proposal's relevant target sections and unchanged governing DESIGN/companion contracts; work within settled design cites applicable Active DESIGN and the authorized Issue or user scope. Every Task names the concrete decision/contract it implements using space-relative paths and headings; list multiple sources when needed. Use N/A only for simple work with no project and no design basis.
+Choose `Design Source` under SKILL.md's authorization and delivery rules: a Proposal-derived Plan cites the current approved Proposal's relevant target sections and unchanged governing DESIGN/companion contracts; work within settled design cites applicable Active DESIGN and the authorized Issue or user scope. PRD and Phase supply context, constraints, and traceability, not direct implementation authorization. Every Task names the concrete decision/contract it implements using space-relative paths and headings; list multiple sources when needed. Use N/A only for simple work with no project and no design basis.
 
 Derive Tasks from the authorized target against real code and entry paths. Map every material changed contract to an implementation owner and falsifiable AC, including affected existing invariants. A document gate does not prove runtime behavior. Unapproved proposals and Draft/Proposed DESIGNs are research references, not target authority.
 
@@ -48,7 +48,7 @@ Before approval, correct Plan inconsistencies with the authorized target; if the
 
 **One criterion**: if a downstream consumer could write their calling code and compatibility tests from this section alone, the contract is defined. If not, it isn't finished.
 
-**Binding force**: if implementation reveals that a signature, error code, or key semantic must change, stop and return to the controlling workflow. Continue only if the issue can be resolved inside the existing DESIGN + approved Plan; a Plan or design change requires user confirmation through the controller. Write N/A when the Plan has no shared or cross-Task contract.
+**Binding force**: if implementation reveals that a signature, error code, or key semantic must change, stop and return to the controlling workflow. Continue only if the issue can be resolved within the authorized target, unchanged design constraints, and approved Plan; changes to the Plan or design decisions follow SKILL.md's conflict rules. Write N/A when the Plan has no shared or cross-Task contract.
 
 Keep this top-level section for contracts shared across Tasks or important across module/project boundaries. A contract owned only by one Task belongs in that Task's `Interface`; if a Task uses a top-level Key Interface, reference it instead of copying it.
 
@@ -240,7 +240,7 @@ Common mistakes: treating a subdirectory (e.g. `projects/<name>/packages/app/`) 
 
 Plans add no Gap-related metadata fields. The phase–Gap relationship is carried naturally by product phase documents; a Plan only states its phase in Goal or Context.
 
-- **Plan phase**: the `Phase` metadata field (declared at creation from the Issue body or `--product`/`--phase`). A phase splits into multiple Plans by scope area; its `Related Plans` table is stable scope/gap/project traceability and does not copy Plan state.
+- **Plan phase**: the `Phase` metadata field (declared at creation from the Issue body or `--product`/`--phase`). Multiple authorized Plans may reference the same Phase; its `Related Plans` table records stable scope/gap/project traceability, neither originating Plans nor copying Plan state.
 - **Plan execution relationships**: Plan-level ordering, blockers, and current implementation sequence belong only to the Active Plan Graph. A Phase may describe capability-level ordering where inherently necessary, but never maintains a Plan DAG.
 - **Archive boundary**: `archive` no longer writes Plan status into the Phase document. A Plan enters the Active Graph after its first successful `submit` and stays there until `archive` succeeds; `done` is only a workflow state and does not remove Graph membership. The Phase does not participate in that lifecycle synchronization.
 - **Unlinked Plans** do not need `Product`/`Phase`, and no Phase row is invented merely to display status or orchestration.

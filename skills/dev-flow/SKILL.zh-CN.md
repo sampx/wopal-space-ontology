@@ -1,10 +1,10 @@
 ---
 name: dev-flow
 description: >
-  驱动开发 Plan 的全生命周期管理工作流。触发场景包括：创建或推进开发 Plan、组织代码实现与评审、执行 approve/complete/verify/archive 状态推进、协调用户验证，或将 PRD 与 Issue 拆解为开发任务。
+  管理项目 Issue 与实施 Plan。当用户要求管理 Issue、依据获批 Proposal（Delivery: plan）或既定设计内的已授权工作创建或修订 Plan、协调 Task 或多 Plan 实施关系，或推进已有 Plan 的实施、评审、用户验证、集成与归档时使用。
 ---
 
-# dev-flow — Issue / Plan Development Workflow
+# dev-flow — Issue 与实施 Plan 管理
 
 ## Controller responsibilities
 
@@ -39,9 +39,15 @@ description: >
 
 具体 Issue 标签、归并命令见 `references/issue-guide.md`；Plan 与 Graph group 写法见 `references/plan-guide.zh-CN.md` / `references/active-plan-graph.zh-CN.md`；完整命令行为见 `references/commands.md`。
 
-## DESIGN, Plan, implementation
+## Plan 的授权来源与职责
 
-已批准 Proposal → Plan → 实现 → 现状 DESIGN → 工程规约。Plan 组织实施，授权来源确定目标和边界。既定设计内的 Issue 或明确授权 Plan 依据适用的 Active DESIGN 与用户授权；Proposal 派生 Plan 引用获批目标契约及未变更的架构约束，现状 DESIGN 交付后同步，不提前写入。
+Plan 是可选的实施组织机制，不是方案设计或审批机制。先确定授权与交付方式，再进入 Plan 流程：
+
+- 获批 Proposal 的 `Delivery: plan` → 按提案目标、契约、验收及未变更的既有设计约束组织实施；`Delivery: direct` → 交 `df-implement`，不创建 Plan。
+- 既定设计内的 Issue 或用户明确授权的工作 → 范围清晰的单点任务直接实施；需要复杂实施编排或用户明确要求 Plan 时，依据已授权范围及适用设计创建 Plan。
+- PRD、产品 DESIGN 与 Phase 提供产品意图、架构约束与追溯背景。若需求包含未确定的重要设计决定，先交 `dev-proposal` 讨论并获批；不从 PRD 或 Phase 直接推导实施 Plan。
+
+Plan 组织已确定方案的实施，现状 DESIGN 与受影响术语表在实施验证后同步，不提前写入。
 
 提交前读取 `references/plan-guide.md`，按授权选择设计依据、推导 Task 和验收覆盖。重要设计决定在上游解决，不把设计审批写成实施 Task。主控负责 Plan 与授权一致。
 
@@ -77,7 +83,7 @@ Graph 手工更新与 lifecycle 命令目前是两个连续动作。命令已经
 
 | 阶段 | 主控动作 | 用户门 |
 |---|---|---|
-| planning | 写 Plan、对齐 DESIGN、运行 `submit` | 无 |
+| planning | 写 Plan、对齐已授权目标、运行 `submit` | 无 |
 | reviewing | 根据评审意见修 Plan | 用户批准 Plan |
 | executing | 组织实施、实施评审、Agent Verification | 无新的范围/设计授权 |
 | verifying | 组织用户验证、必要返工 | 用户确认验证结果；必要时确认 Plan/设计变更 |
@@ -90,13 +96,13 @@ Graph 手工更新与 lifecycle 命令目前是两个连续动作。命令已经
 
 创建或定位 Plan 必须使用 `flow.sh plan ...`，不要手写新 Plan 文件，也不要用 grep/glob 在空间里盲找已有 Plan。已知名称用 `plan status`，需要浏览时用 `plan list`。
 
-Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/字段名保持不变。正文优先用人能直接看懂的大白话，只有 Interface、Constraints、命令、类型/协议等确需精确时使用技术词。拆分 Task 前，先对照已定案的设计与实际代码，找出需要交付的契约，确保每一项都有 Task 和行为 AC。Plan 固定行为、验收、契约与边界；内部实现细节留给实施阶段。Task 格式、TDD 判定、AC、Metadata、命名规范等见 `references/plan-guide.zh-CN.md`。
+Plan 的实际内容使用用户偏好语言；模板规定的结构性 heading/字段名保持不变。正文优先用人能直接看懂的大白话，只有 Interface、Constraints、命令、类型/协议等确需精确时使用技术词。拆分 Task 前，先对照已授权目标与实际代码，找出需要交付的契约，确保每一项都有 Task 和行为 AC。Plan 细化实施行为与验收，继承已确定的契约与边界；内部实现细节留给实施阶段。Task 格式、TDD 判定、AC、Metadata、命名规范等见 `references/plan-guide.zh-CN.md`。
 
 `Delegation Strategy` 必须根据当前可用 Agent 的能力和 Task 关系分配任务；Agent 列只写具体 Agent 名称。
 
 只有带 Issue 的 Plan 需要镜像到 GitHub。Plan 元数据为 `Issue: #N` 时，实质内容改变后运行 `flow.sh sync-issue <plan> --body-only`，同步 Issue 中的 Goal / Scope / Acceptance Criteria 与 Plan 链接。元数据为 `Issue: N/A` 的 Plan 没有 Issue 可更新，Plan 文件本身就是记录，跳过这一步。
 
-写完 Plan 后，主控者必须先运行 `flow.sh submit <plan>` 进入 `reviewing`，再请用户评审。`submit` 自动运行 `plan check`，无需先手动 check。
+写完 Plan 后，主控者必须先运行 `flow.sh submit <plan>` 进入 `reviewing`，按 `df-proposal-review` 的 Plan 模式进行独立评审、解决重要发现，再请用户批准实施安排。`submit` 自动运行 `plan check`，无需先手动 check；不重复审批已获批 Proposal 的设计决定。
 
 在 `reviewing` 阶段，Plan 尚未批准。主控者可以根据用户意见直接修订；带 Issue 的 Plan 再用 `sync-issue` 重新同步，不需要 reset，也不需要再次 submit。用户批准的是当前版本的 Plan。
 
@@ -195,13 +201,11 @@ flow.sh complete <plan>
 
 ## Conflicts and rework
 
-提案驱动交付的返工以当前 Proposal 为依据，按本技能前述授权规则及 `df-implement` 的成果同步顺序执行。以下 DESIGN + Plan 分类用于旧合同和 Issue 路线。
+实施或验证中出现授权目标、Plan、既有设计与代码现实不一致时，主控者先分类：
 
-实施或验证中出现 Plan、DESIGN 与代码现实不一致时，主控者先判断问题属于哪一类：
-
-- **实现问题**：现有 DESIGN + 已批准 Plan 已经给出答案 → 在原边界内修代码并重新验证。
-- **Plan 问题**：要继续必须改变已批准 Plan 的实质内容 → 向用户说明原因与影响，用户确认后再修 Plan；该 Plan 有关联 Issue 时再同步 Issue。
-- **设计问题**：要继续必须改变 DESIGN → 让用户确认设计目标后进入相应设计维护流程，再让 Plan 重新对齐设计。
+- **实现问题**：已授权目标、未改变的约束与获批 Plan 已经给出答案 → 在原边界内修代码并重新验证。
+- **Plan 问题**：实施安排需要实质调整，但不改变授权目标 → 说明原因与影响，用户确认后修订 Plan，按需同步关联 Issue。
+- **设计问题**：需要改变目标方案或既有设计决定 → 停止受影响实施。提案驱动交付按 `dev-proposal` 维护用户明确授权的当前提案调整；其他工作若需要新设计决定，先形成并批准 Proposal，再协调后续实施。现状 DESIGN 按 `df-implement` 在实施验证后同步。
 
 不要用 `reset` 代替这个判断。`reset` 是破坏性操作，只在用户明确要求时使用。
 
@@ -233,7 +237,7 @@ flow.sh complete <plan>
 
 `preserve-history` 只是明确例外：只有 `Integration Strategy` 已写明 `preserve-history`，并且用户在集成前明确选择保留开发历史时，正式分支才保留多条开发提交。默认流程不能退回普通 `git merge`，因为那会把中间开发提交或额外 merge commit 带进正式分支。
 
-验证期间返工遵守本节冲突规则。提案驱动的交付按当前用户授权的 Proposal 实施；需要调整目标时先取得用户明确决定，优先维护提案，再协调 Plan 和实施成果。旧 Plan 和 Issue 路线沿用原合同。
+验证期间返工遵守本节冲突规则。提案驱动的交付按当前用户授权的 Proposal 实施；需要调整目标时先取得用户明确决定，优先维护提案，再协调 Plan 和实施成果。既定设计内的工作按上述授权和冲突处理规则执行。
 
 用户明确确认验证通过并授权相应收尾后，按所选模式完成正式集成，并执行：
 
@@ -267,7 +271,7 @@ flow.sh archive <plan> [--keep-worktree]
 |---|---|
 | `approve --confirm` | 明确批准当前 Plan |
 | 修改已批准 Plan 实质内容 | 明确确认具体 Plan 修订 |
-| 修改 DESIGN | 明确确认设计目标/设计修订 |
+| 改变设计决定或目标方案 | 用户明确授权，按 `dev-proposal` 维护提案；现状 DESIGN 按验证后的成果同步 |
 | 用户验证结果 | 用户明确确认验证通过或指出失败 |
 | `integrate --confirm` | 有开发分支时，用户明确同意把本次 Delivery 写入正式分支 |
 | `verify --confirm` | 用户明确确认对应 Plan 的验证结果并授权状态推进 |
@@ -277,10 +281,10 @@ flow.sh archive <plan> [--keep-worktree]
 
 ## Boundaries that must hold
 
-- 带设计面的工作不要绕过 dev-flow 直接实施。
+- Plan 编排服从用户选择的交付方式；获批提案的 `direct` 路线和既定设计内的直接实施不进入 Plan 生命周期。
 - 本体 Issue 不是 dev-flow 的工作。Issue 的项目是本体组件——即改动落在本体 worktree 的技能、规则、agent、命令、插件、装配里，而不是 `projects/` 下的仓库——就交给 `ontology-evolution`，不要在这里出 Plan。Issue 仍是需求记录，提案才是实施授权。`--project` 怎么决定这一点见 `references/issue-guide.md`。
 - Plan 未进入 `reviewing` 前，不要请用户审批；Plan 未批准前，不要开始其实施。
-- 已批准 Plan 或 DESIGN 需要改变时，不要自行修改后继续。
+- 已批准 Plan 或目标方案需要实质改变时，按授权与冲突处理规则执行。
 - 实施评审未 PASS、Agent Verification 未完成时，不要 `complete`。
 - 未执行 `complete` 进入 `verifying` 前，不要邀请用户最终验证。
 - 不代替用户勾选 User Validation。

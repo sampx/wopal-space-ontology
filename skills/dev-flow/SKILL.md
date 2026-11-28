@@ -1,7 +1,7 @@
 ---
 name: dev-flow
 description: >
-  Issue/Plan-driven development lifecycle workflow. Use when creating or advancing Plans, organizing implementation and review, running approve/complete/verify/archive gates, coordinating user validation, or breaking PRDs/Issues into tasks.
+  Manage project Issues and implementation Plans. Use when managing Issues, creating or revising Plans from approved Proposals with plan delivery or authorized work within settled design, coordinating Tasks or multiple Plans, or advancing an existing Plan through implementation, review, user validation, integration, and archive.
 ---
 
 # dev-flow — Issue / Plan Development Workflow
@@ -39,9 +39,15 @@ Apply these rules in order before entering the lifecycle; do not use a complicat
 
 See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.md` and `references/active-plan-graph.md` for Plan/Graph authoring, and `references/commands.md` for exact commands.
 
-## DESIGN, Plan, implementation
+## Plan authority and responsibility
 
-Approved Proposal → Plan → implementation → present-state DESIGN → engineering rules. A Plan organizes implementation; the authorized source determines its target and boundaries. For work inside settled design, an Issue or explicitly authorized Plan uses the applicable Active DESIGN and user authorization. A Plan derived from an approved Proposal cites that Proposal's target contracts and applicable unchanged architecture; present-state DESIGN is synchronized after delivery, not pre-written.
+A Plan is optional implementation orchestration, not solution design or design approval. Establish authorization and delivery mode before entering the Plan lifecycle:
+
+- Approved Proposal with `Delivery: plan` → organize implementation under its target, contracts, acceptance, and unchanged governing design constraints; `Delivery: direct` → route to `df-implement` without creating a Plan.
+- Issue or explicitly authorized work within settled design → implement bounded tasks directly; create a Plan from authorized scope and applicable design when complex orchestration is needed or the user explicitly requests a Plan.
+- PRD, product DESIGN, and Phase provide product intent, architectural constraints, and traceability. Route unresolved material design decisions to `dev-proposal` for discussion and approval; do not derive implementation Plans directly from PRDs or Phases.
+
+A Plan organizes implementation of the settled solution. Synchronize present-state DESIGN and affected glossary after verified implementation, not in advance.
 
 Before submission, read `references/plan-guide.md` for design-source selection, Task derivation and acceptance coverage. Resolve material design choices upstream; do not turn design approval into implementation Tasks. The controller keeps the Plan consistent with its authorization.
 
@@ -77,7 +83,7 @@ Graph maintenance and lifecycle commands are currently two consecutive controlle
 
 | Stage | Controller action | User gate |
 |---|---|---|
-| planning | Write the Plan, align it to DESIGN, run `submit` | none |
+| planning | Write the Plan, align it to the authorized target, run `submit` | none |
 | reviewing | Revise the not-yet-approved Plan from feedback | user approves the Plan |
 | executing | Organize implementation, implementation review, Agent Verification | no new scope/design authority |
 | verifying | Coordinate user validation and any rework | user confirms validation; user confirms any Plan/design change |
@@ -90,13 +96,13 @@ Never force an illegal transition; return to the correct step instead.
 
 Create or locate Plans through `flow.sh plan ...`. Do not hand-create new Plan files or grep/glob around the space to guess where an existing Plan lives. Use `plan status` for a known name and `plan list` for browsing.
 
-Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. Before splitting Tasks, compare the settled design against the existing implementation, extract the contracts that need to be delivered, and ensure every one has a Task and behavioral AC. A Plan fixes behavior, acceptance, contracts, and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
+Write the Plan's actual content in the user's preferred language; keep structural headings and field names required by the template unchanged. Prefer plain language that a human reviewer can understand directly; use technical terms only where Interface, Constraints, commands, types/protocols, or similar precision requires them. Before splitting Tasks, compare the authorized target against the existing implementation, extract the contracts to deliver, and ensure every one has a Task and behavioral AC. A Plan refines implementation outcomes and acceptance within settled contracts and boundaries; internal implementation details stay with implementation. Task format, TDD selection, ACs, metadata, and naming rules live in `references/plan-guide.md`.
 
 `Delegation Strategy` must assign Tasks from the currently available agents based on capability and Task relationships; the Agent column contains only the specific agent name.
 
 Only an Issue-bound Plan mirrors its content to GitHub. After a substantive change to a Plan whose metadata has `Issue: #N`, run `flow.sh sync-issue <plan> --body-only` so the Issue's Goal / Scope / Acceptance Criteria and Plan link stay aligned. A Plan with `Issue: N/A` has no Issue to update; the Plan file is its own record, so skip that step.
 
-After writing the Plan, the controller must run `flow.sh submit <plan>` to reach `reviewing` before asking the user to review it. `submit` already runs `plan check`; a manual check first is unnecessary.
+After writing the Plan, the controller must run `flow.sh submit <plan>` to reach `reviewing`, use `df-proposal-review` in Plan mode for independent review and resolve material findings, then ask the user to approve the implementation arrangement. `submit` already runs `plan check`; a manual check first is unnecessary. Do not re-approve the settled decisions of an approved Proposal.
 
 While the Plan is in `reviewing`, it is not approved yet. The controller may revise it from user feedback; an Issue-bound Plan is synced again with `sync-issue`, and no reset or second submit is required. The user's approval applies to the current Plan version.
 
@@ -195,13 +201,11 @@ flow.sh complete <plan>
 
 ## Conflicts and rework
 
-For a Proposal-driven delivery, rework follows the current authorized Proposal, the authorization rules above and the artifact-sync order in `df-implement`. The following DESIGN + Plan classification applies to legacy contracts and Issue-driven work.
+When implementation or validation reveals disagreement among the authorized target, Plan, existing design, and code reality, classify the problem:
 
-When implementation or validation reveals disagreement among the Plan, DESIGN, and code reality, the controller classifies the problem:
-
-- **Implementation problem**: existing DESIGN + approved Plan already answer it → fix the code inside the current boundaries and re-verify.
-- **Plan problem**: continuing requires a substantive approved-Plan change → explain cause and impact, then wait for user confirmation before revising the Plan and syncing its Issue, if it has one.
-- **Design problem**: continuing requires a DESIGN change → get the user's decision on the design target, run the appropriate design-maintenance flow, then realign the Plan.
+- **Implementation problem**: the authorized target, unchanged constraints, and approved Plan already answer it → fix code within the current boundaries and re-verify.
+- **Plan problem**: implementation arrangement needs a substantive revision without changing the authorized target → explain cause and impact, get user confirmation, then revise the Plan and sync its Issue where applicable.
+- **Design problem**: a target solution or existing design decision must change → stop affected implementation. For Proposal-driven work, maintain explicit user-authorized adjustments to the current Proposal under `dev-proposal`; for other work requiring a new design decision, form and approve a Proposal before coordinating subsequent implementation. Synchronize present-state DESIGN under `df-implement` after verified implementation.
 
 Do not use `reset` as a substitute for this decision. `reset` is destructive and runs only on explicit user request.
 
@@ -233,7 +237,7 @@ Default to validating before integration. Integrate-first is a user choice, not 
 
 `preserve-history` is an explicit exception only: the integration branch keeps the development commits only when `Integration Strategy` is already `preserve-history` and the user explicitly chooses that history-preserving delivery before integration. The default path must not fall back to ordinary `git merge`, which can carry intermediate commits or an extra merge commit into formal history.
 
-Rework during validation follows the conflict rules above. For Proposal-driven work, implement the current user-authorized Proposal; update it first where possible for an explicit user decision, then coordinate the Plan and delivered artifacts. Legacy Plans and Issue-driven work retain their existing contract.
+Rework during validation follows the conflict rules above. For Proposal-driven work, implement the current user-authorized Proposal; update it first where possible for an explicit user decision, then coordinate the Plan and delivered artifacts. For work within settled design, follow the authorization and conflict rules above.
 
 After the user explicitly confirms validation and authorizes the corresponding closure, finish the selected formal integration path and run:
 
@@ -267,7 +271,7 @@ Do not load a separate worktree-management skill to take over worktrees already 
 |---|---|
 | `approve --confirm` | explicit approval of the current Plan |
 | substantive approved-Plan change | explicit confirmation of that Plan revision |
-| DESIGN change | explicit confirmation of the design target/revision |
+| Change to a design decision or target solution | explicit user authorization; maintain the Proposal under `dev-proposal` and synchronize present-state DESIGN from verified results |
 | user validation result | explicit pass confirmation or failure feedback |
 | `integrate --confirm` | when a work branch exists, explicit authorization to write this Delivery to the integration branch |
 | `verify --confirm` | explicit confirmation of that Plan's validation result and authorization to advance its state |
@@ -277,10 +281,10 @@ Do not expand a single instruction such as “commit it” into authorization fo
 
 ## Boundaries that must hold
 
-- Do not bypass dev-flow for design-bearing work.
+- Plan orchestration follows the user's delivery choice; approved Proposal direct delivery and direct implementation within settled design stay outside the Plan lifecycle.
 - Ontology issues are not dev-flow work. When an Issue's project is the ontology component — its changes land in the ontology worktree (skills, rules, agents, commands, plugins, assembly) rather than in a repository under `projects/` — hand it to `ontology-evolution` instead of planning it here. The Issue stays the demand record; the proposal is the implementation authority. See `references/issue-guide.md` for how `--project` decides this.
 - Do not ask for Plan approval before `reviewing`, and do not implement an unapproved Plan.
-- Do not rewrite approved Plan intent or DESIGN and continue without user confirmation.
+- Handle substantive changes to an approved Plan or target solution under the authorization and conflict rules.
 - Do not `complete` before implementation review PASS and Agent Verification are complete.
 - Do not invite final user validation before `complete` reaches `verifying`.
 - Never tick User Validation for the user.

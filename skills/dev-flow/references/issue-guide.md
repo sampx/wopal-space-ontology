@@ -22,7 +22,7 @@ flow.sh issue create --title "coordinate api and web" --project api --project we
 | Issue 要改的东西 | `--project` | 后续流程 |
 |---|---|---|
 | 本体组件（本体 worktree 下的 skills、rules、agents、commands、plugins、assembly） | 该组件在 `STRUCTURE.md` 里的项目名 | `ontology-evolution` |
-| `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | `dev-flow` |
+| `projects/` 下的某个仓库 | 该仓库在 `STRUCTURE.md` 里的名字 | 按 SKILL.md 判断 Proposal、直接实施或 Plan |
 
 名字从 `STRUCTURE.md` 读，不要凭印象猜。Issue 标签表示影响范围；普通 Plan 的 Target Project 才决定 Plan 落到 `.wopal-space/plans/<name>/`。
 
@@ -54,7 +54,7 @@ flow.sh issue merge --into 40 41 42
 先判断工作对象，再决定流程：
 
 - 改的是本体 worktree 下的技能、规则、agent、命令、插件、装配 → 本体提案（`ontology-evolution`）
-- 改的是 `projects/` 下的代码 → dev-flow Plan
+- 改的是 `projects/` 下的代码 → 需要新设计决定先走 `dev-proposal`；既定设计内的已授权工作按 SKILL.md 选择直接实施或 Plan。
 
 拿不准时看改动路径落在哪个组件。详见 `space-master` 的场景路由表。
 
@@ -153,13 +153,17 @@ Issue 标题是**自由文本**，不再强制 `type(scope): description` 格式
 flow.sh sync-issue <issue> --body-only
 ```
 
-## Issue 驱动 vs 无 Issue 流程
+## Plan 是否关联 Issue
 
-| 模式 | 触发词 | 流程 |
-|------|--------|------|
-| Issue 驱动 | Issue 号、"处理 issue"、"开发" | 先创建 Issue → 再出 Plan |
-| 无 Issue（Plan 驱动） | "出方案"、"写 Plan" | 直接 `flow.sh plan new --project ... --type ... --slug ...` |
+先按 SKILL.md 判定授权及交付方式，再决定是否创建 Plan、是否关联 Issue。
+
+| 场景 | 流程 |
+|------|------|
+| 已有授权且需要 Plan，存在关联 Issue | 使用 `flow.sh plan new <issue> ...` |
+| 已有授权且需要 Plan，无关联 Issue | 使用 `flow.sh plan new --project ... --type ... --slug ...` |
+
+用户要求讨论或“出方案”时，交 `dev-proposal`；Issue 号或“开发”本身不表示必须创建 Plan。
 
 一个目标需要**多份**实施时，不要合并成一个跨项目 Plan；分别创建多份 Plan，再用 Active Plan Graph `groups` 组织共同目标、用 `edges` 表达实施先后。详见 `references/plan-guide.md` / `references/plan-guide.zh-CN.md` 与 `references/active-plan-graph.md`。
 
-两者都是 dev-flow 流程，区别在于是否有 Issue 载体。
+两种 Plan 组织方式的区别只在于是否有 Issue 载体；不改变提案授权或交付选择。
