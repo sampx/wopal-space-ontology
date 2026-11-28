@@ -77,6 +77,8 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 **Proposal sync** — Apply `dev-proposal`'s `references/lifecycle.md` and `references/supersession.md` to authorized adjustments, fact synchronization or migration. Migrate only after full delivery and user acceptance. The controller coordinates shared files.
 
+**Quality gate** — run the quality gates the project's `AGENTS.md` declares for the change (lint, format, typecheck, static test/architecture checks, plus the tests that cover what you changed) and put the real command and result in the report. Scale the scope to the change: run the layer that can prove it, and widen toward the project's full local replica as the change crosses module boundaries or approaches delivery. The project's rules own that ladder — do not restate or invent it here. A gate that first runs in `pre-commit` or CI has run too late: the implementer verifies the change, not the hook.
+
 **Rules gate** — apply the applicable `space-master` quality checks and verifiers to affected rules at all tiers and report actual results. Testing follows the resident `rules/testing.md`.
 
 ## Read before writing

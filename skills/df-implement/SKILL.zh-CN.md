@@ -73,6 +73,8 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 **Proposal 同步** — 按 `dev-proposal/references/lifecycle.md` 和 `references/supersession.md`（相对于 dev-proposal）完成授权调整、事实同步或迁移；全部交付并经用户验收前不迁移。主控协调共享文件。
 
+**质量门禁** — 按项目 `AGENTS.md` 声明的质量门禁执行本次改动适用的检查（lint、format、typecheck、测试/架构静态检查，以及覆盖本次改动的测试），并把真实命令与结果写进报告。范围随改动放大：先跑能证明它的那一层，跨模块边界或接近交付时再扩到项目规定的完整本地副本；这套阶梯由项目规约拥有，不要在此复述或自造。只在 `pre-commit` 或 CI 才第一次跑的门禁已经太晚了——验证由实施者负责，不是钩子。
+
 **规约门禁** — 对受影响的各级规约执行 `space-master` 规定的适用质量检查和校验，报告真实结果。测试遵循常驻的 `rules/testing.md`。
 
 ## Read before writing

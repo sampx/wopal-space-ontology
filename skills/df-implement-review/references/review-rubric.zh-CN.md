@@ -205,6 +205,7 @@ export function useAuth() { return { user: null, login: () => {}, logout: () => 
 | 假断言（占位断言） | `rg -n 'expect\(true\)|expect\(false\)|expect\(1\)'` | 被当作有效验证证据时 **BLOCKER** |
 | 弱断言（只查存不存在） | `rg -n 'toBeDefined|toBeTruthy|not\.toBeNull'` | 根据实际行为和其他验证证据判断是否存在有价值的覆盖缺口 |
 | 根本没写断言 | `rg -c 'expect\|assert' <file>` 结果为 0 | 仅是线索；检查 runner、退出状态和实际结果，按验证缺口定级 |
+| 用源码文本匹配代替行为验证 | 测试读取产品源码文件、对其原始文本做断言（`toContain`/`toMatch`/`indexOf`/`includes`/`match`/`matchAll`/`RegExp.test`），而不是真正执行行为 | 当该测试被当作行为验证证据时 **BLOCKER**：逻辑改坏它照样绿，正常重构它反而碎。以下属合法放行、不算缺陷：读取非源码契约文件（配置、清单、文档）、将读取结果交给 Function/VM/子进程执行、交给 AST 分析器，或经过评审并写明静态审计理由的单文件例外。先看项目自身的静态门禁——已登记理由的例外是决定，不是缺陷 |
 | 设计明确承诺的行为没有测试 | 对照承诺清单逐条找测试或其他有效验证 | 必需验证不足按 SKILL.md 定级；不重复要求等效测试 |
 
 衡量标准只有一条：**如果把对应的业务功能改坏，这个测试会报错变红吗？** 把功能代码删了还能绿的测试就是摆设。
