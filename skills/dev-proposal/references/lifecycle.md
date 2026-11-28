@@ -104,7 +104,7 @@ Fixed entry and exit sections; `Design Decisions` is optional:
 - `## Problem`: why this has to happen now. It must stand without the solution — a reader understands the pain before reading the proposal.
 - `## Design Basis`: applicable design authorities, inherited constraints, and explicitly changed existing design.
 - `## Proposal`: determinate and complete target design per `specification.md`; organize bespoke sections by domain.
-- `## Design Decisions` (optional): final choices, material reasons, and lasting rejected alternatives or residual costs. Put risk controls in target contracts.
+- `## Design Decisions` (optional): rationale only. Record a choice here only when changing it would be costly, a future reader would find it puzzling without context, and real alternatives were weighed; state context, choice and reason in one to three sentences. Never restate behavior already stated in `## Proposal` — the target solution owns it. Put risk controls in target contracts.
 - `## Acceptance criteria`: cover important contracts; a third party can judge met or unmet.
 
 ### `implemented/` — present tense
