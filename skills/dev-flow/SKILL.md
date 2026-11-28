@@ -41,41 +41,11 @@ See `references/issue-guide.md` for Issue labels/merge, `references/plan-guide.m
 
 ## DESIGN, Plan, implementation
 
-**Proposal-driven Plans follow: approved Proposal → Plan → implementation → present-state DESIGN → engineering rules at all tiers.** The Plan organizes tasks; the Proposal owns the target, scope, decisions and acceptance. For explicit user-authorized adjustments during validation, the controller maintains the current Proposal first where possible under `dev-proposal`, coordinates Plan tasks/ACs, and follows `df-implement` for implementation and artifact sync. No duplicate approval or new Plan state.
+Approved Proposal → Plan → implementation → present-state DESIGN → engineering rules. A Plan organizes implementation; the authorized source determines its target and boundaries. For work inside settled design, an Issue or explicitly authorized Plan uses the applicable Active DESIGN and user authorization. A Plan derived from an approved Proposal cites that Proposal's target contracts and applicable unchanged architecture; present-state DESIGN is synchronized after delivery, not pre-written.
 
-The DESIGN → approved Plan → implementation constraints below apply to legacy in-flight Plans under their existing contract and Issues within settled designs; they do not require updating present-state DESIGN in advance of a Proposal-driven delivery.
+Before submission, read `references/plan-guide.md` for design-source selection, Task derivation and acceptance coverage. Resolve material design choices upstream; do not turn design approval into implementation Tasks. The controller keeps the Plan consistent with its authorization.
 
-- DESIGN defines the target state.
-- The Plan translates the settled design into implementation Tasks, with delivery boundaries and behavioral acceptance.
-- Implementation realizes that delivery inside those constraints.
-
-**Hard authoring boundary for design-backed Plans:**
-
-1. **Finish design first.** Resolve target behavior, ownership, edge cases and cross-module paths in Active DESIGN before deriving implementation Tasks. Design writing, design review and the document-set quality gate belong to the preceding design workflow.
-2. **Plan only implementation.** Each Task must deliver a concrete part of the settled design in running code, tests or other implementation artifacts. Never add Tasks to create, align, approve or verify the controlling DESIGN, and never add a document-format/consistency check as a feature Acceptance Criterion. Cite DESIGN through `Design Source`, not through an implementation task to author it.
-3. **Trace design changes to delivery.** Identify the new/changed design contracts and map each to implementation Tasks and observable acceptance; do not substitute a list of files, a green quality gate or a test command for that coverage.
-4. **Do not revise design during execution.** Implementers may read DESIGN but may not silently edit or re-decide it, including to make tests pass. If the agreed contract cannot be implemented, stop the affected work, explain the conflict and impact, and request the user's design decision before changing DESIGN or the approved Plan.
-
-This boundary governs Plans implementing a formal design; it does not prohibit an explicitly requested, standalone documentation deliverable whose *product* is documentation rather than the controlling DESIGN for a code change.
-
-### Before Plan approval
-
-The controller is responsible for making the Plan match formal DESIGN. Design facts for project/phase Plans may come only from DESIGN/sub-DESIGN documents with `Status: Active`; every Task maps to a concrete section, decision, or contract through `Design Source`.
-
-`Draft` / `Proposed` designs are not settled. They may be used only as forward-looking reference, never as `Design Source` or as the basis for implementation targets, contracts, or acceptance. If the Plan itself is wrong or incomplete, fix it directly; if the Active DESIGN conflicts with the user's intended goal, do not choose for the user — ask whether the design should change.
-
-`Design Source: N/A` is valid only for simple work with no project and no design basis.
-
-### After Plan approval
-
-The substantive content of an approved Plan and the DESIGN are no longer autonomous edit surfaces for the controller.
-
-Lifecycle records — status, checkboxes, AC verification commands, Done evidence — may still be updated as defined. Substantive Tasks, scope, boundaries, behavior, approach, and acceptance intent may not be changed on the controller's own authority.
-
-When implementation or validation exposes a problem:
-
-1. If it can be solved inside the existing DESIGN + approved Plan, the controller may investigate, decide, and continue.
-2. If the approved Plan or DESIGN must change, stop affected implementation, explain the conflict and impact to the user and let the user decide which side changes. Edit neither first; resume only after that decision.
+After approval, maintain workflow records (status, checkboxes, AC commands, Done evidence) normally. If a substantive target, scope, interface or acceptance change is needed, stop affected work and return the decision to the user. For explicitly authorized Proposal adjustments, follow `dev-proposal` to maintain the current Proposal, coordinate Task/AC changes, and use `df-implement` for delivery sync. No duplicate approval or new state.
 
 ## Lifecycle
 

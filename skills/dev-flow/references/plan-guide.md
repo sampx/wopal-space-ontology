@@ -27,19 +27,16 @@ Write Plan content in the user's preferred language while keeping template headi
 
 Use exact technical terms where precision matters — especially `Design Source`, `Interface`, `Constraints`, commands, identifiers, types, and protocol names. When a non-obvious term is unavoidable, explain its practical meaning on first use. Do not repeat the same fact across multiple fields.
 
-## A Plan must come from formal design
+## Plan must derive from an authorized design
 
-For project/phase work, use only DESIGN/sub-DESIGN documents with `Status: Active` as design facts before splitting Tasks. Every Task uses **Design Source** to point to the concrete section, decision, or contract it implements; list multiple sources when needed. `N/A` is only for simple work with no project and no design basis.
+Choose `Design Source` by authorization: a Proposal-derived Plan cites the current approved Proposal's relevant target sections and unchanged governing DESIGN/companion contracts; work within settled design cites applicable Active DESIGN and the authorized Issue or user scope. Every Task names the concrete decision/contract it implements using space-relative paths and headings; list multiple sources when needed. Use N/A only for simple work with no project and no design basis.
 
-**Design work is upstream, not a Plan deliverable.** Settle design content, review, and documentation consistency through the design workflow before submitting an implementation Plan. Do not put DESIGN creation/revisions, design approval, or `verify-docset.py` into implementation Tasks, `Affected Files`, or functional Agent Verification. A design document is an authority cited through `Design Source`, not a file the implementing agent is tasked to write. Routine read-only consultation of the design is expected during implementation; editing or revalidating its content is not an implementation step. A separately requested documentation product can have its own delivery scope, but must not be used as a preliminary Task for a code Plan.
+Derive Tasks from the authorized target against real code and entry paths. Map every material changed contract to an implementation owner and falsifiable AC, including affected existing invariants. A document gate does not prove runtime behavior. Unapproved proposals and Draft/Proposed DESIGNs are research references, not target authority.
 
-**Derive Tasks from the design delta.** Compare the Active DESIGN's new/changed behavior and ownership with real code and all applicable entry paths. For each contract, name the implementation outcome, its Task owner, and the observable AC that would detect failure. An unchanged design contract can still need regression protection when implementation touches it; a documentation gate never proves a runtime contract.
+Design analysis, decisions and approval are upstream. A code Plan organizes implementation, tests and delivery synchronization under `df-implement`, not preliminary Tasks to author or approve its controlling design. A separately requested documentation product can have its own delivery scope.
 
-`Draft` / `Proposed` designs may appear only in Research Findings / References as explicitly unsettled forward-looking material. They never belong in Design Source and must not define Behavior, Key Interfaces, ACs, or implementation targets.
+Before approval, correct Plan inconsistencies with the authorized target; if the target is materially unresolved or conflicts with unchanged governing design, return the decision to the user. After approval, substantive changes follow SKILL.md's authorization boundary.
 
-Before approval, fix the Plan when it disagrees with Active DESIGN; if no Active design basis can be found, the Plan is not ready to submit. If the Active DESIGN itself conflicts with the user's goal, do not edit design on your own — ask the user to decide the design target. After approval, substantive changes to either the Plan or design require user confirmation.
-
-When implementation exposes a missing or contradictory design decision, stop affected work and return the conflict to the controller and user. Do not amend the design or expand/reduce Tasks during execution to work around it.
 
 ## How to define contracts: Key Interfaces
 
@@ -166,7 +163,7 @@ Actually touched files: (backfilled after controller acceptance)
 | Field | Required | Meaning |
 |------|------|------|
 | **Verification Intent** | yes | Which Agent Verification entries this Task is responsible for |
-| **Design Source** | project/phase Plans | Authoritative Active DESIGN `path#heading`; simple no-design work may use N/A |
+| **Design Source** | project/phase Plans | Approved Proposal or applicable settled DESIGN/authorization `path#heading`; simple no-design work may use N/A |
 | **Behavior** | yes | Observable outcome in plain language; technical precision only where needed |
 | **Pre-read** | yes | Files/docs the Plan author already found important to read first; N/A if none |
 | **Interface** | optional | Task-local contract added/changed/removed or explicitly preserved |

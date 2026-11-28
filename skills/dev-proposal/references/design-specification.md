@@ -12,15 +12,7 @@ Organize the Proposal around actual domain concepts with bespoke sections rather
 
 ## Contract coverage
 
-Reuse the five-point coverage method in dev-doc-master's design-project-guide.md, describing the target rather than claiming delivery. For every important capability or flow, determine applicable aspects:
-
-- Actors, triggers, inputs, and preconditions.
-- Module responsibilities, collaboration sequence, interface inputs/outputs, and dependency direction.
-- Permissions, business rules, defaults, limits, invariants, and material branches.
-- Data, state ownership, lifecycle, and side effects.
-- Complete failure outcomes, partial success, recovery, and compatibility behavior.
-
-For non-behavioral design, select relevant guidance in design-practices.md. Do not require irrelevant headings or exhaustive code details. Use terms consistently with existing DESIGN and any glossary; define new or changed terms in the target design.
+Load the five-point coverage standard in `dev-doc-master/references/design-project-guide.md` and apply it to each material target capability and flow without claiming delivery. Use `design-practices.md` for applicable domain-specific details, not mandatory headings. Follow existing DESIGN and glossary vocabulary; define changed terms in the target.
 
 ## Important design decisions and risks
 

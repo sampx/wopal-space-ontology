@@ -1,6 +1,6 @@
 # 文档集一致性 — 通用规则
 
-这些规则适用于产品与项目文档集中的每一份文档：PRD、产品 DESIGN、项目主/子现状 DESIGN，以及它们与 Proposal、AGENTS.md 的分工。目标是让每份文档保持单归属、可核实、低冲突、易读懂，并将维护成本控制到最低。
+这些规则适用于产品与项目文档集中的每一份文档：PRD、产品 DESIGN、项目主/子现状 DESIGN、领域术语表，以及它们与 Proposal、AGENTS.md 的分工。目标是让每份文档保持单归属、可核实、低冲突、易读懂，并将维护成本控制到最低。
 
 ## 不编号章节
 
@@ -71,9 +71,11 @@
 支持性文档按**内容职责**分类，而非按原文件名猜测：
 
 - **子 DESIGN**（`DESIGN-<module>.md` 或 `DESIGN-<topic>.md`）：分解主 DESIGN 中某独立模块或架构关注点的正式架构/契约文档。头部携带 `Parent: ./DESIGN.md`，由主文档正文模块地图或章节链接引用，不出现在末尾 `## Reference Documents` 中。
-- **伴随文档**（如 `BRANDING.md`、`API-CONTRACT.md`）：属于文档集、跨切面复用但并非主 DESIGN 某模块分解的单一真相源。保持原文件名，不强改 `DESIGN-*.md`，在主文档头部 `Companion Documents` 或文档关系表中声明。
+- **伴随文档**（如 `BRANDING.md`、`API-CONTRACT.md`、`GLOSSARY.md`）：属于文档集、跨切面复用但并非主 DESIGN 某模块分解的单一真相源。保持原文件名，不强改 `DESIGN-*.md`，在主文档头部 `Companion Documents` 或文档关系表中声明。
 
 若一份原本使用临时名称（如 `AUTH-PROTOCOL.md`）的文件实际承担某个模块或架构子系统的完整契约，应分类并重命名为 `DESIGN-<module>.md`，加上 `Parent: ./DESIGN.md`，并纳入主文档地图。
+
+领域 `GLOSSARY.md` 在产品或项目范围内拥有标准术语定义，按 `references/glossary.md` 编写，由所属主 DESIGN 或 PRD 在 `Companion Documents` 声明。项目引用已有产品级定义，不重复维护。尚待交付的新概念或定义变化归 Proposal，术语表不承担行为契约或架构设计。
 
 ## 文档生命周期：草稿与生效
 
@@ -100,7 +102,7 @@
 | `Sibling DESIGNs` | 产品 DESIGN | 本产品核心子系统的项目 DESIGN；其契约约束本设计 |
 | `Sub-DESIGNs` | 历史兼容 | 仅用于容忍存量未改老文档不报未知字段错；所有产品与项目主 `DESIGN.md` 均不再在头部枚举子文档 |
 | `Sub-PRDs` | 主 PRD | 主 PRD 下每个 `PRD-<topic>.md` 枚举 |
-| `Companion Documents` | 主 DESIGN / PRD | 跨切面伴随真相源（如 `BRANDING.md`、`API-CONTRACT.md`） |
+| `Companion Documents` | 主 DESIGN / PRD | 跨切面伴随真相源（如 `BRANDING.md`、`API-CONTRACT.md`、`GLOSSARY.md`） |
 | `Scope` | 任何文档 | 标题本身存在歧义时用一行收窄本文档覆盖范围 |
 
 两条约束：
@@ -112,12 +114,13 @@
 
 每次创建或更新文档集收尾时，先完成语义审查，再运行确定性脚本（不可用脚本替代语义审查，也不可跳过脚本检查）：
 
-1. **语义审查（必查）**：依据 `references/design-project-guide.md` 完成文字质量、**五项必填覆盖要素**与防漂移审查（其中语言自然清晰、单归属与 **Slop Checklist** 适用于全部文档；**“必须已交付并经代码/运行实测核实”仅约束项目与模块现状 DESIGN**，产品 PRD 与产品 DESIGN 含产品子 DESIGN 允许并应该先于项目实施规划目标架构与未来演进）。
+1. **语义审查（必查）**：依据 `references/design-project-guide.md` 完成文字质量与防漂移审查；**五项必填覆盖要素**用于实际存在的行为契约，不要求术语定义描述行为流程；术语表按 `references/glossary.md` 核查（其中语言自然清晰、单归属与 **Slop Checklist** 适用于全部文档；**“必须已交付并经代码/运行实测核实”仅约束项目与模块现状 DESIGN**，产品 PRD 与产品 DESIGN 含产品子 DESIGN 允许并应该先于项目实施规划目标架构与未来演进）。
 2. **机械门禁（必过）**：运行 `python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md`（代码与文档联动交付时加 `--check-sync [--base <git-ref>]`；PRD 使用 `--main PRD.md`），验证：
    - 扫描磁盘发现 `DESIGN-*.md` 子文档并确认每个子文档头部带有 `Parent: ./DESIGN.md` 指回（**全面取消所有主文档的 `Sub-DESIGNs` 头部枚举检查**；存量历史文档保留该字段亦不报未知字段错），且均在主文档正文除 `Reference Documents` 外被链接（零孤立子文档）
    - 零绝对路径（`/Users/...`、`/Volumes/...`、`file:///...`）
    - 相对 Markdown 链接与头部 `./`、`../` 反引号路径均能解析到存在的文件
    - 末尾 `## Reference Documents` 不重复列出头部链接或本地子 DESIGN
+   - 按需存在的本地 `GLOSSARY.md` 在所属主 DESIGN 或 PRD 的 `Companion Documents` 头部登记，并参与通用结构检查；不存在时不强制创建
    - 零未替换模板占位符与空表格骨架行
    - 所有 `##` 章节非空，且项目主/生效模块子文档必备 `## Business Rules and Failure Boundaries`
    - 无过程态禁语（`deprecated`、`moved from`、`no longer`、`已废弃`、`已放弃`、`不再执行`、`历史机制` 等），含 `Updated` 日期、合法英文头部字段与有效 `Status`（`Draft` / `Proposed` / `Active`）
@@ -131,9 +134,10 @@
 |---|---|---|
 | PRD 变更 | 产品 DESIGN、受影响项目现状 DESIGN 边界 | 若为未实施能力，走 Proposal 而非预写进现状 DESIGN |
 | 产品 DESIGN 变更 | 关联子系统现状 DESIGN（是否产生漂移或需发起 Proposal） | 保持原有产品架构与能力图结构 |
-| 代码/功能/Bug 交付 | 受影响模块的 `DESIGN-<module>.md`（+ 必要时薄主 `DESIGN.md`）+ 对应 Proposal | 纯内部重构不动 DESIGN；并行期写集外漂移只上报主控 |
+| 代码/功能/Bug 交付 | 受影响模块的 `DESIGN-<module>.md`（+ 必要时薄主 `DESIGN.md`）、受影响的术语表定义及对应 Proposal | 纯内部重构不动 DESIGN；并行期写集外漂移只上报主控 |
 | 项目主 `DESIGN.md` | 下属受影响子 `DESIGN-*.md`、关联产品架构边界 | 保持主文档为薄地图，不堆入模块实现细节 |
 | 模块子 `DESIGN-<module>.md` | 主 `DESIGN.md` 模块地图中对应一行定位描述 | 仅当模块增删或职责改名时才更新主地图 |
+| `GLOSSARY.md` | 所属 DESIGN / PRD、继承术语及使用受影响术语的文档 | 现有含义可直接澄清；领域含义变化须经设计授权及交付核实 |
 | `AGENTS.md` | 对应项目/模块现状 DESIGN 与实际命令/测试结果 | 长期工程约束变更交 `space-master` 维护 |
 
 ## 文档角色：什么内容归哪里
@@ -143,9 +147,10 @@
 | 文档载体 | 承载的内容 | 不承载的内容 |
 |---|---|---|
 | **PRD** | 产品意图、用户问题、价值主张、产品范围与边界 | 内部架构、模块布局、技术选型、验收代码详情 |
-| **Proposal**（`proposals/{proposed,implemented,rejected,archived}/{class}/...`） | 重大变更的设计理由、方案对比、未实施计划（`proposed/`）、最终决策与后果（`implemented/`）、否决防错理由（`rejected/`） | 充当日常系统说明书；记录细粒度代码任务进度 |
+| **Proposal**（`proposals/{proposed,implemented,rejected,archived}/{class}/...`） | 确定的目标设计与重要决策理由（`proposed/`）、最终决策与后果（`implemented/`）、否决防错理由（`rejected/`） | 充当日常系统说明书；记录细粒度代码任务进度 |
 | **Product DESIGN** | 产品系统分层、子系统边界、运行时模型、端到端流程、能力路线图 | 单项目内部实现、未交付过程台账 |
 | **Project / Sub DESIGN**（现状文档） | **已落地可核实的**项目/模块能力（用户优先）、组件协作、接口与状态契约、**生效业务规则**、异常与完整失败边界 | 未实施蓝图、思考过程、手抄文件树/全量参数表、测试步骤 |
+| **GLOSSARY.md**（可选伴随文档） | 标准领域术语、含义、概念关系及范围 | 行为规则、接口契约、实现细节、尚未交付的新定义 |
 | **Plan**（可选，复杂实施使用） | 复杂跨模块/跨项目的 Task 拆分、并行写集划分、验证与交付编排 | 替代 Proposal 做架构审批，或替代 DESIGN 成为长期系统说明 |
 | **AGENTS.md** | Agent 操作命令、门禁检查、编码约定、分支/测试要求（由 `space-master` 维护） | 系统架构叙事、业务规则讲解、方案对比 |
 

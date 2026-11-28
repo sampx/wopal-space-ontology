@@ -63,7 +63,7 @@ Never list the same document in both places.
 
 ## Companion Documents in the Header
 
-Truth sources like `BRANDING.md` or `API-CONTRACT.md` that serve cross-cutting concerns keep their descriptive names and are declared in `Companion Documents`. Supporting files that actually detail an architectural module or subsystem of the main DESIGN are renamed to `DESIGN-<module>.md`, given `Parent: ./DESIGN.md`, and linked from the main body map (`consistency.md` details classification by content).
+Truth sources like `BRANDING.md` or `API-CONTRACT.md` that serve cross-cutting concerns keep their descriptive names and are declared in `Companion Documents`. An optional domain `GLOSSARY.md` follows `references/glossary.md`; register it in the owning main DESIGN or PRD header, never as a sub-DESIGN. Supporting files that actually detail an architectural module or subsystem of the main DESIGN are renamed to `DESIGN-<module>.md`, given `Parent: ./DESIGN.md`, and linked from the main body map (`consistency.md` details classification by content).
 
 ## Metadata Field Semantics
 

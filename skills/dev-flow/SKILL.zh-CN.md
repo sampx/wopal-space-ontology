@@ -41,41 +41,11 @@ description: >
 
 ## DESIGN, Plan, implementation
 
-**提案驱动的 Plan：已批准 Proposal → Plan → 实现 → 现状 DESIGN → 各层级规约。** Plan 只组织任务；目标、范围、设计与验收来自 Proposal。用户在验证阶段明确授权调整时，由主控按 `dev-proposal` 优先更新当前提案，并协调 Plan 任务及 AC，再按 `df-implement` 实施和同步成果；不重复审批，不改变 Plan 状态机。
+已批准 Proposal → Plan → 实现 → 现状 DESIGN → 工程规约。Plan 组织实施，授权来源确定目标和边界。既定设计内的 Issue 或明确授权 Plan 依据适用的 Active DESIGN 与用户授权；Proposal 派生 Plan 引用获批目标契约及未变更的架构约束，现状 DESIGN 交付后同步，不提前写入。
 
-以下 DESIGN → 已批准 Plan → 实现 的约束仅适用于保留旧合同的进行中 Plan、以及既定设计内的 Issue 路线，不要求提案驱动交付提前改现状 DESIGN。
+提交前读取 `references/plan-guide.md`，按授权选择设计依据、推导 Task 和验收覆盖。重要设计决定在上游解决，不把设计审批写成实施 Task。主控负责 Plan 与授权一致。
 
-- DESIGN 定义目标状态。
-- Plan 把已经定案的设计转成具体实施 Task，明确这次交付的边界和可观察的行为验收。
-- 实现负责在这些约束内落地。
-
-**有正式设计依据的实施 Plan 必须守住编写边界：**
-
-1. **先完成设计。** 在 Active DESIGN 中确定目标行为、归属、边界情况和跨模块调用路径，再拆实施 Task。设计编写、设计评审和文档集质量检查都属于 Plan 之前的设计流程。
-2. **Plan 只安排实施。** 每个 Task 都必须交付运行代码、测试或其他真正的实施产物。不得安排编写、修改、批准、验证所依据 DESIGN 的 Task，也不得把文档格式或一致性检查当成功能验收项。通过 `Design Source` 引用 DESIGN，不要让实施 Task 编写它。
-3. **逐项落实设计变化。** 对照新增或改变的设计契约，把每项落实到实施 Task 和可观察的 AC；文件清单、质量门禁通过或测试命令本身都不能代替行为覆盖。
-4. **实施期间不擅自改设计。** 实施者可以阅读 DESIGN，但不能为了让代码或测试通过而修改、重新决定设计；发现已定案的契约无法实施时，先停止受影响工作，向用户说明冲突及影响，取得设计决策后再改 DESIGN 或已批准 Plan。
-
-以上边界针对**实施正式设计的 Plan**；如果用户单独要求交付一份文档，而文档本身就是产品，则不禁止为该独立文档交付安排任务。
-
-### Before Plan approval
-
-主控者负责让 Plan 对齐正式 DESIGN。项目/阶段 Plan 的设计事实只能来自 `Status: Active` 的 DESIGN/子 DESIGN；每个 Task 用 `Design Source` 指向其具体章节、决策或契约。
-
-`Draft` / `Proposed` 设计尚未定案，只能作为前瞻参考，不能写入 `Design Source`，也不能据此确定实施目标、契约或验收。如果只是 Plan 写错或漏写，直接修正 Plan；如果 Active DESIGN 本身与用户目标冲突，停止替用户选择，先让用户决定是否修改设计。
-
-只有没有项目、也没有设计依据的简单 Plan 才可使用 `Design Source: N/A`。
-
-### After Plan approval
-
-已批准 Plan 的实质内容和 DESIGN 都不再是主控者的自主编辑面。
-
-状态、checkbox、AC 验证命令、Done 证据等**流程记录**可以按既有规则更新；Task、范围、边界、行为、方案、验收目标等**实质内容**不能自行改变。
-
-实施或验证发现问题时：
-
-1. 如果能在现有 DESIGN + 已批准 Plan 内解决，主控者可以调查、判断并决定如何继续。
-2. 如果必须修改已批准 Plan 或 DESIGN，先停止受影响的实施，向用户说明冲突和影响，让用户决定改哪一边；确认前两者都不改，取得决定后再恢复。
+批准后正常维护状态、checkbox、AC 命令、Done 证据等流程记录。实质目标、范围、接口或验收变化需要停止受影响工作并交用户决定。用户明确授权的提案调整按 `dev-proposal` 维护当前 Proposal、协调 Task/AC，并按 `df-implement` 同步交付成果。不重复审批、不新增状态。
 
 ## Lifecycle
 

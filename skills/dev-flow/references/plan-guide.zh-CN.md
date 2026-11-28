@@ -27,19 +27,16 @@ Plan 内容使用用户偏好语言，模板的结构性 heading 和字段名保
 
 只有需要精确表达时才使用技术词，尤其是 `Design Source`、`Interface`、`Constraints`、命令、标识符、类型和协议名。不可避免的陌生术语第一次出现时顺手说明它实际意味着什么。同一件事不要在多个字段重复写。
 
-## Plan 必须来自正式设计
+## Plan 必须来自已授权设计
 
-项目/阶段 Plan 只以 `Status: Active` 的 DESIGN/子 DESIGN 为设计事实，再拆 Task。每个 Task 用 **Design Source** 指向它实现的具体章节、决策或契约；跨多个设计面就列多个 source。只有没有项目、也没有设计依据的简单 Plan 才可写 `N/A`。
+按授权选择 `Design Source`：Proposal 派生 Plan 引用当前获批提案的目标条款及未改变的 DESIGN/伴随契约；既定设计内的工作引用适用 Active DESIGN 和授权 Issue 或用户范围。每个 Task 使用空间相对路径及章节明确指向所实施决定/契约，按需列多项。仅没有项目也没有设计依据的简单工作可写 N/A。
 
-**设计工作属于 Plan 的上游，不是实施任务。** 正式实施 Plan 提交之前，先在设计流程里完成设计内容、评审和文档一致性检查。不得把 DESIGN 的创建或修订、设计审批，或 `verify-docset.py` 写入实施 Task、`Affected Files` 或功能性 Agent Verification。DESIGN 是通过 `Design Source` 引用的依据，不是实施 Agent 要编写的文件；实施过程中照常只读查阅，不把编辑或重新验证设计内容当作实施步骤。用户单独要求交付的文档可以有独立范围，但不得把它塞进代码 Plan 当作前置 Task。
+对照获批目标、真实代码及入口推导 Task。每项重要变更契约对应实施责任者和可证伪 AC，覆盖受影响的既有不变量；文档门禁不证明运行时行为。未批准提案和 Draft/Proposed DESIGN 仅作研究参考，不作为目标权威。
 
-**从设计变化推导 Task。** 对照 Active DESIGN 新增或变化的行为与归属，检查真实代码和所有适用入口。每项契约都明确对应的实施结果、Task 负责者，以及能够发现失败的可观察 AC。实施会触碰的既有契约即便没有设计变化，也可能需要回归保护；通过文档检查不能证明运行时行为正确。
+设计分析、决定及审批属于上游。代码 Plan 组织实施、测试和按 `df-implement` 同步交付，不设提前编写或审批控制设计的 Task。用户单独要求的文档产品可有独立交付范围。
 
-`Draft` / `Proposed` 设计只能放在 Research Findings / References 中作为前瞻参考，并明确其未定案；不能写入 Design Source，也不能据此确定 Behavior、Key Interfaces、AC 或实施目标。
+批准前修正 Plan 与授权目标的不一致；目标实质未决或与未改变的上层约束冲突时交用户决定。批准后实质调整遵循 SKILL.md 的授权边界。
 
-Plan 批准前，发现 Plan 与 Active DESIGN 不一致就修正 Plan；找不到 Active 设计依据，Plan 还不能提交。如果 Active DESIGN 本身与用户目标冲突，不要自行改设计，先让用户决定设计目标。Plan 批准后，实质修改 Plan 或设计都需要用户确认。
-
-实施时发现设计缺少关键决策或存在互相矛盾的约束，先停止受影响工作，把冲突交还主控者和用户。不得由实施者自行修改设计或扩大、缩减 Task 来绕过问题。
 
 ## 契约怎么定：Key Interfaces
 
@@ -165,7 +162,7 @@ TDD 是用测试先定义行为的工具，不是“只要改代码就必须交�
 | 字段 | 要求 | 说明 |
 |------|------|------|
 | **Verification Intent** | 必填 | 本 Task 负责哪些 Agent Verification 条目 |
-| **Design Source** | 项目/阶段 Plan | 权威 Active DESIGN 的 `path#heading`；简单无设计任务可 N/A |
+| **Design Source** | 项目/阶段 Plan | 获批 Proposal 或适用既定 DESIGN/授权的 `path#heading`；简单无设计任务可 N/A |
 | **Behavior** | 必填 | 用大白话写可观察结果；确需精确时再用技术词 |
 | **Pre-read** | 必填 | Plan 作者已经确认值得实施者先读的文件/文档；无则 N/A |
 | **Interface** | 可选 | 当前 Task 自己新增/修改/删除/保持的局部契约 |

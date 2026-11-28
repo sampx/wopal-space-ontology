@@ -22,7 +22,7 @@ Ontology capability-evolution proposals are not in scope: they live in the ontol
 ```
 
 - `lifecycle ∈ {proposed, implemented, rejected, archived}`
-- `class ∈ {feature, bug-fix, simplification, architecture, process, testing}`
+- `class ∈ {feature, bug-fix, simplification, architecture, process, testing}` — feature: new capability; bug-fix: defect correction; simplification: removal or reduction; architecture: runtime structure and ownership; process: tooling, policy or workflow; testing: test infrastructure and strategy.
 - The date is the **first-proposed** date. Migration and archiving never rename the file.
 - The slug is lowercase kebab-case, 2–4 words, naming the decision rather than the document type.
 - No status or version suffix (`-v2`, `-approved`, `-final`).
@@ -37,8 +37,6 @@ Ontology capability-evolution proposals are not in scope: they live in the ontol
 | `.i18n.yaml` bilingual triplets | This space does not pair languages; one decision, one language |
 | `archived/implemented/` nesting | Only implemented records are archived; the level is implied |
 
-Existing pre-format files stay read-only compatible: read them, cite them, copy their structure if useful, but do not rewrite them to "unify the format", and do not treat them as failures of the current check.
-
 ## 3. Header
 
 ```markdown
@@ -48,7 +46,6 @@ Status: proposed
 
 - **Class**: architecture
 - **Created**: 2026-11-22
-- **Updated**: 2026-11-22
 ```
 
 `Status` stands on its own line before the first body section, prefixed exactly `Status: `, and a file carries exactly one: two status lines mean two claims about the same record, which the verifier rejects. The verifier uses that line to cross-check lifecycle against directory. `Class` and `Created` are required on every formatted file — without `Class` the class-versus-directory check has nothing to compare, and `Created` is the date the topic was first proposed.
@@ -140,10 +137,6 @@ Keep the proposal-time structure (a `## Acceptance criteria` or `## Plan` is fin
 
 Keep the body and sections as they stood at archiving, plus the `Archived` line. Once frozen it need not satisfy any active skeleton rule, and its outbound links are not checked.
 
-### Skeleton compatibility
-
-New Proposals must use the `Design Basis` skeleton. Records without `Design Basis` that satisfy the former skeleton remain valid and follow the original migration rules; do not bulk-rewrite them. The old proposed skeleton requires Problem, Proposal, Alternatives considered, Acceptance criteria, Risks; implemented requires Problem, Decision, Alternatives considered, Consequences; rejected requires Problem, Proposal, Alternatives considered. Archived records stay frozen. The verifier identifies skeletons by visible headings, not creation history; authors and reviewers ensure new Proposals use the new standard.
-
 ## 5. Migration checklists
 
 ### `proposed` → `approved`
@@ -166,7 +159,7 @@ Preconditions: the approved scope is **fully** delivered and the user has accept
 
 1. Move to `implemented/<class>/` without renaming.
 2. Set `Status` to `implemented`.
-3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; put actual acceptance results and material residual costs in `## Consequences`, remove planning-era headings, and retain the design basis and important decisions. For the old skeleton, preserve the alternatives record and fold Risks into Consequences.
+3. In the same change, rewrite the skeleton: `## Proposal` to `## Decision`; put actual acceptance results and material residual costs in `## Consequences`, remove planning-era headings, and retain the design basis and important decisions.
 4. Convert the prose to the present tense; remove "planned", "pending", "v1 for now".
 5. Sync the affected present-state DESIGN (`DESIGN.md` / `DESIGN-<module>.md`) in the same delivery and add the relative link under `## Key Decisions`.
 6. Repair every inbound link pointing at the old path.
@@ -231,6 +224,4 @@ It does **not** do: a history database, a frozen-content hash manifest, Git hist
 
 Filename slug length and section order are writing conventions, not structural invariants: the script checks presence, not shape.
 
-A Markdown file sitting at the tree root, outside every lifecycle directory, is reported as skipped (`outside-lifecycle-layout`) instead of being silently ignored.
-
-A file with neither a `Status:` line nor a `**Class**` field is treated as pre-format: it is reported as skipped, never judged. `--strict` turns the presence of such files into a failure when a project has finished migrating.
+Every Markdown record must be in the current lifecycle/class layout with required metadata. A root-level Markdown file, misplaced record or missing metadata fails verification.

@@ -1,6 +1,6 @@
 # Document-Set Consistency — Universal Rules
 
-These rules apply to every document in the product and project documentation set: PRDs, Product DESIGNs, and Present-State Project/Module DESIGNs, along with their boundaries against Proposals and `AGENTS.md`. They keep every fact single-owned, verifiable, low-conflict, and readable at low maintenance cost.
+These rules apply to every document in the product and project documentation set: PRDs, Product DESIGNs, Present-State Project/Module DESIGNs, and domain glossaries, along with their boundaries against Proposals and `AGENTS.md`. They keep every fact single-owned, verifiable, low-conflict, and readable at low maintenance cost.
 
 ## No Chapter Numbering
 
@@ -71,9 +71,11 @@ Multi-agent parallel execution collides on centralized indexes and shared monoli
 Classify supporting documents by **architectural role**, not by initial filename:
 
 - **Sub-DESIGNs** (`DESIGN-<module>.md` or `DESIGN-<topic>.md`): documents decomposing an independent module or architectural concern of the main DESIGN. They carry `Parent: ./DESIGN.md`, are linked from the main document's map or section, and never appear in `## Reference Documents`.
-- **Companion documents** (such as `BRANDING.md` or `API-CONTRACT.md`): cross-cutting single-source-of-truth references that are not module decompositions. Keep their filenames and declare them in the main header's `Companion Documents` field or relationship table.
+- **Companion documents** (such as `BRANDING.md`, `API-CONTRACT.md`, or `GLOSSARY.md`): cross-cutting single-source-of-truth references that are not module decompositions. Keep their filenames and declare them in the main header's `Companion Documents` field or relationship table.
 
 If an ad-hoc document (such as `AUTH-PROTOCOL.md`) actually owns a module or architectural subsystem's contract, rename it to `DESIGN-<module>.md`, add `Parent: ./DESIGN.md`, and link it from the main module map.
+
+A domain `GLOSSARY.md` owns canonical definitions within its product or project scope, follows `references/glossary.md`, and is declared by the owning main DESIGN or PRD under `Companion Documents`. Do not duplicate product terms in project glossaries; reference the binding definition. New or changed project concepts awaiting delivery belong in the Proposal, not the active glossary. A glossary never owns behavior or architecture contracts.
 
 ## Document Lifecycle: Draft and Active
 
@@ -100,7 +102,7 @@ Header field names come from this fixed English vocabulary (never invent ad-hoc 
 | `Sibling DESIGNs` | product DESIGN | Core subsystem project DESIGNs constraining the product architecture |
 | `Sub-DESIGNs` | Legacy compatibility | Retained in vocabulary solely to tolerate untouched legacy docs without unknown-field errors; omitted from all Product and Project main DESIGN headers |
 | `Sub-PRDs` | main PRD | Enumeration of `PRD-<topic>.md` files when split |
-| `Companion Documents` | main DESIGN / PRD | Cross-cutting companion truth sources (`BRANDING.md`, `API-CONTRACT.md`) |
+| `Companion Documents` | main DESIGN / PRD | Cross-cutting companion truth sources (`BRANDING.md`, `API-CONTRACT.md`, `GLOSSARY.md`) |
 | `Scope` | any document | One line narrowing scope when the title alone is ambiguous |
 
 Rules:
@@ -112,12 +114,13 @@ Rules:
 
 Complete both semantic review and deterministic checks before marking work done:
 
-1. **Semantic Review (required)**: Apply clarity checks, the **5-Point Required Coverage Checklist**, and the **Slop Checklist** in `references/design-project-guide.md` across all docs; apply **"already shipped and code/run-verified"** (Newcomer present-state & live Evidence Review) specifically to **Project and Module Present-State DESIGNs**, keeping Product PRDs and Product DESIGNs (including Product Sub-DESIGNs) free to plan ahead of implementation.
+1. **Semantic Review (required)**: Apply clarity and the **Slop Checklist** in `references/design-project-guide.md` across all docs; apply the **5-Point Required Coverage Checklist** to material behavior contracts wherever they occur, not to a glossary's definition entries. Apply `references/glossary.md` to glossary semantics; apply **"already shipped and code/run-verified"** (Newcomer present-state & live Evidence Review) specifically to **Project and Module Present-State DESIGNs**, keeping Product PRDs and Product DESIGNs (including Product Sub-DESIGNs) free to plan ahead of implementation.
 2. **Deterministic Gate (required)**: Run `python3 scripts/verify-docset.py <docs-dir> --main DESIGN.md` (add `--check-sync [--base <git-ref>]` during code+doc delivery; or `--main PRD.md` for PRDs) and verify:
    - Sub-documents (`DESIGN-*.md`) discovered on disk each carry `Parent: ./DESIGN.md` (`Sub-DESIGNs` header enumeration is retired; untouched legacy docs carrying that field remain tolerated) and are linked from the main document body outside `Reference Documents` (zero orphan sub-DESIGNs)
    - Zero absolute paths (`/Users/...`, `/Volumes/...`, `file:///...`)
    - Relative Markdown links and header `./` or `../` backticked paths resolve to existing files
    - `## Reference Documents` does not repeat header links or local sub-DESIGNs
+   - Optional local `GLOSSARY.md` is registered in the owning main DESIGN or PRD's `Companion Documents` header and participates in shared structural checks; no glossary required when absent
    - Zero unreplaced template placeholders or empty table skeleton rows
    - Non-empty `##` sections and mandatory `## Business Rules and Failure Boundaries` on Project main and Active Module DESIGNs
    - Zero process-state forbidden terms (`deprecated`, `moved from`, `no longer`, `已废弃`, `已放弃`, `不再执行`, `历史机制`, etc.), valid `Updated` date, allowed English header field names, and valid `Status` (`Draft` / `Proposed` / `Active`)
@@ -131,9 +134,10 @@ Check affected documents when editing, strictly respecting parallel write-set bo
 |---|---|---|
 | PRD | Product DESIGN, affected project DESIGN boundaries | Unbuilt capabilities go to Proposals, not present-state DESIGN |
 | Product DESIGN | Affected subsystem present-state DESIGNs (drift check or Proposal trigger) | Preserve product architecture and capability-map conventions |
-| Code / Feature / Bug Fix | Affected `DESIGN-<module>.md` (+ thin main `DESIGN.md` only if boundaries change) + Proposal | Pure internal refactor skips DESIGN; report out-of-scope drift to coordinator |
+| Code / Feature / Bug Fix | Affected `DESIGN-<module>.md` (+ thin main `DESIGN.md` only if boundaries change), affected glossary definitions + Proposal | Pure internal refactor skips DESIGN; report out-of-scope drift to coordinator |
 | Project main `DESIGN.md` | Affected `DESIGN-<module>.md`, parent architecture boundaries | Keep main doc a thin map; push details to sub-DESIGNs |
 | Module `DESIGN-<module>.md` | Corresponding row in main `DESIGN.md` module map | Update main map only if module ownership/existence changed |
+| `GLOSSARY.md` | Owning DESIGN / PRD, inherited vocabulary, documents using the affected terms | Clarify existing meanings directly; change domain meaning only with authorized design and verified delivery |
 | `AGENTS.md` | Owning project/module DESIGN and actual build/test commands | Long-term operational rule edits go through `space-master` |
 
 ## Document Roles: What Belongs Where
@@ -143,9 +147,10 @@ Every fact has one authoritative home:
 | Artifact | Owns | Does Not Own |
 |---|---|---|
 | **PRD** | Product intent, user problem, value proposition, product scope | Internal architecture, module layout, tech choices, test scripts |
-| **Proposal** (`proposals/{proposed,implemented,rejected,archived}/{class}/...`) | Design rationale, alternatives considered, unbuilt proposal specs (`proposed/`), shipped decision & consequences (`implemented/`), guardrail rejections (`rejected/`) | Current system manual; task-by-task execution tracking |
+| **Proposal** (`proposals/{proposed,implemented,rejected,archived}/{class}/...`) | Determinate target design specs and material decision rationale (`proposed/`), shipped decision & consequences (`implemented/`), guardrail rejections (`rejected/`) | Current system manual; task-by-task execution tracking |
 | **Product DESIGN** | System layering, subsystem boundaries, runtime model, E2E flows, capability roadmap | Per-project internals, delivery tracking |
 | **Project / Sub DESIGN** (present-state) | **Shipped, verified** capabilities (user-first), module collaboration, contracts & state ownership, **active business rules**, complete failure bounds | Unbuilt plans, reasoning logs, hand-copied source trees / parameter tables |
+| **GLOSSARY.md** (optional companion) | Canonical domain terms, meanings, conceptual relationships and scope | Behavior rules, interface contracts, implementation details, proposed future meanings |
 | **Plan** (optional, complex work) | Complex multi-module/multi-project task breakdown, parallel write sets, orchestration | Architecture approval (Proposal) or permanent system manual (DESIGN) |
 | **AGENTS.md** | Agent commands, gates, conventions, verification rules (via `space-master`) | Architecture narrative, business-rule prose, proposal deliberation |
 

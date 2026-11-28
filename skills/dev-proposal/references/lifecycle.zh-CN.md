@@ -22,7 +22,7 @@ Proposal 属于**一个**归属地，二选一：
 ```
 
 - `lifecycle ∈ {proposed, implemented, rejected, archived}`
-- `class ∈ {feature, bug-fix, simplification, architecture, process, testing}`
+- `class ∈ {feature, bug-fix, simplification, architecture, process, testing}` — feature 新能力；bug-fix 缺陷修复；simplification 精简功能或结构；architecture 运行结构及职责决策；process 工具、政策或流程；testing 测试基础设施和策略。
 - 日期取**首次提出日**，迁移与归档都不改文件名。
 - slug 小写 kebab-case，2–4 个词，描述决定本身而不是文件类型。
 - 文件名不允许带状态或版本后缀（`-v2`、`-approved`、`-final` 都不行）。
@@ -37,8 +37,6 @@ Proposal 属于**一个**归属地，二选一：
 | 中英 `.i18n.yaml` 三元组配对 | 本空间不做双语配对；一份决定一种语言 |
 | `archived/implemented/` 深层 | 只有已实施记录能归档，层级已隐含 |
 
-存量前格式文件保持历史只读兼容：可以读、可以引用、可以复制其结构，但不要为了"统一格式"去改写它，也不要把它当作本次校验的失败项。
-
 ## 3. 文件头
 
 ```markdown
@@ -48,7 +46,6 @@ Status: proposed
 
 - **Class**: architecture
 - **Created**: 2026-11-22
-- **Updated**: 2026-11-22
 ```
 
 `Status` 必须在第一处正文之前单独成行，前缀就是 `Status: `，且一个文件只能有一条：两条状态行是对同一份记录的两个互斥主张，校验器直接拒绝。校验器按这一行判定生命周期与目录是否一致。`Class` 与 `Created` 是每个格式化文件的必填身份字段——没有 `Class`，「分类与目录是否一致」就无从比较；`Created` 是这个主题首次提出的日期。
@@ -140,10 +137,6 @@ Archived: 2026-11-22
 
 保留归档那一刻的正文与章节，只加 `Archived` 行。冻结之后不再要求满足任何活跃骨架规则，也不再抽查它的出链。
 
-### 新旧骨架兼容
-
-新提案必须使用 `Design Basis` 骨架。没有 `Design Basis` 但满足原骨架的记录仍按原规则校验、迁移；不批量改写旧记录。旧骨架在 proposed 中要求 Problem、Proposal、Alternatives considered、Acceptance criteria、Risks；implemented 中要求 Problem、Decision、Alternatives considered、Consequences；rejected 中要求 Problem、Proposal、Alternatives considered。归档记录保持冻结。校验器按可见章节识别骨架，不能证明文件何时创建，作者和评审负责新提案使用新规范。
-
 ## 5. 迁移清单
 
 ### `proposed` → `approved`
@@ -166,7 +159,7 @@ Archived: 2026-11-22
 
 1. 移动到 `implemented/<class>/`，文件名不变。
 2. `Status` 改为 `implemented`。
-3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；实际验收结果及重要剩余代价写入 `## Consequences`，删除计划期标题，保留设计依据和重要决策。旧骨架保留原备选记录并将 Risks 合并到 Consequences。
+3. 同一次改动内改写骨架：`## Proposal` → `## Decision`；实际验收结果及重要剩余代价写入 `## Consequences`，删除计划期标题，保留设计依据和重要决策。
 4. 正文转现在时，删掉"计划""待定""v1 先这样"这类计划期表述。
 5. 同交付同步受影响的现状 DESIGN（`DESIGN.md` / `DESIGN-<module>.md`），补上 `## Key Decisions` 的相对链接。
 6. 修好所有指向旧路径的入链。
@@ -231,6 +224,4 @@ python3 scripts/verify-proposals.py <proposals-root> --link-scope <文档根目�
 
 文件名 slug 词数与章节顺序属于写作约定，不是结构不变量：脚本只查章节是否存在，不查形状。
 
-直接躺在树根、不属于任何生命周期目录的 Markdown 会按 `outside-lifecycle-layout` 报为跳过，而不是被静默忽略。
-
-既无 `Status:` 行也无 `**Class**` 字段的文件按前格式处理：报为跳过，不做判定。项目完成迁移后可用 `--strict` 把这类文件的存在变成失败。
+所有 Markdown 记录均须遵循当前生命周期及类别目录规范，具备必填头部字段。根目录游离文档、位置错误或元数据缺失均校验失败。

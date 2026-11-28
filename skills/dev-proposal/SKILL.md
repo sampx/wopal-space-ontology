@@ -44,114 +44,11 @@ Existing architecture and contracts not explicitly changed by the approved scope
 
 ## Layout and state machine
 
-### Layout
+Read `references/lifecycle.md` for the authoritative layout, fields, body skeletons, state transitions, migration and link maintenance.
 
-The Proposal root follows ownership:
+`proposed` → user approves → `approved` (same path) → fully delivered and user-accepted → `implemented` → archive when no longer guiding work. Rejection may end a proposed or approved record. Archived records remain frozen. No execution states or independent progress tracking belong in a Proposal.
 
-- Product level: `docs/products/{product}/proposals/`
-- Project level: `projects/{project}/docs/proposals/`
-
-Under that root, the path has two axes, `{lifecycle}/{class}/yyyy-mm-dd-<slug>.md`:
-
-```
-proposals/
-├── proposed/<class>/
-├── implemented/<class>/
-├── rejected/<class>/
-└── archived/<class>/
-```
-
-- `lifecycle` is the closed set `proposed | implemented | rejected | archived`. `archived/` has **no** `implemented` level.
-- `class` is a closed set of six, and you cannot invent one: `feature | bug-fix | simplification | architecture | process | testing`.
-  - `feature`: a new user- or model-facing capability.
-  - `bug-fix`: corrects a defect, or closes a gap a review surfaced.
-  - `simplification`: removes code, behavior, or surface without adding a capability.
-  - `architecture`: a structural decision about shipped source — how modules relate, what the runtime vocabulary is.
-  - `process`: tooling, policy, or workflow around the code, not runtime behavior.
-  - `testing`: test infrastructure and strategy.
-- Filename `yyyy-mm-dd-<slug>.md` uses the date the topic was **first proposed** (per Git history) and a lowercase kebab-case slug of 2–4 words.
-- **Forbidden**: a singular `proposal/` directory, an unknown class directory, and a centralized `INDEX.md`. The paths are the index; an `INDEX.md` puts every unrelated change in contention over one file.
-- Existing pre-format files stay read-only compatible: cite them, read them, do not force a migration, and do not reformat them to the new rules.
-
-### State machine
-
-```text
-proposed ──user approves──▶ approved ──all delivered and accepted──▶ implemented ──mission complete──▶ archived
-    │                            │
-    └────user rejects────────────┴──▶ rejected
-```
-
-| State | Location | Meaning |
-|---|---|---|
-| `proposed` | `proposed/<class>/` | Written and waiting for the user; no authorization yet |
-| `approved` | `proposed/<class>/` | The user approved and authorized a scope; **the file stays in `proposed/`** so Plans and inbound links do not break mid-delivery |
-| `implemented` | `implemented/<class>/` | The approved scope is fully delivered and the user has accepted it |
-| `rejected` | `rejected/<class>/` | Declined, with a one-line reason on the status line |
-| (frozen) | `archived/<class>/` | A finished `implemented/` record that no longer guides daily work; `Status` stays `implemented` and gains `Archived: YYYY-MM-DD` |
-
-Hard constraints:
-
-- **Never introduce `implementing` / `verifying` / `done`.** A Proposal has no execution progress; progress belongs to Plans and Issues.
-- Partial delivery **does not** move into `implemented/`. The file stays in `proposed/` with `Status: approved`; delivery evidence says what is done, and the state does not pretend to guess.
-- A completed or archived Plan **never** flips its Proposal to `implemented`. Only a fully delivered, user-accepted scope does, and the agent moves it in the same delivery.
-- No `approved` without explicit user approval; no `implemented` without acceptance. **A format check cannot forge approval** — a passing script means the shape is valid, not that anyone approved it.
-
-### Header contract
-
-```markdown
-# <Title>
-
-Status: proposed
-
-- **Class**: architecture
-- **Created**: 2026-11-22
-```
-
-`Status` is the third line and takes `proposed`, `approved`, `implemented`, or `rejected — <one-line reason>`. The status line carries no date and no parenthetical; the date lives in the filename and `Created`, and everything else lives in Git.
-
-Approval adds three fields, all required:
-
-```markdown
-- **Approved**: 2026-11-22 — <approver>
-- **Authorized scope**: <one sentence: what was approved, including explicit exclusions>
-- **Delivery**: direct | plan
-```
-
-Archiving inserts `Archived: YYYY-MM-DD` immediately below `Status: implemented`; that line is the only content change archiving may make.
-
-### Body skeleton
-
-`proposed/` (including `approved`) uses the target-state skeleton:
-
-```markdown
-## Problem
-## Design Basis
-## Proposal
-…(bespoke design sections by domain)…
-## Design Decisions
-## Acceptance criteria
-```
-
-`implemented/` uses the present-tense skeleton:
-
-```markdown
-## Problem
-## Design Basis
-## Decision
-…(bespoke sections as needed)…
-## Design Decisions
-## Consequences
-```
-
-`Design Decisions` is optional: record final choices and material reasons; include rejected alternatives and accepted costs only when they have lasting value, never as implementation options. Put risk controls in target contracts and acceptance; no separate risk section is required.
-
-Moving into `implemented/` **rewrites the skeleton in the same delivery**: `## Proposal` becomes `## Decision`; actual acceptance results and material residual costs go into `## Consequences`. Preserve the design basis and important decisions. These planning-era headings are **forbidden** in `implemented/`: `## Proposal`, `## Plan`, `## Migration plan`, `## Acceptance criteria`.
-
-`rejected/` keeps its proposal-time body and sections (including `## Acceptance criteria` if present); the verdict lives only on the status line.
-
-The old skeleton (no `Design Basis` and satisfying the former required sections) remains compatible; new Proposals use the new skeleton. Existing Proposals follow their original lifecycle without mandatory format migration or rewriting historical decisions or frozen records.
-
-Expression standards — clarity, term consistency, no AI slop, `Source Carrier`, evidence-backed claims — come from `dev-doc-master` (including `references/design-project-guide.md`). This skill does not copy them. A Proposal **does not touch present-state DESIGN**: unbuilt design is never pre-written into `DESIGN.md` or `DESIGN-<module>.md`, and **neither DESIGN prose nor `## Reference Documents` may back-link to `proposals/proposed/` or `proposals/rejected/`**; add the link to the owning DESIGN's `## Key Decisions` only when delivery moves the proposal into `implemented/`.
+Use the current templates. Keep target design separate from present-state DESIGN; apply `dev-doc-master` for document ownership and synchronization.
 
 ## Delivery mode: the user decides
 
@@ -193,33 +90,11 @@ Exit code 0 means the shape is valid; the script only checks single-snapshot sta
 
 ## Evolving an implemented proposal
 
-This is the part most likely to go wrong, and the part most worth remembering. **An `implemented/` record is a historical decision: facts may change, the decision may not.**
-
-Classify the change first:
-
-| Class | Test | Action |
-|---|---|---|
-| **Fact-only drift** | Decision, boundary, and defaults are unchanged; only a path moved, a name changed, or a local implementation detail differs | **Update in place** inside `implemented/<class>/` in the same delivery. Write the current fact, create no proposal, append no change log. |
-| **Design adjustment / optimization / partial overturn** | The decision, a core default, or a boundary changes; the user must re-decide (even when it is called an "optimization" or "local enhancement") | **Create** `proposed/<class>/yyyy-mm-dd-<slug>.md` and run it through independent review and user approval. |
-| **Full replacement / capability removal** | The decision as a whole no longer holds and a new one replaces it | **Create** a proposal and dispose of the old one when the new scope is fully delivered (below). |
-
-Hard constraints for the second class:
-
-- **Never** move an `implemented/` proposal back to `proposed/`, and never rewrite it in place into a different decision. Rewriting a historical decision erases why it was chosen.
-- A new proposal **must not modify the old `implemented/` record before it is fully delivered.**
-- When the new proposal moves into `implemented/`, **cross-link both ways in the same delivery**: the new one names which of the old decisions it partly supersedes and which stay valid; the old one states the superseded part as current and links to the new one.
-
-Hard constraints for the third class: dispose of the old record **at delivery time**, not in a later cleanup. Two options:
-
-- **Absorb, then delete** — carry every unique rationale, alternative, cost, verification method, and known gap from the old proposal into the new one, repair all inbound links, then delete the old file.
-- **Move to `archived/<class>/` and freeze** — when the old proposal still has independent historical value.
-
-**`archived/` is permanently read-only**: no unfreezing, no rewrite, no translation, no reformatting, no move, no delete, and no outbound-link checking. Later evolution only ever creates active proposals, citing the archive as background when useful.
+Read `references/evolution-triage.md` before changing an implemented decision: distinguish fact-only synchronization, partial supersession and full replacement. Preserve historical decisions and complete the appropriate link repair, absorption or archive in the same accepted delivery.
 
 ## Honest boundaries
 
 - This skill owns writing, approval recording, migration, and freezing of Proposals. It **does not implement** and does not approve on the user's behalf.
-- The workflow engine cannot yet derive a Plan/Task set from a Proposal. Until `dev-flow` supports it, **do not pretend to call, or automatically call, a Proposal→Plan command that does not exist**; `Delivery: plan` is a recorded user decision, and the user arranges the split.
 - Independent review belongs to `df-proposal-review`. This skill writes; that one reviews. Do not issue your own pass.
 
 ## References

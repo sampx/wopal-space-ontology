@@ -8,7 +8,7 @@ Status: implemented
 - **Authorized scope**: <批准范围，含明确排除项>
 - **Delivery**: <direct | plan>
 
-<!-- 迁移时 Proposal 改为 Decision；验收实际结果与重要剩余代价写入 Consequences。保留设计依据、原决策及必要理由。旧骨架按原生命周期规则迁移。 -->
+<!-- 迁移时 Proposal 改为 Decision；验收实际结果与重要剩余代价写入 Consequences。保留设计依据、原决策及必要理由。 -->
 
 ## Problem
 

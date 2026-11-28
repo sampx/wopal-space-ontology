@@ -43,21 +43,17 @@ PROPOSED_BODY = """
 The current notification path imports three modules directly, so a fourth
 consumer forces edits in three unrelated places and risks a cycle.
 
+## Design Basis
+
+Preserve existing module ownership and notification delivery semantics.
+
 ## Proposal
 
 Route notifications through an in-process bus.
 
-## Alternatives considered
-
-- **Direct callbacks** — still couples each producer to every consumer.
-
 ## Acceptance criteria
 
 1. No notification path imports another module's notifier.
-
-## Risks
-
-- Event names become an implicit contract.
 """
 
 IMPLEMENTED_BODY = """
@@ -66,14 +62,14 @@ IMPLEMENTED_BODY = """
 The current notification path imports three modules directly, so a fourth
 consumer forces edits in three unrelated places and risks a cycle.
 
+## Design Basis
+
+Preserve existing module ownership and notification delivery semantics.
+
 ## Decision
 
 Notifications go through an in-process bus. Producers publish, consumers
 subscribe.
-
-## Alternatives considered
-
-- **Direct callbacks** — still couples each producer to every consumer.
 
 ## Consequences
 
@@ -86,13 +82,13 @@ REJECTED_BODY = """
 
 Occasional validation failures were suspected to be transient.
 
+## Design Basis
+
+Keep deterministic schema validation.
+
 ## Proposal
 
 Retry schema validation three times.
-
-## Alternatives considered
-
-- **Fix the parser** — larger than the symptom suggested.
 
 ## Acceptance criteria
 
@@ -212,17 +208,13 @@ class LegalTreeTests(BaseCase):
     def test_empty_root_passes(self) -> None:
         self.assertPass()
 
-    def test_legacy_preformat_file_is_read_only_compatible(self) -> None:
+    def test_preformat_file_is_rejected(self) -> None:
         # A pre-format file: no header block, no skeleton, no Status line.
         self.tree.write("proposed/2026-01-05-legacy-style.md",
                         "# Legacy style\n\nJust a paragraph written before the format existed.\n")
         self.tree.write("proposed/architecture/2026-11-20-event-bus.md",
                         proposal("Adopt an event bus", "Status: proposed"))
-        result = self.assertPass("--json")
-        report = json.loads(result.stdout)
-        skipped = [n for n in report["skipped"] if "legacy-style" in n["path"]]
-        self.assertTrue(skipped, msg=report["skipped"])
-        self.assertEqual(skipped[0]["reason"], "legacy-preformat")
+        self.assertFailsWith("LAYOUT_UNEXPECTED_PATH")
 
     def test_partial_supersession_cross_links_pass(self) -> None:
         self.tree.write("implemented/architecture/2026-10-02-single-loader.md",
@@ -330,12 +322,10 @@ class SkeletonTests(BaseCase):
                                          body=body.replace(f"## {heading}", "## Other")))
                 self.assertFailsWith("SKELETON_MISSING_SECTION")
 
-    def test_proposed_missing_alternatives_is_rejected(self) -> None:
-        self.tree.write(
-            "proposed/architecture/2026-11-20-x.md",
-            proposal("No alternatives", "Status: proposed",
-                     body=PROPOSED_BODY.split("## Alternatives considered")[0]),
-        )
+    def test_former_skeleton_is_rejected(self) -> None:
+        body = "\n## Problem\n\nCoupling.\n\n## Proposal\n\nUse a bus.\n\n## Alternatives considered\n\nDirect calls.\n\n## Acceptance criteria\n\n1. Publish.\n\n## Risks\n\nNone.\n"
+        self.tree.write("proposed/architecture/2026-11-20-x.md",
+                        proposal("Missing design basis", "Status: proposed", body=body))
         self.assertFailsWith("SKELETON_MISSING_SECTION")
 
     def test_proposed_missing_acceptance_criteria_is_rejected(self) -> None:
@@ -912,18 +902,21 @@ class UncoveredCodeTests(BaseCase):
                         proposal("Unknown", "Status: proposed", cls="refactor"))
         self.assertFailsWith("CLASS_UNKNOWN_VALUE")
 
-    def test_root_level_markdown_is_reported_not_silently_ignored(self) -> None:
+    def test_root_level_markdown_is_rejected(self) -> None:
         self.tree.write("2026-01-05-flat-style.md", "# Flat\n\nSits outside any lifecycle.\n")
-        result = self.assertPass("--json")
-        payload = json.loads(result.stdout)
-        skips = [n for n in payload["skipped"] if "flat-style" in n["path"]]
-        self.assertTrue(skips, msg=payload["skipped"])
-        self.assertEqual(skips[0]["reason"], "outside-lifecycle-layout")
+        self.assertFailsWith("LAYOUT_UNEXPECTED_PATH")
 
-    def test_strict_mode_turns_a_legacy_file_into_a_failure(self) -> None:
-        self.tree.write("proposed/2026-01-05-legacy-style.md",
-                        "# Legacy\n\nWritten before the format existed.\n")
-        self.assertFailsWith("LAYOUT_LEGACY_PRESENT", "--strict")
+    def test_headerless_file_at_valid_path_is_rejected(self) -> None:
+        self.tree.write("proposed/architecture/2026-01-05-x.md", "# No header\n")
+        self.assertFailsWith("STATUS_MISSING")
+
+    def test_headerless_file_in_unknown_class_is_rejected(self) -> None:
+        self.tree.write("proposed/unknown/2026-01-05-x.md", "# No header\n")
+        self.assertFailsWith("LAYOUT_UNKNOWN_CLASS")
+
+    def test_headerless_file_in_unknown_lifecycle_is_rejected(self) -> None:
+        self.tree.write("unknown/architecture/2026-01-05-x.md", "# No header\n")
+        self.assertFailsWith("LAYOUT_UNKNOWN_LIFECYCLE")
 
 
 class ParentRootTests(BaseCase):

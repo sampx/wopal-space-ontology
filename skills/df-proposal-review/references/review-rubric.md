@@ -190,7 +190,7 @@ A proposal explicitly requiring a deliverable that violates a mandatory standard
 
 ## 6. Business Proposal mode — P1–P5
 
-A business Proposal records a decision, so the review is about the decision's soundness, not its prose. Read the proposal once, then read the `implemented/` records it touches before forming any verdict: a supersession claim can only be judged against the record being superseded.
+A business Proposal is a determinate target specification and decision record. Review soundness, coverage and determinacy, not just prose. Read the proposal once, then read the `implemented/` records it touches before forming any verdict: a supersession claim can only be judged against the record being superseded.
 
 ### 6.1 P1 — Is the decision actually decided?
 
@@ -198,6 +198,8 @@ Locate the sentence that chooses. Then test it two ways:
 
 1. **State the choice from memory.** Close the proposal. Can you say what was chosen and what was excluded? If not, the reader will invent the answer during implementation.
 2. **Test the boundary.** Does the proposal say what it will not do? An empty boundary is not a scope; it is a blank cheque.
+
+Build a compact evidence map (authority or confirmed decision → target section → expected behavior and acceptance). Select applicable domains from `dev-proposal/references/design-practices.md` and apply the five-point behavior coverage from `dev-doc-master`. Exercise concrete normal, failure and boundary scenarios: actors, inputs, owners, state transitions, defaults, permissions, side effects, partial failure, recovery and compatibility. Check definitions against the glossary and owning DESIGN. If two independent implementers could legitimately choose materially different responsibilities, state, interfaces or behavior, identify the missing decision and divergent outcome. Missing material decisions or critical contracts block readiness; harmless implementation freedom is not a finding. Compare available settled discussion conclusions with the specification; disclose unavailable discussion evidence rather than assuming decisions.
 
 Approval trail:
 
@@ -215,9 +217,11 @@ Approval trail:
 
 Same command cookbook and revision discipline as §3. A proposal usually makes fewer, heavier claims than a Plan: file paths, current defaults, error strings, counts, and "today the system does X". Each one is a premise for the decision, so a false one is expensive.
 
-### 6.3 P3 — Are the alternatives real?
+Independently discover applicable `AGENTS.md`, product PRD/architecture, project and affected module DESIGNs, companion contracts and glossary by following binding relationships. For each material target decision, classify it as inheriting a constraint, explicitly changing a named decision within scope, or silently conflicting. Cite both authority and target clause (or absence), and the affected behavior/ownership. An explicitly scoped target change is legitimate; unchanged constraints remain binding. Silent material violations block; grade missing references by impact. Verify critical feasibility with code, tests or focused probes; disclose unavailable evidence and do not certify material unverified claims.
 
-For each alternative, ask whether a reasonable author would genuinely have weighed it, and whether the stated reason actually defeats it. Then check the supersession ledger:
+### 6.3 P3 — Are decisions final and historically sound?
+
+Check the final choice and scope in the target itself. Review separate Design Decisions rationale only where dev-proposal requires lasting context; genuine rejected options and residual consequences may explain the choice, never authorize implementation alternatives. Do not demand invented alternatives or a separate rationale section. Then check the supersession ledger:
 
 | Situation | Verdict |
 |---|---|
@@ -233,7 +237,7 @@ The mechanical part (does the file's `Status` match its directory, is the skelet
 
 ### 6.4 P4 — Can it be falsified?
 
-Apply the "if it were broken, would this catch it" test to every acceptance criterion. Then check the risk section: verify the impact, necessary controls and observation for material risks; do not demand fabricated numeric thresholds or revisit signals for every risk.
+Trace each material changed contract and affected invariant to acceptance and back. Apply the "if it were broken, would this catch it" test. Inspect verification boundaries and relevant tests: private mocks cannot prove public journeys or real collaboration they bypass. Choose the lowest-cost sufficient layer under applicable testing rules; do not demand exact commands prematurely. Check risks in the design itself: mitigations are enforceable contracts with acceptance, critical feasibility established, residual consequences and controls explicit for user acceptance. A risk section is optional; 'implementation should be careful' does not resolve a design problem. Block critical unprovable acceptance or unresolved material design risks; grade lesser gaps by impact.
 
 Partial-delivery discipline: a proposal in `proposed/` with `Status: approved` may be unimplemented, partially delivered or awaiting acceptance. The finding is the opposite — claiming the approved scope is complete when the evidence shows a subset, or presenting a partial scope in the wording of full delivery.
 
@@ -253,7 +257,7 @@ The decision is closed; this review is about execution. Check:
 - **Scope fidelity** — every Task maps to a slice of the authorized scope, and no Task exceeds it.
 - **Coverage** — every part of the authorized scope has a Task; nothing is quietly dropped.
 - **Ordering and handoff** — normal Plan-mode Q1/Q3 concerns, unchanged.
-- **No second approval** — a Task that merely chooses a different internal approach, uses another library, or splits the work differently is not a finding, as long as the approved behavior and boundary hold.
+- **No second approval** — a Task that merely chooses a different internal approach, uses another library, or splits the work differently is not a finding, as long as the approved design decisions, behavior and governing constraints hold.
 
 A Task outside the approved scope → BLOCKER (unapproved work). A silently dropped part of the scope, presented as complete → BLOCKER. If the Plan shows the approved scope cannot be delivered as written, raise a Requirement Question for the user; do not redesign during review.
 
@@ -454,13 +458,13 @@ fix: "revert the in-place edit; state the supersession in the new proposed/ reco
 
 ### Example F — Partial delivery presented as complete (P4)
 
-A proposal's `## Risks` says two of five consumer modules will be migrated first. Its `## Proposal` says "all consumers read the schema defaults". The `## Consequences`/delivery evidence lists only two modules migrated.
+The target contract requires all five consumers to read schema defaults. Delivery evidence lists only two migrated modules.
 
 ```yaml
 check: P4_falsifiability
 severity: blocker
 location: "{proposal}.md:{line of the full-scope claim}"
-reality: "{proposal}.md:{line of the risks note}; delivery evidence names two of five modules"
+reality: "{proposal}.md:{line of the target contract}; delivery evidence names two of five modules"
 impact: "if moved to implemented/ on this evidence, the record claims a migration that did not happen; downstream readers trust a false premise"
 fix: "keep it in proposed/ with Status: approved until every consumer is migrated, or narrow the proposal's stated scope with user confirmation"
 ```

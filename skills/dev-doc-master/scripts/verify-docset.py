@@ -16,8 +16,9 @@ Checks:
   9. Every discovered sub-document is linked from the main document body outside Reference Documents (no orphan sub-DESIGNs).
  10. No unreplaced template placeholders or completely empty table skeleton rows.
  11. Non-empty ## sections (unless immediately followed by a ### subsection with content) and required boundaries on Project/Active Module DESIGNs.
- 12. No links or file references to transient proposals (`proposals/proposed/.../*.md` or `proposals/rejected/.../*.md`); only `proposals/implemented/` and `proposals/archived/` may be linked from DESIGN/PRD documents.
+ 12. No links or file references to transient proposals (`proposals/proposed/.../*.md` or `proposals/rejected/.../*.md`); only `proposals/implemented/` and `proposals/archived/` may be linked from design-set documents.
  13. Optional (--check-sync): map changed code paths via Module Architecture's Source Carrier column and require owning DESIGN updates unless --pure-refactor is justified.
+ 14. Optional GLOSSARY.md is scanned as a companion and must be registered in the owning main DESIGN or PRD header.
 
 Exit code 0 on pass, 1 on any failure. Prints a report.
 """
@@ -55,6 +56,14 @@ TEMPLATE_PLACEHOLDERS = (
     "<settled conclusion and concise rationale>",
     "<reference-only material; never repeat Parent, Parent Architecture, or Parent Product>",
     "<prd-path>",
+    "<canonical term>",
+    "<one or two sentences defining the concept and its relevant relationships>",
+    "<optional actual ambiguity or link to owning contract>",
+    "<product or project domain>",
+    "<标准术语>",
+    "<一至两句定义概念及相关概念关系>",
+    "<可选的真实歧义或所属契约链接>",
+    "<产品或项目领域>",
 )
 
 _EMPTY_TABLE_ROW_RE = re.compile(r"^\|\s*(?:\|\s*)+$")
@@ -72,9 +81,9 @@ def fail(report, *lines):
         report.append(f"  FAIL: {line}")
 
 
-# Design-set documents only: DESIGN*.md, PRD*.md, BRANDING.md, API-*.md, WORKBENCH.
+# Design-set documents only: DESIGN*.md, PRD*.md, BRANDING*, API-CONTRACT*, GLOSSARY.md.
 # Excludes PLAN-TODOS.md (task lists), research/, and other auxiliary material.
-_DESIGN_DOC_RE = re.compile(r"^(DESIGN|PRD|BRANDING|API-CONTRACT)[\w-]*\.md$")
+_DESIGN_DOC_RE = re.compile(r"^(?:(DESIGN|PRD|BRANDING|API-CONTRACT)[\w-]*|GLOSSARY)\.md$")
 
 
 def _doc_files(doc_dir):
@@ -149,6 +158,53 @@ def discover_subdesigns(doc_dir, main_name, report):
     return sub_files
 
 
+_MD_TARGET_RE = re.compile(r"\]\(([^)#]+?)(?:#[^)]*)?\)")
+_MD_LINK_RE = re.compile(r"\[[^\]]*\]\([^)]*\)")
+_REL_TICK_RE = re.compile(r"`((?:\.{1,2}/)[^`\s]*?\.md)`")
+_COMPANION_RE = re.compile(r"^>\s*\*\*Companion Documents\*\*:\s*(.*)$")
+
+
+def _relative_targets(line):
+    """Extract actual link destinations, never Markdown display labels."""
+    yield from _MD_TARGET_RE.findall(line)
+    yield from _REL_TICK_RE.findall(_MD_LINK_RE.sub("", line))
+
+
+def _companion_targets(value):
+    """Companion paths are document-relative, including bare local names."""
+    yield from _relative_targets(value)
+    prose = _MD_LINK_RE.sub("", value)
+    for match in _LINK_RE.finditer(prose):
+        yield match.group(1) or match.group(2)
+
+
+def check_glossary_registration(doc_dir, report):
+    """Require a real companion target for an existing local glossary."""
+    glossary = Path(doc_dir) / "GLOSSARY.md"
+    registered = False
+    for name in ("DESIGN.md", "PRD.md"):
+        main = Path(doc_dir) / name
+        if not main.is_file():
+            continue
+        header = main.read_text(encoding="utf-8").split("##", 1)[0]
+        for i, line in enumerate(header.splitlines(), 1):
+            match = _COMPANION_RE.match(line)
+            if not match:
+                continue
+            for target in set(_companion_targets(match.group(1))):
+                if target.startswith(("http://", "https://", "mailto:")):
+                    continue
+                if (main.parent / target).resolve() != glossary.resolve():
+                    continue
+                registered = True
+                # Explicit relative paths and Markdown destinations are
+                # checked by check_relative_links; handle bare header paths here.
+                if not glossary.is_file() and target not in set(_relative_targets(line)):
+                    fail(report, f"{main.name}:{i}: broken link {target}")
+    if glossary.is_file() and not registered:
+        fail(report, "GLOSSARY.md: missing Companion Documents registration in DESIGN.md or PRD.md")
+
+
 def check_sub_parent_links(doc_dir, main_name, sub_files, report):
     """Each sub-document must carry a Parent (上级) link to the main document."""
     for name in sub_files:
@@ -196,15 +252,11 @@ def check_relative_links(doc_dir, report):
     A backticked path with no leading `./` or `../` names something resolved
     against some other root, and is left alone.
     """
-    md_link_re = re.compile(r"\]\(([^)#]+?)(?:#[^)]*)?\)")
-    rel_tick_re = re.compile(r"`((?:\.{1,2}/)[^`\s]*?\.md)`")
     errors = []
     for p in _doc_files(doc_dir):
         text = p.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
-            targets = list(md_link_re.findall(line))
-            targets += rel_tick_re.findall(line)
-            for target in targets:
+            for target in _relative_targets(line):
                 if not target or target.startswith(("http://", "https://", "mailto:", "#")):
                     continue
                 target = target.split("#")[0]
@@ -254,7 +306,7 @@ def check_transient_proposal_links(doc_dir, report):
                     seen_on_line.add(target)
                     fail(
                         report,
-                        f"{p.name}:{i}: transient proposal link '{target}' is forbidden in DESIGN/PRD "
+                        f"{p.name}:{i}: transient proposal link '{target}' is forbidden in design-set documents "
                         "(only proposals/implemented/ or proposals/archived/ may be linked)",
                     )
 
@@ -733,6 +785,7 @@ def main():
 
     report = [f"Document set verification: {doc_dir}", "=" * 50]
     sub_files = discover_subdesigns(doc_dir, main_name, report)
+    check_glossary_registration(doc_dir, report)
     check_sub_parent_links(doc_dir, main_name, sub_files, report)
     check_sub_body_reachability(doc_dir, main_name, sub_files, report)
     check_absolute_paths(doc_dir, report)

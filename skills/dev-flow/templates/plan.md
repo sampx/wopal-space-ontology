@@ -157,7 +157,7 @@
 
 **Verification Intent**: <Agent Verification entries, e.g. AC#1, AC#3>
 
-**Design Source**: <required for project/phase Plans: cite only authoritative `Status: Active` DESIGN as `space-relative-path#heading` + decision/contract; Draft/Proposed are invalid; use N/A only for simple work with no project/design basis>
+**Design Source**: <required for project/phase Plans: cite the approved Proposal target or applicable settled Active DESIGN and authorization as `space-relative-path#heading` + decision/contract; unapproved design is invalid; use N/A only for simple work with no project/design basis>
 
 **Behavior**:
 - <observable outcome in plain language>

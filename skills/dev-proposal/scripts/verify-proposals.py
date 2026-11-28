@@ -2,7 +2,7 @@
 """Verify a Business Proposal tree against the dev-proposal contract.
 
 Usage:
-  python3 verify-proposals.py <proposals-root> [--json] [--strict]
+  python3 verify-proposals.py <proposals-root> [--json]
                               [--link-scope <docs-dir>]...
 
 The root may be the `proposals/` directory itself or any directory that holds
@@ -21,9 +21,8 @@ Single-snapshot, static, deterministic checks only:
      `Archived: YYYY-MM-DD`; `rejected — <reason>` only in `rejected/`.
   3. Skeleton: the future-tense sections in `proposed/`, the present-tense
      sections in `implemented/` with planning-era headings forbidden, and the
-     proposal-time sections in `rejected/`. The Design Basis skeleton and
-     the former complete skeleton are both supported. Archived bodies are
-     frozen and skipped.
+     proposal-time sections in `rejected/`. Active records use the Design
+     Basis skeleton. Archived bodies are frozen and not checked.
   4. Authorization: `Status: approved` carries `Approved`, `Authorized scope`
      and `Delivery: direct | plan`, with a real calendar date and a named
      approver. This checks shape only; it can never prove that a human approved
@@ -49,10 +48,7 @@ A parent directory is a valid entry point, so `<dir>/proposals` is used when
 present. A competing singular `<dir>/proposal` is reported rather than ignored:
 two roots in one project defeat the claim that the path is the index.
 
-A pre-format file — one with neither a `Status:` line nor a `**Class**` field —
-is read-only compatible: it is reported as skipped and never modified or
-judged. A Markdown file at the tree root, outside every lifecycle, is likewise
-reported instead of silently ignored.
+All Markdown in the proposal tree must follow the current layout and metadata.
 
 Exit code 0 when clean, 1 on any issue, 2 on a usage error.
 """
@@ -69,18 +65,9 @@ from pathlib import Path
 LIFECYCLES = ("proposed", "implemented", "rejected", "archived")
 CLASSES = ("feature", "bug-fix", "simplification", "architecture", "process", "testing")
 
-PROPOSED_REQUIRED = ("Problem", "Proposal", "Alternatives considered", "Acceptance criteria", "Risks")
-IMPLEMENTED_REQUIRED = ("Problem", "Decision", "Alternatives considered", "Consequences")
 IMPLEMENTED_FORBIDDEN = ("Proposal", "Plan", "Migration plan", "Acceptance criteria")
-REJECTED_REQUIRED = ("Problem", "Proposal", "Alternatives considered")
 
 REQUIRED_BY_LIFECYCLE = {
-    "proposed": PROPOSED_REQUIRED,
-    "implemented": IMPLEMENTED_REQUIRED,
-    "rejected": REJECTED_REQUIRED,
-    "archived": (),
-}
-DESIGN_BASIS_REQUIRED_BY_LIFECYCLE = {
     "proposed": ("Problem", "Design Basis", "Proposal", "Acceptance criteria"),
     "implemented": ("Problem", "Design Basis", "Decision", "Consequences"),
     "rejected": ("Problem", "Design Basis", "Proposal"),
@@ -129,7 +116,6 @@ FIX_HINTS = {
     "LINK_BROKEN_OUTBOUND": "fix or remove the relative link; repair inbound references when a file moved",
     "LINK_ABSOLUTE_PATH": "use a relative link instead of an absolute path",
     "LINK_SCOPE_MISSING": "pass an existing directory to --link-scope, or omit the flag",
-    "LAYOUT_LEGACY_PRESENT": "migrate the pre-format file to the current layout, or drop --strict",
 }
 
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
@@ -154,7 +140,6 @@ _REJECT_REASON_RE = re.compile(r"^rejected\s*(?:—|-{1,2})\s*(\S.*)$")
 class Report:
     def __init__(self) -> None:
         self.issues: list[dict] = []
-        self.skipped: list[dict] = []
         self.files = 0
         self.scanned: set[Path] = set()
 
@@ -169,19 +154,14 @@ class Report:
             }
         )
 
-    def skip(self, path: Path, reason: str) -> None:
-        self.skipped.append({"path": str(path), "reason": reason})
-
     def as_dict(self) -> dict:
         return {
             "verdict": "FAIL" if self.issues else "PASS",
             "counts": {
                 "files": self.files,
                 "errors": len(self.issues),
-                "skipped": len(self.skipped),
             },
             "issues": self.issues,
-            "skipped": self.skipped,
         }
 
 
@@ -314,13 +294,7 @@ def _check_skeleton(path: Path, text: str, lifecycle: str, report: Report) -> No
     if lifecycle == "archived":
         return
     present = _h2_sections(text)
-    # Existing records remain valid under the former skeleton; authors and
-    # reviewers enforce the new skeleton for newly written Proposals.
-    required = (
-        DESIGN_BASIS_REQUIRED_BY_LIFECYCLE[lifecycle]
-        if "Design Basis" in present
-        else REQUIRED_BY_LIFECYCLE[lifecycle]
-    )
+    required = REQUIRED_BY_LIFECYCLE[lifecycle]
     for name in required:
         if name not in present:
             report.add("SKELETON_MISSING_SECTION", path, f"missing required section '## {name}'")
@@ -397,10 +371,6 @@ def inspect_file(path: Path, lifecycle: str, class_dir: str, report: Report) -> 
     status_line, status = status_hits[0] if status_hits else (None, None)
     class_line, class_value = _line_of(header, _CLASS_RE)
     created_line, created_value = _line_of(header, _CREATED_RE)
-
-    if status_line is None and class_line is None:
-        report.skip(path, "legacy-preformat")
-        return
 
     report.files += 1
 
@@ -500,42 +470,25 @@ def inspect_lifecycle_dir(root: Path, lifecycle: str, report: Report) -> None:
             continue
 
         if len(parts) != 2:
-            text = path.read_text(encoding="utf-8")
-            header = text[: _header_boundary(text)]
-            if _line_of(header, _STATUS_RE)[0] is None and _line_of(header, _CLASS_RE)[0] is None:
-                report.skip(path, "legacy-preformat")
-            else:
-                report.add(
-                    "LAYOUT_UNEXPECTED_PATH",
-                    path,
-                    f"expected '{lifecycle}/<class>/<yyyy-mm-dd-slug>.md', found "
-                    f"'{path.relative_to(root)}'",
-                )
+            report.add(
+                "LAYOUT_UNEXPECTED_PATH",
+                path,
+                f"expected '{lifecycle}/<class>/<yyyy-mm-dd-slug>.md', found "
+                f"'{path.relative_to(root)}'",
+            )
             continue
 
         class_dir, filename = parts
-        is_legacy = False
-        text = path.read_text(encoding="utf-8")
-        header = text[: _header_boundary(text)]
-        if _line_of(header, _STATUS_RE)[0] is None and _line_of(header, _CLASS_RE)[0] is None:
-            is_legacy = True
-
         if class_dir not in CLASSES:
-            if is_legacy:
-                report.skip(path, "legacy-preformat")
-            else:
-                report.add(
-                    "LAYOUT_UNKNOWN_CLASS",
-                    path,
-                    f"unknown class directory '{class_dir}'",
-                )
+            report.add(
+                "LAYOUT_UNKNOWN_CLASS",
+                path,
+                f"unknown class directory '{class_dir}'",
+            )
             continue
 
         filename_match = _FILENAME_RE.match(filename)
         if filename_match is None:
-            if is_legacy:
-                report.skip(path, "legacy-preformat")
-                continue
             report.add(
                 "LAYOUT_BAD_FILENAME",
                 path,
@@ -561,11 +514,9 @@ def inspect_tree(root: Path, report: Report) -> None:
             )
             continue
         if not entry.is_dir():
-            # A Markdown file sitting at the root belongs to no lifecycle. Legacy
-            # trees do this, so it is reported rather than failed; silence would
-            # let a whole tree report "OK" while checking nothing.
             if entry.suffix == ".md":
-                report.skip(entry, "outside-lifecycle-layout")
+                report.add("LAYOUT_UNEXPECTED_PATH", entry,
+                           "Markdown proposal must be inside a lifecycle and class directory")
             continue
 
         if entry.name == "proposal":
@@ -579,16 +530,11 @@ def inspect_tree(root: Path, report: Report) -> None:
 
         if entry.name not in LIFECYCLES:
             for path in sorted(entry.rglob("*.md")):
-                text = path.read_text(encoding="utf-8")
-                header = text[: _header_boundary(text)]
-                if _line_of(header, _STATUS_RE)[0] is None and _line_of(header, _CLASS_RE)[0] is None:
-                    report.skip(path, "legacy-preformat")
-                else:
-                    report.add(
-                        "LAYOUT_UNKNOWN_LIFECYCLE",
-                        path,
-                        f"unknown lifecycle directory '{entry.name}'",
-                    )
+                report.add(
+                    "LAYOUT_UNKNOWN_LIFECYCLE",
+                    path,
+                    f"unknown lifecycle directory '{entry.name}'",
+                )
             continue
 
         inspect_lifecycle_dir(root, entry.name, report)
@@ -615,8 +561,6 @@ def _print_human(report: Report, root: Path) -> None:
     print(f"Proposal tree verification: {root}")
     print("=" * 60)
     print(f"  Files checked: {data['counts']['files']}")
-    for item in report.skipped:
-        print(f"  SKIP: {item['path']} ({item['reason']})")
     for issue in report.issues:
         location = issue["path"] if issue["line"] is None else f"{issue['path']}:{issue['line']}"
         print(f"  FAIL: [{issue['code']}] {location}: {issue['message']}")
@@ -636,11 +580,6 @@ def main(argv: list[str]) -> int:
     parser.add_argument("root", help="proposals root, or a directory containing one")
     parser.add_argument("--json", action="store_true", dest="as_json", help="machine-readable output")
     parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="treat the presence of legacy pre-format files as a failure",
-    )
-    parser.add_argument(
         "--link-scope",
         action="append",
         default=[],
@@ -653,10 +592,9 @@ def main(argv: list[str]) -> int:
     if root is None:
         message = f"root not found or not a directory: {args.root}"
         if args.as_json:
-            print(json.dumps({"verdict": "FAIL", "counts": {"files": 0, "errors": 1, "skipped": 0},
+            print(json.dumps({"verdict": "FAIL", "counts": {"files": 0, "errors": 1},
                               "issues": [{"code": "ROOT_MISSING", "path": args.root, "line": None,
-                                          "message": message, "fix": "pass the proposals directory"}],
-                              "skipped": []}, indent=2))
+                                          "message": message, "fix": "pass the proposals directory"}]}, indent=2))
         else:
             print(f"ERROR: {message}", file=sys.stderr)
         return 2
@@ -682,15 +620,6 @@ def main(argv: list[str]) -> int:
             )
             continue
         _check_link_scope(scope, report, report.scanned)
-
-    if args.strict:
-        for item in report.skipped:
-            if item["reason"] == "legacy-preformat":
-                report.add(
-                    "LAYOUT_LEGACY_PRESENT",
-                    Path(item["path"]),
-                    "legacy pre-format file present under --strict",
-                )
 
     if args.as_json:
         print(json.dumps(report.as_dict(), indent=2))

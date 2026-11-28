@@ -63,7 +63,7 @@
 
 ## 头部中的伴随文档
 
-像 `BRANDING.md`（品牌常量）或 `API-CONTRACT.md`（跨切面契约）等文件属于文档集但不是某模块子 DESIGN，在主文档头部 `Companion Documents` 或文档关系表声明，保持原名。反之，凡实际承担主 DESIGN 某个架构模块或子系统详述的支持性文件，必须识别并命名为 `DESIGN-<module>.md`，加上 `Parent: ./DESIGN.md` 并在主文档正文地图中链接（参见 `consistency.md` 的伴随文档 vs 子 DESIGN 判据）。
+像 `BRANDING.md`（品牌常量）或 `API-CONTRACT.md`（跨切面契约）等文件属于文档集但不是某模块子 DESIGN，在主文档头部 `Companion Documents` 或文档关系表声明，保持原名。可选的领域 `GLOSSARY.md` 遵循 `references/glossary.md`，在所属主 DESIGN 或 PRD 头部登记，不作为子 DESIGN。反之，凡实际承担主 DESIGN 某个架构模块或子系统详述的支持性文件，必须识别并命名为 `DESIGN-<module>.md`，加上 `Parent: ./DESIGN.md` 并在主文档正文地图中链接（参见 `consistency.md` 的伴随文档 vs 子 DESIGN 判据）。
 
 ## 元数据字段语义
 

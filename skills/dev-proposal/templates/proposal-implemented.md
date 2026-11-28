@@ -8,7 +8,7 @@ Status: implemented
 - **Authorized scope**: <approved scope including explicit exclusions>
 - **Delivery**: <direct | plan>
 
-<!-- On migration, rename Proposal to Decision; record actual acceptance results and material residual costs in Consequences. Retain design basis, original decisions, and necessary rationale. Migrate the old skeleton under its original lifecycle rules. -->
+<!-- On migration, rename Proposal to Decision; record actual acceptance results and material residual costs in Consequences. Retain design basis, original decisions, and necessary rationale. -->
 
 ## Problem
 

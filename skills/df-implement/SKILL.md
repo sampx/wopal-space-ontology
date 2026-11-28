@@ -24,7 +24,7 @@ This skill accepts exactly one of three authorized sources and binds to no Plan 
 | Explicit Issue | An issue describing a defect or task inside a settled design | The issue description itself |
 | Plan Task (optional) | An authorized task, its source, ACs and constraints | Task definition within its source authorization |
 
-For a Proposal-driven delivery, the current approved Proposal is the sole target authority; Plans organize execution. An Issue authorizes a task within settled design. Route by the actual source, never by guessing from file names. If you cannot say which authorization covers this change, stop and ask the controller before writing code.
+For a Proposal-driven delivery, the current approved Proposal is the sole target authority for the authorized change; existing design constraints not explicitly changed remain binding. Plans organize execution. An Issue authorizes a task within settled design. Route by the actual source, never by guessing from file names. If you cannot say which authorization covers this change, stop and ask the controller before writing code.
 
 **Plans already in flight** keep their existing contract: DESIGN defines the target, the approved Plan defines the delivery scope, implementation builds it. Do not retroactively rewrite an in-flight Plan or its tasks to the present-state documentation rules; retain the legacy target contract, while applying the applicable present-state documentation and rule quality requirements to affected artifacts.
 
@@ -46,10 +46,10 @@ The isolation branch's starting point is the delivery baseline; record it as `<d
 Complete the following in one delivery, in order:
 
 1. Implement code and tests and verify the authorized target.
-2. Load `dev-doc-master` and synchronize affected project/module present-state DESIGNs with the actual implementation. They describe implemented behavior, not future targets. Pure internal changes that leave the documented facts intact need no DESIGN edit.
+2. Load `dev-doc-master` and synchronize affected project/module present-state DESIGNs with the actual implementation. They describe implemented behavior, not future targets. Synchronize affected canonical terminology in an existing or needed `GLOSSARY.md` according to `dev-doc-master/references/glossary.md`, from verified delivered behavior. Pure internal changes that leave documented facts and terminology intact need no document edit.
 3. Load `space-master` to audit affected rules at every applicable tier (project, module, directory, documentation, etc.), correcting stale constraints and strengthening necessary durable rules against the resulting design. All affected documents and rules must meet their owning skill's SOP and quality standards and agree with one another; do not manufacture edits for ceremony.
 
-Parallel tasks only edit artifacts inside their authorized write set. The controller coordinates shared main DESIGNs, shared rules and Proposals. Report out-of-set drift for resolution before delivery.
+Parallel tasks only edit artifacts inside their authorized write set. The controller coordinates shared main DESIGNs, shared glossaries and companion headers, shared rules and Proposals. Report out-of-set drift for resolution before delivery.
 
 ## Mechanical gates at the delivery exit
 
@@ -75,13 +75,7 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 `<skill-dir>` resolves the same way; `<proposals-root>` is the business's actual proposals root (product-level `docs/products/<product>/proposals/` or project-level `projects/<project>/docs/proposals/`), not wherever happens to be convenient. When a Proposal move, deletion, or rename can break links from external docs, pass each affected docs directory to `--link-scope` (repeatable), sized to the real reference scope.
 
-**Proposal lifecycle sync rules** (the `dev-proposal` skill owns the detail; these bound what an implementer may do):
-
-- Only **after the approved scope is fully delivered and user-accepted**, migrate the Proposal from `proposals/proposed/<class>/` into `implemented/<class>/` in the same delivery, rewriting it to the present-tense `## Decision` / `## Consequences` (planning-time headings removed). A partial delivery stays `Status: approved` — never impersonate full delivery.
-- **Partial supersession** of an existing `implemented/` proposal: at full-scope delivery, add the cross-links both ways in the same commit; never touch the old proposal before full delivery.
-- **Full replacement** of an existing `implemented/` proposal: at full-scope delivery, absorb its unique rationale/alternatives/costs/verification and repair inbound links, then delete the old file, or move it to `archived/<class>/` (inserting `Archived: YYYY-MM-DD`) permanently frozen.
-- Ordinary code changes that drift paths/symbols/defaults without changing the decision: sync the affected fact references inside `implemented/` in place, in the same delivery.
-- **Never** demote `implemented/` back to `proposed/`, never unfreeze or modify `archived/`. Those moves belong to a new proposal through the formal flow.
+**Proposal sync** — Apply `dev-proposal`'s `references/lifecycle.md` and `references/evolution-triage.md` to authorized adjustments, fact synchronization or migration. Migrate only after full delivery and user acceptance. The controller coordinates shared files.
 
 **Rules gate** — apply the applicable `space-master` quality checks and verifiers to affected rules at all tiers and report actual results. Testing follows the resident `rules/testing.md`.
 
@@ -91,7 +85,8 @@ Before editing, understand:
 
 - the current task and acceptance criteria;
 - the Task's authorizing source and `Design Source` when present (legacy Plans retain the Active DESIGN contract);
-- for a direct Proposal or Issue: the proposal's `Authorized scope` and the DESIGNs and constraints it cites;
+- for any Proposal-driven delivery: the approved target, `Authorized scope`, acceptance and verification design, `Design Basis` (if present), governing architecture, applicable DESIGNs, companion contracts and glossary; independently follow applicable constraints not explicitly changed, including for Proposal-derived Plan tasks;
+- for an Issue: the issue's scope and applicable settled design contracts and vocabulary;
 - the Task's `Pre-read`, `Interface`, and `Constraints` when present;
 - the relevant call path and callers;
 - the current and parent `AGENTS.md` rules.
@@ -120,7 +115,7 @@ When your change replaces or removes a function call, a module import, or a pack
 
 Do not autonomously change:
 
-- the approved Proposal target, decisions, authorized scope and acceptance criteria; the settled design constraints of an Issue or legacy Plan;
+- the approved Proposal target, decisions (including module ownership and dependencies, interfaces, behavior, state, failure and risk-control contracts), authorized scope and acceptance criteria; unchanged governing constraints, including for Proposal-derived Plan tasks; the settled design constraints of an Issue or legacy Plan;
 - the behavior, scope, boundaries, interfaces, or acceptance criteria of an approved Plan;
 - anything the user explicitly required.
 
@@ -141,23 +136,15 @@ A few easy-to-misjudge boundaries:
 
 ### Authorization conflicts and user adjustments
 
-If automated implementation needs a change to the target, scope or acceptance criteria, stop affected work, explain the concrete conflict and impact to the controller or user, and resume after the decision. Present-state DESIGN differing from the intended new behavior is not a conflict; synchronize it after implementation. Legacy Plans retain their prior design-source contract.
+If automated implementation needs a change to the target, scope or acceptance criteria, stop affected work, explain the concrete conflict and impact to the controller or user, and resume after the decision. Present-state DESIGN differing from the explicitly authorized new behavior is not a conflict; synchronize it after implementation. A design question left materially undecided, conflicting authority, or a need to change an inherited constraint outside the approved scope is not an implementation detail: return it for decision rather than choosing an alternative or weakening the contract. Legacy Plans retain their prior design-source contract.
 
 For explicit user-authorized adjustments during testing or validation, follow the pre-acceptance maintenance rules in `dev-proposal`: integrate the decision into the current Proposal preferably before implementation, or before delivery if already implemented. The controller coordinates Proposal and shared document edits in delegated work. Do not ask for approval again or add workflow states.
 
 ## TDD
 
-For changes to public commands or user-facing workflows, read the applicable project `AGENTS.md` acceptance contract first. Map each new or changed user behavior to an observable outcome, meaningful failure case, and state-safety invariant; check whether existing tests actually prove those outcomes. Internal unit or mocked collaboration tests prove only their own boundary. When they cannot prove a user can complete the task through the real public entry point, add E2E verification of the complete journey, using isolated resources or real external services as the task requires. Report the test layer, executed commands, observed result, and CI ownership to the controller; a green suite or test filename alone is not acceptance evidence.
+For changes to public commands or user-facing workflows, read the applicable project `AGENTS.md` acceptance contract first. Honor the Proposal's verification boundary and applicable testing rules. Map each new or changed user behavior to an observable outcome, meaningful failure case, and state-safety invariant; check whether existing tests actually prove those outcomes. Internal unit or mocked collaboration tests prove only their own boundary. When they cannot prove a user can complete the task through the real public entry point, add E2E verification of the complete journey, using isolated resources or real external services as the task requires. Report the test layer, executed commands, observed result, and CI ownership to the controller; a green suite or test filename alone is not acceptance evidence.
 
-Use TDD only when it actually helps define behavior, not mechanically every time a file changes.
-
-With `TDD: true`, follow RED → GREEN → REFACTOR: first write a failing test that checks the new or fixed behavior, then write the smallest implementation that passes, then clean up while tests stay green. Every new test must protect real behavior over time; do not write a throwaway test just to produce one red-green cycle.
-
-With `TDD: false`, do not force a fake failing test. Pick verification that actually proves the change works: existing tests, tests that lock in current behavior, build/typecheck/static checks, integration tests, or smoke checks.
-
-- When deleting obsolete behavior or code, delete tests that only existed to check that deleted behavior. Keep or update tests that still protect remaining behavior. If deletion creates a new external behavior, test that new behavior instead.
-- For refactors that keep behavior unchanged, existing tests must stay green. If the old code has no test coverage, first add tests that lock in its current behavior before refactoring; do not manufacture a fake failing test.
-- Config, build/CI, metadata, dependency updates, file moves/renames, import cleanup, UI styling, exploratory work, and simple wiring usually do not need TDD, but still need verification that matches the risk.
+Follow `rules/testing.md` for TDD and risk-appropriate verification. A Plan TDD field must agree with that rule. Remove tests protecting only removed behavior and retain useful regression coverage.
 
 For a dev-flow Plan, determine the real verification commands for relevant ACs during implementation/Verify and return them in the completion report; the implementer does not write them into the Plan directly. For the direct/Issue route, return the verification commands and results in the report's `DESIGN Sync` block (see below) for the controller to re-verify.
 
@@ -215,7 +202,7 @@ DESIGN Sync:
   Worktree: <worktree and branch used; the default isolation tree for direct, the controller-assigned tree for Plan>
   Delivery base: <Git baseline covering the whole delivery (isolation branch start or Delivery Base Commit); a single uncommitted change says working tree>
   Gates: <verify-docset.py --check-sync --base <base> real result (pure refactors add the --pure-refactor reason); plus verify-proposals.py real result when a Proposal was touched, and applicable rule quality checks>
-  Docs synced: <synchronized Proposal, present-state DESIGNs, rules at all affected tiers, and corresponding facts; explain when no change is needed>
+  Docs synced: <synchronized Proposal, present-state DESIGNs, glossary, rules at all affected tiers, and corresponding facts; explain when no change is needed>
   Drift report: <documentation drift found outside the write set, reported not edited; none if nothing found>
 ```
 

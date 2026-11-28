@@ -29,16 +29,13 @@
    - **严禁手抄易变代码清单**：不手抄完整源码目录树、全部命令 flags 表格、完整 API 字段表或函数签名清单。需要具体字段或参数定义时，用一句话概括契约范围并用相对链接指向定义它的源码文件。
    - **在主 `## Module Architecture` 维护 `Source Carrier` 映射**：为每个模块标注源码承载前缀（如 `src/auth/`），供 `verify-docset.py --check-sync` 自动把代码改动映射到所属文档。
 
-## 防多 Agent 并行冲突结构准则
+## 目标设计与现状设计共用契约覆盖标准
 
-四条硬规则从文档组织上根除多人/多 Agent 并行修改撞车：
+上述五项覆盖标准是语义检查，不是固定章节目录。根据文档职责检查每项重要行为契约：Proposal 写明确的新增或变更目标行为，引用不变的上层约束，重要结果对应验收；现状 DESIGN 写经核实的已交付行为。不适用的要素无须单设章节。术语表只定义概念，不描述运行契约。目标设计的讨论、分类覆盖和验证设计归 `dev-proposal`。
 
-| 规则 | 做法 | 为什么这样做 |
-|---|---|---|
-| **1. 主 `DESIGN.md` 强制压薄** | 主文档只保留项目定位、能力边界摘要、跨模块主流程、全局状态所有权与 `## Module Architecture` 模块地图表（带子文档链接） | 主文档内容越稳定、越少模块实现细节，并发开发时越不需要改动主文档 |
-| **2. 多模块默认拆子文档** | 只要项目包含多个独立模块或清晰职责域，**立即按模块拆出 `DESIGN-<module>.md`**（不等到 500 行阈值）；单模块紧耦合小型项目保留单份 `DESIGN.md` | 把日常变更自然隔离到各自模块的物理文件内；同时注意紧耦合的单一契约不要机械切碎成碎片 |
-| **3. 去掉头部 `Sub-DESIGNs` 枚举** | 项目主 `DESIGN.md` 头部**不写** `Sub-DESIGNs` 全量索引表；仅各子 `DESIGN-<module>.md` 头部写 `> **Parent**: ./DESIGN.md` 单向挂回 | 消除集中索引热点——两个并发分支各自新建或修改不同子文档时零主文档头冲突 |
-| **4. 严守写集与单模块静默** | 日常开发或修单个模块的 Bug 只改所属 `DESIGN-<module>.md`；多 Agent 并行期间严禁修改授权写集以外的主 `DESIGN.md` 或其他模块子文档；发现写集外漂移只在交付汇报的 `DESIGN Sync` 中上报主控 | 把跨文档/主地图整合统一交给主控协调阶段，避免并发分叉 |
+## 并行文档同步
+
+文档拆分、单一归属和写集纪律以 `consistency.md` 为准。实施者在 `DESIGN Sync` 中上报写集外漂移，由主控协调共享主文档及术语表。
 
 ## 实测取证标准（Fact-Check Procedure）
 
@@ -54,9 +51,10 @@
 
 1. Proposal 审议与待交付期间，所有设计提案留在 `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`：**既不把未落地设计预写进现状 DESIGN，也不在现状 DESIGN 的正文或 `## Reference Documents` 中挂载指向 `proposals/proposed/` 或 `proposals/rejected/` 的链接**（提案路径是易变临时态，`proposals/proposed/` 目录本身即索引，反向挂载会造成主文档热点与断链）。
 2. 当实施交付完成并经过测试验证时，**在同一轮交付中完成同步**：
+   - 依据已核实的交付行为同步受影响术语表定义，遵循 `references/glossary.md`；共享术语表及头部由主控协调。
    - 依据真实代码、测试与实测输出，更新受影响模块的 `DESIGN-<module>.md`（或小型单模块 `DESIGN.md`）；
    - 仅当本次变更引入/删除模块、调整模块间职责分工或改变项目级边界时，由主控整合更新薄主 `DESIGN.md` 地图及 `## Key Decisions`；
-   - 将对应 Proposal 从 `proposed/<class>/` 同交付迁入 `implemented/<class>/` 并改写为现在时 `Decision`/`Consequences`（若分多个 Plan 实施，仅当全部批准范围完成核验后才迁入 `implemented/`）。
+   - 将对应 Proposal 从 `proposed/<class>/` 同交付迁入 `implemented/<class>/` 并改写为现在时 `Decision`/`Consequences`（若分多个 Plan 实施，仅当全部批准范围交付且用户验收通过后才迁入 `implemented/`）。
 
 ### 场景 B：无 Proposal 的日常修 Bug、小调整与内部重构
 
@@ -128,7 +126,7 @@
 1. **第一道——实施出口变更映射门禁（`verify-docset.py --check-sync`）**：
    - 解析主 `DESIGN.md` → `## Module Architecture` 的 `Source Carrier` 前缀，将本轮非测试代码改动（`--base <git-ref>` 或当前工作区变更）自动映射到对应 `DESIGN-<module>.md`（单模块映射到 `DESIGN.md`）。
    - 凡改动模块代码却未在同批变更中同步所属 DESIGN，脚本直接判 FAIL——从源头抓出“该写却没写”；纯内部重构必须显式传入 `--pure-refactor "<原因>"` 留痕交评审核验。
-2. **第二道——确定性结构与边界硬门禁（`verify-docset.py` 1–11 项）**：
+2. **第二道——确定性结构与边界硬门禁（`verify-docset.py`，结构门禁见 consistency.md）**：
    - 在磁盘上强校验子文档 `Parent` 指回、**零孤立子 DESIGN**（所有 `DESIGN-*.md` 必须在主文档正文除 `Reference Documents` 外被链接）、**零模板占位符残留与空表格行**、**所有 `##` 章节非空**、项目主/生效模块子文档**强制存在 `## Business Rules and Failure Boundaries`**、相对链接无断链、零绝对路径、零过程态禁语、固定英文头部词表与合法 `Status`。
 3. **第三道——结构化交付交接网关（`df-implement` / `dev-flow` 中的 `DESIGN Sync`）**：
    - 实施交付汇报强制要求非空 `DESIGN Sync` 字段，附上：① `verify-docset.py --check-sync` 运行结果、改动的 `DESIGN-<module>.md` 章节与实测依据；或 ② `--pure-refactor` 正当性说明及写集外文档漂移上报。缺少该证据的交付由主控直接打回。

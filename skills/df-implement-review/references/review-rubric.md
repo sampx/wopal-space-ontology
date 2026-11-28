@@ -27,7 +27,7 @@ Read the diff once (`git diff`, `git diff --cached`, `git show <hash>`, or `git 
 
 After this, all four questions consume the lists with targeted probes. Never re-scan what you already read.
 
-When no Plan, design clause, or recorded decision exists, say so in the report and limit the review to Q2 and Q3 real defects. Without a design basis you cannot judge Q1 completeness, and you have no standing to suggest improvements.
+If authorization or design evidence is missing, disclose which Q1 completeness claims cannot be judged. Continue Q2–Q4 checks for real defects, artifact quality and applicable debt; repo audits may identify grounded maintenance cuts without inventing product intent.
 
 ## 2. Q1 — Stub patterns & probes
 
@@ -138,8 +138,8 @@ For each consumer, ask: which assumption from this table does it hold, and is it
 ### Severity
 
 - Diff-outside call site broken with a concrete scenario → **BLOCKER**
-- Behavior changed, but the design may have sanctioned it → check the design first; a sanctioned change is not a finding. Unsupported by any clause → `Info` at most
-- Consumers not fully checked → `UNCOVERED STEPS`, never fake coverage
+- Behavior changed, but the design may have sanctioned it → check the design first; a sanctioned change is not a finding. When authorization is uncertain, disclose it; report independently demonstrated defects at their actual severity
+- Consumers not fully checked → Other notes, never fake coverage
 
 ## 4. Q3 — Defect catalogue
 
@@ -215,10 +215,10 @@ A change that alters an external contract without updating the docs that describ
 
 1. Find where it is documented — `rg '<symbol>' docs/ README* AGENTS.md` and public docstrings.
 2. Check whether the diff updated those spots.
-3. Inconsistency between code and present-state DESIGN, DESIGN and rules, or affected rule tiers, or failure of their governing quality standards → BLOCKER. Proposal-target drift alone → WARNING. Unrequired internal implementation detail need not be documented.
+3. Inconsistency between code and present-state DESIGN, DESIGN and rules, or affected rule tiers, or failure of their governing quality standards → BLOCKER. For business Proposal-driven delivery, material unauthorized design drift or violation of an unchanged governing architectural constraint → BLOCKER; noncritical target discrepancy or authorized-but-unsynced Proposal adjustment → WARNING. Affected glossary consistency is a mandatory document check under dev-doc-master. Unrequired internal implementation detail need not be documented.
 4. A project rule requiring docs to ship with code (stated in `AGENTS.md`) → violating it is BLOCKER, same as any stated constraint.
 
-Pure internal refactors with no contract change trigger nothing. Docs outside the repo you can see → `Needs Human`.
+Pure internal refactors with no contract change trigger nothing. Docs outside the repo you can see → Other notes.
 
 ## 6. Q4 — Orphan tags (change review: diff-created orphans only)
 
@@ -261,7 +261,7 @@ Before recommending a `stdlib:` or `native:` replacement, verify:
 | Diff switches callers away from old code/tests, leaving zero production references (orphan created by this diff) | **WARNING** (REVISE) |
 | Duplication this diff introduced where the repo already ships the logic, finding names `file:line` | **WARNING** (REVISE) |
 | Pre-existing dead code / unused dependency, stdlib/native replacement ideas, single-implementation interfaces (Repo audit mode) | INFO (dead code WARNING when it masks a claimed behavior) |
-| `shrink:` suggestions | INFO |
+| Optional simplification without a demonstrated defect or new duplication | INFO |
 
 Correctness first, then leanness — never trade one for the other. A lean finding must never conflict with Q1–Q3; when it does, correctness wins and the lean idea is dropped.
 
@@ -354,7 +354,7 @@ This gate complements df-proposal-review, which checked the *stated* deliverable
 | Query executed, result discarded, static `{ ok: true }` returned | BLOCKER (Q1) |
 | Deletion of a helper that turns out to still be imported (build would catch) | no finding — CI owns build breakage |
 | Race between two async writes with a concrete interleaving | BLOCKER (Q3) |
-| Implementation works but differs from the Proposal target | WARNING (Q1 target drift; independent bugs or DESIGN/rule inconsistencies are BLOCKER) |
+| Implementation works but changes an approved material design decision or unchanged architecture without authorization | BLOCKER (Q1 design drift); noncritical discrepancies or authorized-but-unsynced Proposal adjustments are WARNING |
 | Implementation matches a tradeoff the design explicitly accepted (fixed short cache window, sequential execution, polling) and violates no clause | no finding — the design decided |
 | Implementation chose a shape the reviewer dislikes, but the design neither requires nor forbids it | no finding (Info at most, and usually stays in your notes) |
 | Change alters a documented API, owning DESIGN left stale | BLOCKER (Q4 DESIGN sync) |
@@ -366,9 +366,9 @@ This gate complements df-proposal-review, which checked the *stated* deliverable
 | `AbstractStore` with a single `FileStore` implementation (pre-existing, untouched) | INFO in Repo audit only; not in a change review |
 | Landed skill buries required trigger conditions in body | BLOCKER (mandatory capability standard) |
 | Landed skill's frontmatter lacks `description` | BLOCKER (capability gate) |
-| Design says unconfirmed quota exhaustion is transient rate limiting; implementation does that, but the reviewer thinks it should disable the account | `Design Feedback`, no verdict change |
+| Design says unconfirmed quota exhaustion is transient rate limiting; implementation does that, but the reviewer thinks it should disable the account | design concern in Other notes, no verdict change |
 | Design never mentions an internal branch; implementation picked its own approach and left it untested | no finding — the design never promised that behavior |
-| Concern about visual appearance of a changed component | `Needs Human` |
+| Concern about visual appearance of a changed component | Other notes |
 | "I would have structured this module differently" | no finding |
 
 Judgement note: any Blocker → BLOCK, else any Warning → REVISE, else PASS. Counting warnings is not the mechanism.
@@ -419,7 +419,7 @@ finding:
 
 A diff rewrites the shared `formatDate` used in 60 files. Reading all 60 is not review — it's a survey.
 
-**Correct handling**: extract the *contract* — signature, accepted inputs, output format, timezone behavior. Diff the contract against the old version. `rg -l` the consumers, read 3–5 representative call sites across categories (props rendering, API serialization, cache keys — anything that might hold a format assumption). Report the remainder under `UNCOVERED STEPS` or `Needs Human` with the reason.
+**Correct handling**: extract the *contract* — signature, accepted inputs, output format, timezone behavior. Diff the contract against the old version. `rg -l` the consumers, read 3–5 representative call sites across categories (props rendering, API serialization, cache keys — anything that might hold a format assumption). Report the remainder under Other notes with the reason.
 
 ### Example D — Circular proof caught by Q4
 
@@ -459,9 +459,9 @@ Watch the boundary: only duplication **this diff wrote** counts. If two old file
 await deleteAllUserContent(userId)
 ```
 
-Report under `Serious Logic Risks (Discuss with User)` only when both hold: the effect is irreversible and severe, **and** it contradicts an explicit design clause (e.g., the design requires soft delete with a 7-day retention window).
+A demonstrated violation of a required safety or design contract is a Blocker, irrespective of whether the effect is reversible (e.g., the design requires soft delete but code deletes permanently).
 
-If the design calls for a hard delete, this is conformance, not risk. When the reviewer believes the design is wrong, that is one `Design Feedback` item — "hard delete is irreversible; consider soft delete with retention" — so the user changes the design first instead of blocking this delivery.
+If the design calls for a hard delete, this is conformance, not risk. When the reviewer believes the design is wrong, that is one design concern in Other notes item — "hard delete is irreversible; consider soft delete with retention" — so the user changes the design first instead of blocking this delivery.
 
 ## 11. Delivery-baseline scope & adversarial DESIGN/Proposal verification
 
@@ -482,6 +482,7 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 |---|---|
 | Every authorized item delivered | Map each `Authorized scope` / Issue item / Plan task bullet to diff hunks; an unmapped item is a Q1 missing-deliverable finding |
 | Nothing beyond the approved scope | `git diff --name-status <base>...HEAD` vs the declared file/behavior scope; undeclared file changes or behavior shifts are findings |
+| Design fidelity | Trace each material changed contract and unchanged governing architectural constraint through actual code, callers and tests; cite the approved target/authority and concrete divergence. Internal choices preserving these contracts are not findings. |
 | Explicit exclusions respected | The proposal's exclusion list (e.g., "excludes layout changes") crossed by any hunk → Q1 scope violation |
 
 ### Adversarial checklist — code → DESIGN (Chain 2)
@@ -489,8 +490,9 @@ The early-miss shape to hunt specifically: `git log --oneline <delivery_base>..H
 | Check | Method |
 |---|---|
 | Owning DESIGN updated for every contract change | For each changed export/default/failure boundary, `rg '<symbol or behavior>' docs/` then confirm the owning `DESIGN-<module>.md` diff contains the updated statement |
+| Glossary fidelity and sync | For new or changed domain meanings, compare approved target and verified behavior with affected glossary definitions and consumers; missing required sync or contradictory active definitions → BLOCKER. Use the glossary guide; no mandatory glossary for simple projects. |
 | DESIGN statements match real behavior | Read the updated DESIGN text against the code hunk; invented behavior or planned-but-unbuilt features → BLOCKER (fact distortion) |
-| `DESIGN Sync` block claims verified | Re-run or spot-check the claimed gate (`verify-docset.py --check-sync --base`); a claimed PASS that does not reproduce is a faked gate result → BLOCKER |
+| `DESIGN Sync` block claims verified | Re-run or spot-check the claimed gate (`verify-docset.py --check-sync --base`); compare baseline, environment and inputs; a reproduced mandatory gate failure blocks delivery, an inconclusive result is disclosed, and fabrication requires evidence |
 | `--pure-refactor` reason honest | Diff the claimed-refactor files for any externally visible change (export surface, defaults, error contract); a visible change hidden behind the flag → BLOCKER |
 | Parallel write-set respected | Confirm the diff touches only authorized `DESIGN-<module>.md` files; any shared main `DESIGN.md` edit from a module worker → BLOCKER (violation of the stated write-set rule) |
 
@@ -514,7 +516,7 @@ Use the actual `space-master` and `dev-doc-master` quality standards. Inspect af
 |---|---|
 | Public behavior changed in an early commit, owning DESIGN never updated in the delivery window | BLOCKER (fact distortion, caught by the full-baseline diff) |
 | Genuine pure internal refactor with `--pure-refactor` reason, no visible contract change | no finding — verify the reason is honest and move on |
-| `--pure-refactor` claimed but the diff changes an export, default, or error contract | BLOCKER (faked gate result) |
+| `--pure-refactor` claimed but the diff changes an export, default, or error contract | BLOCKER (invalid pure-refactor claim) |
 | Parallel worker edited the shared main `DESIGN.md` | BLOCKER (write-set violation) |
 | New proposal migrated into `implemented/` while scope is partially delivered | BLOCKER (impersonated full delivery) |
 | Bidirectional cross-link missing at full-scope partial supersession | WARNING (Proposal maintenance gap; independent DESIGN/rule quality violation is BLOCKER) |

@@ -29,16 +29,13 @@ A project present-state DESIGN is neither a speculative blueprint nor a transcri
    - **Never copy-paste volatile code inventories**: Never transcribe full source directory trees, exhaustive CLI option tables, full API field schemas, or per-function lists. Summarize contract bounds and link to the defining source file.
    - **Record `Source Carrier` paths in main `## Module Architecture`**: List project- or repo-relative path prefixes (such as `src/auth/`) against each module's sub-DESIGN so `--check-sync` can map code changes automatically to the owning document.
 
-## Anti-Conflict Structure for Parallel Agent Execution
+## Shared contract coverage for target and present-state design
 
-Four hard rules eliminate multi-agent merge hotspots structurally:
+The five-point checklist above is a semantic coverage test, not a mandatory section outline. Apply it to each material behavior contract according to the document's role: in a Proposal, define the intended new or changed behavior, reference unchanged governing constraints, and connect material outcomes to acceptance; in present-state DESIGN, describe verified delivered behavior. An inapplicable aspect need not create a section. A glossary defines concepts, not their runtime contracts. For target-design discussion, domain-specific coverage, and verification design, use `dev-proposal`.
 
-| Rule | Practice | Why It Works |
-|---|---|---|
-| **1. Keep main `DESIGN.md` thin** | Retain only project role, capability summary, cross-module flows, global state ownership, and the `## Module Architecture` map linking sub-DESIGNs | A thin, stable map rarely needs edits during feature or bug work |
-| **2. Split multi-module projects by default** | Whenever distinct modules or domains exist, split out `DESIGN-<module>.md` **up front** (do not wait for 500 lines); keep small tightly coupled single-module projects in one `DESIGN.md` | Isolates parallel work into separate physical files; keep tightly coupled contracts together rather than slicing mechanically |
-| **3. Omit `Sub-DESIGNs` from project main headers** | Project main `DESIGN.md` headers **omit** a `Sub-DESIGNs` list; sub-DESIGNs keep `> **Parent**: ./DESIGN.md` pointing back, and the body module map links down | Eliminates centralized header-index collisions when parallel tasks add or edit module docs |
-| **4. Respect write sets & leave main `DESIGN.md` untouched** | Single-module changes and bug fixes touch only `DESIGN-<module>.md`; parallel workers never cross write-set bounds into main `DESIGN.md` or another module's doc — report out-of-scope drift in `DESIGN Sync` for the coordinator | Centralizes shared-map reconciliation in the coordinator instead of creating race conflicts |
+## Parallel document synchronization
+
+Follow `consistency.md` for splitting, single ownership and write-set discipline. Report out-of-scope drift in `DESIGN Sync` so the coordinator reconciles shared main documents and glossaries.
 
 ## Fact-Check Procedure and Honesty Discipline
 
@@ -54,9 +51,10 @@ Never author or update present-state claims from memory or unverified assumption
 
 1. While a Proposal is in `proposals/proposed/<class>/yyyy-mm-dd-<slug>.md`, **never pre-write unbuilt design specs into present-state DESIGN and never link to `proposals/proposed/` or `proposals/rejected/` from DESIGN prose or `## Reference Documents`** (transient proposal paths move on delivery or rejection, and the `proposals/proposed/` directory itself is the index; back-linking turns main `DESIGN.md` into a contention hotspot and breeds broken links).
 2. Upon implementation and verification, update all parts in the **same delivery**:
+   - Synchronize affected glossary definitions from verified delivered behavior, using `references/glossary.md`; the coordinator handles shared glossary/header updates.
    - Update affected `DESIGN-<module>.md` (or single-module `DESIGN.md`) from real code, tests, and live outputs;
    - Only if module ownership, module existence, or cross-module boundaries changed, have the coordinator update thin main `DESIGN.md` and `## Key Decisions`;
-   - When the entire approved Proposal scope finishes, move the Proposal from `proposed/<class>/` to `implemented/<class>/` in the same change and convert it to present-tense `Decision`/`Consequences`.
+   - When the entire approved Proposal scope is delivered and user-accepted, move the Proposal from `proposed/<class>/` to `implemented/<class>/` in the same change and convert it to present-tense `Decision`/`Consequences`.
 
 ### Scenario B: Routine Bug Fixes, Minor Adjustments, and Internal Refactoring (No Proposal)
 
@@ -129,7 +127,7 @@ Documentation standards only work when backed by mechanical gates and adversaria
    - Reads the `Source Carrier` prefixes from main `DESIGN.md` → `## Module Architecture` and maps changed non-test code paths (`--base <git-ref>` or current working tree) to their owning `DESIGN-<module>.md` (or single-module `DESIGN.md`).
    - Fails mechanically if module code changed without updating the owning DESIGN in the same delivery — catching "should have written/updated but didn't" before handoff unless `--pure-refactor "<reason>"` is explicitly declared for reviewer audit.
 2. **Stage 2 — Deterministic Structural & Boundary Gate (`verify-docset.py`)**:
-   - Enforces Checks 1–11 on disk: `Parent` lineage on every sub-doc, **zero orphan sub-DESIGNs** (every `DESIGN-*.md` must be linked from main body outside `Reference Documents`), **zero unreplaced template placeholders or empty table rows**, **non-empty `##` sections**, **mandatory `## Business Rules and Failure Boundaries`** on Project main and Active Module DESIGNs, relative link validity, zero absolute paths, zero process-state narration, fixed English header fields, and valid `Status`.
+   - Run the structural gate in `consistency.md`; use the actual result and correct failures before handoff.
 3. **Stage 3 — Structured Handoff Gate (`DESIGN Sync` in `df-implement` / `dev-flow`)**:
    - Implementation handoff reports require a non-empty `DESIGN Sync` field attaching either (a) the `verify-docset.py --check-sync` output, updated `DESIGN-<module>.md` sections, and live verification evidence, or (b) an explicit `--pure-refactor` justification and any out-of-scope drift escalated to the coordinator. Coordinators reject handoffs lacking this block.
 4. **Stage 4 — Adversarial Read-Only Review (`df-implement-review`)**:
