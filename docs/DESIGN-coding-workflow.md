@@ -275,7 +275,7 @@ python3 skills/dev-proposal/scripts/verify-proposals.py <proposals-root> [--json
 | `skills/dev-doc-master/references/design-project-guide.md` | 现状 DESIGN 写作与审查指南 |
 | `skills/dev-proposal/SKILL.md` | Proposal 生命周期入口 |
 | `skills/dev-proposal/references/lifecycle.md` | 字段、迁移清单与校验器边界的完整细则 |
-| `skills/dev-proposal/references/evolution-triage.md` | 再变更分流的判断细则 |
+| `skills/dev-proposal/references/supersession.md` | 再变更分流的判断细则 |
 | `skills/df-proposal-review/SKILL.md` | 三种评审模式与问题清单 |
 | `skills/df-proposal-review/references/review-rubric.md` | 分模式流程、严重度校准与实例 |
 | `skills/df-implement/SKILL.md` | 实施契约入口：授权来源、隔离工作树、交付门禁与 `DESIGN Sync` 报告 |

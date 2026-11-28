@@ -1,8 +1,8 @@
-# Design practices by domain
+# Proposal practices by domain
 
-Select relevant domains for the actual change; combine them when needed. This table gives the minimum considerations for analysis and target specification, not a mandatory outline. Omit inapplicable aspects. Project-specific standards and higher-level design take precedence; general requirements are in design-specification.md.
+Select relevant domains for the actual change; combine them when needed. This table gives the minimum considerations for analysis and target specification, not a mandatory outline. Omit inapplicable aspects. Project-specific standards and higher-level design take precedence; general requirements are in specification.md.
 
-| Design object | At least consider and specify applicable aspects |
+| Proposal domain | At least consider and specify applicable aspects |
 |---|---|
 | Product feature | Users, goals, end-to-end scenarios, feature boundaries, business rules, defaults, failure feedback, and observable outcomes |
 | UI / UX | Information architecture, page or component ownership, interaction and navigation, loading/empty/error/success states, accessibility, responsiveness, and existing design system where applicable |

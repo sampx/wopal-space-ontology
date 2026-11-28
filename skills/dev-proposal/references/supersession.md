@@ -1,6 +1,6 @@
-# Evolving an Implemented Proposal
+# Maintaining and superseding implemented Proposals
 
-This file answers one question: **a decision already shipped now has to change — what makes the change correct?**
+Use this guide when an implemented Proposal needs factual maintenance or its decision is partly or wholly superseded.
 
 ## 1. Separate "changing facts" from "changing the decision"
 

@@ -71,7 +71,7 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 `<skill-dir>` 解析方式同上；`<proposals-root>` 是该业务实际的 proposals 根目录（如产品级 `docs/products/<product>/proposals/` 或项目级 `projects/<project>/docs/proposals/`），不要想当然指向别处。迁移、删除或重命名 Proposal 导致外部文档可能断链时，按实际引用范围给 `--link-scope` 传入相关 docs 目录（可重复传入）。
 
-**Proposal 同步** — 按 `dev-proposal/references/lifecycle.md` 和 `references/evolution-triage.md`（相对于 dev-proposal）完成授权调整、事实同步或迁移；全部交付并经用户验收前不迁移。主控协调共享文件。
+**Proposal 同步** — 按 `dev-proposal/references/lifecycle.md` 和 `references/supersession.md`（相对于 dev-proposal）完成授权调整、事实同步或迁移；全部交付并经用户验收前不迁移。主控协调共享文件。
 
 **规约门禁** — 对受影响的各级规约执行 `space-master` 规定的适用质量检查和校验，报告真实结果。测试遵循常驻的 `rules/testing.md`。
 

@@ -1,6 +1,6 @@
-# Design analysis and discussion
+# Proposal analysis and discussion
 
-A request to write a Proposal does not mean the design is ready. Resolve important design questions before writing the formal Proposal. When the design is already clear, verify it without repeating questions.
+A request to write a Proposal does not mean the target solution is ready. Resolve important design questions before writing the formal Proposal. When the design is already clear, verify it without repeating questions.
 
 ## Investigate the design basis
 
@@ -18,7 +18,7 @@ Domain modeling actively clarifies concepts and rules rather than merely reading
 - Stress-test relationships, responsibilities, cardinality, state, and lifecycle with concrete scenarios. For example, who determines the valid invoice amount after partial order cancellation? Probe counterexamples until definitions distinguish actual cases rather than merely sounding plausible.
 - Check claims about current behavior against code and tests. Surface contradictions explicitly: if code supports only whole-order cancellation but the user describes partial cancellation, distinguish current facts from the intended change.
 
-Capture terms and important decisions as soon as they are settled, rather than waiting for the final synthesis. New definitions and future changes enter the Proposal's target design; maintain present-state DESIGN and any existing glossary under delivery rules. A simple change only needs its relevant concepts clarified, not a separate model file.
+Capture terms and important decisions as soon as they are settled, rather than waiting for the final synthesis. New definitions and future changes belong in the Proposal specification; maintain present-state DESIGN and any existing glossary under delivery rules. A simple change only needs its relevant concepts clarified, not a separate model file.
 
 ## Discuss in dependency-ordered rounds
 

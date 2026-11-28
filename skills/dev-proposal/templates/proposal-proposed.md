@@ -5,7 +5,7 @@ Status: proposed
 - **Class**: <feature | bug-fix | simplification | architecture | process | testing>
 - **Created**: <YYYY-MM-DD>
 
-<!-- Resolve material design decisions before writing the formal specification per design-specification.md. Use the user's preferred language and determinate target-state prose. Progress belongs to Plans and Issues. -->
+<!-- Resolve material design decisions before writing the formal specification per specification.md. Use the user's preferred language and determinate target-state prose. Progress belongs to Plans and Issues. -->
 
 ## Problem
 
@@ -17,7 +17,7 @@ Status: proposed
 
 ## Proposal
 
-<!-- Determinate target design. Organize bespoke sections by domain per design-practices.md; define applicable behavior, responsibilities, interfaces, rules, state, and failure outcomes. Put risk controls in the design. -->
+<!-- Determinate target design. Organize bespoke sections by domain per practices.md; define applicable behavior, responsibilities, interfaces, rules, state, and failure outcomes. Put risk controls in the design. -->
 
 ## Design Decisions
 

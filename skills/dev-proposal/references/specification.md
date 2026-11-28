@@ -1,8 +1,8 @@
-# Target design specification
+# Proposal specification
 
 A Proposal is the target authority for the approved change, not a research report or implementation task list. Determine the design, leave implementation free: independent implementers should derive materially equivalent designs from the Proposal and its referenced constraints without choosing unauthorized product or architectural alternatives.
 
-## Design basis and target
+## Design basis and target solution
 
 In Design Basis, reference applicable authoritative documents and relevant sections, summarize inherited constraints and explicitly identify changed existing decisions if any; do not copy their text. If no higher-level design exists, state that fact and the current constraints relied upon. A new target differing from current behavior is expected; design outside the approved change remains binding. Applicable engineering rules remain in force after approval.
 
@@ -12,11 +12,11 @@ Organize the Proposal around actual domain concepts with bespoke sections rather
 
 ## Contract coverage
 
-Load the five-point coverage standard in `dev-doc-master/references/design-project-guide.md` and apply it to each material target capability and flow without claiming delivery. Use `design-practices.md` for applicable domain-specific details, not mandatory headings. Follow existing DESIGN and glossary vocabulary; define changed terms in the target.
+Load the five-point coverage standard in `dev-doc-master/references/design-project-guide.md` and apply it to each material target capability and flow without claiming delivery. Use `practices.md` for applicable domain-specific details, not mandatory headings. Follow existing DESIGN and glossary vocabulary; define changed terms in the target.
 
 ## Important design decisions and risks
 
-Design Decisions is optional. Record separate rationale only when all three conditions hold: changing the choice has meaningful cost; a future reader would find it puzzling without context; real alternatives were weighed. State context, final choice, and reason in one to three sentences. Include discarded options only when they explain the choice or prevent a tempting mistake, and consequences only when material and non-obvious. The choice itself belongs in the target design; omitting an ADR-style record never omits a material contract.
+Design Decisions is optional. Record separate rationale only when all three conditions hold: changing the choice has meaningful cost; a future reader would find it puzzling without context; real alternatives were weighed. State context, final choice, and reason in one to three sentences. Include discarded options only when they explain the choice or prevent a tempting mistake, and consequences only when material and non-obvious. The choice itself belongs in the Proposal's target solution; omitting an ADR-style record never omits a material contract.
 
 Resolve risks during discussion: fix avoidable risks in the design; make mitigations concrete design contracts covered by acceptance; verify critical feasibility; explicitly document material residual risks, costs, and controls in the design or decision rationale for user acceptance. Omit resolved analysis that no longer informs future judgment. No separate risk section is required.
 

@@ -75,7 +75,7 @@ python3 <skill-dir>/dev-proposal/scripts/verify-proposals.py <proposals-root> [-
 
 `<skill-dir>` resolves the same way; `<proposals-root>` is the business's actual proposals root (product-level `docs/products/<product>/proposals/` or project-level `projects/<project>/docs/proposals/`), not wherever happens to be convenient. When a Proposal move, deletion, or rename can break links from external docs, pass each affected docs directory to `--link-scope` (repeatable), sized to the real reference scope.
 
-**Proposal sync** — Apply `dev-proposal`'s `references/lifecycle.md` and `references/evolution-triage.md` to authorized adjustments, fact synchronization or migration. Migrate only after full delivery and user acceptance. The controller coordinates shared files.
+**Proposal sync** — Apply `dev-proposal`'s `references/lifecycle.md` and `references/supersession.md` to authorized adjustments, fact synchronization or migration. Migrate only after full delivery and user acceptance. The controller coordinates shared files.
 
 **Rules gate** — apply the applicable `space-master` quality checks and verifiers to affected rules at all tiers and report actual results. Testing follows the resident `rules/testing.md`.
 

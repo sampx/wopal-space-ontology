@@ -40,7 +40,7 @@ description: >
 | P4 验收与风险解决 | 每项重要契约及受影响不变量都有可证伪、边界充分的验收；缓解措施落实为契约，剩余风险明确处理 |
 | P5 简洁性 | 不为没有需求的功能、抽象、配置、依赖或流程增加成本；有证据才建议精简 |
 
-加载 `dev-proposal` 及其 `references/design-specification.md`、相关 `references/design-practices.md`，使用 `dev-doc-master` 适用的契约与术语规范。按评审细则第 6 节取证，独立追溯权威设计，不只相信 Design Basis 清单。有已确认的讨论记录时核对决定。所有非归档 Proposal 均按当前骨架校验。不为凑模板要求 Design Decisions、Alternatives considered 或 Risks 独立章节。
+加载 `dev-proposal` 及其 `references/specification.md`、相关 `references/practices.md`，使用 `dev-doc-master` 适用的契约与术语规范。按评审细则第 6 节取证，独立追溯权威设计，不只相信 Design Basis 清单。有已确认的讨论记录时核对决定。所有非归档 Proposal 均按当前骨架校验。不为凑模板要求 Design Decisions、Alternatives considered 或 Risks 独立章节。
 
 未批准草稿可以诚实列出待决问题；实质设计未决仍不能给出可实施的 PASS。已批准提案的授权以真实用户决定为准，不以格式代替授权。在验收前，用户明确授权的新决定（含扩大范围或方向调整）应融入原提案，不要求重复审批。未明确授权的实质变更仍需用户决定；无法核实授权时说明限制，不假定违规。历史 `implemented/` 决策和冻结归档遵循 `dev-proposal` 的保护规则。
 

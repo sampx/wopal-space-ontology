@@ -5,7 +5,7 @@ Status: proposed
 - **Class**: <feature | bug-fix | simplification | architecture | process | testing>
 - **Created**: <YYYY-MM-DD>
 
-<!-- 先完成重要设计讨论，再按 design-specification.md 整理正式规格。使用用户偏好语言和明确的目标态；执行进度归 Plan 与 Issue。 -->
+<!-- 先完成重要设计讨论，再按 specification.md 整理正式规格。使用用户偏好语言和明确的目标态；执行进度归 Plan 与 Issue。 -->
 
 ## Problem
 
@@ -17,7 +17,7 @@ Status: proposed
 
 ## Proposal
 
-<!-- 确定的目标设计。按实际领域组织专属章节，参考 design-practices.md；写清行为、职责、接口、规则、状态及失败结果等适用契约。风险控制直接写入设计。 -->
+<!-- 确定的目标设计。按实际领域组织专属章节，参考 practices.md；写清行为、职责、接口、规则、状态及失败结果等适用契约。风险控制直接写入设计。 -->
 
 ## Design Decisions
 
